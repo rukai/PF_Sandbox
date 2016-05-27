@@ -48,7 +48,6 @@ impl Fighter {
         };
         let mut action_defs: Vec<ActionDef> = Vec::new();
         for i in 0..(Action::TechB as usize) { // TODO: Super gross but what is a man to do?
-            println!("{}", i);
             action_defs.push(action_def.clone());
         }
         
@@ -140,12 +139,16 @@ pub struct Point {
 enum_from_primitive! {
 #[derive(Clone, RustcEncodable, RustcDecodable, PartialEq, Debug)]
 pub enum Action {
+    // idle
     Spawn,
     SpawnIdle,
+    Idle,
+    //Crouch,
+
+    // movement
     Fall,
     AerialFall,
     Land,
-    Idle,
     JumpSquat,
     JumpF,
     JumpB,
@@ -155,6 +158,8 @@ pub enum Action {
     Dash,
     Run,
     RunEnd,
+
+    // defense
     ShieldOn,
     Shield,
     ShieldOff,
@@ -166,6 +171,28 @@ pub enum Action {
     TechF,
     TechS,
     TechB,
+
+//    // attacks
+//    Jab,
+//    Jab2,
+//    Jab3,
+//    Utilt,
+//    Dtilt,
+//    Ftilt,
+//    DashAttack,
+//    Usmash,
+//    Dsmash,
+//    Fsmash,
+//
+//    // aerials
+//    Uair,
+//    Dair,
+//    Fair,
+//    Nair,
+//    FairLand,
+//    DairLand,
+//    UairLand,
+//    DairLand,
 }
 }
 

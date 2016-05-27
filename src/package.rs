@@ -2,11 +2,11 @@ use std::fs::{File, DirBuilder, self};
 use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use rustc_serialize::{Encodable, Decodable};
 use rustc_serialize::json::{self, Encoder, DecodeResult};
 
 use ::fighter::Fighter;
-use ::game::Game;
 use ::rules::Rules;
 use ::stage::Stage;
 
@@ -14,9 +14,10 @@ pub struct Package {
     pub path:               PathBuf,
     pub meta:               PackageMeta,
     pub rules:              Rules,
-    pub stages:             Vec<Stage>,
+
+    pub stages:             Arc<Mutex<Vec<Stage>>>,
+    pub fighters:           Arc<Mutex<Vec<Fighter>>>,
     pub stages_filenames:   Vec<String>,
-    pub fighters:           Vec<Fighter>,
     pub fighters_filenames: Vec<String>,
 }
 
@@ -37,10 +38,10 @@ impl Package {
             meta:               meta,
             path:               path,
             rules:              Rules::base(),
-            stages:             Vec::new(),
-            stages_filenames:   Vec::new(),
-            fighters:           Vec::new(),
+            stages:             Arc::new(Mutex::new(Vec::new())),
+            fighters:           Arc::new(Mutex::new(Vec::new())),
             fighters_filenames: Vec::new(),
+            stages_filenames:   Vec::new(),
         };
         package.load();
         package
@@ -61,9 +62,9 @@ impl Package {
         let package = Package {
             meta:               meta,
             rules:              Rules::base(),
-            stages:             vec!(Stage::base()),
+            stages:             Arc::new(Mutex::new(vec!(Stage::base()))),
             stages_filenames:   vec!(path.join("Stages").join("base_stage.json").to_str().unwrap().to_string()),
-            fighters:           vec!(Fighter::base()),
+            fighters:           Arc::new(Mutex::new(vec!(Fighter::base()))),
             fighters_filenames: vec!(path.join("Fighters").join("base_fighter.json").to_str().unwrap().to_string()),
             path:               path,
         };
@@ -80,12 +81,18 @@ impl Package {
         Package::save_struct(self.path.join("rules.json"), &self.rules);
         Package::save_struct(self.path.join("package_meta.json"), &self.meta);
 
-        for (i, filename) in self.fighters_filenames.iter().enumerate() {
-            Package::save_struct(PathBuf::from(filename), &self.fighters[i]);
+        {
+            let mut fighters = self.fighters.lock().unwrap();
+            for (i, filename) in self.fighters_filenames.iter().enumerate() {
+                Package::save_struct(PathBuf::from(filename), &fighters[i]);
+            }
         }
-
-        for (i, filename) in self.stages_filenames.iter().enumerate() {
-            Package::save_struct(PathBuf::from(filename), &self.stages[i]);
+        
+        {
+            let mut stages = self.stages.lock().unwrap();
+            for (i, filename) in self.stages_filenames.iter().enumerate() {
+                Package::save_struct(PathBuf::from(filename), &stages[i]);
+            }
         }
     }
 
@@ -96,15 +103,20 @@ impl Package {
         for path in fs::read_dir(self.path.join("Fighters")).unwrap() {
             // TODO: Use magic rust powers to filter out non .json files and form a vec of fighter_filenames
             // http://stackoverflow.com/questions/31225745/iterate-over-stdfsreaddir-and-get-only-filenames-from-paths
+
             let full_path = path.unwrap().path();
             self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
-            self.fighters.push(Package::load_struct(full_path).unwrap());
+
+            let mut fighters = self.fighters.lock().unwrap();
+            fighters.push(Package::load_struct(full_path).unwrap());
         }
 
         for path in fs::read_dir(self.path.join("Stages")).unwrap() {
             let full_path = path.unwrap().path();
             self.stages_filenames.push(full_path.to_str().unwrap().to_string());
-            self.stages.push(Package::load_struct(full_path).unwrap());
+
+            let mut stages = self.stages.lock().unwrap();
+            stages.push(Package::load_struct(full_path).unwrap());
         }
     }
     
@@ -122,11 +134,6 @@ impl Package {
         json::decode(&json)
     }
 
-    pub fn new_game(&self) -> Game {
-        self.save();
-        Game::new(self.rules.clone(), self.fighters.clone(), self.stages.clone())
-    }
-
     pub fn verify(&self) -> bool {
         true //It's fine, I triple checked
     }
@@ -138,6 +145,6 @@ pub struct PackageMeta {
     pub title:     String, // User readable title
     pub source:    String, // check "https://"+source+str(release+1)+".zip" for the next update
     pub signature: String, // package validity + title + version will be boldly declared on the CSS screen
-    pub read_only: bool, // read only packages must be copied before being modified
+    pub read_only: bool,   // read only packages must be copied before being modified
     // TODO: will need to store public keys somewhere too
 }

@@ -2,17 +2,30 @@ extern crate pf_engine;
 extern crate getopts;
 
 use pf_engine::package::Package;
-use std::env;
+use pf_engine::menu::{Menu, MenuChoice};
+use pf_engine::game::Game;
+use pf_engine::graphics::Graphics;
+
 use getopts::Options;
-use std::path::Path;
+use std::env;
 use std::fs;
+use std::path::Path;
+use std::thread;
 
 fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options] package_name", program);
+    let brief = format!("Usage: {} [options] [package_name]\nIf no arguments are given the GUI menu is used instead.", program);
     print!("{}", opts.usage(&brief));
 }
 
 fn main() {
+    if env::args().len() == 1 {
+        gui();
+    } else {
+        cli();
+    }
+}
+
+fn cli() {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
 
@@ -44,6 +57,27 @@ fn main() {
         Err(_) => Package::generate_base(&package_name),
     };
 
-    let mut game = package.new_game();
+    let mut game = Game::new(&package, vec!("base_fighter".to_string()), "base_stage".to_string());
+    init_graphics(&game, &package);
     game.run();
+}
+
+fn init_graphics(game: &Game, package: &Package) {
+    let players = game.players.clone();
+    let fighters = package.fighters.clone();
+    let stages = package.stages.clone();
+    thread::spawn(move || {
+        let mut graphics = Graphics::new(players, fighters, stages);
+        graphics.run();
+    });
+}
+
+fn gui() {
+    loop {
+        let menu_choice = Menu::new().run();
+        let package = Package::open(&menu_choice.package_name); //package should already exist as the menu has generated it.
+        let mut game = Game::new(&package, menu_choice.fighter_names, menu_choice.stage_name);
+        init_graphics(&game, &package);
+        game.run();
+    }
 }

@@ -52,12 +52,12 @@ impl Player {
 
         println!("\nFighter: {}", self.fighter.name);
         println!("action_count: {}", self.action_count);
-        println!("action: {:?}", Action::from_u64(self.action));
+        println!("action: {:?}", Action::from_u64(self.action).unwrap());
 
         self.action_count += 1;
     }
 
-    pub fn action_expired(&mut self) {
+    fn action_expired(&mut self) {
         match Action::from_u64(self.action) {
             Some(Action::Spawn)       => { self.set_action(Action::SpawnIdle);   },
             Some(Action::SpawnIdle)   => { self.set_action(Action::Fall);        },

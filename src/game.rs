@@ -1,58 +1,67 @@
-use ::player::Player;
-use ::fighter::Fighter;
-use ::stage::Stage;
-use ::graphics::Graphics;
-use ::rules::Rules;
 use ::controller::Control;
+use ::fighter::Fighter;
+use ::package::Package;
+use ::player::Player;
+use ::rules::Rules;
+use ::stage::Stage;
+
+use std::sync::{Arc, Mutex};
 
 enum GameState {
-    CharacterSelect,
-    StageSelect,
-    InGame,
-    Results,
+    Running,
     Paused,
-    Quit,
+    Results,
 }
 
+#[allow(dead_code)]
 pub struct Game {
     // package data
     rules:    Rules,
-    fighters: Vec<Fighter>,
-    stages:   Vec<Stage>,
+    fighters: Arc<Mutex<Vec<Fighter>>>,
+    stages:   Arc<Mutex<Vec<Stage>>>,
 
     // variables
     current_stage: u64,
     state:         GameState,
-    players:       Vec<Player>,
-    graphics:      Graphics,
+    pub players:   Arc<Mutex<Vec<Player>>>,
     timer:         u64,
 }
 
 impl Game {
-    pub fn new(rules: Rules, fighters: Vec<Fighter>, stages: Vec<Stage>) -> Game {
+    pub fn new(package: &Package, selected_fighters: Vec<String>, stage: String) -> Game {
+        let mut players: Vec<Player> = Vec::new();
+        for fighter in selected_fighters {
+            players.push(Player::new()); // TODO: set or otherwise handle a player knowing who its fighter is
+        }
+
         Game {
-            state:    GameState::CharacterSelect,
-            rules:    rules,
-            fighters: fighters,
-            stages:   stages,
+            state:    GameState::Running,
+            rules:    package.rules.clone(),
+            fighters: package.fighters.clone(),
+            stages:   package.stages.clone(),
 
             current_stage: 0,
-            players:       Game::setup_players(),
+            players:       Arc::new(Mutex::new(players)),
             timer:         0,
-            graphics:      Graphics::new(),
         }
     }
 
-    pub fn setup_players() -> Vec<Player> {
-        let mut players: Vec<Player> = Vec::new();
-        players.push(Player::new());
-        players.push(Player::new());
-        players
+    pub fn run(&mut self) {
+        loop {
+            match self.state {
+                GameState::Running => { self.step_game();    },
+                GameState::Results => { self.step_results(); },
+                GameState::Paused  => { self.step_pause();   },
+            }
+            
+            //TODO: when finished results screen, return, without aborting
+        }
     }
 
-    pub fn step_game(&mut self) {
+    fn step_game(&mut self) {
         let control: Control = Default::default();
-        for player in &mut self.players {
+        let mut players = self.players.lock().unwrap();
+        for player in &mut *players {
             if control.start {
                 self.state = GameState::Paused; //TODO: on press
             }
@@ -64,50 +73,11 @@ impl Game {
         }
     }
 
-    pub fn step_pause(&mut self) {
-        self.state = GameState::InGame;
+    fn step_pause(&mut self) {
+        self.state = GameState::Running;
         //TODO: Handle character/stage edits here
     }
 
-    pub fn step_select(&mut self) {
-        //TODO: control cursor etc.
-        match self.state {
-            GameState::CharacterSelect => {
-                if self.fighters.len() > 0 {
-                    self.players[0].fighter = self.fighters[0].clone();
-                    self.players[1].fighter = self.fighters[0].clone();
-                }
-                self.state = GameState::StageSelect;
-            },
-            GameState::StageSelect => {
-                self.current_stage = 0;
-                self.state = GameState::InGame;
-            }
-            _ => ()
-        }
-    }
-
-    pub fn step_results(&mut self) {
-    }
-
-    pub fn run(&mut self) {
-        loop {
-            if self.graphics.check_close() {
-                self.state = GameState::Quit
-            }
-
-            match self.state {
-                GameState::CharacterSelect => { self.step_select();  },
-                GameState::StageSelect     => { self.step_select();  },
-                GameState::InGame          => { self.step_game();    },
-                GameState::Results         => { self.step_results(); },
-                GameState::Paused          => { self.step_pause();   },
-                GameState::Quit            =>   return,
-            }
-            
-            if self.stages.len() > 0 {
-                self.graphics.render(&self.stages[self.current_stage as usize], &self.players);
-            }
-        }
+    fn step_results(&mut self) {
     }
 }
