@@ -9,8 +9,8 @@ enum MenuState {
     BrowsePackages,
     CreatePackage,
 
-    BrowsePlayers,
-    CreatePlayer,
+    BrowseFighter,
+    CreateFighter,
 }
 
 #[allow(dead_code)]
@@ -21,7 +21,7 @@ pub struct Menu {
 impl Menu {
     pub fn new() -> Menu {
         Menu {
-            state:    MenuState::CharacterSelect,
+            state: MenuState::CharacterSelect,
         }
     }
 
@@ -40,14 +40,14 @@ impl Menu {
                 MenuState::BrowsePackages  => { self.step_select(); },
                 MenuState::CreatePackage   => { self.step_select(); },
 
-                MenuState::BrowsePlayers   => { self.step_select(); },
-                MenuState::CreatePlayer    => { self.step_select(); },
+                MenuState::BrowseFighter   => { self.step_select(); },
+                MenuState::CreateFighter   => { self.step_select(); },
             }
 
             return MenuChoice {
                 package_name: "base_package".to_string(),
-                fighter_names: vec!("base_fighter".to_string()),
-                stage_name: "base_stage".to_string(),
+                selected_fighters: vec!(0),
+                selected_stage: 0,
             }
         }
     }
@@ -55,6 +55,6 @@ impl Menu {
 
 pub struct MenuChoice {
     pub package_name: String,
-    pub fighter_names: Vec<String>,
-    pub stage_name: String,
+    pub selected_fighters: Vec<usize>,
+    pub selected_stage: usize,
 }

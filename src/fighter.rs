@@ -47,7 +47,7 @@ impl Fighter {
             iasa:   0,
         };
         let mut action_defs: Vec<ActionDef> = Vec::new();
-        for i in 0..(Action::TechB as usize) { // TODO: Super gross but what is a man to do?
+        for _ in 0..(Action::TechB as usize) { // TODO: Super gross but what is a man to do?
             action_defs.push(action_def.clone());
         }
         

@@ -5,7 +5,6 @@ use num::FromPrimitive;
 
 #[derive(Clone)]
 pub struct Player {
-    pub fighter:    Fighter,
     action:         u64,
     action_count:   u64,
     pub stocks:     u64,
@@ -20,7 +19,6 @@ pub struct Player {
 impl Player {
     pub fn new() -> Player {
         Player {
-            fighter: Fighter::base(),
             action: Action::Spawn as u64,
             action_count: 0,
             stocks: 0,
@@ -33,8 +31,8 @@ impl Player {
         }
     }
 
-    pub fn step(&mut self, controls: &Control) {
-        let action_frames = self.fighter.action_defs[self.action as usize].frames.len() as u64;
+    pub fn step(&mut self, controls: &Control, fighter: &Fighter) {
+        let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64;
         if self.action_count == action_frames - 1 {
             self.action_expired();
         }
@@ -50,7 +48,7 @@ impl Player {
             _ => { },
         }
 
-        println!("\nFighter: {}", self.fighter.name);
+        println!("\nFighter: {}", fighter.name);
         println!("action_count: {}", self.action_count);
         println!("action: {:?}", Action::from_u64(self.action).unwrap());
 

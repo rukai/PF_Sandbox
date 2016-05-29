@@ -21,17 +21,20 @@ pub struct Game {
     stages:   Arc<Mutex<Vec<Stage>>>,
 
     // variables
-    current_stage: u64,
-    state:         GameState,
-    pub players:   Arc<Mutex<Vec<Player>>>,
-    timer:         u64,
+    pub players:       Arc<Mutex<Vec<Player>>>,
+    selected_fighters: Vec<usize>,
+    selected_stage:    usize,
+    current_stage:     u64,
+    state:             GameState,
+    timer:             u64,
 }
 
 impl Game {
-    pub fn new(package: &Package, selected_fighters: Vec<String>, stage: String) -> Game {
+    pub fn new(package: &Package, selected_fighters: Vec<usize>, selected_stage: usize) -> Game {
         let mut players: Vec<Player> = Vec::new();
-        for fighter in selected_fighters {
-            players.push(Player::new()); // TODO: set or otherwise handle a player knowing who its fighter is
+
+        for _ in &selected_fighters {
+            players.push(Player::new());
         }
 
         Game {
@@ -40,9 +43,11 @@ impl Game {
             fighters: package.fighters.clone(),
             stages:   package.stages.clone(),
 
-            current_stage: 0,
-            players:       Arc::new(Mutex::new(players)),
-            timer:         0,
+            selected_fighters: selected_fighters,
+            selected_stage:    selected_stage,
+            current_stage:     0,
+            players:           Arc::new(Mutex::new(players)),
+            timer:             0,
         }
     }
 
@@ -61,11 +66,13 @@ impl Game {
     fn step_game(&mut self) {
         let control: Control = Default::default();
         let mut players = self.players.lock().unwrap();
-        for player in &mut *players {
+        let fighters = self.fighters.lock().unwrap();
+        for (i, player) in (&mut *players).iter_mut().enumerate() {
             if control.start {
                 self.state = GameState::Paused; //TODO: on press
             }
-            player.step(&control);
+            let fighter = &fighters[self.selected_fighters[i]];
+            player.step(&control, fighter);
         }
         self.timer += 1;
         if self.timer > self.rules.time_limit {

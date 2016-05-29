@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+#[allow(dead_code)]
 pub struct Graphics {
     display: glium::backend::glutin_backend::GlutinFacade,
     players: Arc<Mutex<Vec<Player>>>,
@@ -34,7 +35,7 @@ impl Graphics {
 
     fn render(&mut self) { //Fighters, Stages
         let mut target = self.display.draw();
-        target.clear_color(0.4, 1.0, 1.0, 1.0);
+        target.clear_color(0.0, 0.0, 0.0, 1.0);
         target.finish().unwrap();
     }
 

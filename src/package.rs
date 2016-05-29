@@ -82,14 +82,14 @@ impl Package {
         Package::save_struct(self.path.join("package_meta.json"), &self.meta);
 
         {
-            let mut fighters = self.fighters.lock().unwrap();
+            let fighters = self.fighters.lock().unwrap();
             for (i, filename) in self.fighters_filenames.iter().enumerate() {
                 Package::save_struct(PathBuf::from(filename), &fighters[i]);
             }
         }
         
         {
-            let mut stages = self.stages.lock().unwrap();
+            let stages = self.stages.lock().unwrap();
             for (i, filename) in self.stages_filenames.iter().enumerate() {
                 Package::save_struct(PathBuf::from(filename), &stages[i]);
             }
