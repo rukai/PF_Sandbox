@@ -59,21 +59,29 @@ impl Player {
 
     fn action_expired(&mut self) {
         match Action::from_u64(self.action) {
-            Some(Action::Spawn)       => { self.set_action(Action::SpawnIdle);   },
-            Some(Action::SpawnIdle)   => { self.set_action(Action::Fall);        },
-            Some(Action::Fall)        => { self.set_action(Action::Fall);        },
-            Some(Action::AerialFall)  => { self.set_action(Action::AerialFall);  },
-            Some(Action::Land)        => { self.set_action(Action::Idle);        },
-            Some(Action::Idle)        => { self.set_action(Action::Idle);        },
-            Some(Action::JumpSquat)   => { self.set_action(Action::JumpF);       }, //TODO: Or JumpB
-            Some(Action::JumpF)       => { self.set_action(Action::Fall);        },
-            Some(Action::JumpB)       => { self.set_action(Action::Fall);        },
-            Some(Action::JumpAerialF) => { self.set_action(Action::AerialFall);  },
-            Some(Action::JumpAerialB) => { self.set_action(Action::AerialFall);  },
-            Some(Action::Turn)        => { self.set_action(Action::Turn);        }, //TODO: I guess this is highly dependent on some other state
-            Some(Action::Dash)        => { self.set_action(Action::Dash);        },
-            Some(Action::Run)         => { self.set_action(Action::RunEnd);      },
-            Some(Action::RunEnd)      => { self.set_action(Action::Idle);        },
+            None => { panic!("Custom defined action expirations have not been implemented"); },
+
+            // Idle
+            Some(Action::Spawn)     => { self.set_action(Action::SpawnIdle); },
+            Some(Action::SpawnIdle) => { self.set_action(Action::Fall);      },
+            Some(Action::Idle)      => { self.set_action(Action::Idle);      },
+            Some(Action::Crouch)    => { self.set_action(Action::Crouch);    },
+
+            // Movement
+            Some(Action::Fall)        => { self.set_action(Action::Fall);       },
+            Some(Action::AerialFall)  => { self.set_action(Action::AerialFall); },
+            Some(Action::Land)        => { self.set_action(Action::Idle);       },
+            Some(Action::JumpSquat)   => { self.set_action(Action::JumpF);      }, //TODO: Or JumpB
+            Some(Action::JumpF)       => { self.set_action(Action::Fall);       },
+            Some(Action::JumpB)       => { self.set_action(Action::Fall);       },
+            Some(Action::JumpAerialF) => { self.set_action(Action::AerialFall); },
+            Some(Action::JumpAerialB) => { self.set_action(Action::AerialFall); },
+            Some(Action::Turn)        => { self.set_action(Action::Turn);       }, //TODO: I guess this is highly dependent on some other state
+            Some(Action::Dash)        => { self.set_action(Action::Dash);       },
+            Some(Action::Run)         => { self.set_action(Action::RunEnd);     },
+            Some(Action::RunEnd)      => { self.set_action(Action::Idle);       },
+
+            // Defense
             Some(Action::ShieldOn)    => { self.set_action(Action::Shield);      },
             Some(Action::Shield)      => { self.set_action(Action::Shield);      },
             Some(Action::ShieldOff)   => { self.set_action(Action::Idle);        },
@@ -85,7 +93,28 @@ impl Player {
             Some(Action::TechF)       => { self.set_action(Action::Idle);        },
             Some(Action::TechS)       => { self.set_action(Action::Idle);        },
             Some(Action::TechB)       => { self.set_action(Action::Idle);        },
-            None                      => { panic!("Custom defined action expirations have not been implemented"); },
+
+            // Attack
+            Some(Action::Jab)        => { self.set_action(Action::Idle); },
+            Some(Action::Jab2)       => { self.set_action(Action::Idle); },
+            Some(Action::Jab3)       => { self.set_action(Action::Idle); },
+            Some(Action::Utilt)      => { self.set_action(Action::Idle); },
+            Some(Action::Dtilt)      => { self.set_action(Action::Idle); },
+            Some(Action::Ftilt)      => { self.set_action(Action::Idle); },
+            Some(Action::DashAttack) => { self.set_action(Action::Idle); },
+            Some(Action::Usmash)     => { self.set_action(Action::Idle); },
+            Some(Action::Dsmash)     => { self.set_action(Action::Idle); },
+            Some(Action::Fsmash)     => { self.set_action(Action::Idle); },
+
+            // Aerials
+            Some(Action::Uair)     => { self.set_action(Action::Fall); },
+            Some(Action::Dair)     => { self.set_action(Action::Fall); },
+            Some(Action::Fair)     => { self.set_action(Action::Fall); },
+            Some(Action::Nair)     => { self.set_action(Action::Fall); },
+            Some(Action::UairLand) => { self.set_action(Action::Idle); },
+            Some(Action::DairLand) => { self.set_action(Action::Idle); },
+            Some(Action::FairLand) => { self.set_action(Action::Idle); },
+            Some(Action::NairLand) => { self.set_action(Action::Idle); },
         };
     }
     

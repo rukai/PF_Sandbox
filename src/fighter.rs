@@ -139,13 +139,13 @@ pub struct Point {
 enum_from_primitive! {
 #[derive(Clone, RustcEncodable, RustcDecodable, PartialEq, Debug)]
 pub enum Action {
-    // idle
+    // Idle
     Spawn,
     SpawnIdle,
     Idle,
-    //Crouch,
+    Crouch,
 
-    // movement
+    // Movement
     Fall,
     AerialFall,
     Land,
@@ -159,7 +159,7 @@ pub enum Action {
     Run,
     RunEnd,
 
-    // defense
+    // Defense
     ShieldOn,
     Shield,
     ShieldOff,
@@ -172,27 +172,27 @@ pub enum Action {
     TechS,
     TechB,
 
-//    // attacks
-//    Jab,
-//    Jab2,
-//    Jab3,
-//    Utilt,
-//    Dtilt,
-//    Ftilt,
-//    DashAttack,
-//    Usmash,
-//    Dsmash,
-//    Fsmash,
-//
-//    // aerials
-//    Uair,
-//    Dair,
-//    Fair,
-//    Nair,
-//    FairLand,
-//    DairLand,
-//    UairLand,
-//    DairLand,
+    // Attacks
+    Jab,
+    Jab2,
+    Jab3,
+    Utilt,
+    Dtilt,
+    Ftilt,
+    DashAttack,
+    Usmash,
+    Dsmash,
+    Fsmash,
+
+    // Aerials
+    Uair,
+    Dair,
+    Fair,
+    Nair,
+    UairLand,
+    DairLand,
+    FairLand,
+    NairLand,
 }
 }
 
