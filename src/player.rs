@@ -9,25 +9,27 @@ pub struct Player {
     action_count:   u64,
     pub stocks:     u64,
     pub damage:     u64,
-    pub x:          f32,
-    pub y:          f32,
-    pub w:          f32,
-    pub h:          f32,
+    pub bps_x:      f64,
+    pub bps_y:      f64,
+    pub ecb_w:      f64,
+    pub ecb_top:    f64, // Relative to bps_y
+    pub ecb_bottom: f64, // Relative to bps_y
     pub face_right: bool,
 }
 
 impl Player {
     pub fn new() -> Player {
         Player {
-            action: Action::Spawn as u64,
+            action:       Action::Spawn as u64,
             action_count: 0,
-            stocks: 0,
-            damage: 0,
-            x: 0.0,
-            y: 0.0,
-            w: 0.0,
-            h: 0.0,
-            face_right: true,
+            stocks:       0,
+            damage:       0,
+            bps_x:        0.0,
+            bps_y:        0.0,
+            ecb_w:        0.0,
+            ecb_top:      0.0,
+            ecb_bottom:   0.0,
+            face_right:   true,
         }
     }
 
@@ -36,10 +38,19 @@ impl Player {
         if self.action_count == action_frames - 1 {
             self.action_expired();
         }
-        
-        // PLAN: A series of match's to handle cases that can occur on multiple states
-        
-        match Action::from_u64(self.action) {
+
+        let frame = &fighter.action_defs[self.action as usize].frames[self.action_count as usize];
+        let action = Action::from_u64(self.action);
+
+        self.ecb_w = frame.ecb_w;
+        self.ecb_top = frame.ecb_top;
+        self.ecb_bottom = match action {
+            Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.action_count < 10
+                => self.ecb_bottom,
+            _   => frame.ecb_bottom,
+        };
+
+        match action {
             Some(Action::Idle) | Some(Action::Run) => {
                 if controls.y || controls.x {
                     self.set_action(Action::JumpSquat);

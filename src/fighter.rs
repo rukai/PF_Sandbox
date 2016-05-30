@@ -36,8 +36,11 @@ impl Fighter {
         };
 
         let action_frame1 = ActionFrame {
-            hitboxes: vec!(hitbox1, hitbox2),
-            effects:  Vec::new(),
+            hitboxes:   vec!(hitbox1, hitbox2),
+            effects:    Vec::new(),
+            ecb_w:      1.0,
+            ecb_top:    1.0,
+            ecb_bottom: 0.0,
         };
 
         let action_frame2 = action_frame1.clone();
@@ -114,8 +117,11 @@ pub struct ActionDef {
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct ActionFrame {
-    pub hitboxes: Vec<Hitbox>,
-    pub effects:  Vec<FrameEffect>,
+    pub hitboxes:   Vec<Hitbox>,
+    pub effects:    Vec<FrameEffect>,
+    pub ecb_w:      f64,
+    pub ecb_top:    f64,
+    pub ecb_bottom: f64,
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
