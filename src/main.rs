@@ -57,7 +57,7 @@ fn cli() {
         Err(_) => Package::generate_base(&package_name),
     };
 
-    let mut game = Game::new(&package, vec!(0), 0);
+    let mut game = Game::new(&package, vec!(0, 0), 0);
     init_graphics(&game, &package);
     game.run();
 }
@@ -67,8 +67,8 @@ fn init_graphics(game: &Game, package: &Package) {
     let fighters = package.fighters.clone();
     let stages = package.stages.clone();
     thread::spawn(move || {
-        let mut graphics = Graphics::new(players, fighters, stages);
-        graphics.run();
+        let mut graphics = Graphics::new();
+        graphics.run(players, fighters, stages);
     });
 }
 

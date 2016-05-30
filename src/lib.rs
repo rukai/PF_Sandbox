@@ -1,5 +1,5 @@
 extern crate rustc_serialize;
-extern crate glium;
+#[macro_use] extern crate glium;
 extern crate libusb;
 #[macro_use] extern crate enum_primitive;
 extern crate num;

@@ -46,7 +46,7 @@ impl Menu {
 
             return MenuChoice {
                 package_name: "base_package".to_string(),
-                selected_fighters: vec!(0),
+                selected_fighters: vec!(0, 0),
                 selected_stage: 0,
             }
         }

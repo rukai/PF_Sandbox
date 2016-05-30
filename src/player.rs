@@ -1,5 +1,6 @@
 use ::fighter::*;
 use ::controller::Control;
+use ::game::Point;
 
 use num::FromPrimitive;
 
@@ -9,24 +10,24 @@ pub struct Player {
     action_count:   u64,
     pub stocks:     u64,
     pub damage:     u64,
-    pub bps_x:      f64,
-    pub bps_y:      f64,
+    pub bps:        Point,
     pub ecb_w:      f64,
-    pub ecb_top:    f64, // Relative to bps_y
-    pub ecb_bottom: f64, // Relative to bps_y
+    pub ecb_y:      f64, // relative to bps.y. when 0, the bottom of the ecb touches the bps
+    pub ecb_top:    f64, // Relative to ecb_y
+    pub ecb_bottom: f64, // Relative to ecb_y
     pub face_right: bool,
 }
 
 impl Player {
-    pub fn new() -> Player {
+    pub fn new(spawn: Point) -> Player {
         Player {
             action:       Action::Spawn as u64,
             action_count: 0,
             stocks:       0,
             damage:       0,
-            bps_x:        0.0,
-            bps_y:        0.0,
+            bps:          spawn,
             ecb_w:        0.0,
+            ecb_y:        0.0,
             ecb_top:      0.0,
             ecb_bottom:   0.0,
             face_right:   true,
@@ -43,11 +44,12 @@ impl Player {
         let action = Action::from_u64(self.action);
 
         self.ecb_w = frame.ecb_w;
-        self.ecb_top = frame.ecb_top;
+        self.ecb_y = frame.ecb_y;
+        self.ecb_top = frame.ecb_h / 2.0;
         self.ecb_bottom = match action {
             Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.action_count < 10
                 => self.ecb_bottom,
-            _   => frame.ecb_bottom,
+            _   => -frame.ecb_h / 2.0,
         };
 
         match action {
@@ -59,11 +61,15 @@ impl Player {
             _ => { },
         }
 
-        println!("\nFighter: {}", fighter.name);
-        println!("action_count: {}", self.action_count);
+        println!("\naction_count: {}", self.action_count);
         println!("action: {:?}", Action::from_u64(self.action).unwrap());
 
         self.action_count += 1;
+
+        self.bps.x += 1.2;
+        if self.bps.x > 200.0 {
+            self.bps.x = -200.0;
+        }
     }
 
     fn action_expired(&mut self) {
@@ -72,7 +78,7 @@ impl Player {
 
             // Idle
             Some(Action::Spawn)     => { self.set_action(Action::SpawnIdle); },
-            Some(Action::SpawnIdle) => { self.set_action(Action::Fall);      },
+            Some(Action::SpawnIdle) => { self.set_action(Action::SpawnIdle); },
             Some(Action::Idle)      => { self.set_action(Action::Idle);      },
             Some(Action::Crouch)    => { self.set_action(Action::Crouch);    },
 

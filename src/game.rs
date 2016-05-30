@@ -6,6 +6,8 @@ use ::rules::Rules;
 use ::stage::Stage;
 
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 enum GameState {
     Running,
@@ -24,7 +26,6 @@ pub struct Game {
     pub players:       Arc<Mutex<Vec<Player>>>,
     selected_fighters: Vec<usize>,
     selected_stage:    usize,
-    current_stage:     u64,
     state:             GameState,
     timer:             u64,
 }
@@ -33,8 +34,12 @@ impl Game {
     pub fn new(package: &Package, selected_fighters: Vec<usize>, selected_stage: usize) -> Game {
         let mut players: Vec<Player> = Vec::new();
 
-        for _ in &selected_fighters {
-            players.push(Player::new());
+        {
+            let stages = package.stages.lock().unwrap();
+            for i in 0..selected_fighters.len() {
+                let spawn = stages[selected_stage].spawn_points[i].clone();
+                players.push(Player::new(spawn.clone()));
+            }
         }
 
         Game {
@@ -45,7 +50,6 @@ impl Game {
 
             selected_fighters: selected_fighters,
             selected_stage:    selected_stage,
-            current_stage:     0,
             players:           Arc::new(Mutex::new(players)),
             timer:             0,
         }
@@ -59,6 +63,7 @@ impl Game {
                 GameState::Paused  => { self.step_pause();   },
             }
             
+            thread::sleep(Duration::from_millis(16));
             //TODO: when finished results screen, return, without aborting
         }
     }
@@ -75,7 +80,7 @@ impl Game {
             player.step(&control, fighter);
         }
         self.timer += 1;
-        if self.timer > self.rules.time_limit {
+        if self.timer / 60 > self.rules.time_limit {
             self.state = GameState::Results;
         }
     }
@@ -87,4 +92,10 @@ impl Game {
 
     fn step_results(&mut self) {
     }
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable)]
+pub struct Point {
+    pub x: f64,
+    pub y: f64
 }

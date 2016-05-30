@@ -1,22 +1,17 @@
+use game::Point;
+
 impl Fighter {
 
     //TODO: Eventually this should produce a blank Fighter
     //      An immutable demonstration package will be provided instead
     pub fn base() -> Fighter {
-        let point1 = Point {
-            x: 3.0,
-            y: 5.0,
-        };
-
-        let point2 = Point {
-            x: 3.0,
-            y: 5.0,
-        };
+        let point1 = Point {x: 3.0, y: 5.0};
+        let point2 = Point {x: 5.0, y: 6.0};
 
         let hitbox1 = Hitbox {
             points: vec!(point1),
             form:   HitboxType::Hurt,
-            size:   5.4,
+            radius: 5.4,
             damage: 0,
             bkb:    0,
             kbg:    0,
@@ -27,7 +22,7 @@ impl Fighter {
         let hitbox2 = Hitbox {
             points: vec!(point2),
             form:   HitboxType::Hit,
-            size:   1.0,
+            radius: 1.0,
             damage: 13,
             bkb:    50,
             kbg:    70,
@@ -36,11 +31,11 @@ impl Fighter {
         };
 
         let action_frame1 = ActionFrame {
-            hitboxes:   vec!(hitbox1, hitbox2),
-            effects:    Vec::new(),
-            ecb_w:      1.0,
-            ecb_top:    1.0,
-            ecb_bottom: 0.0,
+            hitboxes: vec!(hitbox1, hitbox2),
+            effects:  Vec::new(),
+            ecb_w:    3.5,
+            ecb_h:    12.0,
+            ecb_y:    6.0,
         };
 
         let action_frame2 = action_frame1.clone();
@@ -60,10 +55,8 @@ impl Fighter {
             name_short: "BF".to_string(),
             css_action: Action::Idle,
             css_frame:  0,
-            css_x1:     0.0,
-            css_y1:     0.0,
-            css_x2:     0.0,
-            css_y2:     0.0,
+            css_point1: Point {x: 0.0, y: 0.0},
+            css_point2: Point {x: 0.0, y: 0.0},
 
             //in game attributes
             jumps:              2,
@@ -89,10 +82,8 @@ pub struct Fighter {
     pub name_short: String,
     pub css_action: Action,
     pub css_frame:  u64,
-    pub css_x1:     f64,
-    pub css_y1:     f64,
-    pub css_x2:     f64,
-    pub css_y2:     f64,
+    pub css_point1: Point,
+    pub css_point2: Point,
 
     //in game attributes
     pub jumps:             u64,
@@ -120,26 +111,20 @@ pub struct ActionFrame {
     pub hitboxes:   Vec<Hitbox>,
     pub effects:    Vec<FrameEffect>,
     pub ecb_w:      f64,
-    pub ecb_top:    f64,
-    pub ecb_bottom: f64,
+    pub ecb_h:      f64,
+    pub ecb_y:      f64,
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct Hitbox {
     pub points: Vec<Point>,
     pub form:   HitboxType,
-    pub size:   f64,
+    pub radius: f64,
     pub damage: u64,
     pub bkb:    u64,
     pub kbg:    u64,
     pub angle:  u64,
     pub clang:  u64,
-}
-
-#[derive(Clone, RustcEncodable, RustcDecodable)]
-pub struct Point {
-    pub x: f64,
-    pub y: f64,
 }
 
 enum_from_primitive! {
