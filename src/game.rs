@@ -1,4 +1,4 @@
-use ::controller::Control;
+use ::input::Input;
 use ::fighter::Fighter;
 use ::package::Package;
 use ::player::Player;
@@ -69,7 +69,7 @@ impl Game {
     }
 
     fn step_game(&mut self) {
-        let control: Control = Default::default();
+        let control: Input = Default::default();
         let mut players = self.players.lock().unwrap();
         let fighters = self.fighters.lock().unwrap();
         for (i, player) in (&mut *players).iter_mut().enumerate() {

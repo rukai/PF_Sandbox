@@ -5,6 +5,7 @@ use pf_engine::package::Package;
 use pf_engine::menu::{Menu};
 use pf_engine::game::Game;
 use pf_engine::graphics::Graphics;
+use pf_engine::input;
 
 use getopts::Options;
 use std::env;
@@ -56,8 +57,8 @@ fn cli() {
         Ok(_)  => Package::open(&package_name),
         Err(_) => Package::generate_base(&package_name),
     };
-
     let mut game = Game::new(&package, vec!(0, 0), 0);
+    init_input();
     init_graphics(&game, &package);
     game.run();
 }
@@ -72,11 +73,18 @@ fn init_graphics(game: &Game, package: &Package) {
     });
 }
 
+fn init_input() {
+    thread::spawn(|| {
+        input::input_setup();
+    });
+}
+
 fn gui() {
     loop {
         let menu_choice = Menu::new().run();
         let package = Package::open(&menu_choice.package_name); //package should already exist as the menu has generated it.
         let mut game = Game::new(&package, menu_choice.selected_fighters, menu_choice.selected_stage);
+        init_input();
         init_graphics(&game, &package);
         game.run();
     }

@@ -1,5 +1,5 @@
 use ::fighter::*;
-use ::controller::Control;
+use ::input::Input;
 use ::game::Point;
 
 use num::FromPrimitive;
@@ -34,7 +34,7 @@ impl Player {
         }
     }
 
-    pub fn step(&mut self, controls: &Control, fighter: &Fighter) {
+    pub fn step(&mut self, controls: &Input, fighter: &Fighter) {
         let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64;
         if self.action_count == action_frames - 1 {
             self.action_expired();
@@ -61,8 +61,8 @@ impl Player {
             _ => { },
         }
 
-        println!("\naction_count: {}", self.action_count);
-        println!("action: {:?}", Action::from_u64(self.action).unwrap());
+        //println!("\naction_count: {}", self.action_count);
+        //println!("action: {:?}", Action::from_u64(self.action).unwrap());
 
         self.action_count += 1;
 

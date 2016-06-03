@@ -57,10 +57,10 @@ impl Graphics {
         let vertex3 = Vertex { position: [ 0.0, ecb_y + ecb_top] };
 
         // horizontal bps
-        let vertex4  = Vertex { position: [-4.0,-0.15] };
-        let vertex5  = Vertex { position: [-4.0, 0.15] };
-        let vertex6  = Vertex { position: [ 4.0,-0.15] };
-        let vertex7  = Vertex { position: [ 4.0, 0.15] };
+        let vertex4 = Vertex { position: [-4.0,-0.15] };
+        let vertex5 = Vertex { position: [-4.0, 0.15] };
+        let vertex6 = Vertex { position: [ 4.0,-0.15] };
+        let vertex7 = Vertex { position: [ 4.0, 0.15] };
 
         // vertical bps
         let vertex8  = Vertex { position: [-0.15,-4.0] };
