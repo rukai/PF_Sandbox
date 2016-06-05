@@ -1,12 +1,14 @@
 extern crate pf_engine;
 extern crate getopts;
+extern crate libusb;
 
 use pf_engine::package::Package;
 use pf_engine::menu::{Menu};
 use pf_engine::game::Game;
 use pf_engine::graphics::Graphics;
-use pf_engine::input;
+use pf_engine::input::Input;
 
+use libusb::Context;
 use getopts::Options;
 use std::env;
 use std::fs;
@@ -57,10 +59,26 @@ fn cli() {
         Ok(_)  => Package::open(&package_name),
         Err(_) => Package::generate_base(&package_name),
     };
+
+    let mut context = Context::new().unwrap();
+    let mut input = Input::new(&mut context).unwrap();
+
     let mut game = Game::new(&package, vec!(0, 0), 0);
-    init_input();
     init_graphics(&game, &package);
-    game.run();
+    game.run(&mut input);
+}
+
+fn gui() {
+    loop {
+        let mut context = Context::new().unwrap();
+        let mut input = Input::new(&mut context).unwrap();
+
+        let menu_choice = Menu::new().run(&mut input);
+        let package = Package::open(&menu_choice.package_name); //package should already exist as the menu has generated it.
+        let mut game = Game::new(&package, menu_choice.selected_fighters, menu_choice.selected_stage);
+        init_graphics(&game, &package);
+        game.run(&mut input);
+    }
 }
 
 fn init_graphics(game: &Game, package: &Package) {
@@ -71,21 +89,4 @@ fn init_graphics(game: &Game, package: &Package) {
         let mut graphics = Graphics::new();
         graphics.run(players, fighters, stages);
     });
-}
-
-fn init_input() {
-    thread::spawn(|| {
-        input::input_setup();
-    });
-}
-
-fn gui() {
-    loop {
-        let menu_choice = Menu::new().run();
-        let package = Package::open(&menu_choice.package_name); //package should already exist as the menu has generated it.
-        let mut game = Game::new(&package, menu_choice.selected_fighters, menu_choice.selected_stage);
-        init_input();
-        init_graphics(&game, &package);
-        game.run();
-    }
 }

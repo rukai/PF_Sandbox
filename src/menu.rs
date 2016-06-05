@@ -1,3 +1,5 @@
+use ::input::{Input};
+
 #[allow(dead_code)]
 enum MenuState {
     CharacterSelect,
@@ -28,7 +30,7 @@ impl Menu {
     fn step_select(&mut self) {
     }
 
-    pub fn run(&mut self) -> MenuChoice {
+    pub fn run(&mut self, input: &mut Input) -> MenuChoice {
         loop {
             match self.state {
                 MenuState::CharacterSelect => { self.step_select(); },
@@ -43,11 +45,14 @@ impl Menu {
                 MenuState::BrowseFighter   => { self.step_select(); },
                 MenuState::CreateFighter   => { self.step_select(); },
             }
-
-            return MenuChoice {
-                package_name: "base_package".to_string(),
-                selected_fighters: vec!(0, 0),
-                selected_stage: 0,
+            for player_input in input.read() {
+                if player_input.start {
+                    return MenuChoice {
+                        package_name: "base_package".to_string(),
+                        selected_fighters: vec!(0, 0),
+                        selected_stage: 0,
+                    }
+                }
             }
         }
     }

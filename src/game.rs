@@ -1,4 +1,4 @@
-use ::input::Input;
+use ::input::{Input, PlayerInput};
 use ::fighter::Fighter;
 use ::package::Package;
 use ::player::Player;
@@ -55,12 +55,13 @@ impl Game {
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, input: &mut Input) {
         loop {
+            let player_input = input.read(); //TODO: need to be able to dermine which player owns which player_input (atm out of order port usage will break things)
             match self.state {
-                GameState::Running => { self.step_game();    },
-                GameState::Results => { self.step_results(); },
-                GameState::Paused  => { self.step_pause();   },
+                GameState::Running => { self.step_game(&player_input); },
+                GameState::Results => { self.step_results();   },
+                GameState::Paused  => { self.step_pause();     },
             }
             
             thread::sleep(Duration::from_millis(16));
@@ -68,16 +69,16 @@ impl Game {
         }
     }
 
-    fn step_game(&mut self) {
-        let control: Input = Default::default();
+    fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
         let mut players = self.players.lock().unwrap();
         let fighters = self.fighters.lock().unwrap();
         for (i, player) in (&mut *players).iter_mut().enumerate() {
-            if control.start {
+            if player_input[i].start {
                 self.state = GameState::Paused; //TODO: on press
             }
+
             let fighter = &fighters[self.selected_fighters[i]];
-            player.step(&control, fighter);
+            player.step(&player_input[i], fighter);
         }
         self.timer += 1;
         if self.timer / 60 > self.rules.time_limit {
