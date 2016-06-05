@@ -10,7 +10,6 @@ pub mod graphics;
 pub mod input;
 pub mod menu;
 pub mod package;
-pub mod platform;
 pub mod player;
 pub mod rules;
 pub mod stage;
