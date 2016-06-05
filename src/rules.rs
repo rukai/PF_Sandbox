@@ -15,7 +15,7 @@ impl Rules {
         Rules {
             title:         "Base Game Mode".to_string(),
             goal:          Goal::Training,
-            stock_count:   8,
+            stock_count:   4,
             time_limit:    480,
             best_of:       3,
             pause:         true,

@@ -45,7 +45,7 @@ impl Fighter {
             iasa:   0,
         };
         let mut action_defs: Vec<ActionDef> = Vec::new();
-        for _ in 0..(Action::TechB as usize) { // TODO: Super gross but what is a man to do?
+        for _ in 0..(Action::NairLand as usize) { // TODO: Super gross but what is a man to do?
             action_defs.push(action_def.clone());
         }
         
@@ -59,18 +59,21 @@ impl Fighter {
             css_point2: Point {x: 0.0, y: 0.0},
 
             //in game attributes
-            jumps:              2,
-            weight:             80,
-            gravity:            0.13,
-            terminal_vel:       2.0,
-            shield_size:        15.0,
-            walk_init_vel:      0.2,
-            walk_accel:         0.1,
-            walk_max_vel:       0.85,
-            slow_walk_max_vel:  0.85,
-            dash_init_vel:      0.08,
-            friction:           0.05,
-            action_defs: action_defs,
+            jumps:                 2,
+            weight:                80,
+            gravity:               -0.13,
+            terminal_vel:          -2.0,
+            jump_y_init_vel:       3.1,
+            jump_y_init_vel_short: 1.9,
+            jump_x_init_vel:       0.95,
+            shield_size:           15.0,
+            walk_init_vel:         0.2,
+            walk_accel:            0.1,
+            walk_max_vel:          0.85,
+            slow_walk_max_vel:     0.85,
+            dash_init_vel:         0.08,
+            friction:              0.05,
+            action_defs:           action_defs,
         }
     }
 }
@@ -86,33 +89,36 @@ pub struct Fighter {
     pub css_point2: Point,
 
     //in game attributes
-    pub jumps:             u64,
-    pub weight:            u64,
-    pub gravity:           f64,
-    pub terminal_vel:      f64,
-    pub shield_size:       f64,
-    pub walk_init_vel:     f64,
-    pub walk_accel:        f64,
-    pub walk_max_vel:      f64,
-    pub slow_walk_max_vel: f64,
-    pub dash_init_vel:     f64,
-    pub friction:          f64,
-    pub action_defs:       Vec<ActionDef>,
+    pub jumps:                 u64,
+    pub weight:                u64,
+    pub gravity:               f64,
+    pub terminal_vel:          f64,
+    pub jump_y_init_vel:       f64,
+    pub jump_y_init_vel_short: f64,
+    pub jump_x_init_vel:       f64,
+    pub shield_size:           f64,
+    pub walk_init_vel:         f64,
+    pub walk_accel:            f64,
+    pub walk_max_vel:          f64,
+    pub slow_walk_max_vel:     f64,
+    pub dash_init_vel:         f64,
+    pub friction:              f64,
+    pub action_defs:           Vec<ActionDef>,
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct ActionDef {
-    pub frames:   Vec<ActionFrame>,
-    pub iasa:     u64,
+    pub frames: Vec<ActionFrame>,
+    pub iasa:   u64,
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct ActionFrame {
-    pub hitboxes:   Vec<Hitbox>,
-    pub effects:    Vec<FrameEffect>,
-    pub ecb_w:      f64,
-    pub ecb_h:      f64,
-    pub ecb_y:      f64,
+    pub hitboxes: Vec<Hitbox>,
+    pub effects:  Vec<FrameEffect>,
+    pub ecb_w:    f64,
+    pub ecb_h:    f64,
+    pub ecb_y:    f64,
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
@@ -174,6 +180,8 @@ pub enum Action {
     Usmash,
     Dsmash,
     Fsmash,
+    Grab,
+    DashGrab,
 
     // Aerials
     Uair,
@@ -189,8 +197,8 @@ pub enum Action {
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub enum FrameEffect {
-    Velocity    {x: i64, y: i64},
-    Acceleration{x: i64, y: i64},
+    Velocity     {x: i64, y: i64},
+    Acceleration {x: i64, y: i64},
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]

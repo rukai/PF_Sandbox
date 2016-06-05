@@ -72,7 +72,7 @@ impl<'a> Input<'a> {
     }
 }
 
-pub fn stick_filter(stick: u8) -> i8{
+fn stick_filter(stick: u8) -> i8{
     let signed = stick.wrapping_sub(128) as i8;
 
     if signed < 22 && signed > -22 {

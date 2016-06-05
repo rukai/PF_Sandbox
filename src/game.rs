@@ -38,7 +38,7 @@ impl Game {
             let stages = package.stages.lock().unwrap();
             for i in 0..selected_fighters.len() {
                 let spawn = stages[selected_stage].spawn_points[i].clone();
-                players.push(Player::new(spawn.clone()));
+                players.push(Player::new(spawn.clone(), package.rules.stock_count));
             }
         }
 
