@@ -6,39 +6,41 @@ use num::FromPrimitive;
 
 #[derive(Clone)]
 pub struct Player {
-    action:         u64,
-    action_count:   u64,
-    pub stocks:     u64,
-    pub damage:     u64,
-    pub bps:        Point,
-    pub x_vel:      f64,
-    pub y_vel:      f64,
-    pub ecb_w:      f64,
-    pub ecb_y:      f64, // relative to bps.y. when 0, the bottom of the ecb touches the bps
-    pub ecb_top:    f64, // Relative to ecb_y
-    pub ecb_bottom: f64, // Relative to ecb_y
-    pub face_right: bool,
-    pub airbourne:  bool,
-    pub jumps_left: u64,
+    action:             u64,
+    action_count:       u64,
+    pub stocks:         u64,
+    pub damage:         u64,
+    pub bps:            Point,
+    pub spawn:          Point,
+    pub x_vel:          f64,
+    pub y_vel:          f64,
+    pub ecb_w:          f64,
+    pub ecb_y:          f64, // relative to bps.y. when 0, the bottom of the ecb touches the bps
+    pub ecb_top:        f64, // Relative to ecb_y
+    pub ecb_bottom:     f64, // Relative to ecb_y
+    pub face_right:     bool,
+    pub airbourne:      bool,
+    pub air_jumps_left: u64,
 }
 
 impl Player {
     pub fn new(spawn: Point, stocks: u64) -> Player {
         Player {
-            action:       Action::Spawn as u64,
-            action_count: 0,
-            stocks:       stocks,
-            damage:       0,
-            bps:          spawn,
-            x_vel:        0.0,
-            y_vel:        0.0,
-            ecb_w:        0.0,
-            ecb_y:        0.0,
-            ecb_top:      0.0,
-            ecb_bottom:   0.0,
-            face_right:   true,
-            jumps_left:   0,
-            airbourne:    true,
+            action:         Action::Spawn as u64,
+            action_count:   0,
+            stocks:         stocks,
+            damage:         0,
+            bps:            spawn.clone(),
+            spawn:          spawn,
+            x_vel:          0.0,
+            y_vel:          0.0,
+            ecb_w:          0.0,
+            ecb_y:          0.0,
+            ecb_top:        0.0,
+            ecb_bottom:     0.0,
+            face_right:     true,
+            air_jumps_left: 0,
+            airbourne:      true,
         }
     }
 
@@ -114,8 +116,8 @@ impl Player {
         else if input.b {
             // special attack
         }
-        else if (input.x || input.y) && self.jumps_left > 0 {
-            self.jumps_left -= 1;
+        else if (input.x || input.y) && self.air_jumps_left > 0 {
+            self.air_jumps_left -= 1;
             self.y_vel = fighter.jump_y_init_vel;
 
             if self.relative_stick(input.stick_x) < -30 {
@@ -171,17 +173,16 @@ impl Player {
 
     fn land_action(&mut self, fighter: &Fighter) {
         if self.action_count == 0 {
-            self.jumps_left = fighter.jumps;
+            self.air_jumps_left = fighter.air_jumps;
         }
     }
 
     fn die(&mut self, fighter: &Fighter) {
         self.stocks -= 1;
-        self.bps.x = 0.0;
-        self.bps.y = 0.0;
+        self.bps = self.spawn.clone();
         self.y_vel = 0.0;
         self.x_vel = 0.0;
-        self.jumps_left = fighter.jumps;
+        self.air_jumps_left = fighter.air_jumps;
         self.set_action(Action::Spawn);
     }
 

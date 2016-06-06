@@ -59,7 +59,7 @@ impl Fighter {
             css_point2: Point {x: 0.0, y: 0.0},
 
             //in game attributes
-            jumps:                 2,
+            air_jumps:             1,
             weight:                80,
             gravity:               -0.13,
             terminal_vel:          -2.0,
@@ -89,7 +89,7 @@ pub struct Fighter {
     pub css_point2: Point,
 
     //in game attributes
-    pub jumps:                 u64,
+    pub air_jumps:             u64,
     pub weight:                u64,
     pub gravity:               f64,
     pub terminal_vel:          f64,
