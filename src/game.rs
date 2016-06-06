@@ -72,13 +72,17 @@ impl Game {
     fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
         let mut players = self.players.lock().unwrap();
         let fighters = self.fighters.lock().unwrap();
+
+        let stages = self.stages.lock().unwrap();
+        let stage = &stages[self.selected_stage];
+
         for (i, player) in (&mut *players).iter_mut().enumerate() {
             if player_input[i].start {
                 self.state = GameState::Paused; //TODO: on press
             }
 
             let fighter = &fighters[self.selected_fighters[i]];
-            player.step(&player_input[i], fighter);
+            player.step(&player_input[i], fighter, stage);
         }
         self.timer += 1;
         if self.timer / 60 > self.rules.time_limit {
