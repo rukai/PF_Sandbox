@@ -141,6 +141,28 @@ impl Player {
         else if input.z.press {
             self.set_action(Action::Grab);
         }
+        else if input.c_stick_x.value.abs() > 70 { //TODO: hmmmm how do I want to stop smashes from auto-spamming
+            self.face_right = input.c_stick_x.value > 0;
+            self.set_action(Action::Fsmash);
+        }
+        else if input.c_stick_y.value > 70 {
+            self.set_action(Action::Usmash);
+        }
+        else if input.c_stick_y.value < -70 {
+            self.set_action(Action::Dsmash);
+        }
+        else if input.up.press {
+            self.set_action(Action::TauntUp);
+        }
+        else if input.down.press {
+            self.set_action(Action::TauntDown);
+        }
+        else if input.left.press {
+            self.set_action(Action::TauntLeft);
+        }
+        else if input.right.press {
+            self.set_action(Action::TauntRight);
+        }
         else {
             self.x_vel = (input.stick_x.value as f64) / 50.0;
         }
@@ -249,6 +271,12 @@ impl Player {
             Some(Action::DairLand) => { self.set_action(Action::Idle); },
             Some(Action::FairLand) => { self.set_action(Action::Idle); },
             Some(Action::NairLand) => { self.set_action(Action::Idle); },
+
+            // Taunts
+            Some(Action::TauntUp)    => { self.set_action(Action::Idle); },
+            Some(Action::TauntDown)  => { self.set_action(Action::Idle); },
+            Some(Action::TauntLeft)  => { self.set_action(Action::Idle); },
+            Some(Action::TauntRight) => { self.set_action(Action::Idle); },
 
         };
     }
