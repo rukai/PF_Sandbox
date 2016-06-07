@@ -124,16 +124,6 @@ fn empty_player_input() -> PlayerInput {
     }
 }
 
-fn stick_filter(stick: u8) -> i8{
-    let signed = stick.wrapping_sub(128) as i8;
-
-    if signed < 22 && signed > -22 {
-        return 0;
-    }
-
-    signed
-}
-
 /// Add 4 GC adapter controllers to inputs
 fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, prev_inputs: &Vec<PlayerInput>) {
     let mut data: [u8; 37] = [0; 37];
@@ -141,6 +131,8 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
 
     for port in 0..4 {
         let prev_input = &prev_inputs[inputs.len()];
+
+        let plugged_in = data[9*port+1] == 20;
 
         let up    = data[9*port+2] & 0b10000000 != 0;
         let down  = data[9*port+2] & 0b01000000 != 0;
@@ -154,6 +146,7 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
         let r     = data[9*port+3] & 0b00000100 != 0;
         let z     = data[9*port+3] & 0b00000010 != 0;
         let start = data[9*port+3] & 0b00000001 != 0;
+
         let stick_x   = stick_filter(data[9*port+4]);
         let stick_y   = stick_filter(data[9*port+5]);
         let c_stick_x = stick_filter(data[9*port+6]);
@@ -161,29 +154,34 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
         let l_analog  = data[9*port+8];
         let r_analog  = data[9*port+9];
 
-        inputs.push(PlayerInput {
-            plugged_in: data[9*port+1] == 20,
+        if plugged_in {
+            inputs.push(PlayerInput {
+                plugged_in: true,
 
-            up:    Button { value: up,    press: up    && !prev_input.up.value },
-            down:  Button { value: down,  press: down  && !prev_input.down.value },
-            right: Button { value: right, press: right && !prev_input.right.value },
-            left:  Button { value: left,  press: left  && !prev_input.left.value },
-            y:     Button { value: y,     press: y     && !prev_input.y.value },
-            x:     Button { value: x,     press: x     && !prev_input.x.value },
-            b:     Button { value: b,     press: b     && !prev_input.b.value },
-            a:     Button { value: a,     press: a     && !prev_input.a.value },
-            l:     Button { value: l,     press: l     && !prev_input.l.value },
-            r:     Button { value: r,     press: r     && !prev_input.r.value },
-            z:     Button { value: z,     press: z     && !prev_input.z.value },
-            start: Button { value: start, press: start && !prev_input.start.value },
+                up:    Button { value: up,    press: up    && !prev_input.up.value },
+                down:  Button { value: down,  press: down  && !prev_input.down.value },
+                right: Button { value: right, press: right && !prev_input.right.value },
+                left:  Button { value: left,  press: left  && !prev_input.left.value },
+                y:     Button { value: y,     press: y     && !prev_input.y.value },
+                x:     Button { value: x,     press: x     && !prev_input.x.value },
+                b:     Button { value: b,     press: b     && !prev_input.b.value },
+                a:     Button { value: a,     press: a     && !prev_input.a.value },
+                l:     Button { value: l,     press: l     && !prev_input.l.value },
+                r:     Button { value: r,     press: r     && !prev_input.r.value },
+                z:     Button { value: z,     press: z     && !prev_input.z.value },
+                start: Button { value: start, press: start && !prev_input.start.value },
 
-            stick_x:   Stick   { value: stick_x,   diff: (stick_x   as i16) - (prev_input.stick_x.value   as i16) },
-            stick_y:   Stick   { value: stick_y,   diff: (stick_y   as i16) - (prev_input.stick_y.value   as i16) },
-            c_stick_x: Stick   { value: c_stick_x, diff: (c_stick_x as i16) - (prev_input.c_stick_x.value as i16) },
-            c_stick_y: Stick   { value: c_stick_y, diff: (c_stick_y as i16) - (prev_input.c_stick_y.value as i16) },
-            l_analog:  Trigger { value: l_analog,  diff: (l_analog  as i16) - (prev_input.l_analog.value  as i16) },
-            r_analog:  Trigger { value: r_analog,  diff: (r_analog  as i16) - (prev_input.r_analog.value  as i16) },
-        });
+                stick_x:   Stick   { value: stick_x,   diff: stick_x   - prev_input.stick_x.value },
+                stick_y:   Stick   { value: stick_y,   diff: stick_y   - prev_input.stick_y.value },
+                c_stick_x: Stick   { value: c_stick_x, diff: c_stick_x - prev_input.c_stick_x.value },
+                c_stick_y: Stick   { value: c_stick_y, diff: c_stick_y - prev_input.c_stick_y.value },
+
+                l_analog:  Trigger { value: l_analog, diff: (l_analog as i16) - (prev_input.l_analog.value as i16) },
+                r_analog:  Trigger { value: r_analog, diff: (r_analog as i16) - (prev_input.r_analog.value as i16) },
+            });
+        } else {
+            inputs.push(empty_player_input());
+        }
     };
 }
 
@@ -194,6 +192,16 @@ fn read_usb_controllers(inputs: &mut Vec<PlayerInput>, prev_inputs: &Vec<PlayerI
     for _ in 0..4 {
         inputs.push(empty_player_input());
     }
+}
+
+fn stick_filter(stick: u8) -> i16{
+    let signed = stick.wrapping_sub(128) as i8;
+
+    if signed < 22 && signed > -22 {
+        return 0;
+    }
+
+    signed as i16
 }
 
 pub struct PlayerInput {
@@ -225,8 +233,9 @@ pub struct Button {
     pub press: bool, // off->on this frame
 }
 
+// must use i16 instead of i8 for Stick.value as u8::min_value().abs() causes overflow.
 pub struct Stick {
-    pub value: i8, // current.value
+    pub value: i16, // current.value
     pub diff:  i16, // current.value - previous.value
 }
 

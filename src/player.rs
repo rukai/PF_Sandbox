@@ -54,9 +54,7 @@ impl Player {
     }
 
     pub fn step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage) {
-        if input.plugged_in {
-            self.input_step(input, fighter);
-        }
+        self.input_step(input, fighter);
         self.physics_step(fighter, stage);
     }
 
@@ -93,9 +91,11 @@ impl Player {
             _                                         => { },
         }
 
-        println!("\naction_count: {}", self.action_count);
-        println!("airbourne: {}", self.airbourne);
-        println!("action: {:?}", Action::from_u64(self.action).unwrap());
+        if input.plugged_in {
+            println!("\naction_count: {}", self.action_count);
+            println!("airbourne: {}", self.airbourne);
+            println!("action: {:?}", Action::from_u64(self.action).unwrap());
+        }
 
         self.action_count += 1;
     }
@@ -166,6 +166,8 @@ impl Player {
         else {
             self.x_vel = (input.stick_x.value as f64) / 50.0;
         }
+
+        self.pass_through = input.stick_y.diff < -30; // TODO: refine
     }
 
     fn dash_action(&mut self, input: &PlayerInput) {
@@ -281,7 +283,7 @@ impl Player {
         };
     }
 
-    fn relative_stick(&self, input: i8) -> i8 {
+    fn relative_stick(&self, input: i16) -> i16 {
         if self.face_right {
             input
         }
