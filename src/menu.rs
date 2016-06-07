@@ -15,15 +15,16 @@ enum MenuState {
     CreateFighter,
 }
 
-#[allow(dead_code)]
 pub struct Menu {
-    state:         MenuState,
+    state: MenuState,
+    frames: u64,
 }
 
 impl Menu {
     pub fn new() -> Menu {
         Menu {
             state: MenuState::CharacterSelect,
+            frames: 0,
         }
     }
 
@@ -32,6 +33,7 @@ impl Menu {
 
     pub fn run(&mut self, input: &mut Input) -> MenuChoice {
         loop {
+            let player_inputs = input.read(self.frames);
             match self.state {
                 MenuState::CharacterSelect => { self.step_select(); },
                 MenuState::StageSelect     => { self.step_select(); },
@@ -45,8 +47,8 @@ impl Menu {
                 MenuState::BrowseFighter   => { self.step_select(); },
                 MenuState::CreateFighter   => { self.step_select(); },
             }
-            for player_input in input.read() {
-                if player_input.start {
+            for player_input in player_inputs {
+                if player_input.start.press {
                     return MenuChoice {
                         package_name: "base_package".to_string(),
                         selected_fighters: vec!(0, 0),
@@ -54,6 +56,7 @@ impl Menu {
                     }
                 }
             }
+            self.frames += 1
         }
     }
 }

@@ -1,4 +1,4 @@
-use ::input::{Input, PlayerInput};
+use ::input::Input;
 use ::fighter::Fighter;
 use ::package::Package;
 use ::player::Player;
@@ -15,7 +15,6 @@ enum GameState {
     Results,
 }
 
-#[allow(dead_code)]
 pub struct Game {
     // package data
     rules:    Rules,
@@ -27,7 +26,7 @@ pub struct Game {
     selected_fighters: Vec<usize>,
     selected_stage:    usize,
     state:             GameState,
-    timer:             u64,
+    frames:            u64,
 }
 
 impl Game {
@@ -51,41 +50,47 @@ impl Game {
             selected_fighters: selected_fighters,
             selected_stage:    selected_stage,
             players:           Arc::new(Mutex::new(players)),
-            timer:             0,
+            frames:             0,
         }
     }
 
     pub fn run(&mut self, input: &mut Input) {
         loop {
-            let player_input = input.read(); //TODO: need to be able to dermine which player owns which player_input (atm out of order port usage will break things)
+
             match self.state {
-                GameState::Running => { self.step_game(&player_input); },
+                GameState::Running => { self.step_game(input); },
                 GameState::Results => { self.step_results();   },
                 GameState::Paused  => { self.step_pause();     },
             }
-            
+
             thread::sleep(Duration::from_millis(16));
             //TODO: when finished results screen, return, without aborting
         }
     }
 
-    fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
+    fn step_game(&mut self, input: &mut Input) {
+        // get new player inputs
+        let player_input = input.read(self.frames);
+
+        // lock resources
         let mut players = self.players.lock().unwrap();
         let fighters = self.fighters.lock().unwrap();
-
         let stages = self.stages.lock().unwrap();
         let stage = &stages[self.selected_stage];
-
+        
+        // step each player
         for (i, player) in (&mut *players).iter_mut().enumerate() {
-            if player_input[i].start {
-                self.state = GameState::Paused; //TODO: on press
+            if player_input[i].start.press {
+                self.state = GameState::Paused;
             }
 
             let fighter = &fighters[self.selected_fighters[i]];
             player.step(&player_input[i], fighter, stage);
         }
-        self.timer += 1;
-        if self.timer / 60 > self.rules.time_limit {
+
+        // handle timer
+        self.frames += 1;
+        if self.frames / 60 > self.rules.time_limit {
             self.state = GameState::Results;
         }
     }

@@ -61,7 +61,7 @@ fn cli() {
     };
 
     let mut context = Context::new().unwrap();
-    let mut input = Input::new(&mut context).unwrap();
+    let mut input = Input::new(&mut context);
 
     let mut game = Game::new(&package, vec!(0, 0), 0);
     init_graphics(&game, &package);
@@ -71,12 +71,13 @@ fn cli() {
 fn gui() {
     loop {
         let mut context = Context::new().unwrap();
-        let mut input = Input::new(&mut context).unwrap();
+        let mut input = Input::new(&mut context);
 
         let menu_choice = Menu::new().run(&mut input);
         let package = Package::open(&menu_choice.package_name); //package should already exist as the menu has generated it.
         let mut game = Game::new(&package, menu_choice.selected_fighters, menu_choice.selected_stage);
         init_graphics(&game, &package);
+        input.reset_history();
         game.run(&mut input);
     }
 }

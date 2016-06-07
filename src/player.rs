@@ -101,75 +101,75 @@ impl Player {
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if input.a || input.z {
+        if input.a.press || input.z.press {
             self.set_action(Action::Nair);
         }
-        else if input.b {
+        else if input.b.press {
             // special attack
         }
         else if self.check_jump(input) && self.air_jumps_left > 0 {
             self.air_jumps_left -= 1;
             self.y_vel = fighter.jump_y_init_vel;
 
-            if self.relative_stick(input.stick_x) < -30 { // TODO: refine
+            if self.relative_stick(input.stick_x.value) < -30 { // TODO: refine
                 self.set_action(Action::JumpAerialB);
             }
             else {
                 self.set_action(Action::JumpAerialF);
             }
         }
-        else if input.l || input.r {
+        else if input.l.press || input.r.press {
             self.set_action(Action::AerialDodge);
         }
         else {
-            self.x_vel = (input.stick_x as f64) / 50.0;
+            self.x_vel = (input.stick_x.value as f64) / 50.0;
         }
 
-        self.pass_through = input.stick_y < -70; // TODO: refine
+        self.pass_through = input.stick_y.value < -70; // TODO: refine
     }
 
     fn ground_idle_action(&mut self, input: &PlayerInput) {
         if self.check_jump(input) {
             self.set_action(Action::JumpSquat);
         }
-        else if input.a {
+        else if input.a.press {
             self.set_action(Action::Jab);
         }
-        else if input.b {
+        else if input.b.press {
             // special attack
         }
-        else if input.z {
+        else if input.z.press {
             self.set_action(Action::Grab);
         }
         else {
-            self.x_vel = (input.stick_x as f64) / 50.0;
+            self.x_vel = (input.stick_x.value as f64) / 50.0;
         }
     }
 
     fn dash_action(&mut self, input: &PlayerInput) {
-        if input.y || input.x {
+        if input.y.press || input.x.press {
             self.set_action(Action::JumpSquat);
         }
-        if self.relative_stick(input.stick_x) < -100 { //TODO: refine
+        if self.relative_stick(input.stick_x.value) < -100 { //TODO: refine
             self.face_right = !self.face_right;
             self.set_action(Action::Dash);
         }
     }
 
     fn run_action(&mut self, input: &PlayerInput) {
-        if input.y || input.x {
+        if self.check_jump(input) {
             self.set_action(Action::JumpSquat);
         }
-        if input.a {
+        if input.a.press {
             self.set_action(Action::DashAttack);
         }
-        if input.z {
+        if input.z.press {
             self.set_action(Action::DashGrab);
         }
     }
 
     fn check_jump(&self, input: &PlayerInput) -> bool {
-        input.x || input.y || input.stick_y > 52 // TODO: refine
+        input.x.press || input.y.press || input.stick_y.diff > 30 // TODO: refine
     }
 
     fn action_expired(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -197,13 +197,15 @@ impl Player {
             Some(Action::JumpSquat)   => {
                 self.airbourne = true;
 
-                if self.check_jump(input) {
+                let shorthop = input.x.value || input.y.value || input.stick_y.value > 50; // TODO: refine
+
+                if shorthop {
                     self.y_vel = fighter.jump_y_init_vel;
                 } else {
                     self.y_vel = fighter.jump_y_init_vel_short;
                 }
 
-                if self.relative_stick(input.stick_x) < -30 { // TODO: refine
+                if self.relative_stick(input.stick_x.value) < -30 { // TODO: refine
                     self.set_action(Action::JumpB);
                 }
                 else {
@@ -349,6 +351,7 @@ impl Player {
     }
 
     fn fall(&mut self) {
+        self.y_vel = 0.0;
         self.airbourne = true;
         self.set_action(Action::Fall);
     }
