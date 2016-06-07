@@ -85,6 +85,7 @@ impl Game {
             }
 
             let fighter = &fighters[self.selected_fighters[i]];
+            println!("player: {}", i);
             player.step(&player_input[i], fighter, stage);
         }
 

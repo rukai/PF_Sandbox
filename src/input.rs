@@ -1,6 +1,7 @@
-use std::time::Duration;
-use libusb::{Context, Device, DeviceHandle};
 use std::collections::VecDeque;
+use std::time::Duration;
+
+use libusb::{Context, Device, DeviceHandle};
 
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
@@ -115,12 +116,12 @@ fn empty_player_input() -> PlayerInput {
         z:     Button { value: false, press: false },
         start: Button { value: false, press: false },
 
-        stick_x:   Stick { value: 0, diff: 0 },
-        stick_y:   Stick { value: 0, diff: 0 },
-        c_stick_x: Stick { value: 0, diff: 0 },
-        c_stick_y: Stick { value: 0, diff: 0 },
-        l_analog:  Trigger { value: 0, diff: 0 },
-        r_analog:  Trigger { value: 0, diff: 0 },
+        stick_x:   Stick { value: 0.0, diff: 0.0 },
+        stick_y:   Stick { value: 0.0, diff: 0.0 },
+        c_stick_x: Stick { value: 0.0, diff: 0.0 },
+        c_stick_y: Stick { value: 0.0, diff: 0.0 },
+        l_analog:  Trigger { value: 0.0, diff: 0.0 },
+        r_analog:  Trigger { value: 0.0, diff: 0.0 },
     }
 }
 
@@ -147,12 +148,11 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
         let z     = data[9*port+3] & 0b00000010 != 0;
         let start = data[9*port+3] & 0b00000001 != 0;
 
-        let stick_x   = stick_filter(data[9*port+4]);
-        let stick_y   = stick_filter(data[9*port+5]);
-        let c_stick_x = stick_filter(data[9*port+6]);
-        let c_stick_y = stick_filter(data[9*port+7]);
-        let l_analog  = data[9*port+8];
-        let r_analog  = data[9*port+9];
+        let (stick_x, stick_y)     = stick_filter(data[9*port+4], data[9*port+5]);
+        let (c_stick_x, c_stick_y) = stick_filter(data[9*port+6], data[9*port+7]);
+
+        let l_analog  = trigger_filter(data[9*port+8]);
+        let r_analog  = trigger_filter(data[9*port+9]);
 
         if plugged_in {
             inputs.push(PlayerInput {
@@ -176,8 +176,8 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
                 c_stick_x: Stick   { value: c_stick_x, diff: c_stick_x - prev_input.c_stick_x.value },
                 c_stick_y: Stick   { value: c_stick_y, diff: c_stick_y - prev_input.c_stick_y.value },
 
-                l_analog:  Trigger { value: l_analog, diff: (l_analog as i16) - (prev_input.l_analog.value as i16) },
-                r_analog:  Trigger { value: r_analog, diff: (r_analog as i16) - (prev_input.r_analog.value as i16) },
+                l_analog:  Trigger { value: l_analog, diff: (l_analog) - (prev_input.l_analog.value) },
+                r_analog:  Trigger { value: r_analog, diff: (r_analog) - (prev_input.r_analog.value) },
             });
         } else {
             inputs.push(empty_player_input());
@@ -194,14 +194,29 @@ fn read_usb_controllers(inputs: &mut Vec<PlayerInput>, prev_inputs: &Vec<PlayerI
     }
 }
 
-fn stick_filter(stick: u8) -> i16{
-    let signed = stick.wrapping_sub(128) as i8;
-
-    if signed < 22 && signed > -22 {
-        return 0;
+fn abs_min(a: f64, b: f64) -> f64 {
+    if (a >= 0.0 && a > b) || (a <= 0.0 && a < b) {
+        b
+    } else {
+        a
     }
+}
+fn stick_filter(in_stick_x: u8, in_stick_y: u8) -> (f64, f64) {
+    let raw_stick_x = in_stick_x as f64 - 128.0;
+    let raw_stick_y = in_stick_y as f64 - 128.0;
+    let angle = (raw_stick_y).atan2(raw_stick_x);
 
-    signed as i16
+    let max = (angle.cos() * 80.0).trunc();
+    let stick_x = abs_min(raw_stick_x, max) / 80.0;
+
+    let max = (angle.sin() * 80.0).trunc();
+    let stick_y = abs_min(raw_stick_y, max) / 80.0;
+
+    (stick_x, stick_y)
+}
+
+fn trigger_filter(trigger: u8) -> f64 {
+    (trigger as f64) / 140.0
 }
 
 pub struct PlayerInput {
@@ -235,11 +250,11 @@ pub struct Button {
 
 // must use i16 instead of i8 for Stick.value as u8::min_value().abs() causes overflow.
 pub struct Stick {
-    pub value: i16, // current.value
-    pub diff:  i16, // current.value - previous.value
+    pub value: f64, // current.value
+    pub diff:  f64, // current.value - previous.value
 }
 
 pub struct Trigger {
-    pub value: u8, // current.value
-    pub diff:  i16, // current.value - previous.value
+    pub value: f64, // current.value
+    pub diff:  f64, // current.value - previous.value
 }

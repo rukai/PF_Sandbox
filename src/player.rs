@@ -15,6 +15,8 @@ pub struct Player {
     pub spawn:          Point,
     pub x_vel:          f64,
     pub y_vel:          f64,
+    pub x_acc:          f64,
+    pub y_acc:          f64,
     pub ecb_w:          f64,
     pub ecb_y:          f64, // relative to bps.y. when 0, the bottom of the ecb touches the bps
     pub ecb_top:        f64, // Relative to ecb_y
@@ -36,6 +38,8 @@ impl Player {
             spawn:          spawn,
             x_vel:          0.0,
             y_vel:          0.0,
+            x_acc:          0.0,
+            y_acc:          0.0,
             ecb_w:          0.0,
             ecb_y:          0.0,
             ecb_top:        0.0,
@@ -85,16 +89,17 @@ impl Player {
             Some(Action::SpawnIdle) | Some(Action::Fall) | Some(Action::AerialFall) |
             Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | 
             Some(Action::JumpAerialB)                 => { self.aerial_action(input, fighter); },
-            Some(Action::Idle) | Some(Action::Crouch) => { self.ground_idle_action(input); },
-            Some(Action::Dash)                        => { self.dash_action(input); },
-            Some(Action::Run)                         => { self.run_action(input); },
+            Some(Action::Idle) | Some(Action::Crouch) => { self.ground_idle_action(input, fighter); },
+            Some(Action::Dash)                        => { self.dash_action(input, fighter); },
+            Some(Action::Run)                         => { self.run_action(input, fighter); },
             _                                         => { },
         }
 
         if input.plugged_in {
-            println!("\naction_count: {}", self.action_count);
+            println!("action_count: {}", self.action_count);
             println!("airbourne: {}", self.airbourne);
-            println!("action: {:?}", Action::from_u64(self.action).unwrap());
+            println!("action: {:?}\n", Action::from_u64(self.action).unwrap());
+            println!("vel_x: {}", self.x_vel);
         }
 
         self.action_count += 1;
@@ -111,7 +116,7 @@ impl Player {
             self.air_jumps_left -= 1;
             self.y_vel = fighter.jump_y_init_vel;
 
-            if self.relative_stick(input.stick_x.value) < -30 { // TODO: refine
+            if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
                 self.set_action(Action::JumpAerialB);
             }
             else {
@@ -122,13 +127,25 @@ impl Player {
             self.set_action(Action::AerialDodge);
         }
         else {
-            self.x_vel = (input.stick_x.value as f64) / 50.0;
+            self.x_vel = (input.stick_x.value as f64) * 2.5
         }
 
-        self.pass_through = input.stick_y.value < -70; // TODO: refine
+        self.pass_through = input.stick_y.value < -0.2; // TODO: refine
     }
 
-    fn ground_idle_action(&mut self, input: &PlayerInput) {
+    fn ground_idle_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if input.stick_y.value < -0.3 { //TODO: refine
+            self.set_action(Action::Crouch);
+        }
+        else if input.stick_x.diff > 0.1 && input.stick_x.value > 0.1 {
+            self.face_right = true;
+            self.dash(fighter);
+        }
+        else if input.stick_x.diff < -0.1 && input.stick_x.value < -0.1 {
+            self.face_right = false;
+            self.dash(fighter);
+        }
+
         if self.check_jump(input) {
             self.set_action(Action::JumpSquat);
         }
@@ -141,14 +158,14 @@ impl Player {
         else if input.z.press {
             self.set_action(Action::Grab);
         }
-        else if input.c_stick_x.value.abs() > 70 { //TODO: hmmmm how do I want to stop smashes from auto-spamming
-            self.face_right = input.c_stick_x.value > 0;
+        else if input.c_stick_x.value.abs() > 0.2 { //TODO: hmmmm how do I want to stop smashes from auto-spamming
+            self.face_right = input.c_stick_x.value > 0.0;
             self.set_action(Action::Fsmash);
         }
-        else if input.c_stick_y.value > 70 {
+        else if input.c_stick_y.value > 0.2 {
             self.set_action(Action::Usmash);
         }
-        else if input.c_stick_y.value < -70 {
+        else if input.c_stick_y.value < -0.2 {
             self.set_action(Action::Dsmash);
         }
         else if input.up.press {
@@ -163,37 +180,52 @@ impl Player {
         else if input.right.press {
             self.set_action(Action::TauntRight);
         }
-        else {
-            self.x_vel = (input.stick_x.value as f64) / 50.0;
-        }
 
-        self.pass_through = input.stick_y.diff < -30; // TODO: refine
+        self.pass_through = input.stick_y.diff < -0.1; // TODO: refine
     }
 
-    fn dash_action(&mut self, input: &PlayerInput) {
+    fn dash_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        let stick_x = self.relative_f(input.stick_x.value);
+        if stick_x >= 0.8 || stick_x <= 0.4 { // verified horizontally only
+            //TODO: Implement terminal velocity
+            let dash_acc = fighter.dash_run_acc_a * stick_x.abs() + fighter.dash_run_acc_b;
+            self.x_acc = self.relative_f(dash_acc) * if stick_x > 0.0 { 1.0 } else { -1.0 };
+        }
+
         if input.y.press || input.x.press {
             self.set_action(Action::JumpSquat);
         }
-        if self.relative_stick(input.stick_x.value) < -100 { //TODO: refine
+        if self.relative_f(input.stick_x.value) < -0.35 { //TODO: refine
             self.face_right = !self.face_right;
-            self.set_action(Action::Dash);
+            self.dash(fighter);
         }
     }
 
-    fn run_action(&mut self, input: &PlayerInput) {
+    fn run_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         if self.check_jump(input) {
             self.set_action(Action::JumpSquat);
         }
-        if input.a.press {
+        // verified horizontally stick_x <= 0.61250 ends dash
+        else if self.relative_f(input.stick_x.value) <= 0.61300 {
+            self.set_action(Action::RunEnd);
+        }
+        else if input.a.press {
             self.set_action(Action::DashAttack);
         }
-        if input.z.press {
+        else if input.z.press {
             self.set_action(Action::DashGrab);
+        }
+        else {
+            // Placeholder logic, needs research
+            let acc = self.relative_f(fighter.dash_run_acc_b);
+            if self.x_vel + acc <= fighter.dash_run_term_vel {
+                self.x_acc = acc;
+            }
         }
     }
 
     fn check_jump(&self, input: &PlayerInput) -> bool {
-        input.x.press || input.y.press || (input.stick_y.diff > 30 && input.stick_y.value > 30) // TODO: refine
+        input.x.press || input.y.press || (input.stick_y.diff > 0.4 && input.stick_y.value > 0.1) // TODO: refine
     }
 
     fn action_expired(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -214,14 +246,15 @@ impl Player {
             Some(Action::JumpB)       => { self.set_action(Action::Fall);       },
             Some(Action::JumpAerialF) => { self.set_action(Action::AerialFall); },
             Some(Action::JumpAerialB) => { self.set_action(Action::AerialFall); },
-            Some(Action::Turn)        => { self.set_action(Action::Turn);       }, //TODO: I guess this is highly dependent on some other state
-            Some(Action::Dash)        => { self.set_action(Action::Dash);       },
-            Some(Action::Run)         => { self.set_action(Action::RunEnd);     },
+            Some(Action::Turn)        => { self.set_action(Action::Turn);       }, // TODO: I guess this is highly dependent on some other state
+            Some(Action::Dash)        => { self.set_action(Action::Run);        },
+            Some(Action::Run)         => { self.set_action(Action::Run);        },
             Some(Action::RunEnd)      => { self.set_action(Action::Idle);       },
             Some(Action::JumpSquat)   => {
+
                 self.airbourne = true;
 
-                let shorthop = input.x.value || input.y.value || input.stick_y.value > 50; // TODO: refine
+                let shorthop = input.x.value || input.y.value || input.stick_y.value > 0.15; // TODO: refine
 
                 if shorthop {
                     self.y_vel = fighter.jump_y_init_vel;
@@ -229,7 +262,7 @@ impl Player {
                     self.y_vel = fighter.jump_y_init_vel_short;
                 }
 
-                if self.relative_stick(input.stick_x.value) < -30 { // TODO: refine
+                if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
                     self.set_action(Action::JumpB);
                 }
                 else {
@@ -279,16 +312,15 @@ impl Player {
             Some(Action::TauntDown)  => { self.set_action(Action::Idle); },
             Some(Action::TauntLeft)  => { self.set_action(Action::Idle); },
             Some(Action::TauntRight) => { self.set_action(Action::Idle); },
-
         };
     }
 
-    fn relative_stick(&self, input: i16) -> i16 {
+    fn relative_f(&self, input: f64) -> f64 {
         if self.face_right {
             input
         }
         else {
-            input * -1
+            input * -1.0
         }
     }
 
@@ -297,7 +329,6 @@ impl Player {
      */
 
     fn physics_step(&mut self, fighter: &Fighter, stage: &Stage) {
-
         // are we on a platform?
         match self.land_stage_collision(stage, -0.001) {
             Some(_) if self.airbourne && self.action_count > 2 => { // TODO: I dunno what I want to do instead of checking self.action_count ...
@@ -328,15 +359,21 @@ impl Player {
             };
         }
         else {
-            self.bps.x += self.x_vel;
-
-            if fighter.friction > self.x_vel.abs() {
-                self.x_vel = 0.0;
-            } else if self.x_vel > 0.0 {
-                self.x_vel -= fighter.friction;
-            } else {
-                self.x_vel += fighter.friction;
+            if self.x_acc == 0.0 { // Careful, float equality >:/
+                if fighter.friction > self.x_vel.abs() {
+                    self.x_vel = 0.0;
+                } else if self.x_vel > 0.0 {
+                    self.x_vel -= fighter.friction;
+                } else {
+                    self.x_vel += fighter.friction;
+                }
             }
+            else {
+                self.x_vel += self.x_acc;
+            }
+
+            self.bps.x += self.x_vel;
+            self.x_acc = 0.0;
         }
 
         // death
@@ -347,6 +384,10 @@ impl Player {
 
     /// return the platform that the player would land on if moved by y_offset
     fn land_stage_collision<'a> (&self, stage: &'a Stage, y_offset: f64) -> Option<&'a Platform> {
+        if self.y_vel > 0.0 {
+            return None;
+        }
+
         for platform in &stage.platforms {
             if platform.pass_through && self.pass_through {
                 continue;
@@ -372,12 +413,18 @@ impl Player {
         self.air_jumps_left = fighter.air_jumps;
 
         match Action::from_u64(self.action) {
-            Some(Action::Uair) => { self.set_action(Action::UairLand) },
-            Some(Action::Dair) => { self.set_action(Action::DairLand) },
-            Some(Action::Fair) => { self.set_action(Action::FairLand) },
-            Some(Action::Nair) => { self.set_action(Action::NairLand) },
-            Some(_) | None     => { self.set_action(Action::Land);    },
+            Some(Action::Uair)      => { self.set_action(Action::UairLand) },
+            Some(Action::Dair)      => { self.set_action(Action::DairLand) },
+            Some(Action::Fair)      => { self.set_action(Action::FairLand) },
+            Some(Action::Nair)      => { self.set_action(Action::NairLand) },
+            _ if self.y_vel >= -1.0 => { self.set_action(Action::Idle)     }, // no impact land
+            Some(_) | None          => { self.set_action(Action::Land)     },
         }
+    }
+
+    fn dash(&mut self, fighter: &Fighter) {
+        self.x_acc = self.relative_f(fighter.dash_init_vel);
+        self.set_action(Action::Dash);
     }
 
     fn fall(&mut self) {
