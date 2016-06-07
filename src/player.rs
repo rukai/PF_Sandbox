@@ -193,7 +193,7 @@ impl Player {
     }
 
     fn check_jump(&self, input: &PlayerInput) -> bool {
-        input.x.press || input.y.press || input.stick_y.diff > 30 // TODO: refine
+        input.x.press || input.y.press || (input.stick_y.diff > 30 && input.stick_y.value > 30) // TODO: refine
     }
 
     fn action_expired(&mut self, input: &PlayerInput, fighter: &Fighter) {
