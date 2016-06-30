@@ -1,4 +1,4 @@
-use ::input::Input;
+use ::input::{Input, PlayerInput, KeyInput};
 use ::fighter::Fighter;
 use ::package::Package;
 use ::player::Player;
@@ -8,6 +8,7 @@ use ::stage::Stage;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+use glium::glutin::VirtualKeyCode;
 
 enum GameState {
     Running,
@@ -50,17 +51,18 @@ impl Game {
             selected_fighters: selected_fighters,
             selected_stage:    selected_stage,
             players:           Arc::new(Mutex::new(players)),
-            frames:             0,
+            frames:            0,
         }
     }
 
-    pub fn run(&mut self, input: &mut Input) {
+    pub fn run(&mut self, input: &mut Input, key_input: &Arc<Mutex<KeyInput>>) {
         loop {
-
+            let player_input = input.read(self.frames);
+            let key_input = key_input.lock().unwrap();
             match self.state {
-                GameState::Running => { self.step_game(input); },
-                GameState::Results => { self.step_results();   },
-                GameState::Paused  => { self.step_pause();     },
+                GameState::Running => { self.step_game(player_input); },
+                GameState::Paused  => { self.step_pause(player_input, &key_input); },
+                GameState::Results => { self.step_results(); },
             }
 
             thread::sleep(Duration::from_millis(16));
@@ -68,10 +70,7 @@ impl Game {
         }
     }
 
-    fn step_game(&mut self, input: &mut Input) {
-        // get new player inputs
-        let player_input = input.read(self.frames);
-
+    fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
         // lock resources
         let mut players = self.players.lock().unwrap();
         let fighters = self.fighters.lock().unwrap();
@@ -80,12 +79,14 @@ impl Game {
         
         // step each player
         for (i, player) in (&mut *players).iter_mut().enumerate() {
-            if player_input[i].start.press {
-                self.state = GameState::Paused;
+            if true { // TODO: check not netplay
+                if player_input[i].start.press {
+                    self.state = GameState::Paused;
+                }
             }
 
             let fighter = &fighters[self.selected_fighters[i]];
-            println!("player: {}", i);
+            //println!("player: {}", i);
             player.step(&player_input[i], fighter, stage);
         }
 
@@ -96,8 +97,21 @@ impl Game {
         }
     }
 
-    fn step_pause(&mut self) {
-        self.state = GameState::Running;
+    fn step_pause(&mut self, player_input: &Vec<PlayerInput>, key_input: &KeyInput) {
+        if key_input.pressed(VirtualKeyCode::Space) {
+            self.step_game(player_input);
+        }
+
+        // lock resources
+        let players = self.players.lock().unwrap();
+
+        // allow players to resume game
+        for (i, _) in (&players).iter().enumerate() {
+            if player_input[i].start.press {
+                self.state = GameState::Running;
+            }
+        }
+
         //TODO: Handle character/stage edits here
     }
 

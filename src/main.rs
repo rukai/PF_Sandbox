@@ -6,7 +6,7 @@ use pf_engine::package::Package;
 use pf_engine::menu::{Menu};
 use pf_engine::game::Game;
 use pf_engine::graphics::Graphics;
-use pf_engine::input::Input;
+use pf_engine::input::{Input, KeyInput};
 
 use libusb::Context;
 use getopts::Options;
@@ -14,6 +14,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::thread;
+use std::sync::{Arc, Mutex};
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options] [package_name]\nIf no arguments are given the GUI menu is used instead.", program);
@@ -62,32 +63,36 @@ fn cli() {
 
     let mut context = Context::new().unwrap();
     let mut input = Input::new(&mut context);
+    let key_input = Arc::new(Mutex::new(KeyInput::new()));
 
     let mut game = Game::new(&package, vec!(0, 0), 0);
-    init_graphics(&game, &package);
-    game.run(&mut input);
+    init_graphics(&game, &package, &key_input);
+    game.run(&mut input, &key_input);
 }
 
 fn gui() {
     loop {
         let mut context = Context::new().unwrap();
         let mut input = Input::new(&mut context);
+        let key_input = Arc::new(Mutex::new(KeyInput::new()));
 
         let menu_choice = Menu::new().run(&mut input);
-        let package = Package::open(&menu_choice.package_name); //package should already exist as the menu has generated it.
+        let package = Package::open(&menu_choice.package_name); // package should already exist as the menu has generated it.
         let mut game = Game::new(&package, menu_choice.selected_fighters, menu_choice.selected_stage);
-        init_graphics(&game, &package);
+        init_graphics(&game, &package, &key_input);
         input.reset_history();
-        game.run(&mut input);
+        game.run(&mut input, &key_input);
     }
 }
 
-fn init_graphics(game: &Game, package: &Package) {
+fn init_graphics(game: &Game, package: &Package, key_input: &Arc<Mutex<KeyInput>>) {
     let players = game.players.clone();
     let fighters = package.fighters.clone();
     let stages = package.stages.clone();
+    let key_input = key_input.clone();
+
     thread::spawn(move || {
         let mut graphics = Graphics::new();
-        graphics.run(players, fighters, stages);
+        graphics.run(players, fighters, stages, key_input);
     });
 }

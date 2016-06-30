@@ -1,7 +1,7 @@
+use glium::glutin::VirtualKeyCode;
+use libusb::{Context, Device, DeviceHandle};
 use std::collections::VecDeque;
 use std::time::Duration;
-
-use libusb::{Context, Device, DeviceHandle};
 
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
@@ -257,4 +257,64 @@ pub struct Stick {
 pub struct Trigger {
     pub value: f64, // current.value
     pub diff:  f64, // current.value - previous.value
+}
+
+pub struct KeyInput {
+    current_actions: Vec<KeyAction>,
+    held: [bool; 148], // number of VirtualKeyCode's
+}
+
+impl KeyInput {
+    pub fn new() -> KeyInput {
+        KeyInput {
+            current_actions: vec!(),
+            held: [true; 148],
+        }
+    }
+
+    /// Called every frame to set the new keyboard inputs
+    pub fn set_actions(&mut self, actions: Vec<KeyAction>) {
+        for action in &actions {
+            match action {
+                &KeyAction::Pressed(key_code)  => { self.held[key_code as usize] = true; },
+                &KeyAction::Released(key_code) => { self.held[key_code as usize] = false; }
+            }
+        }
+
+        self.current_actions = actions;
+    }
+
+    /// off->on
+    pub fn pressed(&self, check_key_code: VirtualKeyCode) -> bool {
+        for action in &self.current_actions {
+            if let &KeyAction::Pressed(key_code) = action {
+                if key_code == check_key_code {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// on->off
+    pub fn released(&self, check_key_code: VirtualKeyCode) -> bool {
+        for action in &self.current_actions {
+            if let &KeyAction::Released(key_code) = action {
+                if key_code == check_key_code {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// on
+    pub fn held(&self, key_code: VirtualKeyCode) -> bool {
+        return self.held[key_code as usize];
+    }
+}
+
+pub enum KeyAction {
+    Pressed  (VirtualKeyCode),
+    Released (VirtualKeyCode),
 }

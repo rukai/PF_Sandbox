@@ -96,13 +96,17 @@ impl Player {
         }
 
         if input.plugged_in {
-            println!("action_count: {}", self.action_count);
-            println!("airbourne: {}", self.airbourne);
-            println!("action: {:?}\n", Action::from_u64(self.action).unwrap());
-            println!("vel_x: {}", self.x_vel);
+            self.debug_output();
         }
 
         self.action_count += 1;
+    }
+
+    fn debug_output(&self) {
+        println!("action_count: {}", self.action_count);
+        println!("airbourne: {}", self.airbourne);
+        println!("action: {:?}\n", Action::from_u64(self.action).unwrap());
+        println!("vel_x: {}", self.x_vel);
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {

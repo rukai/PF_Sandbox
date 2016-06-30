@@ -1,6 +1,7 @@
 use ::fighter::Fighter;
 use ::player::Player;
 use ::stage::Stage;
+use ::input::{KeyInput, KeyAction};
 
 use glium::{DisplayBuild, Surface, self};
 use std::fs::{File, self};
@@ -51,7 +52,11 @@ impl Graphics {
         shaders
     }
 
-    pub fn run(&mut self, players: Arc<Mutex<Vec<Player>>>, fighters: Arc<Mutex<Vec<Fighter>>>, stages: Arc<Mutex<Vec<Stage>>>) {
+    pub fn run(&mut self,
+               players:   Arc<Mutex<Vec<Player>>>,
+               fighters:  Arc<Mutex<Vec<Fighter>>>,
+               stages:    Arc<Mutex<Vec<Stage>>>,
+               mut key_input: Arc<Mutex<KeyInput>>) {
         loop {
             {
                 let mut target = self.display.draw();
@@ -67,7 +72,7 @@ impl Graphics {
 
                 target.finish().unwrap();
             }
-            self.handle_events();
+            self.handle_events(&mut key_input);
 
             thread::sleep(Duration::from_millis(16));
         }
@@ -167,22 +172,34 @@ impl Graphics {
     }
 
     fn close(&mut self){
-        //TODO: errr I guess I need to get the main thread to terminate
+        // TODO: errr I guess I need to get the main thread to terminate
     }
 
-    fn handle_events(&mut self) {
+    fn handle_events(&mut self, key_input: &mut Arc<Mutex<KeyInput>>) {
         let mut close = false;
-        {
-            for ev in self.display.poll_events() {
-                match ev {
-                    glium::glutin::Event::Closed => { close = true; }, 
-                    _ => ()
-                }
+        let mut key_actions: Vec<KeyAction> = vec!();
+
+        for ev in self.display.poll_events() {
+            use glium::glutin::Event::*;
+            use glium::glutin::ElementState::{Pressed, Released};
+            use glium::glutin::VirtualKeyCode::Escape;
+
+            match ev {
+                KeyboardInput(Pressed, _, Some(Escape)) | Closed
+                    => { close = true; },
+                KeyboardInput(Pressed, _, Some(key_code))
+                    => { key_actions.push(KeyAction::Pressed  (key_code)) },
+                KeyboardInput(Released, _, Some(key_code))
+                    => { key_actions.push(KeyAction::Released (key_code)) },
+                _   => {},
             }
         }
 
         if close {
-            self.close();
+            self.close()
         }
+
+        let mut key_input = key_input.lock().unwrap();
+        key_input.set_actions(key_actions);
     }
 }
