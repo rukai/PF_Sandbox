@@ -120,8 +120,8 @@ fn empty_player_input() -> PlayerInput {
         stick_y:   Stick { value: 0.0, diff: 0.0 },
         c_stick_x: Stick { value: 0.0, diff: 0.0 },
         c_stick_y: Stick { value: 0.0, diff: 0.0 },
-        l_analog:  Trigger { value: 0.0, diff: 0.0 },
-        r_analog:  Trigger { value: 0.0, diff: 0.0 },
+        l_trigger:  Trigger { value: 0.0, diff: 0.0 },
+        r_trigger:  Trigger { value: 0.0, diff: 0.0 },
     }
 }
 
@@ -151,8 +151,8 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
         let (stick_x, stick_y)     = stick_filter(data[9*port+4], data[9*port+5]);
         let (c_stick_x, c_stick_y) = stick_filter(data[9*port+6], data[9*port+7]);
 
-        let l_analog  = trigger_filter(data[9*port+8]);
-        let r_analog  = trigger_filter(data[9*port+9]);
+        let l_trigger  = trigger_filter(data[9*port+8]);
+        let r_trigger  = trigger_filter(data[9*port+9]);
 
         if plugged_in {
             inputs.push(PlayerInput {
@@ -176,8 +176,8 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
                 c_stick_x: Stick   { value: c_stick_x, diff: c_stick_x - prev_input.c_stick_x.value },
                 c_stick_y: Stick   { value: c_stick_y, diff: c_stick_y - prev_input.c_stick_y.value },
 
-                l_analog:  Trigger { value: l_analog, diff: (l_analog) - (prev_input.l_analog.value) },
-                r_analog:  Trigger { value: r_analog, diff: (r_analog) - (prev_input.r_analog.value) },
+                l_trigger:  Trigger { value: l_trigger, diff: (l_trigger) - (prev_input.l_trigger.value) },
+                r_trigger:  Trigger { value: r_trigger, diff: (r_trigger) - (prev_input.r_trigger.value) },
             });
         } else {
             inputs.push(empty_player_input());
@@ -216,7 +216,15 @@ fn stick_filter(in_stick_x: u8, in_stick_y: u8) -> (f64, f64) {
 }
 
 fn trigger_filter(trigger: u8) -> f64 {
-    (trigger as f64) / 140.0
+    let value = (trigger as f64) / 140.0;
+    if value > 1.0
+    {
+        1.0
+    }
+    else {
+        value
+    }
+
 }
 
 pub struct PlayerInput {
@@ -239,8 +247,8 @@ pub struct PlayerInput {
     pub stick_y:   Stick,
     pub c_stick_x: Stick,
     pub c_stick_y: Stick,
-    pub r_analog:  Trigger,
-    pub l_analog:  Trigger,
+    pub r_trigger:  Trigger,
+    pub l_trigger:  Trigger,
 }
 
 pub struct Button {

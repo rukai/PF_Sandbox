@@ -68,7 +68,7 @@ impl Player {
 
     fn input_step(&mut self, input: &PlayerInput, fighter: &Fighter) {
         let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64;
-        if self.action_count == action_frames - 1 {
+        if self.action_count == action_frames -1 {
             self.action_expired(input, fighter);
         }
 
@@ -95,18 +95,7 @@ impl Player {
             _                                         => { },
         }
 
-        if input.plugged_in {
-            self.debug_output();
-        }
-
         self.action_count += 1;
-    }
-
-    fn debug_output(&self) {
-        println!("action_count: {}", self.action_count);
-        println!("airbourne: {}", self.airbourne);
-        println!("action: {:?}\n", Action::from_u64(self.action).unwrap());
-        println!("vel_x: {}", self.x_vel);
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -445,4 +434,41 @@ impl Player {
         self.air_jumps_left = fighter.air_jumps;
         self.set_action(Action::Spawn);
     }
+
+    pub fn debug_physics(&self) {
+        println!("x_vel: {:.5}    y_vel: {:.5}    x_acc {:.5}", self.x_vel, self.y_vel, self.x_acc);
+    }
+
+    pub fn debug_input(&self, input: &PlayerInput) {
+        let stick_x   = input.stick_x.value;
+        let stick_y   = input.stick_y.value;
+        let c_stick_x = input.c_stick_x.value;
+        let c_stick_y = input.c_stick_y.value;
+        let l_trigger = input.l_trigger.value;
+        let r_trigger = input.r_trigger.value;
+
+        println!("stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    r_trigger: {:.5}    l_trigger: {:.5}",
+            stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
+    }
+
+    pub fn debug_action(&self, fighter: &Fighter) {
+        let action = Action::from_u64(self.action).unwrap();
+        let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64;
+        let iasa = fighter.action_defs[self.action as usize].iasa;
+
+        println!("action: {:?}    airbourne: {}    action_count: {}/{}    IASA: {}",
+            action, self.airbourne, self.action_count, action_frames, iasa);
+    }
+
+    pub fn debug_frame(&self, fighter: &Fighter) {
+        let frame = &fighter.action_defs[self.action as usize].frames[self.action_count as usize];
+        let hitbox_count = frame.hitboxes.len();
+        let effects_count = frame.effects.len();
+        let ecb_w = frame.ecb_w;
+        let ecb_h = frame.ecb_h;
+        let ecb_y = frame.ecb_y;
+        println!("hitboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
+            hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
+    }
+
 }
