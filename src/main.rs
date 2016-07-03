@@ -55,7 +55,7 @@ fn cli() {
     let package_name = matches.free[0].clone();
     let package_path = Path::new("packages").join(&package_name);
 
-    //if a package does not already exist create a new one
+    // if a package does not already exist create a new one
     let package = match fs::metadata(package_path) {
         Ok(_)  => Package::open(&package_name),
         Err(_) => Package::generate_base(&package_name),

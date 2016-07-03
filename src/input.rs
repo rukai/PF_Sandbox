@@ -14,18 +14,25 @@ impl<'a> Input<'a> {
         let mut adapter_handles: Vec<DeviceHandle> = Vec::new();
         let devices = context.devices();
         for mut device in devices.unwrap().iter() {
-            let device_desc = device.device_descriptor().unwrap();
-            if device_desc.product_id() == 0x0337 {
-                let mut handle = device.open().unwrap();
-                if handle.kernel_driver_active(0).unwrap() {
-                    handle.detach_kernel_driver(0).unwrap();
+            if let Ok(device_desc) = device.device_descriptor() {
+                if device_desc.product_id() == 0x0337 {
+                    if let Ok(mut handle) = device.open() {
+                        if let Ok(true) = handle.kernel_driver_active(0) {
+                            handle.detach_kernel_driver(0).unwrap();
+                        }
+                        match handle.claim_interface(0) {
+                            Ok(_) => {
+                                // Tell adapter to start reading
+                                let payload = [0x13];
+                                if let Ok(_) = handle.write_interrupt(0x2, &payload, Duration::new(1, 0)) {
+                                    adapter_handles.push(handle);
+                                    println!("GC adapter: Setup complete");
+                                }
+                            },
+                            Err(e) => { println!("GC adapter: Failed to claim interface: {}", e) }
+                        }
+                    }
                 }
-                
-                // Tell adapter to start reading
-                let payload = [0x13];
-                handle.write_interrupt(0x2, &payload, Duration::new(1, 0)).unwrap();
-                
-                adapter_handles.push(handle);
             }
         }
         let mut input = Input {
