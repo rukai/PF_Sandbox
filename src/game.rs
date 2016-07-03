@@ -112,6 +112,10 @@ impl Game {
                     print!("Player: {}    ", player);
                     players[player].debug_input(&player_input[player]);
                 },
+                &DebugOutput::InputDiff{ player } => {
+                    print!("Player: {}    ", player);
+                    players[player].debug_input_diff(&player_input[player]);
+                },
                 &DebugOutput::Action{ player } => {
                     print!("Player: {}    ", player);
                     players[player].debug_action(&fighters[self.selected_fighters[player]]);
@@ -150,7 +154,12 @@ impl Game {
             self.debug_outputs.push(DebugOutput::Physics{ player: self.edit_player });
         }
         else if key_input.pressed(VirtualKeyCode::F2) {
-            self.debug_outputs.push(DebugOutput::Input{ player: self.edit_player });
+            if key_input.held(VirtualKeyCode::LShift) || key_input.held(VirtualKeyCode::RShift) {
+                self.debug_outputs.push(DebugOutput::InputDiff{ player: self.edit_player });
+            }
+            else {
+                self.debug_outputs.push(DebugOutput::Input{ player: self.edit_player });
+            }
         }
         else if key_input.pressed(VirtualKeyCode::F3) {
             self.debug_outputs.push(DebugOutput::Action{ player: self.edit_player });
@@ -177,10 +186,11 @@ impl Game {
 }
 
 enum DebugOutput {
-    Physics {player: usize},
-    Input   {player: usize},
-    Action  {player: usize},
-    Frame   {player: usize},
+    Physics   {player: usize},
+    Input     {player: usize},
+    InputDiff {player: usize},
+    Action    {player: usize},
+    Frame     {player: usize},
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]

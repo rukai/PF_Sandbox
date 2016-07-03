@@ -276,7 +276,7 @@ impl KeyInput {
     pub fn new() -> KeyInput {
         KeyInput {
             current_actions: vec!(),
-            held: [true; 148],
+            held: [false; 148],
         }
     }
 

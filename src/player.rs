@@ -462,7 +462,19 @@ impl Player {
         let l_trigger = input.l_trigger.value;
         let r_trigger = input.r_trigger.value;
 
-        println!("stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    r_trigger: {:.5}    l_trigger: {:.5}",
+        println!("VALUE    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    r_trigger: {:.5}    l_trigger: {:.5}",
+            stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
+    }
+
+    pub fn debug_input_diff(&self, input: &PlayerInput) {
+        let stick_x   = input.stick_x.diff;
+        let stick_y   = input.stick_y.diff;
+        let c_stick_x = input.c_stick_x.diff;
+        let c_stick_y = input.c_stick_y.diff;
+        let l_trigger = input.l_trigger.diff;
+        let r_trigger = input.r_trigger.diff;
+
+        println!("DIFF    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    r_trigger: {:.5}    l_trigger: {:.5}",
             stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
     }
 
