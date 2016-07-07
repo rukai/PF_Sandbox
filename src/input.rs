@@ -92,15 +92,15 @@ impl<'a> Input<'a> {
         // return current frame
         self.history.front().unwrap()
     }
+}
 
-    #[allow(dead_code)]
-    fn debug_print(device: &mut Device) {
-        for interface in device.config_descriptor(0).unwrap().interfaces() {
-            println!("interface: {}", interface.number());
-            for setting in interface.descriptors() {
-                for endpoint in setting.endpoint_descriptors() {
-                    println!("endpoint: {}, {}", endpoint.number(), endpoint.address());
-                }
+#[allow(dead_code)]
+fn display_endpoints(device: &mut Device) {
+    for interface in device.config_descriptor(0).unwrap().interfaces() {
+        println!("interface: {}", interface.number());
+        for setting in interface.descriptors() {
+            for endpoint in setting.endpoint_descriptors() {
+                println!("    endpoint - number: {}, address: {}", endpoint.number(), endpoint.address());
             }
         }
     }
@@ -140,6 +140,7 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
     for port in 0..4 {
         let prev_input = &prev_inputs[inputs.len()];
 
+        // Returns false when rumble usb is not plugged in making this essentially useless
         let plugged_in = data[9*port+1] == 20;
 
         let up    = data[9*port+2] & 0b10000000 != 0;
@@ -161,34 +162,30 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, pre
         let l_trigger  = trigger_filter(data[9*port+8]);
         let r_trigger  = trigger_filter(data[9*port+9]);
 
-        if plugged_in {
-            inputs.push(PlayerInput {
-                plugged_in: true,
+        inputs.push(PlayerInput {
+            plugged_in: plugged_in,
 
-                up:    Button { value: up,    press: up    && !prev_input.up.value },
-                down:  Button { value: down,  press: down  && !prev_input.down.value },
-                right: Button { value: right, press: right && !prev_input.right.value },
-                left:  Button { value: left,  press: left  && !prev_input.left.value },
-                y:     Button { value: y,     press: y     && !prev_input.y.value },
-                x:     Button { value: x,     press: x     && !prev_input.x.value },
-                b:     Button { value: b,     press: b     && !prev_input.b.value },
-                a:     Button { value: a,     press: a     && !prev_input.a.value },
-                l:     Button { value: l,     press: l     && !prev_input.l.value },
-                r:     Button { value: r,     press: r     && !prev_input.r.value },
-                z:     Button { value: z,     press: z     && !prev_input.z.value },
-                start: Button { value: start, press: start && !prev_input.start.value },
+            up:    Button { value: up,    press: up    && !prev_input.up.value },
+            down:  Button { value: down,  press: down  && !prev_input.down.value },
+            right: Button { value: right, press: right && !prev_input.right.value },
+            left:  Button { value: left,  press: left  && !prev_input.left.value },
+            y:     Button { value: y,     press: y     && !prev_input.y.value },
+            x:     Button { value: x,     press: x     && !prev_input.x.value },
+            b:     Button { value: b,     press: b     && !prev_input.b.value },
+            a:     Button { value: a,     press: a     && !prev_input.a.value },
+            l:     Button { value: l,     press: l     && !prev_input.l.value },
+            r:     Button { value: r,     press: r     && !prev_input.r.value },
+            z:     Button { value: z,     press: z     && !prev_input.z.value },
+            start: Button { value: start, press: start && !prev_input.start.value },
 
-                stick_x:   Stick   { value: stick_x,   diff: stick_x   - prev_input.stick_x.value },
-                stick_y:   Stick   { value: stick_y,   diff: stick_y   - prev_input.stick_y.value },
-                c_stick_x: Stick   { value: c_stick_x, diff: c_stick_x - prev_input.c_stick_x.value },
-                c_stick_y: Stick   { value: c_stick_y, diff: c_stick_y - prev_input.c_stick_y.value },
+            stick_x:   Stick   { value: stick_x,   diff: stick_x   - prev_input.stick_x.value },
+            stick_y:   Stick   { value: stick_y,   diff: stick_y   - prev_input.stick_y.value },
+            c_stick_x: Stick   { value: c_stick_x, diff: c_stick_x - prev_input.c_stick_x.value },
+            c_stick_y: Stick   { value: c_stick_y, diff: c_stick_y - prev_input.c_stick_y.value },
 
-                l_trigger:  Trigger { value: l_trigger, diff: (l_trigger) - (prev_input.l_trigger.value) },
-                r_trigger:  Trigger { value: r_trigger, diff: (r_trigger) - (prev_input.r_trigger.value) },
-            });
-        } else {
-            inputs.push(empty_player_input());
-        }
+            l_trigger:  Trigger { value: l_trigger, diff: (l_trigger) - (prev_input.l_trigger.value) },
+            r_trigger:  Trigger { value: r_trigger, diff: (r_trigger) - (prev_input.r_trigger.value) },
+        });
     };
 }
 
