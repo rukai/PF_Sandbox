@@ -33,7 +33,6 @@ impl Menu {
 
     pub fn run(&mut self, input: &mut Input) -> MenuChoice {
         loop {
-            let player_inputs = input.read(self.frames);
             match self.state {
                 MenuState::CharacterSelect => { self.step_select(); },
                 MenuState::StageSelect     => { self.step_select(); },
@@ -47,13 +46,16 @@ impl Menu {
                 MenuState::BrowseFighter   => { self.step_select(); },
                 MenuState::CreateFighter   => { self.step_select(); },
             }
-            for player_input in player_inputs {
-                if player_input.start.press {
-                    return MenuChoice {
-                        package_name: "base_package".to_string(),
-                        selected_fighters: vec!(0, 0),
-                        selected_stage: 0,
-                    }
+            if input.start_pressed() {
+                let mut selected_fighters: Vec<usize> = vec!();
+                for _ in input.player_inputs() {
+                    selected_fighters.push(0);
+                }
+
+                return MenuChoice {
+                    package_name: "base_package".to_string(),
+                    selected_fighters: selected_fighters,
+                    selected_stage: 0,
                 }
             }
             self.frames += 1

@@ -5,8 +5,9 @@ use std::time::Duration;
 
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
-    history: VecDeque<Vec<PlayerInput>>,
-    last_confirmed_frame: u64,
+    history: VecDeque<Vec<ControllerInput>>,
+    prev_start: bool,
+    current_frame: usize,
 }
 
 impl<'a> Input<'a> {
@@ -38,59 +39,120 @@ impl<'a> Input<'a> {
         let mut input = Input {
             adapter_handles: adapter_handles,
             history: VecDeque::new(),
-            last_confirmed_frame: 0,
+            prev_start: false,
+            current_frame: 0,
         };
-        input.new_history();
+        input.reset_history();
         input
     }
     
     /// Generate a new history starting with empty inputs for all controllers
-    fn new_history(&mut self) {
-        let mut history: VecDeque<Vec<PlayerInput>> = VecDeque::new();
-        let mut empty_inputs: Vec<PlayerInput> = Vec::new();
+    pub fn reset_history(&mut self) {
+        let mut history: VecDeque<Vec<ControllerInput>> = VecDeque::new();
+        let mut empty_inputs: Vec<ControllerInput> = Vec::new();
 
         // create empty inputs
         for _ in &mut self.adapter_handles {
             for _ in 0..4 {
-                empty_inputs.push(empty_player_input());
+                empty_inputs.push(empty_controller_input());
             }
         }
-        for _ in 0..4 {
-            empty_inputs.push(empty_player_input());
-        }
 
+        history.push_front(empty_inputs.clone());
         history.push_front(empty_inputs);
         self.history = history;
+        self.current_frame = 1;
     }
 
-    pub fn reset_history(&mut self) {
-        self.last_confirmed_frame = 0;
-        self.new_history();
+    /// Jump the history to the specified index
+    pub fn jump_history(&mut self, frame: usize) { // TODO: -> Result Err(_) on invalid frame
+        self.current_frame = frame;
     }
-    
-    /// return the latest inputs
-    pub fn read(&mut self, confirmed_frame: u64) -> &Vec<PlayerInput> {
-        // add current frame
-        let mut inputs: Vec<PlayerInput> = Vec::new();
-        {
-            let prev_inputs = &self.history.front().unwrap();
-            for handle in &mut self.adapter_handles {
-                read_gc_adapter(handle, &mut inputs, prev_inputs);
-            }
-            read_usb_controllers(&mut inputs, prev_inputs);
+
+    /// Call this once from the game update logic only 
+    /// Throws out all future history that may exist
+    pub fn game_update(&mut self) {
+        let total_frames = self.history.len() - 1;
+        for _ in self.current_frame..total_frames {
+            self.history.pop_front();
         }
+
+        let inputs = self.read_controllers();
         self.history.push_front(inputs);
+        self.current_frame += 1;
+    }
 
-        // delete confirmed frames
-        if self.history.len() > 2 {
-            for _ in self.last_confirmed_frame..confirmed_frame {
-                self.history.pop_back();
+    /// Return inputs at current index into history
+    pub fn player_inputs(&mut self) -> Vec<PlayerInput> {
+        let mut result_inputs: Vec<PlayerInput> = vec!();
+        let inputs      = &self.history.get(0).unwrap();
+        let prev_inputs = &self.history.get(1).unwrap();
+
+        for (i, input) in inputs.iter().enumerate() {
+            let prev_input = &prev_inputs[i];
+            if input.plugged_in {
+                result_inputs.push(PlayerInput {
+                    plugged_in: true,
+
+                    up:    Button { value: input.up,    press: input.up    && !prev_input.up },
+                    down:  Button { value: input.down,  press: input.down  && !prev_input.down },
+                    right: Button { value: input.right, press: input.right && !prev_input.right },
+                    left:  Button { value: input.left,  press: input.left  && !prev_input.left },
+                    y:     Button { value: input.y,     press: input.y     && !prev_input.y },
+                    x:     Button { value: input.x,     press: input.x     && !prev_input.x },
+                    b:     Button { value: input.b,     press: input.b     && !prev_input.b },
+                    a:     Button { value: input.a,     press: input.a     && !prev_input.a },
+                    l:     Button { value: input.l,     press: input.l     && !prev_input.l },
+                    r:     Button { value: input.r,     press: input.r     && !prev_input.r },
+                    z:     Button { value: input.z,     press: input.z     && !prev_input.z },
+                    start: Button { value: input.start, press: input.start && !prev_input.start },
+
+                    stick_x:   Stick { value: input.stick_x,   diff: input.stick_x   - prev_input.stick_x },
+                    stick_y:   Stick { value: input.stick_y,   diff: input.stick_y   - prev_input.stick_y },
+                    c_stick_x: Stick { value: input.c_stick_x, diff: input.c_stick_x - prev_input.c_stick_x },
+                    c_stick_y: Stick { value: input.c_stick_y, diff: input.c_stick_y - prev_input.c_stick_y },
+
+                    l_trigger:  Trigger { value: input.l_trigger, diff: input.l_trigger - prev_input.l_trigger },
+                    r_trigger:  Trigger { value: input.r_trigger, diff: input.r_trigger - prev_input.r_trigger },
+                });
+            }
+            else {
+                result_inputs.push(empty_player_input());
             }
         }
-        self.last_confirmed_frame = confirmed_frame;
-        
-        // return current frame
-        self.history.front().unwrap()
+        result_inputs
+    }
+
+    /// Check for start button press
+    /// Uses a seperate state from the game inputs
+    /// TODO: Maybe this should be extended to include all menu controller interaction? 
+    /// TODO: Does not distinguish between start presses from different players, should it?
+    pub fn start_pressed(&mut self) -> bool {
+        let held = self.start_held();
+        let pressed = !self.prev_start && held;
+        self.prev_start = held;
+        pressed
+    }
+
+    fn start_held(&mut self) -> bool {
+        let players = self.read_controllers();
+        for player in players {
+            if player.start {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn read_controllers(&mut self) -> Vec<ControllerInput>{
+        let mut inputs: Vec<ControllerInput> = Vec::new();
+
+        for handle in &mut self.adapter_handles {
+            read_gc_adapter(handle, &mut inputs);
+        }
+        read_usb_controllers(&mut inputs);
+
+        inputs
     }
 }
 
@@ -103,6 +165,32 @@ fn display_endpoints(device: &mut Device) {
                 println!("    endpoint - number: {}, address: {}", endpoint.number(), endpoint.address());
             }
         }
+    }
+}
+
+fn empty_controller_input() -> ControllerInput {
+    ControllerInput {
+        plugged_in: false,
+
+        up:    false,
+        down:  false,
+        right: false,
+        left:  false,
+        y:     false,
+        x:     false,
+        b:     false,
+        a:     false,
+        l:     false,
+        r:     false,
+        z:     false,
+        start: false,
+
+        stick_x:   0.0,
+        stick_y:   0.0,
+        c_stick_x: 0.0,
+        c_stick_y: 0.0,
+        l_trigger: 0.0,
+        r_trigger: 0.0,
     }
 }
 
@@ -127,74 +215,55 @@ fn empty_player_input() -> PlayerInput {
         stick_y:   Stick { value: 0.0, diff: 0.0 },
         c_stick_x: Stick { value: 0.0, diff: 0.0 },
         c_stick_y: Stick { value: 0.0, diff: 0.0 },
+
         l_trigger:  Trigger { value: 0.0, diff: 0.0 },
         r_trigger:  Trigger { value: 0.0, diff: 0.0 },
     }
 }
 
 /// Add 4 GC adapter controllers to inputs
-fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<PlayerInput>, prev_inputs: &Vec<PlayerInput>) {
+fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<ControllerInput>) {
     let mut data: [u8; 37] = [0; 37];
     handle.read_interrupt(0x81, &mut data, Duration::new(1, 0)).unwrap();
 
     for port in 0..4 {
-        let prev_input = &prev_inputs[inputs.len()];
-
-        // Returns false when rumble usb is not plugged in making this essentially useless
-        let plugged_in = data[9*port+1] == 20;
-
-        let up    = data[9*port+2] & 0b10000000 != 0;
-        let down  = data[9*port+2] & 0b01000000 != 0;
-        let right = data[9*port+2] & 0b00100000 != 0;
-        let left  = data[9*port+2] & 0b00010000 != 0;
-        let y     = data[9*port+2] & 0b00001000 != 0;
-        let x     = data[9*port+2] & 0b00000100 != 0;
-        let b     = data[9*port+2] & 0b00000010 != 0;
-        let a     = data[9*port+2] & 0b00000001 != 0;
-        let l     = data[9*port+3] & 0b00001000 != 0;
-        let r     = data[9*port+3] & 0b00000100 != 0;
-        let z     = data[9*port+3] & 0b00000010 != 0;
-        let start = data[9*port+3] & 0b00000001 != 0;
-
         let (stick_x, stick_y)     = stick_filter(data[9*port+4], data[9*port+5]);
         let (c_stick_x, c_stick_y) = stick_filter(data[9*port+6], data[9*port+7]);
 
-        let l_trigger  = trigger_filter(data[9*port+8]);
-        let r_trigger  = trigger_filter(data[9*port+9]);
+        inputs.push(ControllerInput {
+            plugged_in: data[9*port+1] == 20 || data[9*port+1] == 16,
 
-        inputs.push(PlayerInput {
-            plugged_in: plugged_in,
+            up   : data[9*port+2] & 0b10000000 != 0,
+            down : data[9*port+2] & 0b01000000 != 0,
+            right: data[9*port+2] & 0b00100000 != 0,
+            left : data[9*port+2] & 0b00010000 != 0,
+            y    : data[9*port+2] & 0b00001000 != 0,
+            x    : data[9*port+2] & 0b00000100 != 0,
+            b    : data[9*port+2] & 0b00000010 != 0,
+            a    : data[9*port+2] & 0b00000001 != 0,
+            l    : data[9*port+3] & 0b00001000 != 0,
+            r    : data[9*port+3] & 0b00000100 != 0,
+            z    : data[9*port+3] & 0b00000010 != 0,
+            start: data[9*port+3] & 0b00000001 != 0,
 
-            up:    Button { value: up,    press: up    && !prev_input.up.value },
-            down:  Button { value: down,  press: down  && !prev_input.down.value },
-            right: Button { value: right, press: right && !prev_input.right.value },
-            left:  Button { value: left,  press: left  && !prev_input.left.value },
-            y:     Button { value: y,     press: y     && !prev_input.y.value },
-            x:     Button { value: x,     press: x     && !prev_input.x.value },
-            b:     Button { value: b,     press: b     && !prev_input.b.value },
-            a:     Button { value: a,     press: a     && !prev_input.a.value },
-            l:     Button { value: l,     press: l     && !prev_input.l.value },
-            r:     Button { value: r,     press: r     && !prev_input.r.value },
-            z:     Button { value: z,     press: z     && !prev_input.z.value },
-            start: Button { value: start, press: start && !prev_input.start.value },
+            l_trigger: trigger_filter(data[9*port+8]),
+            r_trigger: trigger_filter(data[9*port+9]),
 
-            stick_x:   Stick   { value: stick_x,   diff: stick_x   - prev_input.stick_x.value },
-            stick_y:   Stick   { value: stick_y,   diff: stick_y   - prev_input.stick_y.value },
-            c_stick_x: Stick   { value: c_stick_x, diff: c_stick_x - prev_input.c_stick_x.value },
-            c_stick_y: Stick   { value: c_stick_y, diff: c_stick_y - prev_input.c_stick_y.value },
+            stick_x:   stick_x,
+            stick_y:   stick_y,
+            c_stick_x: c_stick_x,
+            c_stick_y: c_stick_y,
 
-            l_trigger:  Trigger { value: l_trigger, diff: (l_trigger) - (prev_input.l_trigger.value) },
-            r_trigger:  Trigger { value: r_trigger, diff: (r_trigger) - (prev_input.r_trigger.value) },
         });
     };
 }
 
-//TODO: implement
+// TODO: implement
 /// Add 4 controllers from usb to inputs
 #[allow(unused_variables)]
-fn read_usb_controllers(inputs: &mut Vec<PlayerInput>, prev_inputs: &Vec<PlayerInput>) {
-    for _ in 0..4 {
-        inputs.push(empty_player_input());
+fn read_usb_controllers(inputs: &mut Vec<ControllerInput>) {
+    for _ in 0..0 {
+        inputs.push(empty_controller_input());
     }
 }
 
@@ -228,9 +297,35 @@ fn trigger_filter(trigger: u8) -> f64 {
     else {
         value
     }
-
 }
 
+/// Internal input storage
+#[derive(Clone)]
+struct ControllerInput {
+    pub plugged_in: bool,
+
+    pub a:     bool,
+    pub b:     bool,
+    pub x:     bool,
+    pub y:     bool,
+    pub left:  bool,
+    pub right: bool,
+    pub down:  bool,
+    pub up:    bool,
+    pub start: bool,
+    pub z:     bool,
+    pub r:     bool,
+    pub l:     bool,
+
+    pub stick_x:   f64,
+    pub stick_y:   f64,
+    pub c_stick_x: f64,
+    pub c_stick_y: f64,
+    pub r_trigger: f64,
+    pub l_trigger: f64,
+}
+
+/// external data storage
 pub struct PlayerInput {
     pub plugged_in: bool,
 
@@ -260,7 +355,6 @@ pub struct Button {
     pub press: bool, // off->on this frame
 }
 
-// must use i16 instead of i8 for Stick.value as u8::min_value().abs() causes overflow.
 pub struct Stick {
     pub value: f64, // current.value
     pub diff:  f64, // current.value - previous.value
@@ -292,7 +386,6 @@ impl KeyInput {
                 &KeyAction::Released(key_code) => { self.held[key_code as usize] = false; }
             }
         }
-
         self.current_actions = actions;
     }
 

@@ -73,7 +73,6 @@ impl Graphics {
                 target.finish().unwrap();
             }
             self.handle_events(&mut key_input);
-
             thread::sleep(Duration::from_millis(16));
         }
     }

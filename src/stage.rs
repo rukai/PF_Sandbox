@@ -32,7 +32,10 @@ impl Stage {
             platforms:     vec!(main_platform, second_platform),
             lower_bounds:  Point {x:-200.0, y:-200.0},
             higher_bounds: Point {x: 200.0, y: 200.0},
-            spawn_points:  vec!(Point{x: -50.0, y: 50.0}, Point{x: 50.0, y: 50.0}),
+            spawn_points:  vec!(
+                Point{x: -50.0, y: 50.0}, Point{x: 50.0, y: 50.0},
+                Point{x: -50.0, y: 80.0}, Point{x: 50.0, y: 80.0},
+            ),
         }
     }
 }

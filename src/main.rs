@@ -64,8 +64,11 @@ fn cli() {
     let mut context = Context::new().unwrap();
     let mut input = Input::new(&mut context);
     let key_input = Arc::new(Mutex::new(KeyInput::new()));
-
-    let mut game = Game::new(&package, vec!(0, 0), 0);
+    let mut selected_fighters: Vec<usize> = vec!();
+    for _ in input.player_inputs() {
+        selected_fighters.push(0);
+    }
+    let mut game = Game::new(&package, selected_fighters, 0, false);
     init_graphics(&game, &package, &key_input);
     game.run(&mut input, &key_input);
 }
@@ -78,7 +81,7 @@ fn gui() {
 
         let menu_choice = Menu::new().run(&mut input);
         let package = Package::open(&menu_choice.package_name); // package should already exist as the menu has generated it.
-        let mut game = Game::new(&package, menu_choice.selected_fighters, menu_choice.selected_stage);
+        let mut game = Game::new(&package, menu_choice.selected_fighters, menu_choice.selected_stage, false);
         init_graphics(&game, &package, &key_input);
         input.reset_history();
         game.run(&mut input, &key_input);
