@@ -13,8 +13,10 @@ use glium::glutin::VirtualKeyCode;
 #[derive(Debug)]
 enum GameState {
     Local,
+    ReplayForwards,
+    ReplayBackwards,
     Netplay,
-    Paused,  // Only Local can be paused
+    Paused,  // Only Local, ReplayForwards and ReplayBackwards can be paused
     Results, // Both Local and Netplay end at Results
 }
 
@@ -25,13 +27,15 @@ pub struct Game {
     stages:   Arc<Mutex<Vec<Stage>>>,
 
     // variables
+    player_history:    Vec<Vec<Player>>,
+    current_frame:     usize,
+    saved_frame:       usize,
     pub players:       Arc<Mutex<Vec<Player>>>,
     selected_fighters: Vec<usize>,
     selected_stage:    usize,
     edit_player:       usize,
     debug_outputs:     Vec<DebugOutput>,
     state:             GameState,
-    frames:            u64,
 }
 
 impl Game {
@@ -53,12 +57,14 @@ impl Game {
             fighters: package.fighters.clone(),
             stages:   package.stages.clone(),
 
+            player_history:    vec!(),
+            current_frame:     0,
+            saved_frame:       0,
+            players:           Arc::new(Mutex::new(players)),
             selected_fighters: selected_fighters,
             selected_stage:    selected_stage,
             edit_player:       0,
             debug_outputs:     vec!(),
-            players:           Arc::new(Mutex::new(players)),
-            frames:            0,
         }
     }
 
@@ -69,16 +75,12 @@ impl Game {
                 input.update();
                 let key_input = key_input.lock().unwrap();
                 match self.state {
-                    GameState::Local => { self.step_local(input); },
-                    GameState::Netplay => { self.step_netplay(input); },
-                    GameState::Results => { self.step_results(); },
-                    GameState::Paused  => {
-                        if key_input.pressed(VirtualKeyCode::Space) {
-                            self.step_local(input);
-                        }
-                        else {
-                            self.step_pause(input, &key_input);
-                        } },
+                    GameState::Local           => { self.step_local(input); },
+                    GameState::Netplay         => { self.step_netplay(input); },
+                    GameState::Results         => { self.step_results(); },
+                    GameState::ReplayForwards  => { self.step_replay_forwards(); },
+                    GameState::ReplayBackwards => { self.step_replay_backwards(); },
+                    GameState::Paused          => { self.step_pause(input, &key_input); },
                 }
             }
 
@@ -104,19 +106,19 @@ impl Game {
     }
 
     fn step_pause(&mut self, input: &mut Input, key_input: &KeyInput) {
-        let players = self.players.lock().unwrap();
+        let players_len = self.players.lock().unwrap().len();
 
         // set current player to direct character edits to
-        if key_input.pressed(VirtualKeyCode::Key1) && players.len() >= 1 {
+        if key_input.pressed(VirtualKeyCode::Key1) && players_len >= 1 {
             self.edit_player = 0;
         }
-        else if key_input.pressed(VirtualKeyCode::Key2) && players.len() >= 2 {
+        else if key_input.pressed(VirtualKeyCode::Key2) && players_len >= 2 {
             self.edit_player = 1;
         }
-        else if key_input.pressed(VirtualKeyCode::Key3) && players.len() >= 3 {
+        else if key_input.pressed(VirtualKeyCode::Key3) && players_len >= 3 {
             self.edit_player = 2;
         }
-        else if key_input.pressed(VirtualKeyCode::Key4) && players.len() >= 4 {
+        else if key_input.pressed(VirtualKeyCode::Key4) && players_len >= 4 {
             self.edit_player = 3;
         }
 
@@ -124,22 +126,51 @@ impl Game {
         if key_input.pressed(VirtualKeyCode::F1) {
             self.debug_outputs.push(DebugOutput::Physics{ player: self.edit_player });
         }
-        else if key_input.pressed(VirtualKeyCode::F2) {
-            if key_input.held(VirtualKeyCode::LShift) || key_input.held(VirtualKeyCode::RShift) {
+        if key_input.pressed(VirtualKeyCode::F2) {
+            if key_input.held_shift() {
                 self.debug_outputs.push(DebugOutput::InputDiff{ player: self.edit_player });
             }
             else {
                 self.debug_outputs.push(DebugOutput::Input{ player: self.edit_player });
             }
         }
-        else if key_input.pressed(VirtualKeyCode::F3) {
+        if key_input.pressed(VirtualKeyCode::F3) {
             self.debug_outputs.push(DebugOutput::Action{ player: self.edit_player });
         }
-        else if key_input.pressed(VirtualKeyCode::F4) {
+        if key_input.pressed(VirtualKeyCode::F4) {
             self.debug_outputs.push(DebugOutput::Frame{ player: self.edit_player });
         }
-        else if key_input.pressed(VirtualKeyCode::F5) {
+        if key_input.pressed(VirtualKeyCode::F5) {
             self.debug_outputs = vec!();
+        }
+
+        // game flow
+        if key_input.pressed(VirtualKeyCode::Comma) {
+            if key_input.held_shift() {
+                self.step_replay_forwards();
+            }
+            else {
+                self.state = GameState::ReplayForwards;
+            }
+        }
+        else if key_input.pressed(VirtualKeyCode::Colon) {
+            if key_input.held_shift() {
+                self.step_replay_backwards();
+            }
+            else {
+                self.state = GameState::ReplayBackwards;
+            }
+        }
+        else if key_input.pressed(VirtualKeyCode::Space) {
+            self.step_game(input);
+        }
+        else if key_input.pressed(VirtualKeyCode::K) {
+            // TODO: Invalidate saved_frame when the frame it refers to is deleted.
+            self.saved_frame = self.current_frame;
+        }
+        else if key_input.pressed(VirtualKeyCode::L) {
+            let frame = self.saved_frame;
+            self.jump_frame(frame);
         }
 
         // allow players to resume game
@@ -150,34 +181,40 @@ impl Game {
         // TODO: Handle character/stage edits here
     }
 
-    fn step_results(&mut self) {
+    fn step_replay_forwards(&mut self) {
+    }
+
+    fn step_replay_backwards(&mut self) {
+    }
+
+    fn jump_frame(&mut self, frame: usize) {
     }
 
     fn step_game(&mut self, input: &mut Input) {
-            // acquire resources
-            let mut players = self.players.lock().unwrap();
-            let fighters = self.fighters.lock().unwrap();
-            let stages = self.stages.lock().unwrap();
-            let stage = &stages[self.selected_stage];
+        // acquire resources
+        let mut players = self.players.lock().unwrap();
+        let fighters = self.fighters.lock().unwrap();
+        let stages = self.stages.lock().unwrap();
+        let stage = &stages[self.selected_stage];
 
-            // input
-            input.game_update();
-            let player_input = input.player_inputs();
+        // input
+        input.game_update();
+        let player_input = input.player_inputs();
 
-            // step each player
-            for (i, player) in (&mut *players).iter_mut().enumerate() {
-                let fighter = &fighters[self.selected_fighters[i]];
-                player.step(&player_input[i], fighter, stage);
-            }
+        // step each player
+        for (i, player) in (&mut *players).iter_mut().enumerate() {
+            let fighter = &fighters[self.selected_fighters[i]];
+            player.step(&player_input[i], fighter, stage);
+        }
 
-            // handle timer
-            self.frames += 1;
-            if self.frames / 60 > self.rules.time_limit {
-                self.state = GameState::Results;
-            }
+        // handle timer
+        self.current_frame += 1;
+        if (self.current_frame / 60) as u64 > self.rules.time_limit {
+            self.state = GameState::Results;
+        }
 
         println!("\n-------------------------------------------");
-        println!("Frame {} ", self.frames);
+        println!("Frame {} ", self.current_frame);
 
         for debug_output in &self.debug_outputs {
             match debug_output {
@@ -203,6 +240,9 @@ impl Game {
                 },
             }
         }
+    }
+
+    fn step_results(&mut self) {
     }
 }
 

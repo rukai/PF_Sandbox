@@ -418,6 +418,10 @@ impl KeyInput {
     pub fn held(&self, key_code: VirtualKeyCode) -> bool {
         return self.held[key_code as usize];
     }
+
+    pub fn held_shift(&self) -> bool {
+        return self.held(VirtualKeyCode::LShift) || self.held(VirtualKeyCode::RShift);
+    }
 }
 
 pub enum KeyAction {
