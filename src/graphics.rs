@@ -9,7 +9,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::collections::HashMap;
 
 #[derive(Copy, Clone)]
@@ -58,6 +58,7 @@ impl Graphics {
                stages:    Arc<Mutex<Vec<Stage>>>,
                mut key_input: Arc<Mutex<KeyInput>>) {
         loop {
+            let frame_start = Instant::now();
             {
                 let mut target = self.display.draw();
                 target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -73,7 +74,12 @@ impl Graphics {
                 target.finish().unwrap();
             }
             self.handle_events(&mut key_input);
-            thread::sleep(Duration::from_millis(16));
+
+            let frame_duration = Duration::from_secs(1) / 60;
+            let frame_duration_actual = frame_start.elapsed();
+            if frame_duration_actual < frame_duration {
+                thread::sleep(frame_duration - frame_start.elapsed());
+            }
         }
     }
 

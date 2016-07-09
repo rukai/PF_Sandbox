@@ -7,7 +7,7 @@ use ::stage::Stage;
 
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use glium::glutin::VirtualKeyCode;
 
 #[derive(Debug)]
@@ -64,6 +64,7 @@ impl Game {
 
     pub fn run(&mut self, input: &mut Input, key_input: &Arc<Mutex<KeyInput>>) {
         loop {
+            let frame_start = Instant::now();
             {
                 let key_input = key_input.lock().unwrap();
                 match self.state {
@@ -80,7 +81,11 @@ impl Game {
                 }
             }
 
-            thread::sleep(Duration::from_millis(16));
+            let frame_duration = Duration::from_secs(1) / 60;
+            let frame_duration_actual = frame_start.elapsed();
+            if frame_duration_actual < frame_duration {
+                thread::sleep(frame_duration - frame_start.elapsed());
+            }
             // TODO: when finished results screen, return, without aborting
         }
     }
