@@ -5,9 +5,10 @@ use std::time::Duration;
 
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
-    history: VecDeque<Vec<ControllerInput>>,
-    prev_start: bool,
-    current_frame: usize,
+    current_inputs:  Vec<ControllerInput>,           // inputs for this frame
+    game_inputs:     VecDeque<Vec<ControllerInput>>, // game past and (potentially) future inputs
+    current_frame:   usize,                          // index into game_inputs
+    prev_start:      bool,
 }
 
 impl<'a> Input<'a> {
@@ -38,17 +39,30 @@ impl<'a> Input<'a> {
         }
         let mut input = Input {
             adapter_handles: adapter_handles,
-            history: VecDeque::new(),
-            prev_start: false,
-            current_frame: 0,
+            game_inputs:     VecDeque::new(),
+            current_inputs:  vec!(),
+            prev_start:      false,
+            current_frame:   0,
         };
         input.reset_history();
         input
     }
-    
+
+    /// Call this once every frame
+    pub fn update(&mut self) {
+        let mut inputs: Vec<ControllerInput> = Vec::new();
+
+        for handle in &mut self.adapter_handles {
+            read_gc_adapter(handle, &mut inputs);
+        }
+        read_usb_controllers(&mut inputs);
+
+        self.current_inputs = inputs;
+    }
+
     /// Generate a new history starting with empty inputs for all controllers
     pub fn reset_history(&mut self) {
-        let mut history: VecDeque<Vec<ControllerInput>> = VecDeque::new();
+        let mut game_inputs: VecDeque<Vec<ControllerInput>> = VecDeque::new();
         let mut empty_inputs: Vec<ControllerInput> = Vec::new();
 
         // create empty inputs
@@ -58,9 +72,9 @@ impl<'a> Input<'a> {
             }
         }
 
-        history.push_front(empty_inputs.clone());
-        history.push_front(empty_inputs);
-        self.history = history;
+        game_inputs.push_front(empty_inputs.clone());
+        game_inputs.push_front(empty_inputs);
+        self.game_inputs = game_inputs;
         self.current_frame = 1;
     }
 
@@ -72,21 +86,20 @@ impl<'a> Input<'a> {
     /// Call this once from the game update logic only 
     /// Throws out all future history that may exist
     pub fn game_update(&mut self) {
-        let total_frames = self.history.len() - 1;
+        let total_frames = self.game_inputs.len() - 1;
         for _ in self.current_frame..total_frames {
-            self.history.pop_front();
+            self.game_inputs.pop_front();
         }
 
-        let inputs = self.read_controllers();
-        self.history.push_front(inputs);
+        self.game_inputs.push_front(self.current_inputs.clone());
         self.current_frame += 1;
     }
 
-    /// Return inputs at current index into history
+    /// Return game inputs at current index into history
     pub fn player_inputs(&mut self) -> Vec<PlayerInput> {
         let mut result_inputs: Vec<PlayerInput> = vec!();
-        let inputs      = &self.history.get(0).unwrap();
-        let prev_inputs = &self.history.get(1).unwrap();
+        let inputs      = &self.game_inputs.get(0).unwrap();
+        let prev_inputs = &self.game_inputs.get(1).unwrap();
 
         for (i, input) in inputs.iter().enumerate() {
             let prev_input = &prev_inputs[i];
@@ -135,24 +148,12 @@ impl<'a> Input<'a> {
     }
 
     fn start_held(&mut self) -> bool {
-        let players = self.read_controllers();
-        for player in players {
+        for player in &self.current_inputs {
             if player.start {
                 return true;
             }
         }
         false
-    }
-
-    fn read_controllers(&mut self) -> Vec<ControllerInput>{
-        let mut inputs: Vec<ControllerInput> = Vec::new();
-
-        for handle in &mut self.adapter_handles {
-            read_gc_adapter(handle, &mut inputs);
-        }
-        read_usb_controllers(&mut inputs);
-
-        inputs
     }
 }
 
@@ -325,7 +326,7 @@ struct ControllerInput {
     pub l_trigger: f64,
 }
 
-/// external data storage
+/// External data access
 pub struct PlayerInput {
     pub plugged_in: bool,
 

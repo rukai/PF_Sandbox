@@ -33,6 +33,7 @@ impl Menu {
 
     pub fn run(&mut self, input: &mut Input) -> MenuChoice {
         loop {
+            input.update();
             match self.state {
                 MenuState::CharacterSelect => { self.step_select(); },
                 MenuState::StageSelect     => { self.step_select(); },

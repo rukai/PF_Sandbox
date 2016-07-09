@@ -66,6 +66,7 @@ impl Game {
         loop {
             let frame_start = Instant::now();
             {
+                input.update();
                 let key_input = key_input.lock().unwrap();
                 match self.state {
                     GameState::Local => { self.step_local(input); },
@@ -91,7 +92,6 @@ impl Game {
     }
 
     fn step_local(&mut self, input: &mut Input) {
-        // TODO: Calling this and step_game may introduce problems with polling, investigate
         if input.start_pressed() {
             self.state = GameState::Paused;
         }
