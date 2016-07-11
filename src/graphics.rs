@@ -113,7 +113,7 @@ impl Graphics {
         let vertex_shader = self.shaders.get("vertex").unwrap();
         let fragment_shader = self.shaders.get("fragment").unwrap();
         let program = glium::Program::from_source(&self.display, vertex_shader, fragment_shader, None).unwrap();
-        
+
         let scale: f32 = 0.01;
         let matrix = [
             [scale, 0.0,   0.0, 0.0],
@@ -176,32 +176,23 @@ impl Graphics {
         target.draw(&vertex_buffer, &indices, &program, &uniform! {matrix: matrix}, &Default::default()).unwrap();
     }
 
-    fn close(&mut self){
-        // TODO: errr I guess I need to get the main thread to terminate
-    }
-
     fn handle_events(&mut self, key_input: &mut Arc<Mutex<KeyInput>>) {
-        let mut close = false;
         let mut key_actions: Vec<KeyAction> = vec!();
 
         for ev in self.display.poll_events() {
             use glium::glutin::Event::*;
             use glium::glutin::ElementState::{Pressed, Released};
-            use glium::glutin::VirtualKeyCode::Escape;
+            use glium::glutin::VirtualKeyCode;
 
             match ev {
-                KeyboardInput(Pressed, _, Some(Escape)) | Closed
-                    => { close = true; },
+                Closed
+                    => { key_actions.push(KeyAction::Pressed (VirtualKeyCode::Escape)) },
                 KeyboardInput(Pressed, _, Some(key_code))
                     => { key_actions.push(KeyAction::Pressed  (key_code)) },
                 KeyboardInput(Released, _, Some(key_code))
                     => { key_actions.push(KeyAction::Released (key_code)) },
                 _   => {},
             }
-        }
-
-        if close {
-            self.close()
         }
 
         let mut key_input = key_input.lock().unwrap();

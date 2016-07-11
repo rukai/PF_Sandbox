@@ -1,6 +1,7 @@
 extern crate pf_engine;
 extern crate getopts;
 extern crate libusb;
+extern crate glium;
 
 use pf_engine::package::Package;
 use pf_engine::menu::{Menu};
@@ -8,12 +9,13 @@ use pf_engine::game::Game;
 use pf_engine::graphics::Graphics;
 use pf_engine::input::{Input, KeyInput};
 
-use libusb::Context;
 use getopts::Options;
+use libusb::Context;
+use glium::glutin::VirtualKeyCode;
 use std::env;
 use std::fs;
-use std::path::Path;
 use std::thread;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 fn print_usage(program: &str, opts: Options) {
@@ -85,6 +87,11 @@ fn gui() {
         init_graphics(&game, &package, &key_input);
         input.reset_history();
         game.run(&mut input, &key_input);
+
+        let key_input = key_input.lock().unwrap();
+        if key_input.pressed(VirtualKeyCode::Escape) {
+            return;
+        }
     }
 }
 

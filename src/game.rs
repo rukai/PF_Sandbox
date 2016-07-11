@@ -1,4 +1,4 @@
-use ::input::{Input, KeyInput};
+use ::input::{Input, KeyInput, PlayerInput};
 use ::fighter::Fighter;
 use ::package::Package;
 use ::player::Player;
@@ -74,12 +74,17 @@ impl Game {
             {
                 input.update();
                 let key_input = key_input.lock().unwrap();
+
+                if key_input.pressed(VirtualKeyCode::Escape) {
+                    return;
+                }
+
                 match self.state {
                     GameState::Local           => { self.step_local(input); },
                     GameState::Netplay         => { self.step_netplay(input); },
                     GameState::Results         => { self.step_results(); },
-                    GameState::ReplayForwards  => { self.step_replay_forwards(); },
-                    GameState::ReplayBackwards => { self.step_replay_backwards(); },
+                    GameState::ReplayForwards  => { self.step_replay_forwards(input); },
+                    GameState::ReplayBackwards => { self.step_replay_backwards(input); },
                     GameState::Paused          => { self.step_pause(input, &key_input); },
                 }
             }
@@ -98,11 +103,13 @@ impl Game {
             self.state = GameState::Paused;
         }
 
-        self.step_game(input);
+        input.game_update();
+        self.step_game(&input.player_inputs());
     }
 
     fn step_netplay(&mut self, input: &mut Input) {
-        self.step_game(input);
+        input.game_update();
+        self.step_game(&input.player_inputs());
     }
 
     fn step_pause(&mut self, input: &mut Input, key_input: &KeyInput) {
@@ -144,30 +151,35 @@ impl Game {
             self.debug_outputs = vec!();
         }
 
-        // game flow
+        // replay forwards
         if key_input.pressed(VirtualKeyCode::Comma) {
             if key_input.held_shift() {
-                self.step_replay_forwards();
+                self.step_replay_forwards(input);
             }
             else {
                 self.state = GameState::ReplayForwards;
             }
         }
+        // replay backwards
         else if key_input.pressed(VirtualKeyCode::Colon) {
             if key_input.held_shift() {
-                self.step_replay_backwards();
+                self.step_replay_backwards(input);
             }
             else {
                 self.state = GameState::ReplayBackwards;
             }
         }
+        // frame advance
         else if key_input.pressed(VirtualKeyCode::Space) {
-            self.step_game(input);
+            input.game_update();
+            self.step_game(&input.player_inputs());
         }
+        // save frame
         else if key_input.pressed(VirtualKeyCode::K) {
             // TODO: Invalidate saved_frame when the frame it refers to is deleted.
             self.saved_frame = self.current_frame;
         }
+        // jump to frame
         else if key_input.pressed(VirtualKeyCode::L) {
             let frame = self.saved_frame;
             self.jump_frame(frame);
@@ -181,25 +193,29 @@ impl Game {
         // TODO: Handle character/stage edits here
     }
 
-    fn step_replay_forwards(&mut self) {
+    // next frame determined by previous frame and input of next frame
+    // TODO: speed up by jumping to next frame if pre-computed
+    fn step_replay_forwards(&mut self, input: &mut Input) {
+        self.current_frame += 1;
+        input.jump_history(self.current_frame);
+        self.step_game(&input.player_inputs());
     }
 
-    fn step_replay_backwards(&mut self) {
+    // previous frame is always pre-computed and jumped to immediately
+    fn step_replay_backwards(&mut self, input: &mut Input) {
+        self.current_frame -= 1;
+        //self.players = self.player_history.get(self.current_frame).unwrap().clone();
     }
 
     fn jump_frame(&mut self, frame: usize) {
     }
 
-    fn step_game(&mut self, input: &mut Input) {
+    fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
         // acquire resources
         let mut players = self.players.lock().unwrap();
         let fighters = self.fighters.lock().unwrap();
         let stages = self.stages.lock().unwrap();
         let stage = &stages[self.selected_stage];
-
-        // input
-        input.game_update();
-        let player_input = input.player_inputs();
 
         // step each player
         for (i, player) in (&mut *players).iter_mut().enumerate() {
