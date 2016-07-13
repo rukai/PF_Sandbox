@@ -1,8 +1,7 @@
 use std::fs::{File, DirBuilder, self};
 use std::io::Read;
 use std::io::Write;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::path::{PathBuf, Path};
 use rustc_serialize::{Encodable, Decodable};
 use rustc_serialize::json::{self, Encoder, DecodeResult};
 
@@ -15,8 +14,8 @@ pub struct Package {
     pub meta:               PackageMeta,
     pub rules:              Rules,
 
-    pub stages:             Arc<Mutex<Vec<Stage>>>,
-    pub fighters:           Arc<Mutex<Vec<Fighter>>>,
+    pub stages:             Vec<Stage>,
+    pub fighters:           Vec<Fighter>,
     pub stages_filenames:   Vec<String>,
     pub fighters_filenames: Vec<String>,
 }
@@ -38,14 +37,15 @@ impl Package {
             meta:               meta,
             path:               path,
             rules:              Rules::base(),
-            stages:             Arc::new(Mutex::new(Vec::new())),
-            fighters:           Arc::new(Mutex::new(Vec::new())),
+            stages:             Vec::new(),
+            fighters:           Vec::new(),
             fighters_filenames: Vec::new(),
             stages_filenames:   Vec::new(),
         };
         package.load();
         package
     }
+
 
     pub fn generate_base(name: &str) -> Package {
         let mut path = PathBuf::from("packages");
@@ -62,14 +62,24 @@ impl Package {
         let package = Package {
             meta:               meta,
             rules:              Rules::base(),
-            stages:             Arc::new(Mutex::new(vec!(Stage::base()))),
+            stages:             vec!(Stage::base()),
             stages_filenames:   vec!(path.join("Stages").join("base_stage.json").to_str().unwrap().to_string()),
-            fighters:           Arc::new(Mutex::new(vec!(Fighter::base()))),
+            fighters:           vec!(Fighter::base()),
             fighters_filenames: vec!(path.join("Fighters").join("base_fighter.json").to_str().unwrap().to_string()),
             path:               path,
         };
         package.save();
         package
+    }
+
+    pub fn open_or_generate(package_name: &str) -> Package {
+        let package_path = Path::new("packages").join(package_name);
+
+        // if a package does not already exist create a new one
+        match fs::metadata(package_path) {
+            Ok(_)  => Package::open(package_name),
+            Err(_) => Package::generate_base(package_name),
+        }
     }
 
     pub fn save(&self) {
@@ -81,18 +91,12 @@ impl Package {
         Package::save_struct(self.path.join("rules.json"), &self.rules);
         Package::save_struct(self.path.join("package_meta.json"), &self.meta);
 
-        {
-            let fighters = self.fighters.lock().unwrap();
-            for (i, filename) in self.fighters_filenames.iter().enumerate() {
-                Package::save_struct(PathBuf::from(filename), &fighters[i]);
-            }
+        for (i, filename) in self.fighters_filenames.iter().enumerate() {
+            Package::save_struct(PathBuf::from(filename), &self.fighters[i]);
         }
         
-        {
-            let stages = self.stages.lock().unwrap();
-            for (i, filename) in self.stages_filenames.iter().enumerate() {
-                Package::save_struct(PathBuf::from(filename), &stages[i]);
-            }
+        for (i, filename) in self.stages_filenames.iter().enumerate() {
+            Package::save_struct(PathBuf::from(filename), &self.stages[i]);
         }
     }
 
@@ -107,16 +111,14 @@ impl Package {
             let full_path = path.unwrap().path();
             self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
 
-            let mut fighters = self.fighters.lock().unwrap();
-            fighters.push(Package::load_struct(full_path).unwrap());
+            self.fighters.push(Package::load_struct(full_path).unwrap());
         }
 
         for path in fs::read_dir(self.path.join("Stages")).unwrap() {
             let full_path = path.unwrap().path();
             self.stages_filenames.push(full_path.to_str().unwrap().to_string());
 
-            let mut stages = self.stages.lock().unwrap();
-            stages.push(Package::load_struct(full_path).unwrap());
+            self.stages.push(Package::load_struct(full_path).unwrap());
         }
     }
     

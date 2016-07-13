@@ -1,15 +1,18 @@
 use ::fighter::Fighter;
-use ::player::Player;
+use ::game::{GameState, RenderEntity, RenderGame};
+use ::player::{RenderPlayer};
 use ::stage::Stage;
+use ::package::Package;
 use ::input::{KeyInput, KeyAction};
+use ::app::Render;
+use ::menu::RenderMenu;
 
 use glium::{DisplayBuild, Surface, self};
+use std::sync::mpsc::{Sender, Receiver, channel};
 use std::fs::{File, self};
 use std::io::Read;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
 use std::collections::HashMap;
 
 #[derive(Copy, Clone)]
@@ -18,21 +21,48 @@ struct Vertex {
 }
 implement_vertex!(Vertex, position);
 
+#[allow(dead_code)]
 pub struct Graphics {
-    shaders: HashMap<String, String>,
-    display: glium::backend::glutin_backend::GlutinFacade,
+    shaders:      HashMap<String, String>,
+    display:      glium::backend::glutin_backend::GlutinFacade,
+    stages:       Vec<Stage>,
+    fighters:     Vec<Fighter>,
+    key_input_tx: Sender<KeyAction>,
+    render_rx:    Receiver<Render>,
 }
 
 #[allow(unused_variables)]
 impl Graphics {
-    pub fn new() -> Graphics {
+    pub fn init(package: &Package) -> (Sender<Render>, KeyInput) {
+        let fighters = package.fighters.clone();
+        let stages   = package.stages.clone();
+        let (render_tx, render_rx) = channel();
+        let (key_input, key_input_tx) = KeyInput::new();
+
+        thread::spawn(move || {
+            let mut graphics = Graphics::new(stages, fighters, key_input_tx, render_rx);
+            graphics.run(); // TODO: should render_rx go in the constructor?
+        });
+        (render_tx, key_input)
+    }
+
+    fn new(
+        stages: Vec<Stage>,
+        fighters: Vec<Fighter>,
+        key_input_tx: Sender<KeyAction>,
+        render_rx: Receiver<Render>,
+    ) -> Graphics {
         let display = glium::glutin::WindowBuilder::new()
             .with_title("PF ENGINE")
             .build_glium()
             .unwrap();
         Graphics {
-            shaders: Graphics::load_shaders(),
-            display: display
+            shaders:      Graphics::load_shaders(),
+            display:      display,
+            stages:       stages,
+            fighters:     fighters,
+            key_input_tx: key_input_tx,
+            render_rx:    render_rx,
         }
     }
 
@@ -52,39 +82,54 @@ impl Graphics {
         shaders
     }
 
-    pub fn run(&mut self,
-               players:   Arc<Mutex<Vec<Player>>>,
-               fighters:  Arc<Mutex<Vec<Fighter>>>,
-               stages:    Arc<Mutex<Vec<Stage>>>,
-               mut key_input: Arc<Mutex<KeyInput>>) {
+    fn run(&mut self) {
         loop {
-            let frame_start = Instant::now();
             {
                 let mut target = self.display.draw();
                 target.clear_color(0.0, 0.0, 0.0, 1.0);
 
-                let players = players.lock().unwrap();
-                for player in players.iter() {
-                    self.player_render(player, &mut target);
+                // get the most recent render
+                let mut render = self.render_rx.recv().unwrap();
+                loop {
+                    match self.render_rx.try_recv() {
+                        Ok(msg) => { render = msg; },
+                        Err(_)  => { break; },
+                    }
                 }
 
-                let stages = stages.lock().unwrap();
-                self.stage_render(&stages[0], &mut target);
+                match render {
+                    Render::Game(game) => { self.game_render(game, &mut target); },
+                    Render::Menu(menu) => { self.menu_render(menu); },
+                }
 
                 target.finish().unwrap();
             }
-            self.handle_events(&mut key_input);
-
-            let frame_duration = Duration::from_secs(1) / 60;
-            let frame_duration_actual = frame_start.elapsed();
-            if frame_duration_actual < frame_duration {
-                thread::sleep(frame_duration - frame_start.elapsed());
-            }
+            self.handle_events();
         }
     }
 
+    fn game_render(&mut self, render: RenderGame, target: &mut glium::Frame) {
+        match render.state {
+            GameState::Local  => { },
+            GameState::Paused => { },
+            _                 => { },
+        }
+
+        for entity in render.entities {
+            match entity {
+                RenderEntity::Player(player) => { self.player_render(player, target) },
+            }
+        }
+        self.stage_render(0, target);
+    }
+
+    fn menu_render(&mut self, render: RenderMenu) {
+    }
+
     // TODO: Clean up shared code between stage and player render
-    fn stage_render(&mut self, stage: &Stage, target: &mut glium::Frame) {
+    fn stage_render(&mut self, stage: usize, target: &mut glium::Frame) {
+        let stage = &self.stages[stage];
+
         let mut vertices: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u16> = Vec::new();
         let mut indice_count = 0;
@@ -124,7 +169,7 @@ impl Graphics {
         target.draw(&vertex_buffer, &indices, &program, &uniform! {matrix: matrix}, &Default::default()).unwrap();
     }
 
-    fn player_render(&mut self, player: &Player, target: &mut glium::Frame) {
+    fn player_render(&mut self, player: RenderPlayer, target: &mut glium::Frame) {
         let ecb_w = (player.ecb_w) as f32;
         let ecb_y = (player.ecb_y) as f32;
         let ecb_top = (player.ecb_top) as f32;
@@ -176,9 +221,7 @@ impl Graphics {
         target.draw(&vertex_buffer, &indices, &program, &uniform! {matrix: matrix}, &Default::default()).unwrap();
     }
 
-    fn handle_events(&mut self, key_input: &mut Arc<Mutex<KeyInput>>) {
-        let mut key_actions: Vec<KeyAction> = vec!();
-
+    fn handle_events(&mut self) {
         for ev in self.display.poll_events() {
             use glium::glutin::Event::*;
             use glium::glutin::ElementState::{Pressed, Released};
@@ -186,16 +229,13 @@ impl Graphics {
 
             match ev {
                 Closed
-                    => { key_actions.push(KeyAction::Pressed (VirtualKeyCode::Escape)) },
+                    => { self.key_input_tx.send(KeyAction::Pressed (VirtualKeyCode::Escape)).unwrap(); },
                 KeyboardInput(Pressed, _, Some(key_code))
-                    => { key_actions.push(KeyAction::Pressed  (key_code)) },
+                    => { self.key_input_tx.send(KeyAction::Pressed  (key_code)).unwrap(); },
                 KeyboardInput(Released, _, Some(key_code))
-                    => { key_actions.push(KeyAction::Released (key_code)) },
+                    => { self.key_input_tx.send(KeyAction::Released (key_code)).unwrap(); },
                 _   => {},
             }
         }
-
-        let mut key_input = key_input.lock().unwrap();
-        key_input.set_actions(key_actions);
     }
 }

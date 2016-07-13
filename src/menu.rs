@@ -1,6 +1,7 @@
 use ::input::{Input};
 
 #[allow(dead_code)]
+#[derive(Clone)]
 enum MenuState {
     CharacterSelect,
     StageSelect,
@@ -31,41 +32,55 @@ impl Menu {
     fn step_select(&mut self) {
     }
 
-    pub fn run(&mut self, input: &mut Input) -> MenuChoice {
-        loop {
-            input.update();
-            match self.state {
-                MenuState::CharacterSelect => { self.step_select(); },
-                MenuState::StageSelect     => { self.step_select(); },
+    pub fn step(&mut self, input: &mut Input) -> Vec<MenuChoice> {
+        match self.state {
+            MenuState::CharacterSelect => { self.step_select(); },
+            MenuState::StageSelect     => { self.step_select(); },
 
-                MenuState::SetRules        => { self.step_select(); },
+            MenuState::SetRules        => { self.step_select(); },
 
-                MenuState::SwitchPackages  => { self.step_select(); },
-                MenuState::BrowsePackages  => { self.step_select(); },
-                MenuState::CreatePackage   => { self.step_select(); },
+            MenuState::SwitchPackages  => { self.step_select(); },
+            MenuState::BrowsePackages  => { self.step_select(); },
+            MenuState::CreatePackage   => { self.step_select(); },
 
-                MenuState::BrowseFighter   => { self.step_select(); },
-                MenuState::CreateFighter   => { self.step_select(); },
+            MenuState::BrowseFighter   => { self.step_select(); },
+            MenuState::CreateFighter   => { self.step_select(); },
+        }
+        if input.start_pressed() {
+            let mut selected_fighters: Vec<usize> = vec!();
+            for _ in input.player_inputs() {
+                selected_fighters.push(0);
             }
-            if input.start_pressed() {
-                let mut selected_fighters: Vec<usize> = vec!();
-                for _ in input.player_inputs() {
-                    selected_fighters.push(0);
-                }
 
-                return MenuChoice {
-                    package_name: "base_package".to_string(),
-                    selected_fighters: selected_fighters,
-                    selected_stage: 0,
-                }
+            let mut controllers: Vec<usize> = vec!();
+            for (i, _) in input.player_inputs().iter().enumerate() {
+                controllers.push(i);
             }
-            self.frames += 1
+
+            return vec!(MenuChoice::Start {
+                controllers: controllers,
+                fighters:    selected_fighters,
+                stage:       0,
+                netplay:     false,
+            });
+        }
+        self.frames += 1;
+        return vec!();
+    }
+
+    pub fn render(&self) -> RenderMenu {
+        RenderMenu {
+            state: self.state.clone(),
         }
     }
 }
 
-pub struct MenuChoice {
-    pub package_name: String,
-    pub selected_fighters: Vec<usize>,
-    pub selected_stage: usize,
+pub enum MenuChoice {
+    ChangePackage (String),
+    Start { controllers: Vec<usize>, fighters: Vec<usize>, stage: usize , netplay: bool},
+}
+
+#[allow(dead_code)]
+pub struct RenderMenu {
+    state: MenuState,
 }

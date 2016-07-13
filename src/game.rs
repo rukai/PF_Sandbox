@@ -1,119 +1,89 @@
 use ::input::{Input, KeyInput, PlayerInput};
-use ::fighter::Fighter;
 use ::package::Package;
-use ::player::Player;
-use ::rules::Rules;
-use ::stage::Stage;
+use ::player::{Player, RenderPlayer};
 
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
 use glium::glutin::VirtualKeyCode;
 
-#[derive(Debug)]
-enum GameState {
-    Local,
-    ReplayForwards,
-    ReplayBackwards,
-    Netplay,
-    Paused,  // Only Local, ReplayForwards and ReplayBackwards can be paused
-    Results, // Both Local and Netplay end at Results
-}
-
+#[allow(dead_code)]
 pub struct Game {
-    // package data
-    rules:    Rules,
-    fighters: Arc<Mutex<Vec<Fighter>>>,
-    stages:   Arc<Mutex<Vec<Stage>>>,
-
     // variables
-    player_history:    Vec<Vec<Player>>,
-    current_frame:     usize,
-    saved_frame:       usize,
-    pub players:       Arc<Mutex<Vec<Player>>>,
-    selected_fighters: Vec<usize>,
-    selected_stage:    usize,
-    edit_player:       usize,
-    debug_outputs:     Vec<DebugOutput>,
-    state:             GameState,
+    player_history:       Vec<Vec<Player>>,
+    current_frame:        usize,
+    saved_frame:          usize,
+    players:              Vec<Player>,
+    selected_controllers: Vec<usize>,
+    selected_fighters:    Vec<usize>,
+    selected_stage:       usize,
+    edit_player:          usize,
+    debug_outputs:        Vec<DebugOutput>,
+    state:                GameState,
 }
 
 impl Game {
-    pub fn new(package: &Package, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool) -> Game {
-        let mut players: Vec<Player> = Vec::new();
-        {
-            let stages = package.stages.lock().unwrap();
-            for i in 0..selected_fighters.len() {
-                let spawn_points = &stages[selected_stage].spawn_points;
-                // Spawn points are reused when there are none left
-                let spawn = spawn_points[i % spawn_points.len()].clone();
-                players.push(Player::new(spawn, package.rules.stock_count));
+    pub fn new(package: &Package, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
+        let mut players: Vec<Player> = vec!();
+        let spawn_points = &package.stages[selected_stage].spawn_points;
+        for (i, _) in selected_controllers.iter().enumerate() {
+            // Stages can have less spawn points then players
+            let spawn = spawn_points[i % spawn_points.len()].clone();
+            players.push(Player::new(spawn, package.rules.stock_count));
+        }
+
+        // The CLI allows for selected_fighters to be shorter then players
+        let mut filled_fighters = selected_fighters.clone();
+        let wrap = selected_fighters.len();
+        if players.len() > selected_fighters.len() {
+            let extra = players.len() - selected_fighters.len();
+            for i in 0..extra {
+                filled_fighters.push(selected_fighters[i % wrap]);
             }
         }
 
         Game {
-            state:    if netplay { GameState::Netplay } else { GameState::Local },
-            rules:    package.rules.clone(),
-            fighters: package.fighters.clone(),
-            stages:   package.stages.clone(),
-
-            player_history:    vec!(),
-            current_frame:     0,
-            saved_frame:       0,
-            players:           Arc::new(Mutex::new(players)),
-            selected_fighters: selected_fighters,
-            selected_stage:    selected_stage,
-            edit_player:       0,
-            debug_outputs:     vec!(),
+            state:                if netplay { GameState::Netplay } else { GameState::Local },
+            player_history:       vec!(),
+            current_frame:        0,
+            saved_frame:          0,
+            players:              players,
+            selected_controllers: selected_controllers,
+            selected_fighters:    filled_fighters,
+            selected_stage:       selected_stage,
+            edit_player:          0,
+            debug_outputs:        vec!(),
         }
     }
 
-    pub fn run(&mut self, input: &mut Input, key_input: &Arc<Mutex<KeyInput>>) {
-        loop {
-            let frame_start = Instant::now();
-            {
-                input.update();
-                let key_input = key_input.lock().unwrap();
+    pub fn step(&mut self, package: &mut Package, input: &mut Input, key_input: &KeyInput) {
+        if key_input.pressed(VirtualKeyCode::Escape) {
+            return;
+        }
 
-                if key_input.pressed(VirtualKeyCode::Escape) {
-                    return;
-                }
-
-                match self.state {
-                    GameState::Local           => { self.step_local(input); },
-                    GameState::Netplay         => { self.step_netplay(input); },
-                    GameState::Results         => { self.step_results(); },
-                    GameState::ReplayForwards  => { self.step_replay_forwards(input); },
-                    GameState::ReplayBackwards => { self.step_replay_backwards(input); },
-                    GameState::Paused          => { self.step_pause(input, &key_input); },
-                }
-            }
-
-            let frame_duration = Duration::from_secs(1) / 60;
-            let frame_duration_actual = frame_start.elapsed();
-            if frame_duration_actual < frame_duration {
-                thread::sleep(frame_duration - frame_start.elapsed());
-            }
-            // TODO: when finished results screen, return, without aborting
+        match self.state {
+            GameState::Local           => { self.step_local(package, input); },
+            GameState::Netplay         => { self.step_netplay(package, input); },
+            GameState::Results         => { self.step_results(); },
+            GameState::ReplayForwards  => { self.step_replay_forwards(package, input); },
+            GameState::ReplayBackwards => { self.step_replay_backwards(package, input); },
+            GameState::Paused          => { self.step_pause(package, input, &key_input); },
         }
     }
 
-    fn step_local(&mut self, input: &mut Input) {
+    fn step_local(&mut self, package: &Package, input: &mut Input) {
         if input.start_pressed() {
             self.state = GameState::Paused;
         }
 
         input.game_update();
-        self.step_game(&input.player_inputs());
+        self.step_game(package, &input.player_inputs());
     }
 
-    fn step_netplay(&mut self, input: &mut Input) {
+    fn step_netplay(&mut self, package: &Package, input: &mut Input) {
         input.game_update();
-        self.step_game(&input.player_inputs());
+        self.step_game(package, &input.player_inputs());
     }
 
-    fn step_pause(&mut self, input: &mut Input, key_input: &KeyInput) {
-        let players_len = self.players.lock().unwrap().len();
+    fn step_pause(&mut self, package: &mut Package, input: &mut Input, key_input: &KeyInput) {
+        let players_len = self.players.len();
 
         // set current player to direct character edits to
         if key_input.pressed(VirtualKeyCode::Key1) && players_len >= 1 {
@@ -154,7 +124,7 @@ impl Game {
         // replay forwards
         if key_input.pressed(VirtualKeyCode::Comma) {
             if key_input.held_shift() {
-                self.step_replay_forwards(input);
+                self.step_replay_forwards(package, input);
             }
             else {
                 self.state = GameState::ReplayForwards;
@@ -163,7 +133,7 @@ impl Game {
         // replay backwards
         else if key_input.pressed(VirtualKeyCode::Colon) {
             if key_input.held_shift() {
-                self.step_replay_backwards(input);
+                self.step_replay_backwards(package, input);
             }
             else {
                 self.state = GameState::ReplayBackwards;
@@ -172,7 +142,7 @@ impl Game {
         // frame advance
         else if key_input.pressed(VirtualKeyCode::Space) {
             input.game_update();
-            self.step_game(&input.player_inputs());
+            self.step_game(package, &input.player_inputs());
         }
         // save frame
         else if key_input.pressed(VirtualKeyCode::K) {
@@ -195,37 +165,36 @@ impl Game {
 
     // next frame determined by previous frame and input of next frame
     // TODO: speed up by jumping to next frame if pre-computed
-    fn step_replay_forwards(&mut self, input: &mut Input) {
+    #[allow(unused_variables)]
+    fn step_replay_forwards(&mut self, package: &Package, input: &mut Input) {
         self.current_frame += 1;
         input.jump_history(self.current_frame);
-        self.step_game(&input.player_inputs());
+        self.step_game(package, &input.player_inputs());
     }
 
     // previous frame is always pre-computed and jumped to immediately
-    fn step_replay_backwards(&mut self, input: &mut Input) {
+    #[allow(unused_variables)]
+    fn step_replay_backwards(&mut self, package: &Package, input: &mut Input) {
         self.current_frame -= 1;
         //self.players = self.player_history.get(self.current_frame).unwrap().clone();
     }
 
+    #[allow(unused_variables)]
     fn jump_frame(&mut self, frame: usize) {
     }
 
-    fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
-        // acquire resources
-        let mut players = self.players.lock().unwrap();
-        let fighters = self.fighters.lock().unwrap();
-        let stages = self.stages.lock().unwrap();
-        let stage = &stages[self.selected_stage];
+    fn step_game(&mut self, package: &Package, player_input: &Vec<PlayerInput>) {
+        let stage = &package.stages[self.selected_stage];
 
         // step each player
-        for (i, player) in (&mut *players).iter_mut().enumerate() {
-            let fighter = &fighters[self.selected_fighters[i]];
+        for (i, player) in (&mut *self.players).iter_mut().enumerate() {
+            let fighter = &package.fighters[self.selected_fighters[i]];
             player.step(&player_input[i], fighter, stage);
         }
 
         // handle timer
         self.current_frame += 1;
-        if (self.current_frame / 60) as u64 > self.rules.time_limit {
+        if (self.current_frame / 60) as u64 > package.rules.time_limit {
             self.state = GameState::Results;
         }
 
@@ -236,29 +205,44 @@ impl Game {
             match debug_output {
                 &DebugOutput::Physics{ player } => {
                     print!("Player: {}    ", player);
-                    players[player].debug_physics();
+                    self.players[player].debug_physics();
                 },
                 &DebugOutput::Input{ player } => {
                     print!("Player: {}    ", player);
-                    players[player].debug_input(&player_input[player]);
+                    self.players[player].debug_input(&player_input[player]);
                 },
                 &DebugOutput::InputDiff{ player } => {
                     print!("Player: {}    ", player);
-                    players[player].debug_input_diff(&player_input[player]);
+                    self.players[player].debug_input_diff(&player_input[player]);
                 },
                 &DebugOutput::Action{ player } => {
                     print!("Player: {}    ", player);
-                    players[player].debug_action(&fighters[self.selected_fighters[player]]);
+                    self.players[player].debug_action(&package.fighters[self.selected_fighters[player]]);
                 },
                 &DebugOutput::Frame{ player } => {
                     print!("Player: {}    ", player);
-                    players[player].debug_frame(&fighters[self.selected_fighters[player]]);
+                    self.players[player].debug_frame(&package.fighters[self.selected_fighters[player]]);
                 },
             }
         }
     }
 
     fn step_results(&mut self) {
+    }
+
+    pub fn render(&self) -> RenderGame {
+        let mut entities = vec!();
+        for (i, player) in self.players.iter().enumerate() {
+            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i])));
+        }
+
+        RenderGame {
+            entities: entities,
+            state:    self.state.clone(),
+            pan_x:    0.0,
+            pan_y:    0.0,
+            zoom:     0.0,
+        }
     }
 }
 
@@ -270,8 +254,33 @@ enum DebugOutput {
     Frame     {player: usize},
 }
 
+#[derive(Debug)]
+#[derive(Clone)]
+pub enum GameState {
+    Local,
+    ReplayForwards,
+    ReplayBackwards,
+    Netplay,
+    Paused,  // Only Local, ReplayForwards and ReplayBackwards can be paused
+    Results, // Both Local and Netplay end at Results
+}
+
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct Point {
     pub x: f64,
-    pub y: f64
+    pub y: f64,
+}
+
+pub struct RenderGame {
+    pub entities: Vec<RenderEntity>,
+    pub state:    GameState,
+
+    // camera modifiers
+    pub pan_x: f64,
+    pub pan_y: f64,
+    pub zoom:  f64,
+}
+
+pub enum RenderEntity {
+    Player (RenderPlayer),
 }

@@ -498,4 +498,25 @@ impl Player {
             hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
     }
 
+    pub fn render(&self, fighter: usize) -> RenderPlayer {
+        RenderPlayer {
+            bps:        self.bps.clone(),
+            ecb_w:      self.ecb_w,
+            ecb_y:      self.ecb_y,
+            ecb_top:    self.ecb_top,
+            ecb_bottom: self.ecb_bottom,
+            action:     self.action,
+            fighter:    fighter,
+        }
+    }
+}
+
+pub struct RenderPlayer {
+    pub bps:        Point,
+    pub ecb_w:      f64,
+    pub ecb_y:      f64,
+    pub ecb_top:    f64,
+    pub ecb_bottom: f64,
+    pub action:     u64,
+    pub fighter:    usize,
 }
