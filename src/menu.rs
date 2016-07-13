@@ -17,55 +17,62 @@ enum MenuState {
 }
 
 pub struct Menu {
-    state: MenuState,
-    frames: u64,
+    state:         MenuState,
+    current_frame: usize,
 }
 
 impl Menu {
     pub fn new() -> Menu {
         Menu {
-            state: MenuState::CharacterSelect,
-            frames: 0,
+            state:         MenuState::CharacterSelect,
+            current_frame: 0,
         }
     }
 
-    fn step_select(&mut self) {
-    }
-
-    pub fn step(&mut self, input: &mut Input) -> Vec<MenuChoice> {
-        match self.state {
-            MenuState::CharacterSelect => { self.step_select(); },
-            MenuState::StageSelect     => { self.step_select(); },
-
-            MenuState::SetRules        => { self.step_select(); },
-
-            MenuState::SwitchPackages  => { self.step_select(); },
-            MenuState::BrowsePackages  => { self.step_select(); },
-            MenuState::CreatePackage   => { self.step_select(); },
-
-            MenuState::BrowseFighter   => { self.step_select(); },
-            MenuState::CreateFighter   => { self.step_select(); },
-        }
+    fn step_select(&mut self, input: &mut Input) -> Vec<MenuChoice> {
+        let player_inputs = input.players(self.current_frame);
         if input.start_pressed() {
             let mut selected_fighters: Vec<usize> = vec!();
-            for _ in input.player_inputs() {
+            for _ in &player_inputs {
                 selected_fighters.push(0);
             }
 
             let mut controllers: Vec<usize> = vec!();
-            for (i, _) in input.player_inputs().iter().enumerate() {
+            for (i, _) in (&player_inputs).iter().enumerate() {
                 controllers.push(i);
             }
 
-            return vec!(MenuChoice::Start {
+            vec!(MenuChoice::Start {
                 controllers: controllers,
                 fighters:    selected_fighters,
                 stage:       0,
                 netplay:     false,
-            });
+            })
         }
-        self.frames += 1;
-        return vec!();
+        else {
+            vec!()
+        }
+    }
+
+    pub fn step(&mut self, input: &mut Input) -> Vec<MenuChoice> {
+        input.game_update(self.current_frame);
+
+        let result = match self.state {
+            MenuState::CharacterSelect => { self.step_select(input) },
+            MenuState::StageSelect     => { self.step_select(input) },
+
+            MenuState::SetRules        => { self.step_select(input) },
+
+            MenuState::SwitchPackages  => { self.step_select(input) },
+            MenuState::BrowsePackages  => { self.step_select(input) },
+            MenuState::CreatePackage   => { self.step_select(input) },
+
+            MenuState::BrowseFighter   => { self.step_select(input) },
+            MenuState::CreateFighter   => { self.step_select(input) },
+        };
+
+        self.current_frame += 1;
+        result
     }
 
     pub fn render(&self) -> RenderMenu {

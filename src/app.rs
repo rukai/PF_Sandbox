@@ -47,7 +47,8 @@ pub fn run(mut state: AppState) {
                 let netplay = false;
                 let fighters: Vec<usize> = vec!(0);
                 let mut controllers: Vec<usize> = vec!();
-                for (i, _) in input.player_inputs().iter().enumerate() {
+                input.game_update(0);
+                for (i, _) in input.players(0).iter().enumerate() {
                     controllers.push(i);
                 }
 
@@ -59,6 +60,7 @@ pub fn run(mut state: AppState) {
                     }
                 }
 
+                input.reset_history();
                 next_state = Some(AppState::Game(Game::new(&package, fighters, stage, netplay, controllers)));
             }
 

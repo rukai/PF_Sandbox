@@ -1,14 +1,12 @@
 use glium::glutin::VirtualKeyCode;
 use libusb::{Context, Device, DeviceHandle};
-use std::collections::VecDeque;
 use std::time::Duration;
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
-    current_inputs:  Vec<ControllerInput>,           // inputs for this frame
-    game_inputs:     VecDeque<Vec<ControllerInput>>, // game past and (potentially) future inputs
-    current_frame:   usize,                          // index into game_inputs
+    current_inputs:  Vec<ControllerInput>,      // inputs for this frame
+    game_inputs:     Vec<Vec<ControllerInput>>, // game past and (potentially) future inputs, frame 0 has index 2
     prev_start:      bool,
 }
 
@@ -40,10 +38,9 @@ impl<'a> Input<'a> {
         }
         let mut input = Input {
             adapter_handles: adapter_handles,
-            game_inputs:     VecDeque::new(),
+            game_inputs:     vec!(),
             current_inputs:  vec!(),
             prev_start:      false,
-            current_frame:   0,
         };
         input.reset_history();
         input
@@ -63,8 +60,8 @@ impl<'a> Input<'a> {
 
     /// Generate a new history starting with empty inputs for all controllers
     pub fn reset_history(&mut self) {
-        let mut game_inputs: VecDeque<Vec<ControllerInput>> = VecDeque::new();
-        let mut empty_inputs: Vec<ControllerInput> = Vec::new();
+        let mut game_inputs: Vec<Vec<ControllerInput>> = vec!();
+        let mut empty_inputs: Vec<ControllerInput> = vec!();
 
         // create empty inputs
         for _ in &mut self.adapter_handles {
@@ -73,34 +70,28 @@ impl<'a> Input<'a> {
             }
         }
 
-        game_inputs.push_front(empty_inputs.clone());
-        game_inputs.push_front(empty_inputs);
+        game_inputs.push(empty_inputs);
         self.game_inputs = game_inputs;
-        self.current_frame = 1;
     }
 
-    /// Jump the history to the specified index
-    pub fn jump_history(&mut self, frame: usize) { // TODO: -> Result Err(_) on invalid frame
-        self.current_frame = frame;
-    }
 
     /// Call this once from the game update logic only 
     /// Throws out all future history that may exist
-    pub fn game_update(&mut self) {
-        let total_frames = self.game_inputs.len() - 1;
-        for _ in self.current_frame..total_frames {
-            self.game_inputs.pop_front();
+    pub fn game_update(&mut self, game_frame: usize) {
+        for _ in Input::input_index(game_frame)..self.game_inputs.len() {
+            self.game_inputs.pop();
         }
 
-        self.game_inputs.push_front(self.current_inputs.clone());
-        self.current_frame += 1;
+        self.game_inputs.push(self.current_inputs.clone());
     }
 
+
     /// Return game inputs at current index into history
-    pub fn player_inputs(&mut self) -> Vec<PlayerInput> {
+    pub fn players(&self, frame: usize) -> Vec<PlayerInput> {
         let mut result_inputs: Vec<PlayerInput> = vec!();
-        let inputs      = &self.game_inputs.get(0).unwrap();
-        let prev_inputs = &self.game_inputs.get(1).unwrap();
+        let index = Input::input_index(frame);
+        let inputs      = &self.game_inputs.get(index).unwrap();
+        let prev_inputs = &self.game_inputs.get(index-1).unwrap();
 
         for (i, input) in inputs.iter().enumerate() {
             let prev_input = &prev_inputs[i];
@@ -131,7 +122,7 @@ impl<'a> Input<'a> {
                 });
             }
             else {
-                result_inputs.push(empty_player_input());
+                result_inputs.push(empty_players());
             }
         }
         result_inputs
@@ -155,6 +146,30 @@ impl<'a> Input<'a> {
             }
         }
         false
+    }
+
+    // --------------------------------------------------------------------
+    // The following helper methods are used to avoid off-by-one
+    // errors by giving higher level descriptions of the offsets
+
+    /// Returns the game frame of the last frame in history
+    pub fn last_frame(&self) -> usize {
+        Input::game_frame(self.last_index())
+    }
+
+    /// Returns the input index of the last frame in history
+    fn last_index(&self) -> usize {
+        self.game_inputs.len() - 1
+    }
+
+    /// Converts an input index into a game frame
+    fn input_index(frame: usize) -> usize {
+        frame + 1
+    }
+
+    /// Converts a game frame into an input index
+    fn game_frame(index: usize) -> usize {
+        index - 1
     }
 }
 
@@ -196,7 +211,7 @@ fn empty_controller_input() -> ControllerInput {
     }
 }
 
-fn empty_player_input() -> PlayerInput {
+fn empty_players() -> PlayerInput {
     PlayerInput {
         plugged_in: false,
 
@@ -262,7 +277,6 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<ControllerInput>)
 
 // TODO: implement
 /// Add 4 controllers from usb to inputs
-#[allow(unused_variables)]
 fn read_usb_controllers(inputs: &mut Vec<ControllerInput>) {
     for _ in 0..0 {
         inputs.push(empty_controller_input());
