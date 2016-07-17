@@ -1,5 +1,5 @@
 use glium::glutin::VirtualKeyCode;
-use libusb::{Context, Device, DeviceHandle};
+use libusb::{Context, Device, DeviceHandle, Error};
 use std::time::Duration;
 use std::sync::mpsc::{Sender, Receiver, channel};
 
@@ -10,27 +10,36 @@ pub struct Input<'a> {
     prev_start:      bool,
 }
 
+// In/Out is from perspective of computer
+// Out means: computer->adapter
+// In means:  adapter->computer
+
 impl<'a> Input<'a> {
     pub fn new(context: &'a mut  Context) -> Input<'a> {
         let mut adapter_handles: Vec<DeviceHandle> = Vec::new();
         let devices = context.devices();
         for mut device in devices.unwrap().iter() {
             if let Ok(device_desc) = device.device_descriptor() {
-                if device_desc.product_id() == 0x0337 {
-                    if let Ok(mut handle) = device.open() {
-                        if let Ok(true) = handle.kernel_driver_active(0) {
-                            handle.detach_kernel_driver(0).unwrap();
+                if device_desc.vendor_id() == 0x057E && device_desc.product_id() == 0x0337 {
+                    match device.open() {
+                        Ok(mut handle) => {
+                            if let Ok(true) = handle.kernel_driver_active(0) {
+                                handle.detach_kernel_driver(0).unwrap();
+                            }
+                            match handle.claim_interface(0) {
+                                Ok(_) => {
+                                    // Tell adapter to start reading
+                                    let payload = [0x13];
+                                    if let Ok(_) = handle.write_interrupt(0x2, &payload, Duration::new(1, 0)) {
+                                        adapter_handles.push(handle);
+                                        println!("GC adapter: Setup complete");
+                                    }
+                                },
+                                Err(e) => { println!("GC adapter: Failed to claim interface: {}", e) }
+                            }
                         }
-                        match handle.claim_interface(0) {
-                            Ok(_) => {
-                                // Tell adapter to start reading
-                                let payload = [0x13];
-                                if let Ok(_) = handle.write_interrupt(0x2, &payload, Duration::new(1, 0)) {
-                                    adapter_handles.push(handle);
-                                    println!("GC adapter: Setup complete");
-                                }
-                            },
-                            Err(e) => { println!("GC adapter: Failed to claim interface: {}", e) }
+                        Err(e) => {
+                            Input::handle_open_error(e);
                         }
                     }
                 }
@@ -44,6 +53,22 @@ impl<'a> Input<'a> {
         };
         input.reset_history();
         input
+    }
+
+    fn handle_open_error(e: Error) {
+        let access_solution = if cfg!(target_os = "linux") { r#":
+    You need to set a udev rule so that the adapter can be accessed.
+    To fix this on most Linux distributions, run the following command and then restart your computer.
+    echo 'SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="057e", ATTRS{idProduct}=="0337", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/51-gcadapter.rules"#
+        } else { "" };
+
+        match e {
+            Error::Access => {
+                println!("GC adapter: Permissions error{}", access_solution);
+
+            },
+            _ => { println!("GC adapter: Failed to open handle: {:?}", e); },
+        }
     }
 
     /// Call this once every frame
