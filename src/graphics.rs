@@ -1,11 +1,11 @@
+use ::app::Render;
+use ::buffers::{Buffers, PackageBuffers};
 use ::fighter::Fighter;
 use ::game::{GameState, RenderEntity, RenderGame};
-use ::stage::Stage;
-use ::package::Package;
 use ::input::{KeyInput, KeyAction};
-use ::app::Render;
 use ::menu::RenderMenu;
-use ::buffers::{Buffers, PackageBuffers};
+use ::package::Package;
+use ::stage::Stage;
 
 use glium::{DisplayBuild, Surface, self};
 use glium::backend::glutin_backend::GlutinFacade;
@@ -121,8 +121,9 @@ impl Graphics {
                     let uniform = &uniform! { position_offset: position, zoom: zoom };
 
                     // draw fighter
-                    let vertices = &self.package_buffers.fighters[player.fighter].vertex;
-                    let indices  = &self.package_buffers.fighters[player.fighter].index;
+                    let frame = &self.package_buffers.fighters[player.fighter][player.action][player.frame];
+                    let vertices = &frame.vertex;
+                    let indices  = &frame.index;
                     target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
 
                     // draw player ecb

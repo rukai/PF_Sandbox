@@ -1,9 +1,11 @@
 use ::stage::Stage;
-use ::fighter::Fighter;
+use ::fighter::{Fighter, ActionFrame};
 use ::player::RenderPlayer;
 
 use glium;
 use glium::backend::glutin_backend::GlutinFacade;
+
+use std::f32::consts;
 
 #[derive(Copy, Clone)]
 pub struct Vertex {
@@ -25,8 +27,8 @@ impl Buffers {
     }
 
     pub fn new_stage(display: &GlutinFacade, stage: &Stage) -> Buffers {
-        let mut vertices: Vec<Vertex> = Vec::new();
-        let mut indices: Vec<u16> = Vec::new();
+        let mut vertices: Vec<Vertex> = vec!();
+        let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
         for platform in &stage.platforms {
             let x1 = (platform.x - platform.w / 2.0) as f32;
@@ -54,8 +56,33 @@ impl Buffers {
         }
     }
 
-    pub fn new_fighter(display: &GlutinFacade, fighter: &Fighter) -> Buffers {
-        Buffers::new(display)
+    fn new_fighter_frame(display: &GlutinFacade, frame: &ActionFrame) -> Buffers {
+        let mut vertices: Vec<Vertex> = vec!();
+        let mut indices: Vec<u16> = vec!();
+        let mut index_count = 0;
+        let triangles = 20;
+
+        for hitbox in &frame.hitboxes {
+            for point in &hitbox.points {
+                // Draw a hitbox, at the point
+                // triangles are drawn meeting at the centre, forming a circle
+                for i in 0..triangles {
+                    let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
+                    let x = (point.x as f32) + angle.cos() * (hitbox.radius as f32);
+                    let y = (point.y as f32) + angle.sin() * (hitbox.radius as f32);
+                    vertices.push(Vertex { position: [x, y] });
+                    indices.push(index_count);
+                    indices.push(index_count + i);
+                    indices.push(index_count + (i + 1) % triangles);
+                }
+            }
+            index_count += 20;
+        }
+
+        Buffers {
+            vertex: glium::VertexBuffer::new(display, &vertices).unwrap(),
+            index: glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap(),
+        }
     }
 
     pub fn new_player(display: &GlutinFacade, player: &RenderPlayer) -> Buffers {
@@ -104,18 +131,25 @@ impl Buffers {
 
 pub struct PackageBuffers {
     pub stages: Vec<Buffers>,
-    pub fighters: Vec<Buffers>,
+    pub fighters: Vec<Vec<Vec<Buffers>>>, // fighters <- actions <- frames
 }
 
 impl PackageBuffers {
     pub fn new(display: &GlutinFacade, fighters: &Vec<Fighter>, stages: &Vec<Stage>) -> PackageBuffers {
-        let mut stage_buffers:   Vec<Buffers> = vec!();
-        let mut fighter_buffers: Vec<Buffers> = vec!();
-
+        let mut fighter_buffers: Vec<Vec<Vec<Buffers>>> = vec!();
         for fighter in fighters {
-            fighter_buffers.push(Buffers::new_fighter(display, fighter));
+            let mut action_buffers: Vec<Vec<Buffers>> = vec!();
+            for action in &fighter.action_defs {
+                let mut frame_buffers: Vec<Buffers> = vec!();
+                for frame in &action.frames {
+                    frame_buffers.push(Buffers::new_fighter_frame(display, frame));
+                }
+                action_buffers.push(frame_buffers);
+            }
+            fighter_buffers.push(action_buffers);
         }
 
+        let mut stage_buffers:   Vec<Buffers> = vec!();
         for stage in stages {
             stage_buffers.push(Buffers::new_stage(display, stage));
         }

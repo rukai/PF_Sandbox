@@ -11,7 +11,7 @@ impl Fighter {
         let hitbox1 = Hitbox {
             points: vec!(point1),
             form:   HitboxType::Hurt,
-            radius: 5.4,
+            radius: 1.4,
             damage: 0,
             bkb:    0,
             kbg:    0,

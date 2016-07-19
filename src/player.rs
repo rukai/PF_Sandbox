@@ -507,7 +507,8 @@ impl Player {
             ecb_y:      self.ecb_y,
             ecb_top:    self.ecb_top,
             ecb_bottom: self.ecb_bottom,
-            action:     self.action,
+            frame:      self.action_count as usize,
+            action:     self.action as usize,
             fighter:    fighter,
         }
     }
@@ -520,6 +521,7 @@ pub struct RenderPlayer {
     pub ecb_y:      f64,
     pub ecb_top:    f64,
     pub ecb_bottom: f64,
-    pub action:     u64,
+    pub frame:      usize,
+    pub action:     usize,
     pub fighter:    usize,
 }
