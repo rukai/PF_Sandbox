@@ -6,6 +6,7 @@ extern crate getopts;
 #[macro_use] extern crate glium;
 
 pub mod app;
+pub mod buffers;
 pub mod cli;
 pub mod fighter;
 pub mod game;

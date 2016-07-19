@@ -86,6 +86,7 @@ impl Player {
         self.ecb_y = frame.ecb_y;
         self.ecb_top = frame.ecb_h / 2.0;
         self.ecb_bottom = match action {
+            //TODO: Err does this if apply to all Some()?
             Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.action_count < 10
                 => self.ecb_bottom,
             _   => -frame.ecb_h / 2.0,
@@ -501,6 +502,7 @@ impl Player {
     pub fn render(&self, fighter: usize) -> RenderPlayer {
         RenderPlayer {
             bps:        self.bps.clone(),
+            ecb_enable: true,
             ecb_w:      self.ecb_w,
             ecb_y:      self.ecb_y,
             ecb_top:    self.ecb_top,
@@ -513,6 +515,7 @@ impl Player {
 
 pub struct RenderPlayer {
     pub bps:        Point,
+    pub ecb_enable: bool,
     pub ecb_w:      f64,
     pub ecb_y:      f64,
     pub ecb_top:    f64,

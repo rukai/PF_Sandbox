@@ -1,9 +1,10 @@
 # version 140
 
 in vec2 position;
-uniform mat4 matrix;
+uniform vec2 position_offset;
+uniform float zoom;
 
 void main() {
-    vec2 pos = position;
-    gl_Position = vec4(pos, 0.0, 1.0) * matrix;
+    vec2 pos = (position + position_offset) * zoom;
+    gl_Position = vec4(pos, 0.0, 1.0);
 }
