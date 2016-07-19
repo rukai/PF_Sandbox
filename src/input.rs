@@ -308,16 +308,16 @@ fn read_usb_controllers(inputs: &mut Vec<ControllerInput>) {
     }
 }
 
-fn abs_min(a: f64, b: f64) -> f64 {
+fn abs_min(a: f32, b: f32) -> f32 {
     if (a >= 0.0 && a > b) || (a <= 0.0 && a < b) {
         b
     } else {
         a
     }
 }
-fn stick_filter(in_stick_x: u8, in_stick_y: u8) -> (f64, f64) {
-    let raw_stick_x = in_stick_x as f64 - 128.0;
-    let raw_stick_y = in_stick_y as f64 - 128.0;
+fn stick_filter(in_stick_x: u8, in_stick_y: u8) -> (f32, f32) {
+    let raw_stick_x = in_stick_x as f32 - 128.0;
+    let raw_stick_y = in_stick_y as f32 - 128.0;
     let angle = (raw_stick_y).atan2(raw_stick_x);
 
     let max = (angle.cos() * 80.0).trunc();
@@ -329,8 +329,8 @@ fn stick_filter(in_stick_x: u8, in_stick_y: u8) -> (f64, f64) {
     (stick_x, stick_y)
 }
 
-fn trigger_filter(trigger: u8) -> f64 {
-    let value = (trigger as f64) / 140.0;
+fn trigger_filter(trigger: u8) -> f32 {
+    let value = (trigger as f32) / 140.0;
     if value > 1.0
     {
         1.0
@@ -358,12 +358,12 @@ struct ControllerInput {
     pub r:     bool,
     pub l:     bool,
 
-    pub stick_x:   f64,
-    pub stick_y:   f64,
-    pub c_stick_x: f64,
-    pub c_stick_y: f64,
-    pub r_trigger: f64,
-    pub l_trigger: f64,
+    pub stick_x:   f32,
+    pub stick_y:   f32,
+    pub c_stick_x: f32,
+    pub c_stick_y: f32,
+    pub r_trigger: f32,
+    pub l_trigger: f32,
 }
 
 /// External data access
@@ -397,13 +397,13 @@ pub struct Button {
 }
 
 pub struct Stick {
-    pub value: f64, // current.value
-    pub diff:  f64, // current.value - previous.value
+    pub value: f32, // current.value
+    pub diff:  f32, // current.value - previous.value
 }
 
 pub struct Trigger {
-    pub value: f64, // current.value
-    pub diff:  f64, // current.value - previous.value
+    pub value: f32, // current.value
+    pub diff:  f32, // current.value - previous.value
 }
 
 pub struct KeyInput {

@@ -117,7 +117,7 @@ impl Graphics {
         for entity in render.entities {
             match entity {
                 RenderEntity::Player(player) => {
-                    let position: [f32; 2] = [player.bps.x as f32, player.bps.y as f32];
+                    let position: [f32; 2] = [player.bps.x, player.bps.y];
                     let uniform = &uniform! { position_offset: position, zoom: zoom };
 
                     // draw fighter

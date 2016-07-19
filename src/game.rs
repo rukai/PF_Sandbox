@@ -304,8 +304,8 @@ pub enum GameState {
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct Point {
-    pub x: f64,
-    pub y: f64,
+    pub x: f32,
+    pub y: f32,
 }
 
 pub struct RenderGame {
@@ -313,9 +313,9 @@ pub struct RenderGame {
     pub state:    GameState,
 
     // camera modifiers
-    pub pan_x: f64,
-    pub pan_y: f64,
-    pub zoom:  f64,
+    pub pan_x: f32,
+    pub pan_y: f32,
+    pub zoom:  f32,
 }
 
 pub enum RenderEntity {

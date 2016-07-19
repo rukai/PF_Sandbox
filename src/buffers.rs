@@ -31,10 +31,10 @@ impl Buffers {
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
         for platform in &stage.platforms {
-            let x1 = (platform.x - platform.w / 2.0) as f32;
-            let y1 = (platform.y - platform.h / 2.0) as f32;
-            let x2 = (platform.x + platform.w / 2.0) as f32;
-            let y2 = (platform.y + platform.h / 2.0) as f32;
+            let x1 = platform.x - platform.w / 2.0;
+            let y1 = platform.y - platform.h / 2.0;
+            let x2 = platform.x + platform.w / 2.0;
+            let y2 = platform.y + platform.h / 2.0;
 
             vertices.push(Vertex { position: [x1, y1] });
             vertices.push(Vertex { position: [x1, y2] });
@@ -68,8 +68,8 @@ impl Buffers {
                 // triangles are drawn meeting at the centre, forming a circle
                 for i in 0..triangles {
                     let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
-                    let x = (point.x as f32) + angle.cos() * (hitbox.radius as f32);
-                    let y = (point.y as f32) + angle.sin() * (hitbox.radius as f32);
+                    let x = point.x + angle.cos() * hitbox.radius;
+                    let y = point.y + angle.sin() * hitbox.radius;
                     vertices.push(Vertex { position: [x, y] });
                     indices.push(index_count);
                     indices.push(index_count + i);
@@ -86,10 +86,10 @@ impl Buffers {
     }
 
     pub fn new_player(display: &GlutinFacade, player: &RenderPlayer) -> Buffers {
-        let ecb_w = player.ecb_w as f32;
-        let ecb_y = player.ecb_y as f32;
-        let ecb_top = player.ecb_top as f32;
-        let ecb_bottom = player.ecb_bottom as f32;
+        let ecb_w = player.ecb_w;
+        let ecb_y = player.ecb_y;
+        let ecb_top = player.ecb_top;
+        let ecb_bottom = player.ecb_bottom;
 
         // ecb
         let vertex0 = Vertex { position: [ 0.0, ecb_y + ecb_bottom] };

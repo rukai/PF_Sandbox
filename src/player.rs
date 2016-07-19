@@ -15,14 +15,14 @@ pub struct Player {
     pub damage:         u64,
     pub bps:            Point,
     pub spawn:          Point,
-    pub x_vel:          f64,
-    pub y_vel:          f64,
-    pub x_acc:          f64,
-    pub y_acc:          f64,
-    pub ecb_w:          f64,
-    pub ecb_y:          f64, // relative to bps.y. when 0, the bottom of the ecb touches the bps
-    pub ecb_top:        f64, // Relative to ecb_y
-    pub ecb_bottom:     f64, // Relative to ecb_y
+    pub x_vel:          f32,
+    pub y_vel:          f32,
+    pub x_acc:          f32,
+    pub y_acc:          f32,
+    pub ecb_w:          f32,
+    pub ecb_y:          f32, // relative to bps.y. when 0, the bottom of the ecb touches the bps
+    pub ecb_top:        f32, // Relative to ecb_y
+    pub ecb_bottom:     f32, // Relative to ecb_y
     pub face_right:     bool,
     pub airbourne:      bool,
     pub pass_through:   bool,
@@ -136,7 +136,7 @@ impl Player {
             self.set_action(Action::AerialDodge);
         }
         else {
-            self.x_vel = (input.stick_x.value as f64) * 2.5
+            self.x_vel = input.stick_x.value * 2.5
         }
 
         self.pass_through = input.stick_y.value < -0.2; // TODO: refine
@@ -324,7 +324,7 @@ impl Player {
         };
     }
 
-    fn relative_f(&self, input: f64) -> f64 {
+    fn relative_f(&self, input: f32) -> f32 {
         if self.face_right {
             input
         }
@@ -392,7 +392,7 @@ impl Player {
     }
 
     /// return the platform that the player would land on if moved by y_offset
-    fn land_stage_collision<'a> (&self, stage: &'a Stage, y_offset: f64) -> Option<&'a Platform> {
+    fn land_stage_collision<'a> (&self, stage: &'a Stage, y_offset: f32) -> Option<&'a Platform> {
         if self.y_vel > 0.0 {
             return None;
         }
@@ -517,10 +517,10 @@ impl Player {
 pub struct RenderPlayer {
     pub bps:        Point,
     pub ecb_enable: bool,
-    pub ecb_w:      f64,
-    pub ecb_y:      f64,
-    pub ecb_top:    f64,
-    pub ecb_bottom: f64,
+    pub ecb_w:      f32,
+    pub ecb_y:      f32,
+    pub ecb_top:    f32,
+    pub ecb_bottom: f32,
     pub frame:      usize,
     pub action:     usize,
     pub fighter:    usize,
