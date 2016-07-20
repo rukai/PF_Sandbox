@@ -2,7 +2,7 @@ use ::package::Package;
 use ::menu::{Menu, RenderMenu, MenuChoice};
 use ::cli::CLIChoice;
 use ::game::{Game, RenderGame};
-use ::graphics::Graphics;
+use ::graphics::{Graphics, GraphicsMessage};
 use ::input::{Input};
 
 use libusb::Context;
@@ -37,8 +37,10 @@ pub fn run(mut state: AppState) {
                     }
                 }
 
-                let render = Render::Menu(menu.render());
-                graphics_tx.send(render).unwrap();
+                graphics_tx.send(GraphicsMessage {
+                    package_updates: package.updates(),
+                    render:  Render::Menu(menu.render()),
+                }).unwrap();
             }
 
             &mut AppState::CLI(ref cli_choices) => {
@@ -66,10 +68,14 @@ pub fn run(mut state: AppState) {
 
             &mut AppState::Game (ref mut game) => {
                 game.step(&mut package, &mut input, &key_input);
-                let render = Render::Game(game.render());
-                graphics_tx.send(render).unwrap();
+
+                graphics_tx.send(GraphicsMessage {
+                    package_updates: package.updates(),
+                    render:  Render::Game(game.render()),
+                }).unwrap();
             }
         };
+
         if let Some(next) = next_state {
             state = next;
             next_state = None;

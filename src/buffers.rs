@@ -1,6 +1,7 @@
 use ::stage::Stage;
-use ::fighter::{Fighter, ActionFrame};
+use ::fighter::ActionFrame;
 use ::player::RenderPlayer;
+use ::package::{Package, PackageUpdate};
 
 use glium;
 use glium::backend::glutin_backend::GlutinFacade;
@@ -135,28 +136,52 @@ pub struct PackageBuffers {
 }
 
 impl PackageBuffers {
-    pub fn new(display: &GlutinFacade, fighters: &Vec<Fighter>, stages: &Vec<Stage>) -> PackageBuffers {
-        let mut fighter_buffers: Vec<Vec<Vec<Buffers>>> = vec!();
-        for fighter in fighters {
-            let mut action_buffers: Vec<Vec<Buffers>> = vec!();
-            for action in &fighter.action_defs {
-                let mut frame_buffers: Vec<Buffers> = vec!();
-                for frame in &action.frames {
-                    frame_buffers.push(Buffers::new_fighter_frame(display, frame));
+    pub fn new(display: &GlutinFacade, package: Package) -> PackageBuffers {
+        let mut package_buffers = PackageBuffers {
+            stages:   vec!(),
+            fighters: vec!(),
+        };
+        package_buffers.update(display, vec!(PackageUpdate::Package(package)));
+        package_buffers
+    }
+
+    pub fn update(&mut self, display: &GlutinFacade, package_updates: Vec<PackageUpdate>) {
+        for update in package_updates {
+            match update {
+                PackageUpdate::Package (package) => {
+                    self.stages = vec!();
+                    self.fighters = vec!();
+
+                    for fighter in package.fighters {
+                        let mut action_buffers: Vec<Vec<Buffers>> = vec!();
+                        for action in &fighter.action_defs {
+                            let mut frame_buffers: Vec<Buffers> = vec!();
+                            for frame in &action.frames {
+                                frame_buffers.push(Buffers::new_fighter_frame(display, frame));
+                            }
+                            action_buffers.push(frame_buffers);
+                        }
+                        self.fighters.push(action_buffers);
+                    }
+
+                    for stage in package.stages {
+                        self.stages.push(Buffers::new_stage(display, &stage));
+                    }
                 }
-                action_buffers.push(frame_buffers);
+                PackageUpdate::DeleteFighterFrame { fighter, action, frame_index } => {
+                    self.fighters[fighter][action].remove(frame_index);
+                }
+                PackageUpdate::InsertFighterFrame { fighter, action, frame_index, frame } => {
+                    let buffers = Buffers::new_fighter_frame(display, &frame);
+                    self.fighters[fighter][action].insert(frame_index, buffers);
+                }
+                PackageUpdate::DeleteStage { stage_index } => {
+                    self.stages.remove(stage_index);
+                }
+                PackageUpdate::InsertStage { stage_index, stage } => {
+                    self.stages.insert(stage_index, Buffers::new_stage(display, &stage));
+                }
             }
-            fighter_buffers.push(action_buffers);
-        }
-
-        let mut stage_buffers:   Vec<Buffers> = vec!();
-        for stage in stages {
-            stage_buffers.push(Buffers::new_stage(display, stage));
-        }
-
-        PackageBuffers {
-            stages: stage_buffers,
-            fighters: fighter_buffers,
         }
     }
 }

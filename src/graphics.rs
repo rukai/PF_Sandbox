@@ -1,11 +1,9 @@
 use ::app::Render;
 use ::buffers::{Buffers, PackageBuffers};
-use ::fighter::Fighter;
 use ::game::{GameState, RenderEntity, RenderGame};
 use ::input::{KeyInput, KeyAction};
 use ::menu::RenderMenu;
-use ::package::Package;
-use ::stage::Stage;
+use ::package::{Package, PackageUpdate};
 
 use glium::{DisplayBuild, Surface, self};
 use glium::backend::glutin_backend::GlutinFacade;
@@ -23,29 +21,29 @@ pub struct Graphics {
     package_buffers: PackageBuffers,
     display:         GlutinFacade,
     key_input_tx:    Sender<KeyAction>,
-    render_rx:       Receiver<Render>,
+    render_rx:       Receiver<GraphicsMessage>,
 }
 
 #[allow(unused_variables)]
 impl Graphics {
-    pub fn init(package: &Package) -> (Sender<Render>, KeyInput) {
+    pub fn init(package: &Package) -> (Sender<GraphicsMessage>, KeyInput) {
         let fighters = package.fighters.clone();
         let stages   = package.stages.clone();
         let (render_tx, render_rx) = channel();
         let (key_input, key_input_tx) = KeyInput::new();
+        let package = package.clone();
 
         thread::spawn(move || {
-            let mut graphics = Graphics::new(stages, fighters, key_input_tx, render_rx);
+            let mut graphics = Graphics::new(package, key_input_tx, render_rx);
             graphics.run();
         });
         (render_tx, key_input)
     }
 
     fn new(
-        stages: Vec<Stage>,
-        fighters: Vec<Fighter>,
+        package: Package,
         key_input_tx: Sender<KeyAction>,
-        render_rx: Receiver<Render>,
+        render_rx: Receiver<GraphicsMessage>,
     ) -> Graphics {
         let display = glium::glutin::WindowBuilder::new()
             .with_title("PF ENGINE")
@@ -53,7 +51,7 @@ impl Graphics {
             .unwrap();
         Graphics {
             shaders:         Graphics::load_shaders(),
-            package_buffers: PackageBuffers::new(&display, &fighters, &stages),
+            package_buffers: PackageBuffers::new(&display, package),
             display:         display,
             key_input_tx:    key_input_tx,
             render_rx:       render_rx,
@@ -80,10 +78,13 @@ impl Graphics {
         loop {
             {
                 // get the most recent render
-                let mut render = self.render_rx.recv().unwrap();
+                let mut render = {
+                    let message = self.render_rx.recv().unwrap();
+                    self.read_message(message)
+                };
                 loop {
                     match self.render_rx.try_recv() {
-                        Ok(msg) => { render = msg; },
+                        Ok(message) => { render = self.read_message(message); },
                         Err(_)  => { break; },
                     }
                 }
@@ -95,6 +96,11 @@ impl Graphics {
             }
             self.handle_events();
         }
+    }
+
+    fn read_message(&mut self, message: GraphicsMessage) -> Render {
+        self.package_buffers.update(&self.display, message.package_updates);
+        message.render
     }
 
     fn game_render(&mut self, render: RenderGame) {
@@ -121,10 +127,15 @@ impl Graphics {
                     let uniform = &uniform! { position_offset: position, zoom: zoom };
 
                     // draw fighter
-                    let frame = &self.package_buffers.fighters[player.fighter][player.action][player.frame];
-                    let vertices = &frame.vertex;
-                    let indices  = &frame.index;
-                    target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
+                    let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
+                    if player.frame < fighter_frames.len() {
+                        let vertices = &fighter_frames[player.frame].vertex;
+                        let indices  = &fighter_frames[player.frame].index;
+                        target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
+                    }
+                    else {
+                        // TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
+                    }
 
                     // draw player ecb
                     if player.ecb_enable {
@@ -155,14 +166,22 @@ impl Graphics {
             use glium::glutin::VirtualKeyCode;
 
             match ev {
-                Closed
-                    => { self.key_input_tx.send(KeyAction::Pressed (VirtualKeyCode::Escape)).unwrap(); },
-                KeyboardInput(Pressed, _, Some(key_code))
-                    => { self.key_input_tx.send(KeyAction::Pressed  (key_code)).unwrap(); },
-                KeyboardInput(Released, _, Some(key_code))
-                    => { self.key_input_tx.send(KeyAction::Released (key_code)).unwrap(); },
+                Closed => {
+                    self.key_input_tx.send(KeyAction::Pressed (VirtualKeyCode::Escape)).unwrap();
+                },
+                KeyboardInput(Pressed, _, Some(key_code)) => {
+                    self.key_input_tx.send(KeyAction::Pressed  (key_code)).unwrap();
+                },
+                KeyboardInput(Released, _, Some(key_code)) => {
+                    self.key_input_tx.send(KeyAction::Released (key_code)).unwrap();
+                },
                 _   => {},
             }
         }
     }
+}
+
+pub struct GraphicsMessage {
+    pub render: Render,
+    pub package_updates: Vec<PackageUpdate>,
 }

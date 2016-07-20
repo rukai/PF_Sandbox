@@ -5,10 +5,11 @@ use std::path::{PathBuf, Path};
 use rustc_serialize::{Encodable, Decodable};
 use rustc_serialize::json::{self, Encoder, DecodeResult};
 
-use ::fighter::Fighter;
+use ::fighter::{Fighter, ActionFrame};
 use ::rules::Rules;
 use ::stage::Stage;
 
+#[derive(Clone)]
 pub struct Package {
     pub path:               PathBuf,
     pub meta:               PackageMeta,
@@ -18,6 +19,7 @@ pub struct Package {
     pub fighters:           Vec<Fighter>,
     pub stages_filenames:   Vec<String>,
     pub fighters_filenames: Vec<String>,
+    pub package_updates:    Vec<PackageUpdate>,
 }
 
 impl Package {
@@ -37,10 +39,11 @@ impl Package {
             meta:               meta,
             path:               path,
             rules:              Rules::base(),
-            stages:             Vec::new(),
-            fighters:           Vec::new(),
-            fighters_filenames: Vec::new(),
-            stages_filenames:   Vec::new(),
+            stages:             vec!(),
+            fighters:           vec!(),
+            fighters_filenames: vec!(),
+            stages_filenames:   vec!(),
+            package_updates:    vec!(),
         };
         package.load();
         package
@@ -67,6 +70,7 @@ impl Package {
             fighters:           vec!(Fighter::base()),
             fighters_filenames: vec!(path.join("Fighters").join("base_fighter.json").to_str().unwrap().to_string()),
             path:               path,
+            package_updates:    vec!(),
         };
         package.save();
         package
@@ -139,9 +143,57 @@ impl Package {
     pub fn verify(&self) -> bool {
         true //It's fine, I triple checked
     }
+
+    pub fn add_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) {
+        let mut action_frames = &mut self.fighters[fighter].action_defs[action].frames;
+
+        let new_frame = action_frames[frame].clone();
+        let new_frame_update = new_frame.clone();
+        action_frames.insert(frame + 1, new_frame);
+
+        self.package_updates.push(PackageUpdate::InsertFighterFrame {
+            fighter:     fighter,
+            action:      action,
+            frame_index: frame,
+            frame:       new_frame_update,
+        });
+    }
+
+    pub fn delete_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) -> bool {
+        let mut action_frames = &mut self.fighters[fighter].action_defs[action].frames;
+
+        if action_frames.len() > 1 {
+            action_frames.remove(frame);
+
+            self.package_updates.push(PackageUpdate::DeleteFighterFrame {
+                fighter:     fighter,
+                action:      action,
+                frame_index: frame,
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn updates(&mut self) -> Vec<PackageUpdate> {
+        let package_updates = self.package_updates.clone();
+        self.package_updates = vec!();
+        return package_updates;
+    }
 }
 
-#[derive(RustcEncodable, RustcDecodable)]
+// Finer grained changes are used when speed is needed
+#[derive(Clone)]
+pub enum PackageUpdate {
+    Package (Package),
+    DeleteFighterFrame { fighter: usize, action: usize, frame_index: usize },
+    InsertFighterFrame { fighter: usize, action: usize, frame_index: usize, frame: ActionFrame },
+    DeleteStage { stage_index: usize },
+    InsertStage { stage_index: usize, stage: Stage },
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct PackageMeta {
     pub version:   u64,    // increment every release, 
     pub title:     String, // User readable title

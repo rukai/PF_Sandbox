@@ -130,6 +130,43 @@ impl Game {
             self.debug_outputs = vec!();
         }
 
+        // modify fighter
+        {
+            let player = self.edit_player;
+
+            let fighter = self.selected_fighters[player];
+            let action = self.players[player].action as usize;
+            let frame  = self.players[player].frame as usize;
+
+                if key_input.pressed(VirtualKeyCode::N) {
+                    package.add_fighter_frame(fighter, action, frame);
+                }
+
+                if key_input.pressed(VirtualKeyCode::M) {
+                    if package.delete_fighter_frame(fighter, action, frame) {
+                        // Correct any players that are now on a nonexistent frame due to the frame deletion.
+                        // This is purely to stay on the same action for usability.
+                        // The player itself must handle being on a frame that has been deleted in order for replays to work.
+                        for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
+                            if self.selected_fighters[i] == fighter && any_player.action as usize == action
+                                && any_player.frame as usize == package.fighters[fighter].action_defs[action].frames.len() {
+                                any_player.frame -= 1;
+                            }
+                        }
+                    }
+                }
+        }
+        // TODO: add debug_output call
+        // TODO: maybe refactor debug_output to be called at the end of main loop on flag set
+
+        // modify package
+        if key_input.pressed(VirtualKeyCode::S) {
+            package.save();
+        }
+        if key_input.pressed(VirtualKeyCode::R) {
+            package.load();
+        }
+
         // game flow control
         if key_input.pressed(VirtualKeyCode::J) {
             self.step_replay_backwards(package, input, key_input);
@@ -162,6 +199,7 @@ impl Game {
     }
 
     /// next frame is advanced by using the input history on the current frame
+    // TODO: Allow choice between using input history and game history
     fn step_replay_forwards(&mut self, package: &Package, input: &mut Input, key_input: &KeyInput) {
         if self.current_frame < input.last_frame() {
             let player_inputs = &input.players(self.current_frame);

@@ -7,10 +7,10 @@ use num::FromPrimitive;
 
 #[derive(Clone)]
 pub struct Player {
-    action:             u64,
+    pub action:         u64,
     action_new:         u64,
     action_set:         bool,
-    action_count:       u64,
+    pub frame:          u64,
     pub stocks:         u64,
     pub damage:         u64,
     pub bps:            Point,
@@ -35,7 +35,7 @@ impl Player {
             action:         Action::Spawn as u64,
             action_new:     Action::Spawn as u64,
             action_set:     false,
-            action_count:   0,
+            frame:          0,
             stocks:         stocks,
             damage:         0,
             bps:            spawn.clone(),
@@ -58,7 +58,6 @@ impl Player {
     // always change self.action through this method
     fn set_action(&mut self, action: Action) {
         self.action_new = action as u64;
-        self.action_count = 0;
         self.action_set = true;
     }
 
@@ -68,28 +67,45 @@ impl Player {
         self.action_step();
     }
 
+    fn action_step(&mut self) {
+        if self.action_set {
+            self.frame = 0;
+            self.action = self.action_new;
+            self.action_set = false;
+        }
+        else {
+            self.frame += 1;
+        }
+    }
+
     /*
      *  Begin input section
      */
 
     fn input_step(&mut self, input: &PlayerInput, fighter: &Fighter) {
         let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64;
-        if self.action_count == action_frames -1 {
+
+        // handles a frame index that no longer exists by jumping to the last existing frame
+        if self.frame >= action_frames - 1 {
+            self.frame = action_frames - 1;
+        }
+
+        if self.frame == action_frames - 1 {
             self.action_expired(input, fighter);
         }
 
-        let frame = &fighter.action_defs[self.action as usize].frames[self.action_count as usize];
+        let fighter_frame = &fighter.action_defs[self.action as usize].frames[self.frame as usize];
         let action = Action::from_u64(self.action);
 
         // update ecb
-        self.ecb_w = frame.ecb_w;
-        self.ecb_y = frame.ecb_y;
-        self.ecb_top = frame.ecb_h / 2.0;
+        self.ecb_w = fighter_frame.ecb_w;
+        self.ecb_y = fighter_frame.ecb_y;
+        self.ecb_top = fighter_frame.ecb_h / 2.0;
         self.ecb_bottom = match action {
             //TODO: Err does this if apply to all Some()?
-            Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.action_count < 10
+            Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.frame < 10
                 => self.ecb_bottom,
-            _   => -frame.ecb_h / 2.0,
+            _   => -fighter_frame.ecb_h / 2.0,
         };
 
         match action {
@@ -100,17 +116,6 @@ impl Player {
             Some(Action::Dash)                        => { self.dash_action(input, fighter); },
             Some(Action::Run)                         => { self.run_action(input, fighter); },
             _                                         => { },
-        }
-    }
-
-    fn action_step(&mut self) {
-        if self.action_set {
-            self.action = self.action_new;
-            self.action_set = false;
-        }
-        else
-        {
-            self.action_count += 1;
         }
     }
 
@@ -376,7 +381,7 @@ impl Player {
 
         // are we on a platform?
         match self.land_stage_collision(stage, -0.001) {
-            Some(_) if self.airbourne && self.action_count > 2 => { // TODO: I dunno what I want to do instead of checking self.action_count ...
+            Some(_) if self.airbourne && self.frame > 2 => { // TODO: I dunno what I want to do instead of checking self.frame ...
                 self.land(fighter);
             },
             None if !self.airbourne => {
@@ -484,12 +489,12 @@ impl Player {
         let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64 - 1;
         let iasa = fighter.action_defs[self.action as usize].iasa;
 
-        println!("action: {:?}    airbourne: {}    action_count: {}/{}    IASA: {}",
-            action, self.airbourne, self.action_count, action_frames, iasa);
+        println!("action: {:?}    airbourne: {}    frame: {}/{}    IASA: {}",
+            action, self.airbourne, self.frame, action_frames, iasa);
     }
 
     pub fn debug_frame(&self, fighter: &Fighter) {
-        let frame = &fighter.action_defs[self.action as usize].frames[self.action_count as usize];
+        let frame = &fighter.action_defs[self.action as usize].frames[self.frame as usize];
         let hitbox_count = frame.hitboxes.len();
         let effects_count = frame.effects.len();
         let ecb_w = frame.ecb_w;
@@ -507,7 +512,7 @@ impl Player {
             ecb_y:      self.ecb_y,
             ecb_top:    self.ecb_top,
             ecb_bottom: self.ecb_bottom,
-            frame:      self.action_count as usize,
+            frame:      self.frame as usize,
             action:     self.action as usize,
             fighter:    fighter,
         }
