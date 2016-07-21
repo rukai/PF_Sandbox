@@ -5,16 +5,17 @@ use ::player::{Player, RenderPlayer};
 use glium::glutin::VirtualKeyCode;
 
 pub struct Game {
-    player_history:       Vec<Vec<Player>>,
-    current_frame:        usize,
-    saved_frame:          usize,
-    players:              Vec<Player>,
-    selected_controllers: Vec<usize>,
-    selected_fighters:    Vec<usize>,
-    selected_stage:       usize,
-    edit_player:          usize,
-    debug_outputs:        Vec<DebugOutput>,
-    state:                GameState,
+    player_history:         Vec<Vec<Player>>,
+    current_frame:          usize,
+    saved_frame:            usize,
+    players:                Vec<Player>,
+    selected_controllers:   Vec<usize>,
+    selected_fighters:      Vec<usize>,
+    selected_stage:         usize,
+    edit_player:            usize,
+    debug_output_this_step: Option<usize>,
+    debug_outputs:          Vec<DebugOutput>,
+    state:                  GameState,
 }
 
 impl Game {
@@ -38,16 +39,17 @@ impl Game {
         }
 
         Game {
-            state:                if netplay { GameState::Netplay } else { GameState::Local },
-            player_history:       vec!(),
-            current_frame:        0,
-            saved_frame:          0,
-            players:              players,
-            selected_controllers: selected_controllers,
-            selected_fighters:    filled_fighters,
-            selected_stage:       selected_stage,
-            edit_player:          0,
-            debug_outputs:        vec!(),
+            state:                  if netplay { GameState::Netplay } else { GameState::Local },
+            player_history:         vec!(),
+            current_frame:          0,
+            saved_frame:            0,
+            players:                players,
+            selected_controllers:   selected_controllers,
+            selected_fighters:      filled_fighters,
+            selected_stage:         selected_stage,
+            edit_player:            0,
+            debug_output_this_step: None,
+            debug_outputs:          vec!(),
         }
     }
 
@@ -57,8 +59,13 @@ impl Game {
             GameState::Netplay         => { self.step_netplay(package, input); },
             GameState::Results         => { self.step_results(); },
             GameState::ReplayForwards  => { self.step_replay_forwards(package, input, key_input); },
-            GameState::ReplayBackwards => { self.step_replay_backwards(package, input, key_input); },
+            GameState::ReplayBackwards => { self.step_replay_backwards(input, key_input); },
             GameState::Paused          => { self.step_pause(package, input, &key_input); },
+        }
+
+        if let Some(frame) = self.debug_output_this_step {
+            self.debug_output_this_step = None;
+            self.debug_output(package, input, frame);
         }
     }
 
@@ -140,6 +147,7 @@ impl Game {
 
                 if key_input.pressed(VirtualKeyCode::N) {
                     package.add_fighter_frame(fighter, action, frame);
+                    self.debug_output_this_step = Some(self.current_frame);
                 }
 
                 if key_input.pressed(VirtualKeyCode::M) {
@@ -153,6 +161,7 @@ impl Game {
                                 any_player.frame -= 1;
                             }
                         }
+                        self.debug_output_this_step = Some(self.current_frame);
                     }
                 }
         }
@@ -169,7 +178,7 @@ impl Game {
 
         // game flow control
         if key_input.pressed(VirtualKeyCode::J) {
-            self.step_replay_backwards(package, input, key_input);
+            self.step_replay_backwards(input, key_input);
         }
         else if key_input.pressed(VirtualKeyCode::K) {
             self.step_replay_forwards(package, input, key_input);
@@ -189,7 +198,7 @@ impl Game {
             self.saved_frame = self.current_frame;
         }
         else if key_input.pressed(VirtualKeyCode::I) {
-            self.jump_frame(package, input);
+            self.jump_frame();
         }
         else if input.start_pressed() {
             self.state = GameState::Local;
@@ -220,14 +229,13 @@ impl Game {
     }
 
     /// Immediately jumps to the previous frame in history
-    fn step_replay_backwards(&mut self, package: &Package, input: &mut Input, key_input: &KeyInput) {
+    fn step_replay_backwards(&mut self, input: &mut Input, key_input: &KeyInput) {
         if self.current_frame > 0 {
             let jump_to = self.current_frame - 1;
             self.players = self.player_history.get(jump_to).unwrap().clone();
 
-            let player_inputs = &input.players(jump_to);
             self.current_frame = jump_to;
-            self.debug_output(package, player_inputs);
+            self.debug_output_this_step = Some(jump_to);
         }
         else {
             self.state = GameState::Paused;
@@ -242,15 +250,14 @@ impl Game {
         }
     }
 
-    /// Jump to the specified frame in history
-    fn jump_frame(&mut self, package: &Package, input: &mut Input) {
+    /// Jump to the saved frame in history
+    fn jump_frame(&mut self) {
         let frame = self.saved_frame;
         if (frame+1) < self.player_history.len() {
             self.players = self.player_history.get(frame).unwrap().clone();
 
-            let player_inputs = &input.players(frame);
             self.current_frame = frame;
-            self.debug_output(package, player_inputs);
+            self.debug_output_this_step = Some(frame);
         }
     }
 
@@ -269,12 +276,14 @@ impl Game {
             self.state = GameState::Results;
         }
 
-        self.debug_output(package, player_input);
+        self.debug_output_this_step = Some(self.current_frame);
     }
 
-    fn debug_output(&mut self, package: &Package, player_input: &Vec<PlayerInput>) {
+    fn debug_output(&mut self, package: &Package, input: &Input, frame: usize) {
+        let player_input = &input.players(frame);
+
         println!("\n-------------------------------------------");
-        println!("Frame: {}    state: {:?}", self.current_frame, self.state);
+        println!("Frame: {}    state: {:?}", frame, self.state);
 
         for debug_output in &self.debug_outputs {
             match debug_output {
