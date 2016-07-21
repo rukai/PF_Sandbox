@@ -12,6 +12,7 @@ pub mod fighter;
 pub mod game;
 pub mod graphics;
 pub mod input;
+pub mod os_input;
 pub mod menu;
 pub mod package;
 pub mod player;

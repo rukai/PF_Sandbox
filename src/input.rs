@@ -1,7 +1,5 @@
-use glium::glutin::VirtualKeyCode;
 use libusb::{Context, Device, DeviceHandle, Error};
 use std::time::Duration;
-use std::sync::mpsc::{Sender, Receiver, channel};
 
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
@@ -404,77 +402,4 @@ pub struct Stick {
 pub struct Trigger {
     pub value: f32, // current.value
     pub diff:  f32, // current.value - previous.value
-}
-
-pub struct KeyInput {
-    current_actions: Vec<KeyAction>,
-    held:            [bool; 148], // number of VirtualKeyCode's
-    rx:              Receiver<KeyAction>
-}
-
-impl KeyInput {
-    pub fn new() -> (KeyInput, Sender<KeyAction>) {
-        let (tx, rx) = channel();
-        let key_input = KeyInput {
-            current_actions: vec!(),
-            held:            [false; 148],
-            rx:              rx,
-        };
-        (key_input, tx)
-    }
-
-    /// Called every frame
-    pub fn update(&mut self) {
-        self.current_actions = vec!();
-        loop {
-            match self.rx.try_recv() {
-                Ok(action) => {
-                    match &action {
-                        &KeyAction::Pressed(key_code)  => { self.held[key_code as usize] = true; },
-                        &KeyAction::Released(key_code) => { self.held[key_code as usize] = false; }
-                    }
-                    self.current_actions.push(action);
-                },
-                Err(_)  => { break; },
-            }
-        }
-    }
-
-    /// off->on
-    pub fn pressed(&self, check_key_code: VirtualKeyCode) -> bool {
-        for action in &self.current_actions {
-            if let &KeyAction::Pressed(key_code) = action {
-                if key_code == check_key_code {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    /// on->off
-    pub fn released(&self, check_key_code: VirtualKeyCode) -> bool {
-        for action in &self.current_actions {
-            if let &KeyAction::Released(key_code) = action {
-                if key_code == check_key_code {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    /// on
-    pub fn held(&self, key_code: VirtualKeyCode) -> bool {
-        return self.held[key_code as usize];
-    }
-
-    pub fn held_shift(&self) -> bool {
-        return self.held(VirtualKeyCode::LShift) || self.held(VirtualKeyCode::RShift);
-    }
-}
-
-pub enum KeyAction {
-    Pressed  (VirtualKeyCode),
-    Released (VirtualKeyCode),
 }

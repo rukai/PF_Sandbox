@@ -1,11 +1,12 @@
 use ::app::Render;
 use ::buffers::{Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
-use ::input::{KeyInput, KeyAction};
+use ::os_input::OsInput;
 use ::menu::RenderMenu;
 use ::package::{Package, PackageUpdate};
 
 use glium::{DisplayBuild, Surface, self};
+use glium::glutin::Event;
 use glium::backend::glutin_backend::GlutinFacade;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::fs::{File, self};
@@ -20,29 +21,29 @@ pub struct Graphics {
     shaders:         HashMap<String, String>,
     package_buffers: PackageBuffers,
     display:         GlutinFacade,
-    key_input_tx:    Sender<KeyAction>,
+    os_input_tx:     Sender<Event>,
     render_rx:       Receiver<GraphicsMessage>,
 }
 
 #[allow(unused_variables)]
 impl Graphics {
-    pub fn init(package: &Package) -> (Sender<GraphicsMessage>, KeyInput) {
+    pub fn init(package: &Package) -> (Sender<GraphicsMessage>, OsInput) {
         let fighters = package.fighters.clone();
         let stages   = package.stages.clone();
         let (render_tx, render_rx) = channel();
-        let (key_input, key_input_tx) = KeyInput::new();
+        let (os_input, os_input_tx) = OsInput::new();
         let package = package.clone();
 
         thread::spawn(move || {
-            let mut graphics = Graphics::new(package, key_input_tx, render_rx);
+            let mut graphics = Graphics::new(package, os_input_tx, render_rx);
             graphics.run();
         });
-        (render_tx, key_input)
+        (render_tx, os_input)
     }
 
     fn new(
         package: Package,
-        key_input_tx: Sender<KeyAction>,
+        os_input_tx: Sender<Event>,
         render_rx: Receiver<GraphicsMessage>,
     ) -> Graphics {
         let display = glium::glutin::WindowBuilder::new()
@@ -53,7 +54,7 @@ impl Graphics {
             shaders:         Graphics::load_shaders(),
             package_buffers: PackageBuffers::new(&display, package),
             display:         display,
-            key_input_tx:    key_input_tx,
+            os_input_tx:    os_input_tx,
             render_rx:       render_rx,
         }
     }
@@ -107,7 +108,7 @@ impl Graphics {
         let mut target = self.display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
 
-        //TODO: Run these once only
+        // TODO: Run these once only
         let vertex_shader = self.shaders.get("vertex").unwrap();
         let fragment_shader = self.shaders.get("fragment").unwrap();
         let program = glium::Program::from_source(&self.display, vertex_shader, fragment_shader, None).unwrap();
@@ -161,22 +162,7 @@ impl Graphics {
 
     fn handle_events(&mut self) {
         for ev in self.display.poll_events() {
-            use glium::glutin::Event::*;
-            use glium::glutin::ElementState::{Pressed, Released};
-            use glium::glutin::VirtualKeyCode;
-
-            match ev {
-                Closed => {
-                    self.key_input_tx.send(KeyAction::Pressed (VirtualKeyCode::Escape)).unwrap();
-                },
-                KeyboardInput(Pressed, _, Some(key_code)) => {
-                    self.key_input_tx.send(KeyAction::Pressed  (key_code)).unwrap();
-                },
-                KeyboardInput(Released, _, Some(key_code)) => {
-                    self.key_input_tx.send(KeyAction::Released (key_code)).unwrap();
-                },
-                _   => {},
-            }
+            self.os_input_tx.send(ev).unwrap();
         }
     }
 }

@@ -14,14 +14,14 @@ pub fn run(mut state: AppState) {
     let mut context = Context::new().unwrap();
     let mut input = Input::new(&mut context);
     let mut package = Package::open_or_generate("base_package");
-    let (graphics_tx, mut key_input) = Graphics::init(&package);
+    let (graphics_tx, mut os_input) = Graphics::init(&package);
     let mut next_state: Option<AppState> = None;
 
     loop {
         let frame_start = Instant::now();
 
         input.update();
-        key_input.update();
+        os_input.update();
 
         match &mut state {
             &mut AppState::Menu (ref mut menu) => {
@@ -67,7 +67,7 @@ pub fn run(mut state: AppState) {
             }
 
             &mut AppState::Game (ref mut game) => {
-                game.step(&mut package, &mut input, &key_input);
+                game.step(&mut package, &mut input, &os_input);
 
                 graphics_tx.send(GraphicsMessage {
                     package_updates: package.updates(),
@@ -81,7 +81,7 @@ pub fn run(mut state: AppState) {
             next_state = None;
         }
 
-        if key_input.pressed(VirtualKeyCode::Escape) {
+        if os_input.key_pressed(VirtualKeyCode::Escape) {
             return;
         }
 
