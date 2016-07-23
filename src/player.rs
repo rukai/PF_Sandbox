@@ -1,9 +1,9 @@
 use ::fighter::*;
-use ::game::Point;
 use ::input::{PlayerInput};
 use ::stage::{Stage, Platform};
 
 use num::FromPrimitive;
+use std::collections::HashSet;
 
 #[derive(Clone)]
 pub struct Player {
@@ -13,8 +13,9 @@ pub struct Player {
     pub frame:          u64,
     pub stocks:         u64,
     pub damage:         u64,
-    pub bps:            Point,
-    pub spawn:          Point,
+    pub bps_x:          f32,
+    pub bps_y:          f32,
+    pub spawn:          (f32, f32),
     pub x_vel:          f32,
     pub y_vel:          f32,
     pub x_acc:          f32,
@@ -30,7 +31,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(spawn: Point, stocks: u64) -> Player {
+    pub fn new(spawn: (f32, f32), stocks: u64) -> Player {
         Player {
             action:         Action::Spawn as u64,
             action_new:     Action::Spawn as u64,
@@ -38,7 +39,8 @@ impl Player {
             frame:          0,
             stocks:         stocks,
             damage:         0,
-            bps:            spawn.clone(),
+            bps_x:          spawn.0,
+            bps_y:          spawn.1,
             spawn:          spawn,
             x_vel:          0.0,
             y_vel:          0.0,
@@ -350,12 +352,12 @@ impl Player {
                 self.y_vel = fighter.terminal_vel;
             }
 
-            self.bps.x += self.x_vel;
-            self.bps.y += match self.land_stage_collision(stage, self.y_vel) {
+            self.bps_x += self.x_vel;
+            self.bps_y += match self.land_stage_collision(stage, self.y_vel) {
                 None => { self.y_vel },
                 Some(platform) => {
                     self.land(fighter);
-                    let ecb_y = self.bps.y + self.ecb_y + self.ecb_bottom;
+                    let ecb_y = self.bps_y + self.ecb_y + self.ecb_bottom;
                     let plat_y = platform.y + platform.h / 2.0;
                     plat_y - ecb_y
                 },
@@ -375,7 +377,7 @@ impl Player {
                 self.x_vel += self.x_acc;
             }
 
-            self.bps.x += self.x_vel;
+            self.bps_x += self.x_vel;
             self.x_acc = 0.0;
         }
 
@@ -391,7 +393,9 @@ impl Player {
         }
 
         // death
-        if self.bps.x < stage.lower_bounds.x || self.bps.x > stage.higher_bounds.x || self.bps.y < stage.lower_bounds.y || self.bps.y > stage.higher_bounds.y {
+        let (lower_x, lower_y) = stage.lower_bounds;
+        let (higher_x, higher_y) = stage.higher_bounds;
+        if self.bps_x < lower_x || self.bps_x > higher_x || self.bps_y < lower_y || self.bps_y > higher_y {
             self.die(fighter);
         }
     }
@@ -407,8 +411,8 @@ impl Player {
                 continue;
             }
 
-            let ecb_x = self.bps.x;
-            let ecb_y = self.bps.y + self.ecb_y + self.ecb_bottom + y_offset;
+            let ecb_x = self.bps_x;
+            let ecb_y = self.bps_y + self.ecb_y + self.ecb_bottom + y_offset;
 
             let plat_x1 = platform.x - platform.w / 2.0;
             let plat_x2 = platform.x + platform.w / 2.0;
@@ -449,7 +453,8 @@ impl Player {
 
     fn die(&mut self, fighter: &Fighter) {
         self.stocks -= 1;
-        self.bps = self.spawn.clone();
+        self.bps_x = self.spawn.0;
+        self.bps_y = self.spawn.1;
         self.y_vel = 0.0;
         self.x_vel = 0.0;
         self.air_jumps_left = fighter.air_jumps;
@@ -457,7 +462,7 @@ impl Player {
     }
 
     pub fn debug_physics(&self) {
-        println!("x_vel: {:.5}    y_vel: {:.5}    x_acc {:.5}", self.x_vel, self.y_vel, self.x_acc);
+        println!("x: {}    y: {}    x_vel: {:.5}    y_vel: {:.5}    x_acc {:.5}", self.bps_x, self.bps_y, self.x_vel, self.y_vel, self.x_acc);
     }
 
     pub fn debug_input(&self, input: &PlayerInput) {
@@ -504,9 +509,9 @@ impl Player {
             hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
     }
 
-    pub fn render(&self, fighter: usize) -> RenderPlayer {
+    pub fn render(&self, fighter: usize, selected_hitboxes: HashSet<usize>, selected: bool) -> RenderPlayer {
         RenderPlayer {
-            bps:        self.bps.clone(),
+            bps:        (self.bps_x, self.bps_y),
             ecb_enable: true,
             ecb_w:      self.ecb_w,
             ecb_y:      self.ecb_y,
@@ -515,12 +520,14 @@ impl Player {
             frame:      self.frame as usize,
             action:     self.action as usize,
             fighter:    fighter,
+            selected:   selected,
+            selected_hitboxes: selected_hitboxes,
         }
     }
 }
 
 pub struct RenderPlayer {
-    pub bps:        Point,
+    pub bps:        (f32, f32),
     pub ecb_enable: bool,
     pub ecb_w:      f32,
     pub ecb_y:      f32,
@@ -529,4 +536,6 @@ pub struct RenderPlayer {
     pub frame:      usize,
     pub action:     usize,
     pub fighter:    usize,
+    pub selected:   bool,
+    pub selected_hitboxes: HashSet<usize>,
 }

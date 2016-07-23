@@ -8,7 +8,8 @@ struct CurrentInput {
     pub key_actions:    Vec<KeyAction>,
     pub key_held:       [bool; 255],
     pub mouse_held:     [bool; 255],
-    pub mouse_location: Option<(i32, i32)>,
+    pub mouse_location: Option<(f32, f32)>,
+    pub resolution:     (u32, u32),
 }
 
 impl CurrentInput {
@@ -19,6 +20,7 @@ impl CurrentInput {
             key_held:       [false; 255],
             mouse_held:     [false; 255],
             mouse_location: None,
+            resolution:     (0, 0),
         }
     }
 
@@ -41,6 +43,9 @@ impl CurrentInput {
                 self.key_actions.push(KeyAction::Released(key_code));
             },
             Event::MouseMoved (x, y) => {
+                //TODO replace * 200.0 and - 100.0 with camera zoom and account for camera offset
+                let x = (200.0 * (x as f32)) / (self.resolution.0 as f32) - 100.0;
+                let y = (-200.0 * (y as f32)) / (self.resolution.1 as f32) + 100.0;
                 self.mouse_location = Some((x, y));
             },
             Event::MouseInput (Pressed, button) => {
@@ -53,6 +58,9 @@ impl CurrentInput {
                 self.mouse_held[button] = false;
                 self.mouse_actions.push(MouseAction::Released(button));
             },
+            Event::Resized (x, y) => {
+                self.resolution = (x, y);
+            }
             _ => {},
         }
     }
@@ -60,7 +68,7 @@ impl CurrentInput {
 
 pub struct OsInput {
     current: Option<CurrentInput>,
-    rx:      Receiver<Event>,
+    rx: Receiver<Event>,
 }
 
 impl OsInput {
@@ -167,7 +175,7 @@ impl OsInput {
         return self.key_held(VirtualKeyCode::LShift) || self.key_held(VirtualKeyCode::RShift);
     }
 
-    pub fn mouse(&self) -> Option<(i32, i32)> {
+    pub fn mouse(&self) -> Option<(f32, f32)> {
         match self.current {
             Some(ref current) => { current.mouse_location },
             None => { None },

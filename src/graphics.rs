@@ -50,11 +50,12 @@ impl Graphics {
             .with_title("PF ENGINE")
             .build_glium()
             .unwrap();
+
         Graphics {
             shaders:         Graphics::load_shaders(),
             package_buffers: PackageBuffers::new(&display, package),
             display:         display,
-            os_input_tx:    os_input_tx,
+            os_input_tx:     os_input_tx,
             render_rx:       render_rx,
         }
     }
@@ -83,11 +84,8 @@ impl Graphics {
                     let message = self.render_rx.recv().unwrap();
                     self.read_message(message)
                 };
-                loop {
-                    match self.render_rx.try_recv() {
-                        Ok(message) => { render = self.read_message(message); },
-                        Err(_)  => { break; },
-                    }
+                while let Ok(message) = self.render_rx.try_recv() {
+                    render = self.read_message(message);
                 }
 
                 match render {
@@ -121,11 +119,13 @@ impl Graphics {
             _                 => { },
         }
 
+        let white = [1.0 as f32, 1.0 as f32, 1.0 as f32];
+        let green = [0.0 as f32, 1.0 as f32, 0.0 as f32];
         for entity in render.entities {
             match entity {
                 RenderEntity::Player(player) => {
-                    let position: [f32; 2] = [player.bps.x, player.bps.y];
-                    let uniform = &uniform! { position_offset: position, zoom: zoom };
+                    let position: [f32; 2] = [player.bps.0, player.bps.1];
+                    let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white};
 
                     // draw fighter
                     let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
@@ -137,12 +137,29 @@ impl Graphics {
                     else {
                         // TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
                     }
+                    // TODO: Edit::Player  - render selected player's BPS as green
+                    // TODO: Edit::Fighter - render selected hitboxes and ecb points as green on selected player
+                    // TODO: Edit::Fighter - render outline of selected player as green
+                    // TODO: Edit::Stage   - render selected platforms as green
 
                     // draw player ecb
                     if player.ecb_enable {
                         let ecb = Buffers::new_player(&self.display, &player);
-                        target.draw(&ecb.vertex, &ecb.index, &program, uniform, &Default::default()).unwrap();
+                        if player.selected {
+                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: green};
+                            target.draw(&ecb.vertex, &ecb.index, &program, uniform, &Default::default()).unwrap();
+                        }
+                        else {
+                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white};
+                            target.draw(&ecb.vertex, &ecb.index, &program, uniform, &Default::default()).unwrap();
+                        }
                     }
+                },
+                RenderEntity::Selector(rect) => {
+                    let vertices = Buffers::rect_vertices(&self.display, rect);
+                    let indices = glium::index::NoIndices(glium::index::PrimitiveType::LineStrip);
+                    let uniform = &uniform! { position_offset: [0.0 as f32, 0.0 as f32], zoom: zoom, uniform_rgb: green };
+                    target.draw(&vertices, &indices, &program, uniform, &Default::default()).unwrap();
                 },
             }
         }
@@ -150,7 +167,7 @@ impl Graphics {
 
         let vertices = &self.package_buffers.stages[stage].vertex;
         let indices = &self.package_buffers.stages[stage].index;
-        let uniform = &uniform! { position_offset: [0.0 as f32, 0.0 as f32], zoom: zoom };
+        let uniform = &uniform! { position_offset: [0.0 as f32, 0.0 as f32], zoom: zoom, uniform_rgb: white };
         target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
 
         target.finish().unwrap();
@@ -161,6 +178,10 @@ impl Graphics {
     }
 
     fn handle_events(&mut self) {
+        // force send the current resolution
+        let res = self.display.get_window().unwrap().get_inner_size_points().unwrap();
+        self.os_input_tx.send(Event::Resized(res.0, res.1)).unwrap();
+
         for ev in self.display.poll_events() {
             self.os_input_tx.send(ev).unwrap();
         }

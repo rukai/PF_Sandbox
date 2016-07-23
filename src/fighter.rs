@@ -5,11 +5,11 @@ impl Fighter {
     //TODO: Eventually this should produce a blank Fighter
     //      An immutable demonstration package will be provided instead
     pub fn base() -> Fighter {
-        let point1 = Point {x: 3.0, y: 5.0};
-        let point2 = Point {x: 5.0, y: 6.0};
+        let point1 = (3.0, 5.0);
+        let point2 = (5.0, 6.0);
 
         let hitbox1 = Hitbox {
-            points: vec!(point1),
+            point:  point1,
             form:   HitboxType::Hurt,
             radius: 1.4,
             damage: 0,
@@ -20,7 +20,7 @@ impl Fighter {
         };
 
         let hitbox2 = Hitbox {
-            points: vec!(point2),
+            point: point2,
             form:   HitboxType::Hit,
             radius: 1.0,
             damage: 13,
@@ -129,7 +129,7 @@ pub struct ActionFrame {
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct Hitbox {
-    pub points: Vec<Point>,
+    pub point:  (f32, f32),
     pub form:   HitboxType,
     pub radius: f32,
     pub damage: u64,

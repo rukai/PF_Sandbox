@@ -2,6 +2,7 @@ use ::stage::Stage;
 use ::fighter::ActionFrame;
 use ::player::RenderPlayer;
 use ::package::{Package, PackageUpdate};
+use ::game::RenderRect;
 
 use glium;
 use glium::backend::glutin_backend::GlutinFacade;
@@ -57,6 +58,19 @@ impl Buffers {
         }
     }
 
+    /// Returns only a VertexBuffer
+    /// Use with index::PrimitiveType::LineStrip
+    pub fn rect_vertices(display: &GlutinFacade, rect: RenderRect) -> glium::VertexBuffer<Vertex> {
+        let vertices: Vec<Vertex> = vec!(
+            Vertex { position: [rect.p1.0, rect.p1.1] },
+            Vertex { position: [rect.p1.0, rect.p2.1] },
+            Vertex { position: [rect.p2.0, rect.p2.1] },
+            Vertex { position: [rect.p2.0, rect.p1.1] },
+            Vertex { position: [rect.p1.0, rect.p1.1] },
+        );
+        glium::VertexBuffer::immutable(display, &vertices).unwrap()
+    }
+
     fn new_fighter_frame(display: &GlutinFacade, frame: &ActionFrame) -> Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
@@ -64,18 +78,17 @@ impl Buffers {
         let triangles = 20;
 
         for hitbox in &frame.hitboxes {
-            for point in &hitbox.points {
-                // Draw a hitbox, at the point
-                // triangles are drawn meeting at the centre, forming a circle
-                for i in 0..triangles {
-                    let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
-                    let x = point.x + angle.cos() * hitbox.radius;
-                    let y = point.y + angle.sin() * hitbox.radius;
-                    vertices.push(Vertex { position: [x, y] });
-                    indices.push(index_count);
-                    indices.push(index_count + i);
-                    indices.push(index_count + (i + 1) % triangles);
-                }
+            // Draw a hitbox, at the point
+            // triangles are drawn meeting at the centre, forming a circle
+            let point = &hitbox.point;
+            for i in 0..triangles {
+                let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
+                let x = point.0 + angle.cos() * hitbox.radius;
+                let y = point.1 + angle.sin() * hitbox.radius;
+                vertices.push(Vertex { position: [x, y] });
+                indices.push(index_count);
+                indices.push(index_count + i);
+                indices.push(index_count + (i + 1) % triangles);
             }
             index_count += 20;
         }

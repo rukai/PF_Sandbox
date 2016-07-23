@@ -1,12 +1,10 @@
-use ::game::Point;
-
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct Stage {
     pub title:         String,
     pub platforms:     Vec<Platform>,
-    pub lower_bounds:  Point,
-    pub higher_bounds: Point,
-    pub spawn_points:  Vec<Point>,
+    pub lower_bounds:  (f32, f32),
+    pub higher_bounds: (f32, f32),
+    pub spawn_points:  Vec<(f32, f32)>,
 }
 
 impl Stage {
@@ -30,11 +28,11 @@ impl Stage {
         Stage {
             title:         "Base Stage".to_string(),
             platforms:     vec!(main_platform, second_platform),
-            lower_bounds:  Point {x:-200.0, y:-200.0},
-            higher_bounds: Point {x: 200.0, y: 200.0},
+            lower_bounds:  (-200.0, -200.0),
+            higher_bounds: (200.0,  200.0),
             spawn_points:  vec!(
-                Point{x: -50.0, y: 50.0}, Point{x: 50.0, y: 50.0},
-                Point{x: -50.0, y: 80.0}, Point{x: 50.0, y: 80.0},
+                (-50.0, 50.0), (50.0, 50.0),
+                (-50.0, 80.0), (50.0, 80.0),
             ),
         }
     }

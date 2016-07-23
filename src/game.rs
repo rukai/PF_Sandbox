@@ -3,9 +3,12 @@ use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer};
 
+use ::std::collections::HashSet;
+
 use glium::glutin::VirtualKeyCode;
 
 pub struct Game {
+    state:                  GameState,
     player_history:         Vec<Vec<Player>>,
     current_frame:          usize,
     saved_frame:            usize,
@@ -13,10 +16,11 @@ pub struct Game {
     selected_controllers:   Vec<usize>,
     selected_fighters:      Vec<usize>,
     selected_stage:         usize,
-    edit_player:            usize,
+    edit:                   Edit,
     debug_output_this_step: Option<usize>,
     debug_outputs:          Vec<DebugOutput>,
-    state:                  GameState,
+    selector:               Selector,
+    mouse:                  Option<(f32, f32)> // TODO: Can I get rid of this?
 }
 
 impl Game {
@@ -48,14 +52,16 @@ impl Game {
             selected_controllers:   selected_controllers,
             selected_fighters:      filled_fighters,
             selected_stage:         selected_stage,
-            edit_player:            0,
+            edit:                   Edit::Stage,
             debug_output_this_step: None,
             debug_outputs:          vec!(),
+            selector:               Selector { hitboxes: HashSet::new(), point: None },
+            mouse:                  None,
         }
     }
 
     pub fn step(&mut self, package: &mut Package, input: &mut Input, os_input: &OsInput) {
-        match self.state {
+        match self.state.clone() {
             GameState::Local           => { self.step_local(package, input, os_input); },
             GameState::Netplay         => { self.step_netplay(package, input); },
             GameState::Results         => { self.step_results(); },
@@ -83,7 +89,7 @@ impl Game {
 
         self.player_history.push(self.players.clone());
         if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
-            self.state = GameState::Paused;
+            self.set_paused();
         }
         else {
             self.current_frame += 1;
@@ -102,72 +108,42 @@ impl Game {
     fn step_pause(&mut self, package: &mut Package, input: &mut Input, os_input: &OsInput) {
         let players_len = self.players.len();
 
-        // set current player to direct character edits to
-        if os_input.key_pressed(VirtualKeyCode::Key1) && players_len >= 1 {
-            self.edit_player = 0;
+        // set current edit state
+        if os_input.key_pressed(VirtualKeyCode::Grave) {
+            self.edit = Edit::Stage;
         }
-        else if os_input.key_pressed(VirtualKeyCode::Key2) && players_len >= 2 {
-            self.edit_player = 1;
-        }
-        else if os_input.key_pressed(VirtualKeyCode::Key3) && players_len >= 3 {
-            self.edit_player = 2;
-        }
-        else if os_input.key_pressed(VirtualKeyCode::Key4) && players_len >= 4 {
-            self.edit_player = 3;
-        }
-
-        // add debug outputs
-        if os_input.key_pressed(VirtualKeyCode::F1) {
-            self.debug_outputs.push(DebugOutput::Physics{ player: self.edit_player });
-        }
-        if os_input.key_pressed(VirtualKeyCode::F2) {
+        else if os_input.key_pressed(VirtualKeyCode::Key1) && players_len >= 1 {
             if os_input.held_shift() {
-                self.debug_outputs.push(DebugOutput::InputDiff{ player: self.edit_player });
+                self.edit = Edit::Player (0);
             }
             else {
-                self.debug_outputs.push(DebugOutput::Input{ player: self.edit_player });
+                self.edit = Edit::Fighter (0);
             }
         }
-        if os_input.key_pressed(VirtualKeyCode::F3) {
-            self.debug_outputs.push(DebugOutput::Action{ player: self.edit_player });
+        else if os_input.key_pressed(VirtualKeyCode::Key2) && players_len >= 2 {
+            if os_input.held_shift() {
+                self.edit = Edit::Player (1);
+            }
+            else {
+                self.edit = Edit::Fighter (1);
+            }
         }
-        if os_input.key_pressed(VirtualKeyCode::F4) {
-            self.debug_outputs.push(DebugOutput::Frame{ player: self.edit_player });
+        else if os_input.key_pressed(VirtualKeyCode::Key3) && players_len >= 3 {
+            if os_input.held_shift() {
+                self.edit = Edit::Player (2);
+            }
+            else {
+                self.edit = Edit::Fighter (2);
+            }
         }
-        if os_input.key_pressed(VirtualKeyCode::F5) {
-            self.debug_outputs = vec!();
+        else if os_input.key_pressed(VirtualKeyCode::Key4) && players_len >= 4 {
+            if os_input.held_shift() {
+                self.edit = Edit::Player (3);
+            }
+            else {
+                self.edit = Edit::Fighter (3);
+            }
         }
-
-        // modify fighter
-        {
-            let player = self.edit_player;
-
-            let fighter = self.selected_fighters[player];
-            let action = self.players[player].action as usize;
-            let frame  = self.players[player].frame as usize;
-
-                if os_input.key_pressed(VirtualKeyCode::N) {
-                    package.add_fighter_frame(fighter, action, frame);
-                    self.debug_output_this_step = Some(self.current_frame);
-                }
-
-                if os_input.key_pressed(VirtualKeyCode::M) {
-                    if package.delete_fighter_frame(fighter, action, frame) {
-                        // Correct any players that are now on a nonexistent frame due to the frame deletion.
-                        // This is purely to stay on the same action for usability.
-                        // The player itself must handle being on a frame that has been deleted in order for replays to work.
-                        for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
-                            if self.selected_fighters[i] == fighter && any_player.action as usize == action
-                                && any_player.frame as usize == package.fighters[fighter].action_defs[action].frames.len() {
-                                any_player.frame -= 1;
-                            }
-                        }
-                        self.debug_output_this_step = Some(self.current_frame);
-                    }
-                }
-        }
-        // TODO: add debug_output call
-        // TODO: maybe refactor debug_output to be called at the end of main loop on flag set
 
         // modify package
         if os_input.key_pressed(VirtualKeyCode::S) {
@@ -205,7 +181,118 @@ impl Game {
             self.state = GameState::Local;
         }
 
-        // TODO: Handle character/stage edits here
+        match self.edit {
+            Edit::Fighter (player) => {
+                // add debug outputs
+                if os_input.key_pressed(VirtualKeyCode::F1) {
+                    self.debug_outputs.push(DebugOutput::Physics { player: player });
+                }
+                if os_input.key_pressed(VirtualKeyCode::F2) {
+                    if os_input.held_shift() {
+                        self.debug_outputs.push(DebugOutput::InputDiff { player: player });
+                    }
+                    else {
+                        self.debug_outputs.push(DebugOutput::Input { player: player });
+                    }
+                }
+                if os_input.key_pressed(VirtualKeyCode::F3) {
+                    self.debug_outputs.push(DebugOutput::Action { player: player });
+                }
+                if os_input.key_pressed(VirtualKeyCode::F4) {
+                    self.debug_outputs.push(DebugOutput::Frame { player: player });
+                }
+                if os_input.key_pressed(VirtualKeyCode::F5) {
+                    self.debug_outputs = vec!();
+                }
+
+                // modify fighter
+                let fighter = self.selected_fighters[player];
+                let action = self.players[player].action as usize;
+                let frame  = self.players[player].frame as usize;
+
+                if os_input.key_pressed(VirtualKeyCode::N) {
+                    package.add_fighter_frame(fighter, action, frame);
+                    self.debug_output_this_step = Some(self.current_frame);
+                }
+
+                if os_input.key_pressed(VirtualKeyCode::M) {
+                    if package.delete_fighter_frame(fighter, action, frame) {
+                        // Correct any players that are now on a nonexistent frame due to the frame deletion.
+                        // This is purely to stay on the same action for usability.
+                        // The player itself must handle being on a frame that has been deleted in order for replays to work.
+                        for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
+                            if self.selected_fighters[i] == fighter && any_player.action as usize == action
+                                && any_player.frame as usize == package.fighters[fighter].action_defs[action].frames.len() {
+                                any_player.frame -= 1;
+                            }
+                        }
+                        self.debug_output_this_step = Some(self.current_frame);
+                    }
+                }
+                self.mouse = os_input.mouse();
+
+                // single hitbox selection
+                if os_input.mouse_pressed(0) {
+                    if let Some((m_x, m_y)) = self.mouse {
+                        let fighter = self.selected_fighters[player];
+                        let action = self.players[player].action as usize;
+                        let frame  = self.players[player].frame as usize;
+                        let player_x = self.players[player].bps_x;
+                        let player_y = self.players[player].bps_y;
+
+                        for (i, hitbox) in (&package.fighters[fighter].action_defs[action].frames[frame].hitboxes).iter().enumerate() {
+                            let hit_x = hitbox.point.0 + player_x;
+                            let hit_y = hitbox.point.1 + player_y;
+
+                            let distance = ((m_x - hit_x).powi(2) + (m_y - hit_y).powi(2)).sqrt();
+                            if distance < hitbox.radius {
+                                if !os_input.held_shift() {
+                                    self.selector.hitboxes = HashSet::new();
+                                }
+                                self.selector.hitboxes.insert(i);
+                            }
+                        }
+                    }
+                }
+
+                // begin multiple hitbox selection
+                if os_input.mouse_pressed(1) {
+                    if let Some(mouse) = self.mouse {
+                        self.selector.point = Some(mouse);
+                    }
+                }
+
+                // complete multiple hitbox selection
+                if let Some(selection) = self.selector.point {
+                    let (x1, y1) = selection;
+                    if os_input.mouse_released(1) {
+                        if let Some((x2, y2)) = self.mouse {
+                            if !os_input.held_shift() {
+                                self.selector.hitboxes = HashSet::new();
+                            }
+                            let fighter = self.selected_fighters[player];
+                            let action = self.players[player].action as usize;
+                            let frame  = self.players[player].frame as usize;
+                            let player_x = self.players[player].bps_x;
+                            let player_y = self.players[player].bps_y;
+
+                            for (i, hitbox) in (&package.fighters[fighter].action_defs[action].frames[frame].hitboxes).iter().enumerate() {
+                                let hit_x = hitbox.point.0 + player_x;
+                                let hit_y = hitbox.point.1 + player_y;
+
+                                let x_check = (hit_x > x1 && hit_x < x2) || (hit_x > x2 && hit_x < x1);
+                                let y_check = (hit_y > y1 && hit_y < y2) || (hit_y > y2 && hit_y < y1);
+                                if x_check && y_check {
+                                    self.selector.hitboxes.insert(i);
+                                }
+                            }
+                            self.selector.point = None;
+                        }
+                    }
+                }
+            },
+            _ => { },
+        }
     }
 
     /// next frame is advanced by using the input history on the current frame
@@ -220,12 +307,12 @@ impl Game {
                 self.state = GameState::ReplayBackwards;
             }
             if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
-                self.state = GameState::Paused;
+                self.set_paused();
             }
             self.current_frame += 1;
         }
         else {
-            self.state = GameState::Paused;
+            self.set_paused();
         }
     }
 
@@ -239,7 +326,7 @@ impl Game {
             self.debug_output_this_step = Some(jump_to);
         }
         else {
-            self.state = GameState::Paused;
+            self.set_paused();
         }
 
         // flow controls
@@ -247,7 +334,7 @@ impl Game {
             self.state = GameState::ReplayForwards;
         }
         else if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
-            self.state = GameState::Paused;
+            self.set_paused();
         }
     }
 
@@ -315,10 +402,46 @@ impl Game {
     fn step_results(&mut self) {
     }
 
+    fn set_paused(&mut self) {
+        self.state = GameState::Paused;
+        self.selector.point = None;
+        self.selector.hitboxes = HashSet::new();
+    }
+
     pub fn render(&self) -> RenderGame {
         let mut entities = vec!();
         for (i, player) in self.players.iter().enumerate() {
-            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i])));
+
+            let mut selected_hitboxes = HashSet::new();
+            let mut selected = false;
+            if let GameState::Paused = self.state {
+                match self.edit {
+                    Edit::Fighter (player) => {
+
+                        if i == player {
+                            selected_hitboxes = self.selector.hitboxes.clone();
+                            // TODO: color outline green
+                        }
+
+                    },
+                    Edit::Player (player) => {
+                        selected = player == i;
+                    },
+                    _ => { },
+                }
+            }
+            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i], selected_hitboxes, selected)));
+        }
+
+        // render selector box
+        if let Some(point) = self.selector.point {
+            if let Some(mouse) = self.mouse {
+                let render_box = RenderRect {
+                    p1: point,
+                    p2: mouse,
+                };
+                entities.push(RenderEntity::Selector(render_box));
+            }
         }
 
         RenderGame {
@@ -350,6 +473,19 @@ pub enum GameState {
     Results, // Both Local and Netplay end at Results
 }
 
+pub enum Edit {
+    Fighter (usize), // index to player
+    Player  (usize),
+    Stage
+}
+
+#[derive(Debug)]
+#[derive(Clone)]
+pub struct Selector {
+    hitboxes: HashSet<usize>,
+    point: Option<(f32, f32)>
+}
+
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct Point {
     pub x: f32,
@@ -367,5 +503,11 @@ pub struct RenderGame {
 }
 
 pub enum RenderEntity {
-    Player (RenderPlayer),
+    Player   (RenderPlayer),
+    Selector (RenderRect),
+}
+
+pub struct RenderRect {
+    pub p1: (f32, f32),
+    pub p2: (f32, f32),
 }
