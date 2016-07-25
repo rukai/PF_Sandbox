@@ -6,36 +6,27 @@ impl Fighter {
     //      An immutable demonstration package will be provided instead
     pub fn base() -> Fighter {
         let point1 = (3.0, 5.0);
-        let point2 = (5.0, 6.0);
+        let point2 = (-2.0, 7.0);
 
-        let hitbox1 = Hitbox {
+        let hitbox1 = CollisionBox {
             point:  point1,
-            form:   HitboxType::Hurt,
+            role:   CollisionBoxRole::Hurt (Default::default()),
             radius: 1.4,
-            damage: 0,
-            bkb:    0,
-            kbg:    0,
-            angle:  0,
-            clang:  0,
         };
 
-        let hitbox2 = Hitbox {
-            point: point2,
-            form:   HitboxType::Hit,
+        let hitbox2 = CollisionBox {
+            point:  point2,
+            role:   CollisionBoxRole::Hit (Default::default()),
             radius: 1.0,
-            damage: 13,
-            bkb:    50,
-            kbg:    70,
-            angle:  40,
-            clang:  3,
         };
 
         let action_frame1 = ActionFrame {
-            hitboxes: vec!(hitbox1, hitbox2),
-            effects:  Vec::new(),
-            ecb_w:    3.5,
-            ecb_h:    12.0,
-            ecb_y:    6.0,
+            collisionboxes:      vec!(hitbox1, hitbox2),
+            collisionbox_links: vec!(),
+            effects:             vec!(),
+            ecb_w:               3.5,
+            ecb_h:               12.0,
+            ecb_y:               6.0,
         };
 
         let action_frame2 = action_frame1.clone();
@@ -120,23 +111,18 @@ pub struct ActionDef {
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct ActionFrame {
-    pub hitboxes: Vec<Hitbox>,
-    pub effects:  Vec<FrameEffect>,
-    pub ecb_w:    f32,
-    pub ecb_h:    f32,
-    pub ecb_y:    f32,
+    pub collisionboxes:     Vec<CollisionBox>,
+    pub collisionbox_links: Vec<CollisionBoxLink>,
+    pub effects:      Vec<FrameEffect>,
+    pub ecb_w:        f32,
+    pub ecb_h:        f32,
+    pub ecb_y:        f32,
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
-pub struct Hitbox {
-    pub point:  (f32, f32),
-    pub form:   HitboxType,
-    pub radius: f32,
-    pub damage: u64,
-    pub bkb:    u64,
-    pub kbg:    u64,
-    pub angle:  u64,
-    pub clang:  u64,
+pub enum CollisionBoxLink {
+    Meld   (usize, usize),
+    Simple (usize, usize),
 }
 
 enum_from_primitive! {
@@ -213,15 +199,53 @@ pub enum FrameEffect {
     Acceleration {x: i64, y: i64},
 }
 
+
 #[derive(Clone, RustcEncodable, RustcDecodable)]
-pub enum HitboxType {
-    Hurt,
-    Intantigible,
-    Invincible,
-    Hit,
+pub struct CollisionBox {
+    pub point:  (f32, f32),
+    pub radius: f32,
+    pub role:   CollisionBoxRole,
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable)]
+pub enum CollisionBoxRole {
+    Hurt (HurtBox), // a target
+    Hit  (HitBox),  // a launching attack
     Grab,
-    Sleep,
-    Freeze,
+    Intangible,     // cannot be interacted with
+    Invincible,     // cannot receive damage or knockback.
+    Reflect,        // reflects projectiles
+    Absorb,         // absorb projectiles
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable, Default)]
+pub struct HurtBox {
+    pub knockback_mod: u64,
+    pub damage_mod:    u64,
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable, Default)]
+pub struct HitBox {
+    pub shield_damage: u64,
+    pub damage:        u64,
+    pub bkb:           u64, // base knockback
+    pub kbg:           u64, // knockback growth
+    pub angle:         u64,
+    pub priority:      u64,
+    pub effect:        HitboxEffect,
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable)]
+pub enum HitboxEffect {
     Fire,
     Electric,
+    Sleep,
+    Reverse,
+    Stun,
+    Freeze,
+    None,
+}
+
+impl Default for HitboxEffect {
+    fn default() -> HitboxEffect { HitboxEffect::None }
 }

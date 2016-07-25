@@ -504,17 +504,17 @@ impl Player {
 
         if self.debug.frame {
             let frame = &fighter.action_defs[self.action as usize].frames[self.frame as usize];
-            let hitbox_count = frame.hitboxes.len();
+            let hitbox_count = frame.collisionboxes.len();
             let effects_count = frame.effects.len();
             let ecb_w = frame.ecb_w;
             let ecb_h = frame.ecb_h;
             let ecb_y = frame.ecb_y;
-            println!("Player: {}    hitboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
+            println!("Player: {}    collisionboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
                 index, hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
         }
     }
 
-    pub fn render(&self, fighter: usize, selected_hitboxes: HashSet<usize>, selected: bool) -> RenderPlayer {
+    pub fn render(&self, fighter: usize, selected_collisionboxes: HashSet<usize>, selected: bool) -> RenderPlayer {
         RenderPlayer {
             debug:      self.debug.clone(),
             bps:        (self.bps_x, self.bps_y),
@@ -527,7 +527,7 @@ impl Player {
             fighter:    fighter,
             face_right: self.face_right,
             selected:   selected,
-            selected_hitboxes: selected_hitboxes,
+            selected_collisionboxes: selected_collisionboxes,
         }
     }
 }
@@ -544,7 +544,7 @@ pub struct RenderPlayer {
     pub fighter:    usize,
     pub face_right: bool,
     pub selected:   bool,
-    pub selected_hitboxes: HashSet<usize>,
+    pub selected_collisionboxes: HashSet<usize>,
 }
 
 #[derive(Clone)]

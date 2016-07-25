@@ -97,8 +97,9 @@ Most of these operations will apply to all selected hitboxes:
 *   S - resize hitboxes
 *   D - delete selected hitboxes
 *   F - Insert hitbox, left click to confirm
-*   Z - Connect hitboxes as meld
-*   X - Connect hitboxes as pivot
+*   Z - Meld link hitboxes
+*   X - Simple link hitboxes
+*   C - Unlink hitboxes
 
 Melding hitboxes combines them into a single hitbox.
 Pivot hitboxes act as if they are melded but remain as seperate hitboxes.

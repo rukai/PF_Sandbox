@@ -77,14 +77,14 @@ impl Buffers {
         let mut index_count = 0;
         let triangles = 20;
 
-        for hitbox in &frame.hitboxes {
-            // Draw a hitbox, at the point
+        for collisionbox in &frame.collisionboxes {
+            // Draw a collisionbox, at the point
             // triangles are drawn meeting at the centre, forming a circle
-            let point = &hitbox.point;
+            let point = &collisionbox.point;
             for i in 0..triangles {
                 let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
-                let x = point.0 + angle.cos() * hitbox.radius;
-                let y = point.1 + angle.sin() * hitbox.radius;
+                let x = point.0 + angle.cos() * collisionbox.radius;
+                let y = point.1 + angle.sin() * collisionbox.radius;
                 vertices.push(Vertex { position: [x, y] });
                 indices.push(index_count);
                 indices.push(index_count + i);

@@ -52,7 +52,7 @@ impl Game {
             selected_stage:         selected_stage,
             edit:                   Edit::Stage,
             debug_output_this_step: None,
-            selector:               Selector { hitboxes: HashSet::new(), point: None, mouse: None },
+            selector:               Selector { collisionboxes: HashSet::new(), point: None, mouse: None },
         }
     }
 
@@ -185,11 +185,13 @@ impl Game {
                 let action = self.players[player].action as usize;
                 let frame  = self.players[player].frame as usize;
 
+                // delete frame
                 if os_input.key_pressed(VirtualKeyCode::N) {
                     package.add_fighter_frame(fighter, action, frame);
                     self.debug_output_this_step = Some(self.current_frame);
                 }
 
+                //add frame
                 if os_input.key_pressed(VirtualKeyCode::M) {
                     if package.delete_fighter_frame(fighter, action, frame) {
                         // Correct any players that are now on a nonexistent frame due to the frame deletion.
@@ -206,7 +208,7 @@ impl Game {
                 }
                 self.selector.mouse = os_input.mouse();
 
-                // single hitbox selection
+                // single collsionbox selection
                 if os_input.mouse_pressed(0) {
                     if let Some((m_x, m_y)) = self.selector.mouse {
                         let fighter = self.selected_fighters[player];
@@ -215,35 +217,35 @@ impl Game {
                         let player_x = self.players[player].bps_x;
                         let player_y = self.players[player].bps_y;
 
-                        for (i, hitbox) in (&package.fighters[fighter].action_defs[action].frames[frame].hitboxes).iter().enumerate() {
-                            let hit_x = hitbox.point.0 + player_x;
-                            let hit_y = hitbox.point.1 + player_y;
+                        for (i, collisionbox) in (&package.fighters[fighter].action_defs[action].frames[frame].collisionboxes).iter().enumerate() {
+                            let hit_x = collisionbox.point.0 + player_x;
+                            let hit_y = collisionbox.point.1 + player_y;
 
                             let distance = ((m_x - hit_x).powi(2) + (m_y - hit_y).powi(2)).sqrt();
-                            if distance < hitbox.radius {
+                            if distance < collisionbox.radius {
                                 if !os_input.held_shift() {
-                                    self.selector.hitboxes = HashSet::new();
+                                    self.selector.collisionboxes = HashSet::new();
                                 }
-                                self.selector.hitboxes.insert(i);
+                                self.selector.collisionboxes.insert(i);
                             }
                         }
                     }
                 }
 
-                // begin multiple hitbox selection
+                // begin multiple collisionbox selection
                 if os_input.mouse_pressed(1) {
                     if let Some(mouse) = self.selector.mouse {
                         self.selector.point = Some(mouse);
                     }
                 }
 
-                // complete multiple hitbox selection
+                // complete multiple collisionbox selection
                 if let Some(selection) = self.selector.point {
                     let (x1, y1) = selection;
                     if os_input.mouse_released(1) {
                         if let Some((x2, y2)) = self.selector.mouse {
                             if !os_input.held_shift() {
-                                self.selector.hitboxes = HashSet::new();
+                                self.selector.collisionboxes = HashSet::new();
                             }
                             let fighter = self.selected_fighters[player];
                             let action = self.players[player].action as usize;
@@ -251,14 +253,14 @@ impl Game {
                             let player_x = self.players[player].bps_x;
                             let player_y = self.players[player].bps_y;
 
-                            for (i, hitbox) in (&package.fighters[fighter].action_defs[action].frames[frame].hitboxes).iter().enumerate() {
-                                let hit_x = hitbox.point.0 + player_x;
-                                let hit_y = hitbox.point.1 + player_y;
+                            for (i, collisionbox) in (&package.fighters[fighter].action_defs[action].frames[frame].collisionboxes).iter().enumerate() {
+                                let hit_x = collisionbox.point.0 + player_x;
+                                let hit_y = collisionbox.point.1 + player_y;
 
                                 let x_check = (hit_x > x1 && hit_x < x2) || (hit_x > x2 && hit_x < x1);
                                 let y_check = (hit_y > y1 && hit_y < y2) || (hit_y > y2 && hit_y < y1);
                                 if x_check && y_check {
-                                    self.selector.hitboxes.insert(i);
+                                    self.selector.collisionboxes.insert(i);
                                 }
                             }
                             self.selector.point = None;
@@ -423,21 +425,21 @@ impl Game {
     fn set_paused(&mut self) {
         self.state = GameState::Paused;
         self.selector.point = None;
-        self.selector.hitboxes = HashSet::new();
+        self.selector.collisionboxes = HashSet::new();
     }
 
     pub fn render(&self) -> RenderGame {
         let mut entities = vec!();
         for (i, player) in self.players.iter().enumerate() {
 
-            let mut selected_hitboxes = HashSet::new();
+            let mut selected_collisionboxes = HashSet::new();
             let mut selected = false;
             if let GameState::Paused = self.state {
                 match self.edit {
                     Edit::Fighter (player) => {
 
                         if i == player {
-                            selected_hitboxes = self.selector.hitboxes.clone();
+                            selected_collisionboxes = self.selector.collisionboxes.clone();
                             // TODO: color outline green
                         }
 
@@ -448,7 +450,7 @@ impl Game {
                     _ => { },
                 }
             }
-            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i], selected_hitboxes, selected)));
+            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i], selected_collisionboxes, selected)));
         }
 
         // render selector box
@@ -492,9 +494,9 @@ pub enum Edit {
 #[derive(Debug)]
 #[derive(Clone)]
 pub struct Selector {
-    hitboxes: HashSet<usize>,
-    point:    Option<(f32, f32)>,
-    mouse:    Option<(f32, f32)>,
+    collisionboxes: HashSet<usize>,
+    point:          Option<(f32, f32)>,
+    mouse:          Option<(f32, f32)>,
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
