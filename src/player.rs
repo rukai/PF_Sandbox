@@ -525,6 +525,7 @@ impl Player {
             frame:      self.frame as usize,
             action:     self.action as usize,
             fighter:    fighter,
+            face_right: self.face_right,
             selected:   selected,
             selected_hitboxes: selected_hitboxes,
         }
@@ -541,6 +542,7 @@ pub struct RenderPlayer {
     pub frame:      usize,
     pub action:     usize,
     pub fighter:    usize,
+    pub face_right: bool,
     pub selected:   bool,
     pub selected_hitboxes: HashSet<usize>,
 }

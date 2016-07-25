@@ -107,9 +107,17 @@ impl Graphics {
         target.clear_color(0.0, 0.0, 0.0, 1.0);
 
         // TODO: Run these once only
-        let vertex_shader = self.shaders.get("vertex").unwrap();
-        let fragment_shader = self.shaders.get("fragment").unwrap();
-        let program = glium::Program::from_source(&self.display, vertex_shader, fragment_shader, None).unwrap();
+        let program = {
+            let vertex_shader = self.shaders.get("generic-vertex").unwrap();
+            let fragment_shader = self.shaders.get("generic-fragment").unwrap();
+            glium::Program::from_source(&self.display, vertex_shader, fragment_shader, None).unwrap()
+        };
+
+        let player_program = {
+            let vertex_shader = self.shaders.get("player-vertex").unwrap();
+            let fragment_shader = self.shaders.get("generic-fragment").unwrap();
+            glium::Program::from_source(&self.display, vertex_shader, fragment_shader, None).unwrap()
+        };
 
         let zoom: f32 = 0.01;
 
@@ -125,15 +133,16 @@ impl Graphics {
             match entity {
                 RenderEntity::Player(player) => {
                     let position: [f32; 2] = [player.bps.0, player.bps.1];
+                    let dir = if player.face_right { 1.0 } else { -1.0 } as f32;
 
                     // draw fighter
                     if !player.debug.no_fighter {
-                        let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white};
+                        let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white, direction: dir};
                         let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
                         if player.frame < fighter_frames.len() {
                             let vertices = &fighter_frames[player.frame].vertex;
                             let indices  = &fighter_frames[player.frame].index;
-                            target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
+                            target.draw(vertices, indices, &player_program, uniform, &Default::default()).unwrap();
                         }
                         else {
                             // TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
@@ -148,12 +157,12 @@ impl Graphics {
                     if player.debug.player {
                         let ecb = Buffers::new_player(&self.display, &player);
                         if player.selected {
-                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: green};
-                            target.draw(&ecb.vertex, &ecb.index, &program, uniform, &Default::default()).unwrap();
+                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: green, direction: dir };
+                            target.draw(&ecb.vertex, &ecb.index, &player_program, uniform, &Default::default()).unwrap();
                         }
                         else {
-                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white};
-                            target.draw(&ecb.vertex, &ecb.index, &program, uniform, &Default::default()).unwrap();
+                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white, direction: dir };
+                            target.draw(&ecb.vertex, &ecb.index, &player_program, uniform, &Default::default()).unwrap();
                         }
                     }
                 },
