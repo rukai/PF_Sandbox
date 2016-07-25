@@ -28,6 +28,7 @@ pub struct Player {
     pub airbourne:      bool,
     pub pass_through:   bool,
     pub air_jumps_left: u64,
+    pub debug:  DebugPlayer,
 }
 
 impl Player {
@@ -54,6 +55,7 @@ impl Player {
             airbourne:      true,
             pass_through:   false,
             air_jumps_left: 0,
+            debug:  DebugPlayer::default(),
         }
     }
 
@@ -435,8 +437,8 @@ impl Player {
             Some(Action::Dair)      => { self.set_action(Action::DairLand) },
             Some(Action::Fair)      => { self.set_action(Action::FairLand) },
             Some(Action::Nair)      => { self.set_action(Action::NairLand) },
-            _ if self.y_vel >= -1.0 => { self.set_action(Action::Idle)     }, // no impact land
-            Some(_) | None          => { self.set_action(Action::Land)     },
+            _ if self.y_vel >= -1.0 => { self.set_action(Action::Idle) }, // no impact land
+            Some(_) | None          => { self.set_action(Action::Land) },
         }
     }
 
@@ -461,58 +463,61 @@ impl Player {
         self.set_action(Action::Spawn);
     }
 
-    pub fn debug_physics(&self) {
-        println!("x: {}    y: {}    x_vel: {:.5}    y_vel: {:.5}    x_acc {:.5}", self.bps_x, self.bps_y, self.x_vel, self.y_vel, self.x_acc);
-    }
+    pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, index: usize) {
+        if self.debug.physics {
+            println!("Player: {}    x: {}    y: {}    x_vel: {:.5}    y_vel: {:.5}    x_acc {:.5}",
+                index, self.bps_x, self.bps_y, self.x_vel, self.y_vel, self.x_acc);
+        }
 
-    pub fn debug_input(&self, input: &PlayerInput) {
-        let stick_x   = input.stick_x.value;
-        let stick_y   = input.stick_y.value;
-        let c_stick_x = input.c_stick_x.value;
-        let c_stick_y = input.c_stick_y.value;
-        let l_trigger = input.l_trigger.value;
-        let r_trigger = input.r_trigger.value;
+        if self.debug.input {
+            let stick_x   = player_input.stick_x.value;
+            let stick_y   = player_input.stick_y.value;
+            let c_stick_x = player_input.c_stick_x.value;
+            let c_stick_y = player_input.c_stick_y.value;
+            let l_trigger = player_input.l_trigger.value;
+            let r_trigger = player_input.r_trigger.value;
 
-        println!("VALUE    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
-            stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
-    }
+            println!("Player: {}    VALUE    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
+                index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
+        }
 
-    pub fn debug_input_diff(&self, input: &PlayerInput) {
-        let stick_x   = input.stick_x.diff;
-        let stick_y   = input.stick_y.diff;
-        let c_stick_x = input.c_stick_x.diff;
-        let c_stick_y = input.c_stick_y.diff;
-        let l_trigger = input.l_trigger.diff;
-        let r_trigger = input.r_trigger.diff;
+        if self.debug.input_diff {
+            let stick_x   = player_input.stick_x.diff;
+            let stick_y   = player_input.stick_y.diff;
+            let c_stick_x = player_input.c_stick_x.diff;
+            let c_stick_y = player_input.c_stick_y.diff;
+            let l_trigger = player_input.l_trigger.diff;
+            let r_trigger = player_input.r_trigger.diff;
 
-        println!("DIFF    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
-            stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
-    }
+            println!("Player: {}    DIFF    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
+                index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
+        }
 
-    pub fn debug_action(&self, fighter: &Fighter) {
-        let action = Action::from_u64(self.action).unwrap();
-        let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64 - 1;
-        let iasa = fighter.action_defs[self.action as usize].iasa;
+        if self.debug.action {
+            let action = Action::from_u64(self.action).unwrap();
+            let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64 - 1;
+            let iasa = fighter.action_defs[self.action as usize].iasa;
 
-        println!("action: {:?}    airbourne: {}    frame: {}/{}    IASA: {}",
-            action, self.airbourne, self.frame, action_frames, iasa);
-    }
+            println!("Player: {}    action: {:?}    airbourne: {}    frame: {}/{}    IASA: {}",
+                index, action, self.airbourne, self.frame, action_frames, iasa);
+        }
 
-    pub fn debug_frame(&self, fighter: &Fighter) {
-        let frame = &fighter.action_defs[self.action as usize].frames[self.frame as usize];
-        let hitbox_count = frame.hitboxes.len();
-        let effects_count = frame.effects.len();
-        let ecb_w = frame.ecb_w;
-        let ecb_h = frame.ecb_h;
-        let ecb_y = frame.ecb_y;
-        println!("hitboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
-            hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
+        if self.debug.frame {
+            let frame = &fighter.action_defs[self.action as usize].frames[self.frame as usize];
+            let hitbox_count = frame.hitboxes.len();
+            let effects_count = frame.effects.len();
+            let ecb_w = frame.ecb_w;
+            let ecb_h = frame.ecb_h;
+            let ecb_y = frame.ecb_y;
+            println!("Player: {}    hitboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
+                index, hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
+        }
     }
 
     pub fn render(&self, fighter: usize, selected_hitboxes: HashSet<usize>, selected: bool) -> RenderPlayer {
         RenderPlayer {
+            debug:      self.debug.clone(),
             bps:        (self.bps_x, self.bps_y),
-            ecb_enable: true,
             ecb_w:      self.ecb_w,
             ecb_y:      self.ecb_y,
             ecb_top:    self.ecb_top,
@@ -527,8 +532,8 @@ impl Player {
 }
 
 pub struct RenderPlayer {
+    pub debug:      DebugPlayer,
     pub bps:        (f32, f32),
-    pub ecb_enable: bool,
     pub ecb_w:      f32,
     pub ecb_y:      f32,
     pub ecb_top:    f32,
@@ -538,4 +543,19 @@ pub struct RenderPlayer {
     pub fighter:    usize,
     pub selected:   bool,
     pub selected_hitboxes: HashSet<usize>,
+}
+
+#[derive(Clone)]
+#[derive(Default)]
+pub struct DebugPlayer {
+    pub physics:        bool,
+    pub input:          bool,
+    pub input_diff:     bool,
+    pub action:         bool,
+    pub frame:          bool,
+    pub stick_vector:   bool,
+    pub c_stick_vector: bool,
+    pub di_vector:      bool,
+    pub player:         bool,
+    pub no_fighter:     bool,
 }

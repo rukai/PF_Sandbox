@@ -57,17 +57,23 @@ First you must select what you wish to edit:
 *   3 + Shift - Player 3
 *   4 + Shift - Player 4
 
-### Debug output
+### Debug Displays
 
-To display debug output on the currently selected player use the following keys:
-Debug output is displayed every time a frame is changed or modified.
+Debug output is displayed to the terminal every time a frame is changed or modified.
+Use the following keys to toggle debug displays:
 
-*   F1 - Player physics 
-*   F2 - Input
-*   F2 + Shift - Input difference
-*   F3 - Current action
-*   F4 - Frame
-*   F5 - Display ECB on screen at all times
+*   F1 - Player physics  (terminal only)
+*   F2 - Input (terminal only)
+*   F2 + Shift - Input difference (terminal only)
+*   F3 - Current action (terminal only)
+*   F4 - Frame (terminal only)
+*   F5 - Main stick vector
+*   F6 - CStick vector
+*   F7 - DI vector
+*   F8 - Display ECB and BPS
+*   F9 -
+*   F10 -
+*   F11 - Set all
 *   F12 - Reset all
 
 ### Selection

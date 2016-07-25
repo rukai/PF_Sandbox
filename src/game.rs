@@ -1,7 +1,7 @@
 use ::input::{Input, PlayerInput};
 use ::os_input::OsInput;
 use ::package::Package;
-use ::player::{Player, RenderPlayer};
+use ::player::{Player, RenderPlayer, DebugPlayer};
 
 use ::std::collections::HashSet;
 
@@ -18,9 +18,7 @@ pub struct Game {
     selected_stage:         usize,
     edit:                   Edit,
     debug_output_this_step: Option<usize>,
-    debug_outputs:          Vec<DebugOutput>,
     selector:               Selector,
-    mouse:                  Option<(f32, f32)> // TODO: Can I get rid of this?
 }
 
 impl Game {
@@ -54,9 +52,7 @@ impl Game {
             selected_stage:         selected_stage,
             edit:                   Edit::Stage,
             debug_output_this_step: None,
-            debug_outputs:          vec!(),
-            selector:               Selector { hitboxes: HashSet::new(), point: None },
-            mouse:                  None,
+            selector:               Selector { hitboxes: HashSet::new(), point: None, mouse: None },
         }
     }
 
@@ -183,28 +179,7 @@ impl Game {
 
         match self.edit {
             Edit::Fighter (player) => {
-                // add debug outputs
-                if os_input.key_pressed(VirtualKeyCode::F1) {
-                    self.debug_outputs.push(DebugOutput::Physics { player: player });
-                }
-                if os_input.key_pressed(VirtualKeyCode::F2) {
-                    if os_input.held_shift() {
-                        self.debug_outputs.push(DebugOutput::InputDiff { player: player });
-                    }
-                    else {
-                        self.debug_outputs.push(DebugOutput::Input { player: player });
-                    }
-                }
-                if os_input.key_pressed(VirtualKeyCode::F3) {
-                    self.debug_outputs.push(DebugOutput::Action { player: player });
-                }
-                if os_input.key_pressed(VirtualKeyCode::F4) {
-                    self.debug_outputs.push(DebugOutput::Frame { player: player });
-                }
-                if os_input.key_pressed(VirtualKeyCode::F5) {
-                    self.debug_outputs = vec!();
-                }
-
+                self.set_debug(os_input, player);
                 // modify fighter
                 let fighter = self.selected_fighters[player];
                 let action = self.players[player].action as usize;
@@ -229,11 +204,11 @@ impl Game {
                         self.debug_output_this_step = Some(self.current_frame);
                     }
                 }
-                self.mouse = os_input.mouse();
+                self.selector.mouse = os_input.mouse();
 
                 // single hitbox selection
                 if os_input.mouse_pressed(0) {
-                    if let Some((m_x, m_y)) = self.mouse {
+                    if let Some((m_x, m_y)) = self.selector.mouse {
                         let fighter = self.selected_fighters[player];
                         let action = self.players[player].action as usize;
                         let frame  = self.players[player].frame as usize;
@@ -257,7 +232,7 @@ impl Game {
 
                 // begin multiple hitbox selection
                 if os_input.mouse_pressed(1) {
-                    if let Some(mouse) = self.mouse {
+                    if let Some(mouse) = self.selector.mouse {
                         self.selector.point = Some(mouse);
                     }
                 }
@@ -266,7 +241,7 @@ impl Game {
                 if let Some(selection) = self.selector.point {
                     let (x1, y1) = selection;
                     if os_input.mouse_released(1) {
-                        if let Some((x2, y2)) = self.mouse {
+                        if let Some((x2, y2)) = self.selector.mouse {
                             if !os_input.held_shift() {
                                 self.selector.hitboxes = HashSet::new();
                             }
@@ -291,7 +266,69 @@ impl Game {
                     }
                 }
             },
-            _ => { },
+            Edit::Player (player) => {
+                self.set_debug(os_input, player);
+            },
+            Edit::Stage => { },
+        }
+    }
+
+    // TODO: Shift to apply to all players
+    // TODO: F09 - load preset from player profile
+    // TODO: F10 - save preset to player profile
+    fn set_debug(&mut self, os_input: &OsInput, player: usize) {
+        {
+            let debug = &mut self.players[player].debug;
+
+            if os_input.key_pressed(VirtualKeyCode::F1) {
+                debug.physics = !debug.physics;
+            }
+            if os_input.key_pressed(VirtualKeyCode::F2) {
+                if os_input.held_shift() {
+                    debug.input_diff = !debug.input_diff;
+                }
+                else {
+                    debug.input = !debug.input;
+                }
+            }
+            if os_input.key_pressed(VirtualKeyCode::F3) {
+                debug.action = !debug.action;
+            }
+            if os_input.key_pressed(VirtualKeyCode::F4) {
+                debug.frame = !debug.frame;
+            }
+            if os_input.key_pressed(VirtualKeyCode::F5) {
+                debug.stick_vector = !debug.stick_vector;
+            }
+            if os_input.key_pressed(VirtualKeyCode::F6) {
+                debug.c_stick_vector = !debug.c_stick_vector;
+            }
+            if os_input.key_pressed(VirtualKeyCode::F7) {
+                debug.di_vector = !debug.di_vector;
+            }
+            if os_input.key_pressed(VirtualKeyCode::F8) {
+                debug.player = !debug.player;
+            }
+            if os_input.key_pressed(VirtualKeyCode::F9) {
+                debug.no_fighter = !debug.no_fighter;
+            }
+        }
+        if os_input.key_pressed(VirtualKeyCode::F11) {
+            self.players[player].debug = DebugPlayer {
+                physics:        true,
+                input:          true,
+                input_diff:     true,
+                action:         true,
+                frame:          true,
+                stick_vector:   true,
+                c_stick_vector: true,
+                di_vector:      true,
+                player:         true,
+                no_fighter:     true,
+            }
+        }
+        if os_input.key_pressed(VirtualKeyCode::F12) {
+            self.players[player].debug = DebugPlayer::default();
         }
     }
 
@@ -368,34 +405,15 @@ impl Game {
     }
 
     fn debug_output(&mut self, package: &Package, input: &Input, frame: usize) {
-        let player_input = &input.players(frame);
+        let player_inputs = &input.players(frame);
 
         println!("\n-------------------------------------------");
         println!("Frame: {}    state: {:?}", frame, self.state);
 
-        for debug_output in &self.debug_outputs {
-            match debug_output {
-                &DebugOutput::Physics{ player } => {
-                    print!("Player: {}    ", player);
-                    self.players[player].debug_physics();
-                },
-                &DebugOutput::Input{ player } => {
-                    print!("Player: {}    ", player);
-                    self.players[player].debug_input(&player_input[player]);
-                },
-                &DebugOutput::InputDiff{ player } => {
-                    print!("Player: {}    ", player);
-                    self.players[player].debug_input_diff(&player_input[player]);
-                },
-                &DebugOutput::Action{ player } => {
-                    print!("Player: {}    ", player);
-                    self.players[player].debug_action(&package.fighters[self.selected_fighters[player]]);
-                },
-                &DebugOutput::Frame{ player } => {
-                    print!("Player: {}    ", player);
-                    self.players[player].debug_frame(&package.fighters[self.selected_fighters[player]]);
-                },
-            }
+        for (i, player) in self.players.iter().enumerate() {
+            let fighter = &package.fighters[self.selected_fighters[i]];
+            let player_input = &player_inputs[i];
+            player.debug_print(fighter, player_input, i);
         }
     }
 
@@ -435,7 +453,7 @@ impl Game {
 
         // render selector box
         if let Some(point) = self.selector.point {
-            if let Some(mouse) = self.mouse {
+            if let Some(mouse) = self.selector.mouse {
                 let render_box = RenderRect {
                     p1: point,
                     p2: mouse,
@@ -452,14 +470,6 @@ impl Game {
             zoom:     0.0,
         }
     }
-}
-
-enum DebugOutput {
-    Physics   {player: usize},
-    Input     {player: usize},
-    InputDiff {player: usize},
-    Action    {player: usize},
-    Frame     {player: usize},
 }
 
 #[derive(Debug)]
@@ -483,7 +493,8 @@ pub enum Edit {
 #[derive(Clone)]
 pub struct Selector {
     hitboxes: HashSet<usize>,
-    point: Option<(f32, f32)>
+    point:    Option<(f32, f32)>,
+    mouse:    Option<(f32, f32)>,
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]

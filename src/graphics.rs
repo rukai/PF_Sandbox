@@ -125,17 +125,19 @@ impl Graphics {
             match entity {
                 RenderEntity::Player(player) => {
                     let position: [f32; 2] = [player.bps.0, player.bps.1];
-                    let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white};
 
                     // draw fighter
-                    let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
-                    if player.frame < fighter_frames.len() {
-                        let vertices = &fighter_frames[player.frame].vertex;
-                        let indices  = &fighter_frames[player.frame].index;
-                        target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
-                    }
-                    else {
-                        // TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
+                    if !player.debug.no_fighter {
+                        let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white};
+                        let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
+                        if player.frame < fighter_frames.len() {
+                            let vertices = &fighter_frames[player.frame].vertex;
+                            let indices  = &fighter_frames[player.frame].index;
+                            target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
+                        }
+                        else {
+                            // TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
+                        }
                     }
                     // TODO: Edit::Player  - render selected player's BPS as green
                     // TODO: Edit::Fighter - render selected hitboxes and ecb points as green on selected player
@@ -143,7 +145,7 @@ impl Graphics {
                     // TODO: Edit::Stage   - render selected platforms as green
 
                     // draw player ecb
-                    if player.ecb_enable {
+                    if player.debug.player {
                         let ecb = Buffers::new_player(&self.display, &player);
                         if player.selected {
                             let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: green};
