@@ -24,7 +24,7 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn open(name: &str) -> Package {
+    fn open(name: &str) -> Package {
         let mut path = PathBuf::from("packages");
         path.push(name);
 
@@ -50,7 +50,7 @@ impl Package {
         package
     }
 
-    pub fn generate_base(name: &str) -> Package {
+    fn generate_base(name: &str) -> Package {
         let mut path = PathBuf::from("packages");
         path.push(name);
 
@@ -80,10 +80,14 @@ impl Package {
         let package_path = Path::new("packages").join(package_name);
 
         // if a package does not already exist create a new one
-        match fs::metadata(package_path) {
+        let mut package = match fs::metadata(package_path) {
             Ok(_)  => Package::open(package_name),
             Err(_) => Package::generate_base(package_name),
-        }
+        };
+
+        let package_update = PackageUpdate::Package(package.clone());
+        package.package_updates.push(package_update);
+        package
     }
 
     pub fn save(&self) {
