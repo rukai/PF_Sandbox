@@ -2,6 +2,7 @@ use ::input::{Input, PlayerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer};
+use ::fighter::{CollisionBox};
 
 use ::std::collections::HashSet;
 
@@ -52,7 +53,7 @@ impl Game {
             selected_stage:         selected_stage,
             edit:                   Edit::Stage,
             debug_output_this_step: None,
-            selector:               Selector { collisionboxes: HashSet::new(), point: None, mouse: None },
+            selector:               Default::default(),
         }
     }
 
@@ -142,7 +143,7 @@ impl Game {
         }
 
         // modify package
-        if os_input.key_pressed(VirtualKeyCode::S) {
+        if os_input.key_pressed(VirtualKeyCode::E) {
             package.save();
         }
         if os_input.key_pressed(VirtualKeyCode::R) {
@@ -179,94 +180,153 @@ impl Game {
 
         match self.edit {
             Edit::Fighter (player) => {
-                self.set_debug(os_input, player);
-                // modify fighter
                 let fighter = self.selected_fighters[player];
                 let action = self.players[player].action as usize;
                 let frame  = self.players[player].frame as usize;
+                self.set_debug(os_input, player);
 
-                // delete frame
-                if os_input.key_pressed(VirtualKeyCode::N) {
-                    package.add_fighter_frame(fighter, action, frame);
-                    self.debug_output_this_step = Some(self.current_frame);
-                }
+                // move collisionboxes
+                if let Some(start_mouse) = self.selector.move_from {
+                    if let Some(new_mouse) = os_input.mouse() {
+                        let d_x = new_mouse.0 - start_mouse.0;
+                        let d_y = new_mouse.1 - start_mouse.1;
+                        let distance = (self.players[player].relative_f(d_x), d_y);
+                        package.move_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, distance);
 
-                //add frame
-                if os_input.key_pressed(VirtualKeyCode::M) {
-                    if package.delete_fighter_frame(fighter, action, frame) {
-                        // Correct any players that are now on a nonexistent frame due to the frame deletion.
-                        // This is purely to stay on the same action for usability.
-                        // The player itself must handle being on a frame that has been deleted in order for replays to work.
-                        for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
-                            if self.selected_fighters[i] == fighter && any_player.action as usize == action
-                                && any_player.frame as usize == package.fighters[fighter].action_defs[action].frames.len() {
-                                any_player.frame -= 1;
-                            }
+                        if os_input.mouse_pressed(0) {
+                            self.selector = Default::default();
                         }
+                        else {
+                            self.selector.move_from = os_input.mouse();
+                        }
+                    }
+                }
+                else {
+                    // add frame
+                    if os_input.key_pressed(VirtualKeyCode::M) {
+                        package.add_fighter_frame(fighter, action, frame);
+                        self.players[player].frame += 1;
                         self.debug_output_this_step = Some(self.current_frame);
                     }
-                }
-                self.selector.mouse = os_input.mouse();
 
-                // single collsionbox selection
-                if os_input.mouse_pressed(0) {
-                    if let Some((m_x, m_y)) = self.selector.mouse {
-                        let fighter = self.selected_fighters[player];
-                        let action = self.players[player].action as usize;
-                        let frame  = self.players[player].frame as usize;
-                        let player_x = self.players[player].bps_x;
-                        let player_y = self.players[player].bps_y;
-
-                        for (i, collisionbox) in (&package.fighters[fighter].action_defs[action].frames[frame].collisionboxes).iter().enumerate() {
-                            let hit_x = collisionbox.point.0 + player_x;
-                            let hit_y = collisionbox.point.1 + player_y;
-
-                            let distance = ((m_x - hit_x).powi(2) + (m_y - hit_y).powi(2)).sqrt();
-                            if distance < collisionbox.radius {
-                                if !os_input.held_shift() {
-                                    self.selector.collisionboxes = HashSet::new();
+                    // delete frame
+                    if os_input.key_pressed(VirtualKeyCode::N) {
+                        if package.delete_fighter_frame(fighter, action, frame) {
+                            // Correct any players that are now on a nonexistent frame due to the frame deletion.
+                            // This is purely to stay on the same action for usability.
+                            // The player itself must handle being on a frame that has been deleted in order for replays to work.
+                            for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
+                                if self.selected_fighters[i] == fighter && any_player.action as usize == action
+                                    && any_player.frame as usize == package.fighters[fighter].action_defs[action].frames.len() {
+                                    any_player.frame -= 1;
                                 }
-                                self.selector.collisionboxes.insert(i);
                             }
+                            self.debug_output_this_step = Some(self.current_frame);
                         }
                     }
-                }
 
-                // begin multiple collisionbox selection
-                if os_input.mouse_pressed(1) {
-                    if let Some(mouse) = self.selector.mouse {
-                        self.selector.point = Some(mouse);
+                    // start move collisionbox
+                    if os_input.key_pressed(VirtualKeyCode::A) {
+                        self.selector.move_from = os_input.mouse();
                     }
-                }
+                    // resize collisionbox
+                    if os_input.key_pressed(VirtualKeyCode::S) {
+                        // TODO: resize
+                    }
+                    // delete collisionbox
+                    if os_input.key_pressed(VirtualKeyCode::D) {
+                        package.delete_fighter_colboxes(fighter, action, frame, &self.selector.colboxes);
 
-                // complete multiple collisionbox selection
-                if let Some(selection) = self.selector.point {
-                    let (x1, y1) = selection;
-                    if os_input.mouse_released(1) {
-                        if let Some((x2, y2)) = self.selector.mouse {
-                            if !os_input.held_shift() {
-                                self.selector.collisionboxes = HashSet::new();
-                            }
-                            let fighter = self.selected_fighters[player];
-                            let action = self.players[player].action as usize;
-                            let frame  = self.players[player].frame as usize;
+                        self.selector = Default::default();
+                    }
+                    // add collisionbox
+                    if os_input.key_pressed(VirtualKeyCode::F) {
+                        if let Some((m_x, m_y)) = os_input.mouse() {
+                            let player = &self.players[player];
+                            let p_x = player.bps_x;
+                            let p_y = player.bps_y;
+
+                            let point = (player.relative_f(m_x - p_x), m_y - p_y);
+                            let colbox = CollisionBox::new(point);
+
+                            package.append_fighter_colboxes(fighter, action, frame, vec!(colbox));
+                        }
+                    }
+                    // meld link collisionboxes
+                    if os_input.key_pressed(VirtualKeyCode::Z) {
+                        // TODO
+                    }
+                    // simple link collisionboxes
+                    if os_input.key_pressed(VirtualKeyCode::X) {
+                        // TODO
+                    }
+                    // unlink collisionboxes
+                    if os_input.key_pressed(VirtualKeyCode::C) {
+                        // TODO
+                    }
+
+                    // single collisionbox selection
+                    if os_input.mouse_pressed(0) {
+                        if let Some((m_x, m_y)) = os_input.mouse() {
                             let player_x = self.players[player].bps_x;
                             let player_y = self.players[player].bps_y;
 
-                            for (i, collisionbox) in (&package.fighters[fighter].action_defs[action].frames[frame].collisionboxes).iter().enumerate() {
-                                let hit_x = collisionbox.point.0 + player_x;
-                                let hit_y = collisionbox.point.1 + player_y;
+                            if !os_input.held_shift() {
+                                self.selector.colboxes = HashSet::new();
+                            }
+                            let frame = &package.fighters[fighter].action_defs[action].frames[frame];
+                            let frame = self.players[player].relative_frame(frame);
+                            for (i, colbox) in frame.colboxes.iter().enumerate() {
+                                let hit_x = colbox.point.0 + player_x;
+                                let hit_y = colbox.point.1 + player_y;
 
-                                let x_check = (hit_x > x1 && hit_x < x2) || (hit_x > x2 && hit_x < x1);
-                                let y_check = (hit_y > y1 && hit_y < y2) || (hit_y > y2 && hit_y < y1);
-                                if x_check && y_check {
-                                    self.selector.collisionboxes.insert(i);
+                                let distance = ((m_x - hit_x).powi(2) + (m_y - hit_y).powi(2)).sqrt();
+                                if distance < colbox.radius {
+                                    self.selector.colboxes.insert(i);
+                                    break;
                                 }
                             }
-                            self.selector.point = None;
+                        }
+                    }
+
+                    // begin multiple collisionbox selection
+                    if os_input.mouse_pressed(1) {
+                        self.selector = Default::default();
+                        if let Some(mouse) = os_input.mouse() {
+                            self.selector.point = Some(mouse);
+                        }
+                    }
+
+                    // complete multiple collisionbox selection
+                    if let Some(selection) = self.selector.point {
+                        let (x1, y1) = selection;
+                        if os_input.mouse_released(1) {
+                            if let Some((x2, y2)) = os_input.mouse() {
+                                if !os_input.held_shift() {
+                                    self.selector.colboxes = HashSet::new();
+                                }
+                                let player_x = self.players[player].bps_x;
+                                let player_y = self.players[player].bps_y;
+                                let frame = &package.fighters[fighter].action_defs[action].frames[frame];
+                                let frame = self.players[player].relative_frame(frame);
+
+                                for (i, colbox) in frame.colboxes.iter().enumerate() {
+                                    let hit_x = colbox.point.0 + player_x;
+                                    let hit_y = colbox.point.1 + player_y;
+
+                                    let x_check = (hit_x > x1 && hit_x < x2) || (hit_x > x2 && hit_x < x1);
+                                    let y_check = (hit_y > y1 && hit_y < y2) || (hit_y > y2 && hit_y < y1);
+                                    if x_check && y_check {
+                                        self.selector.colboxes.insert(i);
+                                    }
+                                }
+                                self.selector.point = None;
+                            }
                         }
                     }
                 }
+
+                self.selector.mouse = os_input.mouse(); // hack to access mouse during render call, dont use this otherwise
             },
             Edit::Player (player) => {
                 self.set_debug(os_input, player);
@@ -424,22 +484,21 @@ impl Game {
 
     fn set_paused(&mut self) {
         self.state = GameState::Paused;
-        self.selector.point = None;
-        self.selector.collisionboxes = HashSet::new();
+        self.selector = Default::default();
     }
 
     pub fn render(&self) -> RenderGame {
         let mut entities = vec!();
         for (i, player) in self.players.iter().enumerate() {
 
-            let mut selected_collisionboxes = HashSet::new();
+            let mut selected_colboxes = HashSet::new();
             let mut selected = false;
             if let GameState::Paused = self.state {
                 match self.edit {
                     Edit::Fighter (player) => {
 
                         if i == player {
-                            selected_collisionboxes = self.selector.collisionboxes.clone();
+                            selected_colboxes = self.selector.colboxes.clone();
                             // TODO: color outline green
                         }
 
@@ -450,7 +509,7 @@ impl Game {
                     _ => { },
                 }
             }
-            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i], selected_collisionboxes, selected)));
+            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i], selected_colboxes, selected)));
         }
 
         // render selector box
@@ -474,8 +533,7 @@ impl Game {
     }
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum GameState {
     Local,
     ReplayForwards,
@@ -491,11 +549,11 @@ pub enum Edit {
     Stage
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Selector {
-    collisionboxes: HashSet<usize>,
-    point:          Option<(f32, f32)>,
+    colboxes: HashSet<usize>,
+    move_from:      Option<(f32, f32)>,
+    point:          Option<(f32, f32)>, // TODO: eughghghh what do these names mean?
     mouse:          Option<(f32, f32)>,
 }
 

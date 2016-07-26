@@ -57,7 +57,7 @@ pub fn run(mut state: AppState) {
                 // replace with any cli_choices
                 for choice in cli_choices {
                     match choice {
-                        &CLIChoice::Package(ref name) => { package = Package::open_or_generate(&name); },
+                        &CLIChoice::Package(ref name) => { package = Package::open_or_generate(&name); }, // TODO: send PackageUpdate::Package
                         &CLIChoice::Close => { return; },
                     }
                 }

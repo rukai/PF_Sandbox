@@ -2,10 +2,11 @@ use std::fs::{File, DirBuilder, self};
 use std::io::Read;
 use std::io::Write;
 use std::path::{PathBuf, Path};
+use std::collections::HashSet;
 use rustc_serialize::{Encodable, Decodable};
 use rustc_serialize::json::{self, Encoder, DecodeResult};
 
-use ::fighter::{Fighter, ActionFrame};
+use ::fighter::{Fighter, ActionFrame, CollisionBox};
 use ::rules::Rules;
 use ::stage::Stage;
 
@@ -49,7 +50,6 @@ impl Package {
         package
     }
 
-
     pub fn generate_base(name: &str) -> Package {
         let mut path = PathBuf::from("packages");
         path.push(name);
@@ -91,7 +91,7 @@ impl Package {
         DirBuilder::new().recursive(true).create(self.path.join("Fighters")).unwrap();
         DirBuilder::new().recursive(true).create(self.path.join("Stages")).unwrap();
 
-        //save all json files
+        // save all json files
         Package::save_struct(self.path.join("rules.json"), &self.rules);
         Package::save_struct(self.path.join("package_meta.json"), &self.meta);
 
@@ -176,6 +176,83 @@ impl Package {
         }
     }
 
+    pub fn append_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, new_colboxes: Vec<CollisionBox>) {
+        let mut fighter_frame = &mut self.fighters[fighter].action_defs[action].frames[frame];
+        {
+            let mut colboxes = &mut fighter_frame.colboxes;
+
+            for colbox in new_colboxes {
+                colboxes.push(colbox);
+            }
+        }
+
+        self.package_updates.push(PackageUpdate::DeleteFighterFrame {
+            fighter:     fighter,
+            action:      action,
+            frame_index: frame,
+        });
+        self.package_updates.push(PackageUpdate::InsertFighterFrame {
+            fighter:     fighter,
+            action:      action,
+            frame_index: frame,
+            frame:       fighter_frame.clone(),
+        });
+    }
+
+    pub fn delete_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, delete_boxes: &HashSet<usize>) {
+        let mut fighter_frame = &mut self.fighters[fighter].action_defs[action].frames[frame];
+        {
+            let mut colboxes = &mut fighter_frame.colboxes;
+
+            // ensure that collisionboxes are deleted in an order in which the indexes continue to refer to the same element.
+            let mut delete_boxes = delete_boxes.iter().collect::<Vec<_>>();
+            delete_boxes.sort();
+            delete_boxes.reverse();
+
+            for i in delete_boxes {
+                colboxes.remove(*i);
+            }
+        }
+
+        self.package_updates.push(PackageUpdate::DeleteFighterFrame {
+            fighter:     fighter,
+            action:      action,
+            frame_index: frame,
+        });
+        self.package_updates.push(PackageUpdate::InsertFighterFrame {
+            fighter:     fighter,
+            action:      action,
+            frame_index: frame,
+            frame:       fighter_frame.clone(),
+        });
+    }
+
+    pub fn move_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, moved_colboxes: &HashSet<usize>, distance: (f32, f32)) {
+        let mut fighter_frame = &mut self.fighters[fighter].action_defs[action].frames[frame];
+        {
+            let mut colboxes = &mut fighter_frame.colboxes;
+            let (d_x, d_y) = distance;
+
+            for i in moved_colboxes {
+                let (b_x, b_y) = colboxes[*i].point;
+                colboxes[*i].point = (b_x + d_x, b_y + d_y);
+            }
+        }
+
+        self.package_updates.push(PackageUpdate::DeleteFighterFrame {
+            fighter:     fighter,
+            action:      action,
+            frame_index: frame,
+        });
+        self.package_updates.push(PackageUpdate::InsertFighterFrame {
+            fighter:     fighter,
+            action:      action,
+            frame_index: frame,
+            frame:       fighter_frame.clone(),
+        });
+    }
+
+    // TODO: Swaparino
     pub fn updates(&mut self) -> Vec<PackageUpdate> {
         let package_updates = self.package_updates.clone();
         self.package_updates = vec!();

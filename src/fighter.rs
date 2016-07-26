@@ -1,38 +1,18 @@
 use game::Point;
 
 impl Fighter {
-
-    //TODO: Eventually this should produce a blank Fighter
-    //      An immutable demonstration package will be provided instead
     pub fn base() -> Fighter {
-        let point1 = (3.0, 5.0);
-        let point2 = (-2.0, 7.0);
-
-        let hitbox1 = CollisionBox {
-            point:  point1,
-            role:   CollisionBoxRole::Hurt (Default::default()),
-            radius: 1.4,
-        };
-
-        let hitbox2 = CollisionBox {
-            point:  point2,
-            role:   CollisionBoxRole::Hit (Default::default()),
-            radius: 1.0,
-        };
-
         let action_frame1 = ActionFrame {
-            collisionboxes:      vec!(hitbox1, hitbox2),
-            collisionbox_links: vec!(),
-            effects:             vec!(),
-            ecb_w:               3.5,
-            ecb_h:               12.0,
-            ecb_y:               6.0,
+            colboxes:     vec!(),
+            colbox_links: vec!(),
+            effects:      vec!(),
+            ecb_w:        3.5,
+            ecb_h:        12.0,
+            ecb_y:        6.0,
         };
-
-        let action_frame2 = action_frame1.clone();
 
         let action_def = ActionDef {
-            frames: vec!(action_frame1, action_frame2),
+            frames: vec!(action_frame1),
             iasa:   0,
         };
         let mut action_defs: Vec<ActionDef> = Vec::new();
@@ -111,8 +91,8 @@ pub struct ActionDef {
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct ActionFrame {
-    pub collisionboxes:     Vec<CollisionBox>,
-    pub collisionbox_links: Vec<CollisionBoxLink>,
+    pub colboxes:     Vec<CollisionBox>,
+    pub colbox_links: Vec<CollisionBoxLink>,
     pub effects:      Vec<FrameEffect>,
     pub ecb_w:        f32,
     pub ecb_h:        f32,
@@ -195,8 +175,8 @@ pub enum Action {
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub enum FrameEffect {
-    Velocity     {x: i64, y: i64},
-    Acceleration {x: i64, y: i64},
+    Velocity     {x: f32, y: f32},
+    Acceleration {x: f32, y: f32},
 }
 
 
@@ -205,6 +185,16 @@ pub struct CollisionBox {
     pub point:  (f32, f32),
     pub radius: f32,
     pub role:   CollisionBoxRole,
+}
+
+impl CollisionBox {
+    pub fn new (point: (f32, f32)) -> CollisionBox {
+        CollisionBox {
+            point:  point,
+            radius: 2.0,
+            role:   CollisionBoxRole::Intangible,
+        }
+    }
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]

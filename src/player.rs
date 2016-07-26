@@ -333,13 +333,37 @@ impl Player {
         };
     }
 
-    fn relative_f(&self, input: f32) -> f32 {
+    pub fn relative_f(&self, input: f32) -> f32 {
         if self.face_right {
             input
         }
         else {
             input * -1.0
         }
+    }
+
+    pub fn relative_frame(&self, frame: &ActionFrame) -> ActionFrame {
+        let mut frame = frame.clone();
+
+        // fix hitboxes
+        for mut colbox in &mut frame.colboxes {
+            let (x, y) = colbox.point;
+            colbox.point = (self.relative_f(x), y);
+        }
+
+        // fix effects
+        let mut relative_effects: Vec<FrameEffect> = vec!();
+        for effect in frame.effects {
+            relative_effects.push(
+                match effect {
+                    FrameEffect::Velocity     { x, y } => { FrameEffect::Velocity     { x: self.relative_f(x), y: y } },
+                    FrameEffect::Acceleration { x, y } => { FrameEffect::Acceleration { x: self.relative_f(x), y: y } },
+                    //_                                  => { effect }, // When the time comes, uncomment this
+                }
+            );
+        }
+        frame.effects = relative_effects;
+        frame
     }
 
     /*
@@ -504,17 +528,17 @@ impl Player {
 
         if self.debug.frame {
             let frame = &fighter.action_defs[self.action as usize].frames[self.frame as usize];
-            let hitbox_count = frame.collisionboxes.len();
+            let hitbox_count = frame.colboxes.len();
             let effects_count = frame.effects.len();
             let ecb_w = frame.ecb_w;
             let ecb_h = frame.ecb_h;
             let ecb_y = frame.ecb_y;
-            println!("Player: {}    collisionboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
+            println!("Player: {}    colboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
                 index, hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
         }
     }
 
-    pub fn render(&self, fighter: usize, selected_collisionboxes: HashSet<usize>, selected: bool) -> RenderPlayer {
+    pub fn render(&self, fighter: usize, selected_colboxes: HashSet<usize>, selected: bool) -> RenderPlayer {
         RenderPlayer {
             debug:      self.debug.clone(),
             bps:        (self.bps_x, self.bps_y),
@@ -527,7 +551,7 @@ impl Player {
             fighter:    fighter,
             face_right: self.face_right,
             selected:   selected,
-            selected_collisionboxes: selected_collisionboxes,
+            selected_colboxes: selected_colboxes,
         }
     }
 }
@@ -544,7 +568,7 @@ pub struct RenderPlayer {
     pub fighter:    usize,
     pub face_right: bool,
     pub selected:   bool,
-    pub selected_collisionboxes: HashSet<usize>,
+    pub selected_colboxes: HashSet<usize>,
 }
 
 #[derive(Clone)]
