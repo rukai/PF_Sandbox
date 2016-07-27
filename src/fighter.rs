@@ -1,5 +1,3 @@
-use game::Point;
-
 impl Fighter {
     pub fn base() -> Fighter {
         let action_frame1 = ActionFrame {
@@ -26,8 +24,8 @@ impl Fighter {
             name_short: "BF".to_string(),
             css_action: Action::Idle,
             css_frame:  0,
-            css_point1: Point {x: 0.0, y: 0.0},
-            css_point2: Point {x: 0.0, y: 0.0},
+            css_point1: (0.0, 0.0),
+            css_point2: (0.0, 0.0),
 
             //in game attributes
             air_jumps:             1,
@@ -59,8 +57,8 @@ pub struct Fighter {
     pub name_short: String,
     pub css_action: Action,
     pub css_frame:  u64,
-    pub css_point1: Point,
-    pub css_point2: Point,
+    pub css_point1: (f32, f32),
+    pub css_point2: (f32, f32),
 
     //in game attributes
     pub air_jumps:             u64,

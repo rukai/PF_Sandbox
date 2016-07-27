@@ -7,6 +7,7 @@ extern crate getopts;
 
 pub mod app;
 pub mod buffers;
+pub mod camera;
 pub mod cli;
 pub mod fighter;
 pub mod game;

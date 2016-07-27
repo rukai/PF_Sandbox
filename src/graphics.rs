@@ -119,7 +119,8 @@ impl Graphics {
             glium::Program::from_source(&self.display, vertex_shader, fragment_shader, None).unwrap()
         };
 
-        let zoom: f32 = 0.01;
+        let zoom = render.camera.zoom.recip();
+        let pan  = render.camera.pan;
 
         match render.state {
             GameState::Local  => { },
@@ -132,7 +133,7 @@ impl Graphics {
         for entity in render.entities {
             match entity {
                 RenderEntity::Player(player) => {
-                    let position: [f32; 2] = [player.bps.0, player.bps.1];
+                    let position: [f32; 2] = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
                     let dir = if player.face_right { 1.0 } else { -1.0 } as f32;
 
                     // draw fighter
@@ -169,7 +170,7 @@ impl Graphics {
                 RenderEntity::Selector(rect) => {
                     let vertices = Buffers::rect_vertices(&self.display, rect);
                     let indices = glium::index::NoIndices(glium::index::PrimitiveType::LineStrip);
-                    let uniform = &uniform! { position_offset: [0.0 as f32, 0.0 as f32], zoom: zoom, uniform_rgb: green };
+                    let uniform = &uniform! { position_offset: [pan.0 as f32, pan.1 as f32], zoom: zoom, uniform_rgb: green };
                     target.draw(&vertices, &indices, &program, uniform, &Default::default()).unwrap();
                 },
             }
@@ -178,7 +179,7 @@ impl Graphics {
 
         let vertices = &self.package_buffers.stages[stage].vertex;
         let indices = &self.package_buffers.stages[stage].index;
-        let uniform = &uniform! { position_offset: [0.0 as f32, 0.0 as f32], zoom: zoom, uniform_rgb: white };
+        let uniform = &uniform! { position_offset: [pan.0 as f32, pan.1 as f32], zoom: zoom, uniform_rgb: white };
         target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
 
         target.finish().unwrap();

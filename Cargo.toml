@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 
 [dependencies]
-glium = "0.14.0"
+glium = "0.15.0"
 rustc-serialize = "0.3.19"
 getopts = "0.2.14"
 libusb = "0.2"

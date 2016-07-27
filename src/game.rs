@@ -3,6 +3,7 @@ use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer};
 use ::fighter::{CollisionBox};
+use ::camera::Camera;
 
 use ::std::collections::HashSet;
 
@@ -20,6 +21,7 @@ pub struct Game {
     edit:                   Edit,
     debug_output_this_step: Option<usize>,
     selector:               Selector,
+    camera:                 Camera,
 }
 
 impl Game {
@@ -54,6 +56,7 @@ impl Game {
             edit:                   Edit::Stage,
             debug_output_this_step: None,
             selector:               Default::default(),
+            camera:                 Camera::new(),
         }
     }
 
@@ -66,6 +69,9 @@ impl Game {
             GameState::ReplayBackwards => { self.step_replay_backwards(input, os_input); },
             GameState::Paused          => { self.step_pause(package, input, &os_input); },
         }
+
+        self.camera.update(os_input);
+        println!("{:?}", os_input.game_mouse(&self.camera));
 
         if let Some(frame) = self.debug_output_this_step {
             self.debug_output_this_step = None;
@@ -186,19 +192,13 @@ impl Game {
                 self.set_debug(os_input, player);
 
                 // move collisionboxes
-                if let Some(start_mouse) = self.selector.move_from {
-                    if let Some(new_mouse) = os_input.mouse() {
-                        let d_x = new_mouse.0 - start_mouse.0;
-                        let d_y = new_mouse.1 - start_mouse.1;
-                        let distance = (self.players[player].relative_f(d_x), d_y);
-                        package.move_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, distance);
+                if self.selector.moving {
+                    let (d_x, d_y) = os_input.game_mouse_diff(&self.camera);
+                    let distance = (self.players[player].relative_f(d_x), d_y);
+                    package.move_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, distance);
 
-                        if os_input.mouse_pressed(0) {
-                            self.selector = Default::default();
-                        }
-                        else {
-                            self.selector.move_from = os_input.mouse();
-                        }
+                    if os_input.mouse_pressed(0) {
+                        self.selector = Default::default();
                     }
                 }
                 else {
@@ -227,7 +227,9 @@ impl Game {
 
                     // start move collisionbox
                     if os_input.key_pressed(VirtualKeyCode::A) {
-                        self.selector.move_from = os_input.mouse();
+                        if self.selector.colboxes.len() > 0 {
+                            self.selector.moving = true;
+                        }
                     }
                     // resize collisionbox
                     if os_input.key_pressed(VirtualKeyCode::S) {
@@ -241,7 +243,7 @@ impl Game {
                     }
                     // add collisionbox
                     if os_input.key_pressed(VirtualKeyCode::F) {
-                        if let Some((m_x, m_y)) = os_input.mouse() {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             let player = &self.players[player];
                             let p_x = player.bps_x;
                             let p_y = player.bps_y;
@@ -267,7 +269,7 @@ impl Game {
 
                     // single collisionbox selection
                     if os_input.mouse_pressed(0) {
-                        if let Some((m_x, m_y)) = os_input.mouse() {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             let player_x = self.players[player].bps_x;
                             let player_y = self.players[player].bps_y;
 
@@ -292,7 +294,7 @@ impl Game {
                     // begin multiple collisionbox selection
                     if os_input.mouse_pressed(1) {
                         self.selector = Default::default();
-                        if let Some(mouse) = os_input.mouse() {
+                        if let Some(mouse) = os_input.game_mouse(&self.camera) {
                             self.selector.point = Some(mouse);
                         }
                     }
@@ -301,7 +303,7 @@ impl Game {
                     if let Some(selection) = self.selector.point {
                         let (x1, y1) = selection;
                         if os_input.mouse_released(1) {
-                            if let Some((x2, y2)) = os_input.mouse() {
+                            if let Some((x2, y2)) = os_input.game_mouse(&self.camera) {
                                 if !os_input.held_shift() {
                                     self.selector.colboxes = HashSet::new();
                                 }
@@ -325,8 +327,7 @@ impl Game {
                         }
                     }
                 }
-
-                self.selector.mouse = os_input.mouse(); // hack to access mouse during render call, dont use this otherwise
+                self.selector.mouse = os_input.game_mouse(&self.camera); // hack to access mouse during render call, dont use this otherwise
             },
             Edit::Player (player) => {
                 self.set_debug(os_input, player);
@@ -334,6 +335,7 @@ impl Game {
             Edit::Stage => { },
         }
     }
+
 
     // TODO: Shift to apply to all players
     // TODO: F09 - load preset from player profile
@@ -526,9 +528,7 @@ impl Game {
         RenderGame {
             entities: entities,
             state:    self.state.clone(),
-            pan_x:    0.0,
-            pan_y:    0.0,
-            zoom:     0.0,
+            camera:   self.camera.clone(),
         }
     }
 }
@@ -552,25 +552,15 @@ pub enum Edit {
 #[derive(Debug, Clone, Default)]
 pub struct Selector {
     colboxes: HashSet<usize>,
-    move_from:      Option<(f32, f32)>,
-    point:          Option<(f32, f32)>, // TODO: eughghghh what do these names mean?
-    mouse:          Option<(f32, f32)>,
-}
-
-#[derive(Clone, RustcEncodable, RustcDecodable)]
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
+    moving:   bool,
+    point:    Option<(f32, f32)>, // selector starting point
+    mouse:    Option<(f32, f32)>, // used to know mouse point during render
 }
 
 pub struct RenderGame {
     pub entities: Vec<RenderEntity>,
     pub state:    GameState,
-
-    // camera modifiers
-    pub pan_x: f32,
-    pub pan_y: f32,
-    pub zoom:  f32,
+    pub camera:   Camera,
 }
 
 pub enum RenderEntity {
