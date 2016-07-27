@@ -1,6 +1,5 @@
-use glium::glutin::Event;
 use glium::glutin::ElementState::{Pressed, Released};
-use glium::glutin::{VirtualKeyCode, MouseButton};
+use glium::glutin::{Event, MouseScrollDelta, VirtualKeyCode, MouseButton};
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 struct CurrentInput {
@@ -9,6 +8,7 @@ struct CurrentInput {
     pub key_held:       [bool; 255],
     pub mouse_held:     [bool; 255],
     pub mouse_location: Option<(f32, f32)>,
+    pub scroll_diff:    f32,
     pub resolution:     (u32, u32),
 }
 
@@ -20,6 +20,7 @@ impl CurrentInput {
             key_held:       [false; 255],
             mouse_held:     [false; 255],
             mouse_location: None,
+            scroll_diff:    0.0,
             resolution:     (0, 0),
         }
     }
@@ -27,6 +28,7 @@ impl CurrentInput {
     pub fn update(&mut self) {
         self.mouse_actions = vec!();
         self.key_actions   = vec!();
+        self.scroll_diff   = 0.0;
     }
 
     pub fn handle_event(&mut self, event: Event) {
@@ -43,7 +45,7 @@ impl CurrentInput {
                 self.key_actions.push(KeyAction::Released(key_code));
             },
             Event::MouseMoved (x, y) => {
-                //TODO replace * 200.0 and - 100.0 with camera zoom and account for camera offset
+                // TODO: replace * 200.0 and - 100.0 with camera zoom and account for camera offset
                 let x = (200.0 * (x as f32)) / (self.resolution.0 as f32) - 100.0;
                 let y = (-200.0 * (y as f32)) / (self.resolution.1 as f32) + 100.0;
                 self.mouse_location = Some((x, y));
@@ -57,6 +59,12 @@ impl CurrentInput {
                 let button = mouse_button_to_int(button);
                 self.mouse_held[button] = false;
                 self.mouse_actions.push(MouseAction::Released(button));
+            },
+            Event::MouseWheel (sub_event, _) => {
+                match sub_event {
+                    MouseScrollDelta::LineDelta  (_, y) => { self.scroll_diff += y; },
+                    MouseScrollDelta::PixelDelta (_, _) => { panic!("Ooer, I dont know how to handle PixelDelta...") }, // TODO
+                }
             },
             Event::Resized (x, y) => {
                 self.resolution = (x, y);
@@ -175,10 +183,17 @@ impl OsInput {
         return self.key_held(VirtualKeyCode::LShift) || self.key_held(VirtualKeyCode::RShift);
     }
 
+    pub fn scroll_diff(&self) -> f32 {
+        match self.current {
+            Some( ref current) => { current.scroll_diff },
+            None               => { 0.0 }
+        }
+    }
+
     pub fn mouse(&self) -> Option<(f32, f32)> {
         match self.current {
             Some(ref current) => { current.mouse_location },
-            None => { None },
+            None              => { None },
         }
     }
 }
