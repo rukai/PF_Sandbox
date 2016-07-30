@@ -175,6 +175,12 @@ impl Graphics {
                     let uniform = &uniform! { position_offset: [pan.0 as f32, pan.1 as f32], zoom: zoom, uniform_rgb: green, aspect_ratio: aspect_ratio };
                     target.draw(&vertices, &indices, &program, uniform, &Default::default()).unwrap();
                 },
+                RenderEntity::Area(rect) => {
+                    let vertices = Buffers::rect_vertices(&self.display, rect);
+                    let indices = glium::index::NoIndices(glium::index::PrimitiveType::LineStrip);
+                    let uniform = &uniform! { position_offset: [pan.0 as f32, pan.1 as f32], zoom: zoom, uniform_rgb: green, aspect_ratio: aspect_ratio };
+                    target.draw(&vertices, &indices, &program, uniform, &Default::default()).unwrap();
+                },
             }
         }
         let stage = 0;

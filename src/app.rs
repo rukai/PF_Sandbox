@@ -71,7 +71,7 @@ pub fn run(mut state: AppState) {
 
                 graphics_tx.send(GraphicsMessage {
                     package_updates: package.updates(),
-                    render:  Render::Game(game.render()),
+                    render:  Render::Game(game.render(&package)),
                 }).unwrap();
             }
         };

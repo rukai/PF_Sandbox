@@ -4,6 +4,7 @@ use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer};
 use ::fighter::{CollisionBox};
 use ::camera::Camera;
+use ::stage::{Area};
 
 use ::std::collections::HashSet;
 
@@ -70,7 +71,8 @@ impl Game {
             GameState::Paused          => { self.step_pause(package, input, &os_input); },
         }
 
-        self.camera.update(os_input);
+        let stage = &package.stages[self.selected_stage];
+        self.camera.update(os_input, &self.players, stage);
 
         if let Some(frame) = self.debug_output_this_step {
             self.debug_output_this_step = None;
@@ -375,6 +377,9 @@ impl Game {
             if os_input.key_pressed(VirtualKeyCode::F9) {
                 debug.no_fighter = !debug.no_fighter;
             }
+            if os_input.key_pressed(VirtualKeyCode::F10) {
+                debug.cam_area = !debug.cam_area;
+            }
         }
         if os_input.key_pressed(VirtualKeyCode::F11) {
             self.players[player].debug = DebugPlayer {
@@ -388,6 +393,7 @@ impl Game {
                 di_vector:      true,
                 player:         true,
                 no_fighter:     true,
+                cam_area: true,
             }
         }
         if os_input.key_pressed(VirtualKeyCode::F12) {
@@ -488,7 +494,7 @@ impl Game {
         self.selector = Default::default();
     }
 
-    pub fn render(&self) -> RenderGame {
+    pub fn render(&self, package: &Package) -> RenderGame {
         let mut entities = vec!();
         for (i, player) in self.players.iter().enumerate() {
 
@@ -497,12 +503,10 @@ impl Game {
             if let GameState::Paused = self.state {
                 match self.edit {
                     Edit::Fighter (player) => {
-
                         if i == player {
                             selected_colboxes = self.selector.colboxes.clone();
                             // TODO: color outline green
                         }
-
                     },
                     Edit::Player (player) => {
                         selected = player == i;
@@ -511,7 +515,17 @@ impl Game {
                 }
             }
             entities.push(RenderEntity::Player(player.render(self.selected_fighters[i], selected_colboxes, selected)));
+
+            if player.debug.cam_area {
+                let cam_area = &player.cam_area(&package.stages[self.selected_stage].camera);
+                entities.push(RenderEntity::Area(area_to_render(cam_area)));
+            }
         }
+
+        // stage areas
+        let stage = &package.stages[self.selected_stage];
+        entities.push(RenderEntity::Area(area_to_render(&stage.camera)));
+        entities.push(RenderEntity::Area(area_to_render(&stage.blast)));
 
         // render selector box
         if let Some(point) = self.selector.point {
@@ -529,6 +543,13 @@ impl Game {
             state:    self.state.clone(),
             camera:   self.camera.clone(),
         }
+    }
+}
+
+fn area_to_render(area: &Area) -> RenderRect {
+    RenderRect {
+        p1: (area.left,  area.bot),
+        p2: (area.right, area.top)
     }
 }
 
@@ -565,6 +586,7 @@ pub struct RenderGame {
 pub enum RenderEntity {
     Player   (RenderPlayer),
     Selector (RenderRect),
+    Area     (RenderRect),
 }
 
 pub struct RenderRect {

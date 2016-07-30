@@ -25,7 +25,7 @@ impl CurrentInput {
             mouse_point:      None,
             mouse_point_prev: None,
             scroll_diff:      0.0,
-            resolution:       (0, 0),
+            resolution:       (1, 1),
         }
     }
 
@@ -250,6 +250,13 @@ impl OsInput {
             }
         }
         (0.0, 0.0)
+    }
+
+    pub fn resolution(&self) -> Option<(u32, u32)> {
+        match self.current {
+            Some(ref current) => { Some(current.resolution) },
+            None          => { None }
+        }
     }
 }
 

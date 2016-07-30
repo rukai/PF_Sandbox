@@ -1,6 +1,6 @@
 use ::fighter::*;
 use ::input::{PlayerInput};
-use ::stage::{Stage, Platform};
+use ::stage::{Stage, Platform, Area};
 
 use num::FromPrimitive;
 use std::collections::HashSet;
@@ -419,9 +419,8 @@ impl Player {
         }
 
         // death
-        let (lower_x, lower_y) = stage.lower_bounds;
-        let (higher_x, higher_y) = stage.higher_bounds;
-        if self.bps_x < lower_x || self.bps_x > higher_x || self.bps_y < lower_y || self.bps_y > higher_y {
+        let blast = &stage.blast;
+        if self.bps_x < blast.left || self.bps_x > blast.right || self.bps_y < blast.bot || self.bps_y > blast.top {
             self.die(fighter);
         }
     }
@@ -450,6 +449,52 @@ impl Player {
             }
         }
         None
+    }
+
+    /// Returns the area sorounding the player that the camera must include
+    pub fn cam_area(&self, cam_max: &Area) -> Area {
+        let mut left  = self.bps_x;
+        let mut right = self.bps_x;
+        let mut bot   = self.bps_y - 5.0;
+        let mut top   = self.bps_y + 25.0;
+
+        if self.face_right {
+            left  -= 7.0;
+            right += 40.0;
+        }
+        else {
+            left  -= 40.0;
+            right += 7.0;
+        }
+
+        if left < cam_max.left {
+            let diff = left - cam_max.left;
+            left  -= diff;
+            right -= diff;
+        }
+        else if right > cam_max.right {
+            let diff = right - cam_max.right;
+            left  -= diff;
+            right -= diff;
+        }
+
+        if bot < cam_max.bot {
+            let diff = bot - cam_max.bot;
+            bot -= diff;
+            top -= diff;
+        }
+        else if top > cam_max.top {
+            let diff = top - cam_max.top;
+            bot -= diff;
+            top -= diff;
+        }
+
+        Area {
+            left:  left,
+            right: right,
+            bot:   bot,
+            top:   top,
+        }
     }
 
     fn land(&mut self, fighter: &Fighter) {
@@ -584,4 +629,5 @@ pub struct DebugPlayer {
     pub di_vector:      bool,
     pub player:         bool,
     pub no_fighter:     bool,
+    pub cam_area:       bool,
 }

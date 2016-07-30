@@ -1,10 +1,10 @@
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct Stage {
-    pub title:         String,
-    pub platforms:     Vec<Platform>,
-    pub lower_bounds:  (f32, f32),
-    pub higher_bounds: (f32, f32),
-    pub spawn_points:  Vec<(f32, f32)>,
+    pub title:        String,
+    pub platforms:    Vec<Platform>,
+    pub blast:        Area,
+    pub camera:       Area,
+    pub spawn_points: Vec<(f32, f32)>,
 }
 
 impl Stage {
@@ -25,11 +25,25 @@ impl Stage {
             pass_through: true,
         };
 
+        let blast = Area {
+            left: -200.0,
+            right: 200.0,
+            bot:  -200.0,
+            top:   200.0,
+        };
+
+        let camera = Area {
+            left: -150.0,
+            right: 150.0,
+            bot:  -150.0,
+            top:   150.0,
+        };
+
         Stage {
             title:         "Base Stage".to_string(),
             platforms:     vec!(main_platform, second_platform),
-            lower_bounds:  (-200.0, -200.0),
-            higher_bounds: (200.0,  200.0),
+            blast:         blast,
+            camera:        camera,
             spawn_points:  vec!(
                 (-50.0, 50.0), (50.0, 50.0),
                 (-50.0, 80.0), (50.0, 80.0),
@@ -45,4 +59,12 @@ pub struct Platform {
     pub w:            f32,
     pub h:            f32,
     pub pass_through: bool,
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable, Debug)]
+pub struct Area {
+    pub left:  f32,
+    pub right: f32,
+    pub bot:   f32,
+    pub top:   f32,
 }
