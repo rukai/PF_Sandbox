@@ -71,7 +71,6 @@ impl Game {
         }
 
         self.camera.update(os_input);
-        println!("{:?}", os_input.game_mouse(&self.camera));
 
         if let Some(frame) = self.debug_output_this_step {
             self.debug_output_this_step = None;

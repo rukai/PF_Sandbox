@@ -87,8 +87,11 @@ impl CurrentInput {
         let (pan_x, pan_y) = camera.pan;
         let (pan_x, pan_y) = (pan_x as f32, pan_y as f32);
 
-        let x =  zoom * (2.0 * m_x / w - 1.0) - pan_x;
-        let y = -zoom * (2.0 * m_y / h - 1.0) - pan_y;
+        let (width, height) = self.resolution;
+        let aspect_ratio = width as f32 / height as f32;
+
+        let x = zoom * ( 2.0 * m_x / w - 1.0)                - pan_x;
+        let y = zoom * (-2.0 * m_y / h + 1.0) / aspect_ratio - pan_y;
         (x, y)
     }
 }

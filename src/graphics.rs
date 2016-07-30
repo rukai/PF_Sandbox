@@ -121,6 +121,8 @@ impl Graphics {
 
         let zoom = render.camera.zoom.recip();
         let pan  = render.camera.pan;
+        let (width, height) = self.display.get_window().unwrap().get_inner_size_points().unwrap();
+        let aspect_ratio = width as f32 / height as f32;
 
         match render.state {
             GameState::Local  => { },
@@ -138,7 +140,7 @@ impl Graphics {
 
                     // draw fighter
                     if !player.debug.no_fighter {
-                        let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white, direction: dir};
+                        let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white, direction: dir, aspect_ratio: aspect_ratio};
                         let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
                         if player.frame < fighter_frames.len() {
                             let vertices = &fighter_frames[player.frame].vertex;
@@ -158,11 +160,11 @@ impl Graphics {
                     if player.debug.player {
                         let ecb = Buffers::new_player(&self.display, &player);
                         if player.selected {
-                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: green, direction: dir };
+                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: green, direction: dir, aspect_ratio: aspect_ratio };
                             target.draw(&ecb.vertex, &ecb.index, &player_program, uniform, &Default::default()).unwrap();
                         }
                         else {
-                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white, direction: dir };
+                            let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white, direction: dir, aspect_ratio: aspect_ratio };
                             target.draw(&ecb.vertex, &ecb.index, &player_program, uniform, &Default::default()).unwrap();
                         }
                     }
@@ -170,7 +172,7 @@ impl Graphics {
                 RenderEntity::Selector(rect) => {
                     let vertices = Buffers::rect_vertices(&self.display, rect);
                     let indices = glium::index::NoIndices(glium::index::PrimitiveType::LineStrip);
-                    let uniform = &uniform! { position_offset: [pan.0 as f32, pan.1 as f32], zoom: zoom, uniform_rgb: green };
+                    let uniform = &uniform! { position_offset: [pan.0 as f32, pan.1 as f32], zoom: zoom, uniform_rgb: green, aspect_ratio: aspect_ratio };
                     target.draw(&vertices, &indices, &program, uniform, &Default::default()).unwrap();
                 },
             }
@@ -179,7 +181,7 @@ impl Graphics {
 
         let vertices = &self.package_buffers.stages[stage].vertex;
         let indices = &self.package_buffers.stages[stage].index;
-        let uniform = &uniform! { position_offset: [pan.0 as f32, pan.1 as f32], zoom: zoom, uniform_rgb: white };
+        let uniform = &uniform! { position_offset: [pan.0 as f32, pan.1 as f32], zoom: zoom, uniform_rgb: white, aspect_ratio: aspect_ratio };
         target.draw(vertices, indices, &program, uniform, &Default::default()).unwrap();
 
         target.finish().unwrap();
