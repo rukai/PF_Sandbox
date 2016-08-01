@@ -148,18 +148,24 @@ impl Package {
         true //It's fine, I triple checked
     }
 
-    pub fn add_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) {
+    pub fn new_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) {
+        let new_frame = {
+            let action_frames = &self.fighters[fighter].action_defs[action].frames;
+            action_frames[frame].clone()
+        };
+        self.insert_fighter_frame(fighter, action, frame, new_frame);
+    }
+
+    pub fn insert_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize, action_frame: ActionFrame) {
         let mut action_frames = &mut self.fighters[fighter].action_defs[action].frames;
 
-        let new_frame = action_frames[frame].clone();
-        let new_frame_update = new_frame.clone();
-        action_frames.insert(frame + 1, new_frame);
+        action_frames.insert(frame + 1, action_frame.clone());
 
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
             fighter:     fighter,
             action:      action,
             frame_index: frame,
-            frame:       new_frame_update,
+            frame:       action_frame,
         });
     }
 

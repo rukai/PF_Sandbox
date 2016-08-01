@@ -2,7 +2,7 @@ use ::input::{Input, PlayerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer};
-use ::fighter::{CollisionBox, LinkType};
+use ::fighter::{ActionFrame, CollisionBox, LinkType};
 use ::camera::Camera;
 use ::stage::{Area};
 
@@ -22,6 +22,7 @@ pub struct Game {
     edit:                   Edit,
     debug_output_this_step: Option<usize>,
     selector:               Selector,
+    copied_frame:           Option<ActionFrame>,
     camera:                 Camera,
 }
 
@@ -57,6 +58,7 @@ impl Game {
             edit:                   Edit::Stage,
             debug_output_this_step: None,
             selector:               Default::default(),
+            copied_frame:           None,
             camera:                 Camera::new(),
         }
     }
@@ -205,16 +207,20 @@ impl Game {
                 else {
                     // copy frame
                     if os_input.key_pressed(VirtualKeyCode::V) {
-                        // TODO
+                        let frame = package.fighters[fighter].action_defs[action].frames[frame].clone();
+                        self.copied_frame = Some(frame);
                     }
                     // paste frame
                     if os_input.key_pressed(VirtualKeyCode::B) {
-                        // TODO
+                        if let Some(ref action_frame) = self.copied_frame {
+                            package.insert_fighter_frame(fighter, action, frame, action_frame.clone());
+                            self.debug_output_this_step = Some(self.current_frame);
+                        }
                     }
 
-                    // add frame
+                    // new frame
                     if os_input.key_pressed(VirtualKeyCode::M) {
-                        package.add_fighter_frame(fighter, action, frame);
+                        package.new_fighter_frame(fighter, action, frame);
                         self.players[player].frame += 1;
                         self.debug_output_this_step = Some(self.current_frame);
                     }
@@ -259,7 +265,6 @@ impl Game {
 
                             let point = (player.relative_f(m_x - p_x), m_y - p_y);
                             let new_colbox = CollisionBox::new(point);
-
                             let link_type = match os_input.held_shift() {
                                 true  => { LinkType::Simple },
                                 false => { LinkType::Meld }
