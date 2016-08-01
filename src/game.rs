@@ -4,7 +4,7 @@ use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer};
 use ::fighter::{ActionFrame, CollisionBox, LinkType};
 use ::camera::Camera;
-use ::stage::{Area};
+use ::stage::Area;
 
 use ::std::collections::HashSet;
 
@@ -20,11 +20,16 @@ pub struct Game {
     selected_fighters:      Vec<usize>,
     selected_stage:         usize,
     edit:                   Edit,
-    debug_output_this_step: Option<usize>,
+    debug_output_this_step: bool,
     selector:               Selector,
     copied_frame:           Option<ActionFrame>,
     camera:                 Camera,
 }
+
+/// Frame 0 refers to the initial state of the game.
+/// Any changes occur in the proceeding frames i.e. frames 1, 2, 3 ...
+
+/// All previous frame state is used to calculate the next frame then the current_frame is incremented
 
 impl Game {
     pub fn new(package: &Package, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
@@ -56,7 +61,7 @@ impl Game {
             selected_fighters:      filled_fighters,
             selected_stage:         selected_stage,
             edit:                   Edit::Stage,
-            debug_output_this_step: None,
+            debug_output_this_step: false,
             selector:               Default::default(),
             copied_frame:           None,
             camera:                 Camera::new(),
@@ -76,15 +81,18 @@ impl Game {
         let stage = &package.stages[self.selected_stage];
         self.camera.update(os_input, &self.players, stage);
 
-        if let Some(frame) = self.debug_output_this_step {
-            self.debug_output_this_step = None;
-            self.debug_output(package, input, frame);
+        if self.debug_output_this_step {
+            self.debug_output_this_step = false;
+            self.debug_output(package, input);
         }
     }
 
     fn step_local(&mut self, package: &Package, input: &mut Input, os_input: &OsInput) {
+        self.player_history.push(self.players.clone());
+        self.current_frame += 1;
+
         // erase any future history
-        for _ in (self.current_frame+1)..(self.player_history.len()) {
+        for _ in self.current_frame..self.player_history.len() {
             self.player_history.pop();
         }
 
@@ -93,22 +101,20 @@ impl Game {
         let player_inputs = &input.players(self.current_frame);
         self.step_game(package, player_inputs);
 
-        self.player_history.push(self.players.clone());
+        // pause game
         if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
-            self.set_paused();
-        }
-        else {
-            self.current_frame += 1;
+            self.state = GameState::Paused;
         }
     }
 
     fn step_netplay(&mut self, package: &Package, input: &mut Input) {
+        self.player_history.push(self.players.clone());
+        self.current_frame += 1;
+
         input.game_update(self.current_frame);
         let player_inputs = &input.players(self.current_frame);
         self.step_game(package, player_inputs);
 
-        self.player_history.push(self.players.clone());
-        self.current_frame += 1;
     }
 
     fn step_pause(&mut self, package: &mut Package, input: &mut Input, os_input: &OsInput) {
@@ -173,7 +179,6 @@ impl Game {
             self.state = GameState::ReplayForwards;
         }
         else if os_input.key_pressed(VirtualKeyCode::Space) {
-            self.current_frame += 1;
             self.step_local(package, input, os_input);
         }
         else if os_input.key_pressed(VirtualKeyCode::U) {
@@ -200,8 +205,9 @@ impl Game {
                     let distance = (self.players[player].relative_f(d_x), d_y);
                     package.move_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, distance);
 
+                    // end move
                     if os_input.mouse_pressed(0) {
-                        self.selector = Default::default();
+                        self.update_frame();
                     }
                 }
                 else {
@@ -212,17 +218,19 @@ impl Game {
                     }
                     // paste frame
                     if os_input.key_pressed(VirtualKeyCode::B) {
-                        if let Some(ref action_frame) = self.copied_frame {
-                            package.insert_fighter_frame(fighter, action, frame, action_frame.clone());
-                            self.debug_output_this_step = Some(self.current_frame);
+                        let action_frame = self.copied_frame.clone();
+                        if let Some(action_frame) = action_frame {
+                            package.insert_fighter_frame(fighter, action, frame, action_frame);
+                            self.step_local(package, input, os_input);
                         }
                     }
 
                     // new frame
                     if os_input.key_pressed(VirtualKeyCode::M) {
                         package.new_fighter_frame(fighter, action, frame);
-                        self.players[player].frame += 1;
-                        self.debug_output_this_step = Some(self.current_frame);
+                        // We want to step just the players current frame to simplify the animation work flow
+                        // However we need to do a proper full step so that the history doesn't get mucked up.
+                        self.step_local(package, input, os_input);
                     }
                     // delete frame
                     if os_input.key_pressed(VirtualKeyCode::N) {
@@ -236,7 +244,6 @@ impl Game {
                                     any_player.frame -= 1;
                                 }
                             }
-                            self.debug_output_this_step = Some(self.current_frame);
                         }
                     }
 
@@ -253,25 +260,26 @@ impl Game {
                     // delete collisionbox
                     if os_input.key_pressed(VirtualKeyCode::D) {
                         package.delete_fighter_colboxes(fighter, action, frame, &self.selector.colboxes);
-
-                        self.selector = Default::default();
+                        self.update_frame();
                     }
                     // add collisionbox
                     if os_input.key_pressed(VirtualKeyCode::F) {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
-                            let player = &self.players[player];
-                            let p_x = player.bps_x;
-                            let p_y = player.bps_y;
+                            let selected = {
+                                let player = &self.players[player];
+                                let p_x = player.bps_x;
+                                let p_y = player.bps_y;
 
-                            let point = (player.relative_f(m_x - p_x), m_y - p_y);
-                            let new_colbox = CollisionBox::new(point);
-                            let link_type = match os_input.held_shift() {
-                                true  => { LinkType::Simple },
-                                false => { LinkType::Meld }
+                                let point = (player.relative_f(m_x - p_x), m_y - p_y);
+                                let new_colbox = CollisionBox::new(point);
+                                let link_type = match os_input.held_shift() {
+                                    true  => { LinkType::Simple },
+                                    false => { LinkType::Meld }
+                                };
+
+                                package.append_fighter_colbox(fighter, action, frame, new_colbox, &self.selector.colboxes, link_type)
                             };
-
-                            let selected = package.append_fighter_colbox(fighter, action, frame, new_colbox, &self.selector.colboxes, link_type);
-                            self.selector.colboxes = HashSet::new();
+                            self.update_frame();
                             self.selector.colboxes.insert(selected);
                         }
                     }
@@ -417,7 +425,7 @@ impl Game {
                 di_vector:      true,
                 player:         true,
                 no_fighter:     true,
-                cam_area: true,
+                cam_area:       true,
             }
         }
         if os_input.key_pressed(VirtualKeyCode::F12) {
@@ -437,12 +445,13 @@ impl Game {
                 self.state = GameState::ReplayBackwards;
             }
             if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
-                self.set_paused();
+                self.state = GameState::Paused;
             }
             self.current_frame += 1;
+            self.update_frame();
         }
         else {
-            self.set_paused();
+            self.state = GameState::Paused;
         }
     }
 
@@ -451,12 +460,11 @@ impl Game {
         if self.current_frame > 0 {
             let jump_to = self.current_frame - 1;
             self.players = self.player_history.get(jump_to).unwrap().clone();
-
             self.current_frame = jump_to;
-            self.debug_output_this_step = Some(jump_to);
+            self.update_frame();
         }
         else {
-            self.set_paused();
+            self.state = GameState::Paused;
         }
 
         // flow controls
@@ -464,7 +472,8 @@ impl Game {
             self.state = GameState::ReplayForwards;
         }
         else if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
-            self.set_paused();
+            self.state = GameState::Paused;
+            self.update_frame();
         }
     }
 
@@ -475,7 +484,7 @@ impl Game {
             self.players = self.player_history.get(frame).unwrap().clone();
 
             self.current_frame = frame;
-            self.debug_output_this_step = Some(frame);
+            self.update_frame();
         }
     }
 
@@ -494,10 +503,11 @@ impl Game {
             self.state = GameState::Results;
         }
 
-        self.debug_output_this_step = Some(self.current_frame);
+        self.update_frame();
     }
 
-    fn debug_output(&mut self, package: &Package, input: &Input, frame: usize) {
+    fn debug_output(&mut self, package: &Package, input: &Input) {
+        let frame = self.current_frame;
         let player_inputs = &input.players(frame);
 
         println!("\n-------------------------------------------");
@@ -513,9 +523,12 @@ impl Game {
     fn step_results(&mut self) {
     }
 
-    fn set_paused(&mut self) {
-        self.state = GameState::Paused;
+    /// Call this whenever a frame player's frame is changed, this can be from:
+    /// *   the fighter's frame data is changed
+    /// *   the player now refers to a different frame.
+    fn update_frame(&mut self) {
         self.selector = Default::default();
+        self.debug_output_this_step = true;
     }
 
     pub fn render(&self, package: &Package) -> RenderGame {

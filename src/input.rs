@@ -3,6 +3,7 @@ use std::time::Duration;
 
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
+    empty_inputs:    Vec<ControllerInput>,
     current_inputs:  Vec<ControllerInput>,      // inputs for this frame
     game_inputs:     Vec<Vec<ControllerInput>>, // game past and (potentially) future inputs, frame 0 has index 2
     prev_start:      bool,
@@ -43,13 +44,21 @@ impl<'a> Input<'a> {
                 }
             }
         }
-        let mut input = Input {
+
+        let mut empty_inputs: Vec<ControllerInput> = vec!();
+        for _ in &adapter_handles {
+            for _ in 0..4 {
+                empty_inputs.push(ControllerInput::empty());
+            }
+        }
+
+        let input = Input {
             adapter_handles: adapter_handles,
+            empty_inputs:    empty_inputs,
             game_inputs:     vec!(),
             current_inputs:  vec!(),
             prev_start:      false,
         };
-        input.reset_history();
         input
     }
 
@@ -81,27 +90,15 @@ impl<'a> Input<'a> {
         self.current_inputs = inputs;
     }
 
-    /// Generate a new history starting with empty inputs for all controllers
+    /// Reset the game input history
     pub fn reset_history(&mut self) {
-        let mut game_inputs: Vec<Vec<ControllerInput>> = vec!();
-        let mut empty_inputs: Vec<ControllerInput> = vec!();
-
-        // create empty inputs
-        for _ in &mut self.adapter_handles {
-            for _ in 0..4 {
-                empty_inputs.push(empty_controller_input());
-            }
-        }
-
-        game_inputs.push(empty_inputs);
-        self.game_inputs = game_inputs;
+        self.game_inputs = vec!();
     }
-
 
     /// Call this once from the game update logic only 
     /// Throws out all future history that may exist
-    pub fn game_update(&mut self, game_frame: usize) {
-        for _ in Input::input_index(game_frame)..self.game_inputs.len() {
+    pub fn game_update(&mut self, frame: usize) {
+        for _ in frame..(self.game_inputs.len()+1) {
             self.game_inputs.pop();
         }
 
@@ -112,9 +109,9 @@ impl<'a> Input<'a> {
     /// Return game inputs at current index into history
     pub fn players(&self, frame: usize) -> Vec<PlayerInput> {
         let mut result_inputs: Vec<PlayerInput> = vec!();
-        let index = Input::input_index(frame);
-        let inputs      = &self.game_inputs.get(index).unwrap();
-        let prev_inputs = &self.game_inputs.get(index-1).unwrap();
+        let frame = frame as i64;
+        let inputs      = self.get_inputs(frame);
+        let prev_inputs = self.get_inputs(frame-1);
 
         for (i, input) in inputs.iter().enumerate() {
             let prev_input = &prev_inputs[i];
@@ -145,10 +142,25 @@ impl<'a> Input<'a> {
                 });
             }
             else {
-                result_inputs.push(empty_players());
+                result_inputs.push(PlayerInput::empty());
             }
         }
         result_inputs
+    }
+
+    fn get_inputs(&self, frame: i64) -> &Vec<ControllerInput> {
+        // when players(0) is called it requests inputs on frames 0 and -1
+        // when players(1) is called it requests inputs on frames 1 and 0
+        // empty inputs are returned for 0 and -1 as:
+        // *    frame 0 has no inputs
+        // *    frame 1 has no diff
+        if frame == 0 || frame == -1 {
+            &self.empty_inputs
+        }
+        else {
+            let index = frame as usize - 1;
+            &self.game_inputs.get(index).unwrap()
+        }
     }
 
     /// Check for start button press
@@ -171,28 +183,9 @@ impl<'a> Input<'a> {
         false
     }
 
-    // --------------------------------------------------------------------
-    // The following helper methods are used to avoid off-by-one
-    // errors by giving higher level descriptions of the offsets
-
-    /// Returns the game frame of the last frame in history
+    /// Returns the index to the last frame in history
     pub fn last_frame(&self) -> usize {
-        Input::game_frame(self.last_index())
-    }
-
-    /// Returns the input index of the last frame in history
-    fn last_index(&self) -> usize {
         self.game_inputs.len() - 1
-    }
-
-    /// Converts an input index into a game frame
-    fn input_index(frame: usize) -> usize {
-        frame + 1
-    }
-
-    /// Converts a game frame into an input index
-    fn game_frame(index: usize) -> usize {
-        index - 1
     }
 }
 
@@ -208,56 +201,60 @@ fn display_endpoints(device: &mut Device) {
     }
 }
 
-fn empty_controller_input() -> ControllerInput {
-    ControllerInput {
-        plugged_in: false,
+impl ControllerInput {
+    fn empty() -> ControllerInput {
+        ControllerInput {
+            plugged_in: false,
 
-        up:    false,
-        down:  false,
-        right: false,
-        left:  false,
-        y:     false,
-        x:     false,
-        b:     false,
-        a:     false,
-        l:     false,
-        r:     false,
-        z:     false,
-        start: false,
+            up:    false,
+            down:  false,
+            right: false,
+            left:  false,
+            y:     false,
+            x:     false,
+            b:     false,
+            a:     false,
+            l:     false,
+            r:     false,
+            z:     false,
+            start: false,
 
-        stick_x:   0.0,
-        stick_y:   0.0,
-        c_stick_x: 0.0,
-        c_stick_y: 0.0,
-        l_trigger: 0.0,
-        r_trigger: 0.0,
+            stick_x:   0.0,
+            stick_y:   0.0,
+            c_stick_x: 0.0,
+            c_stick_y: 0.0,
+            l_trigger: 0.0,
+            r_trigger: 0.0,
+        }
     }
 }
 
-fn empty_players() -> PlayerInput {
-    PlayerInput {
-        plugged_in: false,
+impl PlayerInput {
+    pub fn empty() -> PlayerInput {
+        PlayerInput {
+            plugged_in: false,
 
-        up:    Button { value: false, press: false },
-        down:  Button { value: false, press: false },
-        right: Button { value: false, press: false },
-        left:  Button { value: false, press: false },
-        y:     Button { value: false, press: false },
-        x:     Button { value: false, press: false },
-        b:     Button { value: false, press: false },
-        a:     Button { value: false, press: false },
-        l:     Button { value: false, press: false },
-        r:     Button { value: false, press: false },
-        z:     Button { value: false, press: false },
-        start: Button { value: false, press: false },
+            up:    Button { value: false, press: false },
+            down:  Button { value: false, press: false },
+            right: Button { value: false, press: false },
+            left:  Button { value: false, press: false },
+            y:     Button { value: false, press: false },
+            x:     Button { value: false, press: false },
+            b:     Button { value: false, press: false },
+            a:     Button { value: false, press: false },
+            l:     Button { value: false, press: false },
+            r:     Button { value: false, press: false },
+            z:     Button { value: false, press: false },
+            start: Button { value: false, press: false },
 
-        stick_x:   Stick { value: 0.0, diff: 0.0 },
-        stick_y:   Stick { value: 0.0, diff: 0.0 },
-        c_stick_x: Stick { value: 0.0, diff: 0.0 },
-        c_stick_y: Stick { value: 0.0, diff: 0.0 },
+            stick_x:   Stick { value: 0.0, diff: 0.0 },
+            stick_y:   Stick { value: 0.0, diff: 0.0 },
+            c_stick_x: Stick { value: 0.0, diff: 0.0 },
+            c_stick_y: Stick { value: 0.0, diff: 0.0 },
 
-        l_trigger:  Trigger { value: 0.0, diff: 0.0 },
-        r_trigger:  Trigger { value: 0.0, diff: 0.0 },
+            l_trigger:  Trigger { value: 0.0, diff: 0.0 },
+            r_trigger:  Trigger { value: 0.0, diff: 0.0 },
+        }
     }
 }
 
@@ -302,7 +299,7 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<ControllerInput>)
 /// Add 4 controllers from usb to inputs
 fn read_usb_controllers(inputs: &mut Vec<ControllerInput>) {
     for _ in 0..0 {
-        inputs.push(empty_controller_input());
+        inputs.push(ControllerInput::empty());
     }
 }
 

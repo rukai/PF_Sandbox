@@ -572,14 +572,20 @@ impl Player {
         }
 
         if self.debug.frame {
-            let frame = &fighter.action_defs[self.action as usize].frames[self.frame as usize];
-            let hitbox_count = frame.colboxes.len();
-            let effects_count = frame.effects.len();
-            let ecb_w = frame.ecb_w;
-            let ecb_h = frame.ecb_h;
-            let ecb_y = frame.ecb_y;
-            println!("Player: {}    colboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
-                index, hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
+            let frames = &fighter.action_defs[self.action as usize].frames;
+            if frames.len() > self.frame as usize {
+                let frame = &frames[self.frame as usize];
+                let hitbox_count = frame.colboxes.len();
+                let effects_count = frame.effects.len();
+                let ecb_w = frame.ecb_w;
+                let ecb_h = frame.ecb_h;
+                let ecb_y = frame.ecb_y;
+                println!("Player: {}    colboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
+                    index, hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
+            }
+            else {
+                println!("Player: {}    frame {} does not exist.", index, self.frame);
+            }
         }
     }
 
