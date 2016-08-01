@@ -1,5 +1,5 @@
 use ::stage::Stage;
-use ::fighter::ActionFrame;
+use ::fighter::{ActionFrame, LinkType};
 use ::player::RenderPlayer;
 use ::package::{Package, PackageUpdate};
 use ::game::RenderRect;
@@ -90,7 +90,51 @@ impl Buffers {
                 indices.push(index_count + i);
                 indices.push(index_count + (i + 1) % triangles);
             }
-            index_count += 20;
+            index_count += triangles;
+        }
+
+        for link in &frame.colbox_links {
+            match link.link_type {
+                LinkType::Meld => {
+                    // draw a rectangle connecting two colboxes
+                    let (x1, y1) = frame.colboxes[link.one].point;
+                    let (x2, y2) = frame.colboxes[link.two].point;
+                    let one_radius     = frame.colboxes[link.one].radius;
+                    let two_radius     = frame.colboxes[link.two].radius;
+
+                    let mid_angle = (y1 - y2).atan2(x1 - x2);
+
+                    let angle1 = mid_angle + consts::FRAC_PI_2;
+                    let angle2 = mid_angle - consts::FRAC_PI_2;
+
+                    // rectangle as 4 points
+                    let link_x1 = x1 + angle1.cos() * one_radius;
+                    let link_x2 = x1 + angle2.cos() * one_radius;
+                    let link_x3 = x2 + angle1.cos() * two_radius;
+                    let link_x4 = x2 + angle2.cos() * two_radius;
+
+                    let link_y1 = y1 + angle1.sin() * one_radius;
+                    let link_y2 = y1 + angle2.sin() * one_radius;
+                    let link_y3 = y2 + angle1.sin() * two_radius;
+                    let link_y4 = y2 + angle2.sin() * two_radius;
+
+                    // rectangle into buffers
+                    vertices.push(Vertex { position: [link_x1, link_y1] });
+                    vertices.push(Vertex { position: [link_x2, link_y2] });
+                    vertices.push(Vertex { position: [link_x3, link_y3] });
+                    vertices.push(Vertex { position: [link_x4, link_y4] });
+
+                    indices.push(index_count);
+                    indices.push(index_count + 1);
+                    indices.push(index_count + 2);
+
+                    indices.push(index_count + 1);
+                    indices.push(index_count + 2);
+                    indices.push(index_count + 3);
+                    index_count += 4;
+                },
+                LinkType::Simple => { },
+            }
         }
 
         Buffers {
