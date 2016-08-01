@@ -98,9 +98,45 @@ pub struct ActionFrame {
 }
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
-pub enum CollisionBoxLink {
-    Meld   (usize, usize),
-    Simple (usize, usize),
+pub struct CollisionBoxLink {
+    pub one:       usize,
+    pub two:       usize,
+    pub link_type: LinkType,
+}
+
+impl CollisionBoxLink {
+    pub fn equals (&self, one: usize, two: usize) -> bool {
+        self.one == one && self.two == two ||
+        self.one == two && self.two == one
+    }
+
+    pub fn contains (&self, check: usize) -> bool {
+        self.one == check || self.two == check
+    }
+
+    pub fn dec_greater_than(&self, check: usize) -> CollisionBoxLink {
+        let mut one = self.one;
+        let mut two = self.two;
+
+        if self.one > check {
+            one -= 1;
+        }
+        if self.two > check {
+            two -= 1;
+        }
+
+        CollisionBoxLink {
+            one: one,
+            two: two,
+            link_type: self.link_type.clone(),
+        }
+    }
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable)]
+pub enum LinkType {
+    Meld,
+    Simple,
 }
 
 enum_from_primitive! {

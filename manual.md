@@ -71,8 +71,8 @@ Use the following keys to toggle debug displays:
 *   F6 - CStick vector
 *   F7 - DI vector
 *   F8 - Display ECB and BPS
-*   F9 -
-*   F10 -
+*   F9 - Dont display fighter
+*   F10 - Display player camera area
 *   F11 - Set all
 *   F12 - Reset all
 
@@ -86,6 +86,8 @@ To add to the previous selection hold the Shift key.
 
 ### Frame editing
 
+*   V - Copy frame
+*   B - Paste frame
 *   N - Delete frame
 *   M - Insert frame, copies from previous frame
 
@@ -93,17 +95,28 @@ To add to the previous selection hold the Shift key.
 
 Most of these operations will apply to all selected hitboxes:
 
-*   A - move hitboxes, left click to confirm
-*   S - resize hitboxes
-*   D - delete selected hitboxes
-*   F - Insert hitbox, left click to confirm
+*   A - Move hitboxes, left click to confirm
+*   S - Toggle pivot mode
+*   D - Delete selected hitboxes
+*   F - Insert hitbox meld linked to selected hitboxes, left click to confirm
+    +   Shift: simple link
+*   G - Resize hitboxes
 *   Z - Meld link hitboxes
 *   X - Simple link hitboxes
 *   C - Unlink hitboxes
 
-Melding hitboxes combines them into a single hitbox.
-Pivot hitboxes act as if they are melded but remain as seperate hitboxes.
+Linking collision boxes allows them to be pivoted in pivot mode.
+Meld links combines collisionboxes into a single collisionbox.
 
 Hitbox data can be set via a command:
 *   Hitbox (damage, bkb, kbg, angle, clang)
 *   Hurtbox (armor)
+
+### Pivot mode
+
+When there is one collisionbox selected, pressing `S` will enter pivot mode.
+
+The selected collisionbox becomes the root collision box.
+Any collisionbox can now be click and drag'ed around the root box.
+
+Press `S` again to leave pivot mode.

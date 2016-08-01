@@ -2,7 +2,7 @@ use ::input::{Input, PlayerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer};
-use ::fighter::{CollisionBox};
+use ::fighter::{CollisionBox, LinkType};
 use ::camera::Camera;
 use ::stage::{Area};
 
@@ -203,13 +203,21 @@ impl Game {
                     }
                 }
                 else {
+                    // copy frame
+                    if os_input.key_pressed(VirtualKeyCode::V) {
+                        // TODO
+                    }
+                    // paste frame
+                    if os_input.key_pressed(VirtualKeyCode::B) {
+                        // TODO
+                    }
+
                     // add frame
                     if os_input.key_pressed(VirtualKeyCode::M) {
                         package.add_fighter_frame(fighter, action, frame);
                         self.players[player].frame += 1;
                         self.debug_output_this_step = Some(self.current_frame);
                     }
-
                     // delete frame
                     if os_input.key_pressed(VirtualKeyCode::N) {
                         if package.delete_fighter_frame(fighter, action, frame) {
@@ -232,9 +240,9 @@ impl Game {
                             self.selector.moving = true;
                         }
                     }
-                    // resize collisionbox
+                    // enter pivot mode
                     if os_input.key_pressed(VirtualKeyCode::S) {
-                        // TODO: resize
+                        // TODO
                     }
                     // delete collisionbox
                     if os_input.key_pressed(VirtualKeyCode::D) {
@@ -250,10 +258,21 @@ impl Game {
                             let p_y = player.bps_y;
 
                             let point = (player.relative_f(m_x - p_x), m_y - p_y);
-                            let colbox = CollisionBox::new(point);
+                            let new_colbox = CollisionBox::new(point);
 
-                            package.append_fighter_colboxes(fighter, action, frame, vec!(colbox));
+                            let link_type = match os_input.held_shift() {
+                                true  => { LinkType::Simple },
+                                false => { LinkType::Meld }
+                            };
+
+                            let selected = package.append_fighter_colbox(fighter, action, frame, new_colbox, &self.selector.colboxes, link_type);
+                            self.selector.colboxes = HashSet::new();
+                            self.selector.colboxes.insert(selected);
                         }
+                    }
+                    // resize collisionbox
+                    if os_input.key_pressed(VirtualKeyCode::G) {
+                        // TODO
                     }
                     // meld link collisionboxes
                     if os_input.key_pressed(VirtualKeyCode::Z) {

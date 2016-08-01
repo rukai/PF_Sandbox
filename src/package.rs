@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use rustc_serialize::{Encodable, Decodable};
 use rustc_serialize::json::{self, Encoder, DecodeResult};
 
-use ::fighter::{Fighter, ActionFrame, CollisionBox};
+use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType};
 use ::rules::Rules;
 use ::stage::Stage;
 
@@ -180,14 +180,23 @@ impl Package {
         }
     }
 
-    pub fn append_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, new_colboxes: Vec<CollisionBox>) {
+    /// add the passed collisionbox to the specified fighter frame
+    /// the added collisionbox is linked to the specified collisionboxes
+    /// returns the index the collisionbox was added to.
+    pub fn append_fighter_colbox(
+        &mut self, fighter: usize, action: usize, frame: usize,
+        new_colbox: CollisionBox, link_to: &HashSet<usize>, link_type: LinkType
+    ) -> usize {
         let mut fighter_frame = &mut self.fighters[fighter].action_defs[action].frames[frame];
-        {
-            let mut colboxes = &mut fighter_frame.colboxes;
+        let new_colbox_index = fighter_frame.colboxes.len();
+        fighter_frame.colboxes.push(new_colbox);
 
-            for colbox in new_colboxes {
-                colboxes.push(colbox);
-            }
+        for colbox_index in link_to {
+            fighter_frame.colbox_links.push(CollisionBoxLink {
+                one:       *colbox_index,
+                two:       new_colbox_index,
+                link_type: link_type.clone(),
+            });
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
@@ -201,6 +210,8 @@ impl Package {
             frame_index: frame,
             frame:       fighter_frame.clone(),
         });
+
+        new_colbox_index
     }
 
     pub fn delete_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, delete_boxes: &HashSet<usize>) {
@@ -214,8 +225,19 @@ impl Package {
             delete_boxes.reverse();
 
             for i in delete_boxes {
-                colboxes.remove(*i);
+                let delete = *i;
+                colboxes.remove(delete);
+
+                // construct a new list of links that is valid after the deletion
+                let mut new_links = vec!();
+                for link in &fighter_frame.colbox_links {
+                    if !link.contains(delete) {
+                        new_links.push(link.dec_greater_than(delete));
+                    }
+                }
+                fighter_frame.colbox_links = new_links;
             }
+
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
