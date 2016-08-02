@@ -159,7 +159,7 @@ impl Package {
     pub fn insert_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize, action_frame: ActionFrame) {
         let mut action_frames = &mut self.fighters[fighter].action_defs[action].frames;
 
-        action_frames.insert(frame + 1, action_frame.clone());
+        action_frames.insert(frame, action_frame.clone());
 
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
             fighter:     fighter,

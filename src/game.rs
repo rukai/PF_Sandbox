@@ -221,12 +221,12 @@ impl Game {
                         let frame = package.fighters[fighter].action_defs[action].frames[frame].clone();
                         self.copied_frame = Some(frame);
                     }
-                    // paste frame
+                    // paste over current frame
                     if os_input.key_pressed(VirtualKeyCode::B) {
                         let action_frame = self.copied_frame.clone();
                         if let Some(action_frame) = action_frame {
                             package.insert_fighter_frame(fighter, action, frame, action_frame);
-                            self.step_local(package, input, os_input);
+                            package.delete_fighter_frame(fighter, action, frame+1);
                         }
                     }
 
@@ -249,6 +249,7 @@ impl Game {
                                     any_player.frame -= 1;
                                 }
                             }
+                            self.update_frame();
                         }
                     }
 
