@@ -28,7 +28,6 @@ pub struct Player {
     pub airbourne:      bool,
     pub pass_through:   bool,
     pub air_jumps_left: u64,
-    pub debug:  DebugPlayer,
 }
 
 impl Player {
@@ -55,7 +54,6 @@ impl Player {
             airbourne:      true,
             pass_through:   false,
             air_jumps_left: 0,
-            debug:  DebugPlayer::default(),
         }
     }
 
@@ -532,13 +530,13 @@ impl Player {
         self.set_action(Action::Spawn);
     }
 
-    pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, index: usize) {
-        if self.debug.physics {
+    pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, debug: &DebugPlayer, index: usize) {
+        if debug.physics {
             println!("Player: {}    x: {}    y: {}    x_vel: {:.5}    y_vel: {:.5}    x_acc {:.5}",
                 index, self.bps_x, self.bps_y, self.x_vel, self.y_vel, self.x_acc);
         }
 
-        if self.debug.input {
+        if debug.input {
             let stick_x   = player_input.stick_x.value;
             let stick_y   = player_input.stick_y.value;
             let c_stick_x = player_input.c_stick_x.value;
@@ -550,7 +548,7 @@ impl Player {
                 index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
         }
 
-        if self.debug.input_diff {
+        if debug.input_diff {
             let stick_x   = player_input.stick_x.diff;
             let stick_y   = player_input.stick_y.diff;
             let c_stick_x = player_input.c_stick_x.diff;
@@ -562,7 +560,7 @@ impl Player {
                 index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
         }
 
-        if self.debug.action {
+        if debug.action {
             let action = Action::from_u64(self.action).unwrap();
             let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64 - 1;
             let iasa = fighter.action_defs[self.action as usize].iasa;
@@ -571,7 +569,7 @@ impl Player {
                 index, action, self.airbourne, self.frame, action_frames, iasa);
         }
 
-        if self.debug.frame {
+        if debug.frame {
             let frames = &fighter.action_defs[self.action as usize].frames;
             if frames.len() > self.frame as usize {
                 let frame = &frames[self.frame as usize];
@@ -589,9 +587,9 @@ impl Player {
         }
     }
 
-    pub fn render(&self, fighter: usize, selected_colboxes: HashSet<usize>, selected: bool) -> RenderPlayer {
+    pub fn render(&self, fighter: usize, selected_colboxes: HashSet<usize>, selected: bool, debug: DebugPlayer) -> RenderPlayer {
         RenderPlayer {
-            debug:      self.debug.clone(),
+            debug:      debug,
             bps:        (self.bps_x, self.bps_y),
             ecb_w:      self.ecb_w,
             ecb_y:      self.ecb_y,

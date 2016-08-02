@@ -16,6 +16,7 @@ pub struct Game {
     current_frame:          usize,
     saved_frame:            usize,
     players:                Vec<Player>,
+    debug_players:          Vec<DebugPlayer>,
     selected_controllers:   Vec<usize>,
     selected_fighters:      Vec<usize>,
     selected_stage:         usize,
@@ -33,12 +34,15 @@ pub struct Game {
 
 impl Game {
     pub fn new(package: &Package, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
-        let mut players: Vec<Player> = vec!();
+        // generate players
+        let mut players:       Vec<Player>      = vec!();
+        let mut debug_players: Vec<DebugPlayer> = vec!();
         let spawn_points = &package.stages[selected_stage].spawn_points;
         for (i, _) in selected_controllers.iter().enumerate() {
             // Stages can have less spawn points then players
             let spawn = spawn_points[i % spawn_points.len()].clone();
             players.push(Player::new(spawn, package.rules.stock_count));
+            debug_players.push(Default::default());
         }
 
         // The CLI allows for selected_fighters to be shorter then players
@@ -57,6 +61,7 @@ impl Game {
             current_frame:          0,
             saved_frame:            0,
             players:                players,
+            debug_players:          debug_players,
             selected_controllers:   selected_controllers,
             selected_fighters:      filled_fighters,
             selected_stage:         selected_stage,
@@ -375,7 +380,7 @@ impl Game {
     // TODO: F10 - save preset to player profile
     fn set_debug(&mut self, os_input: &OsInput, player: usize) {
         {
-            let debug = &mut self.players[player].debug;
+            let debug = &mut self.debug_players[player];
 
             if os_input.key_pressed(VirtualKeyCode::F1) {
                 debug.physics = !debug.physics;
@@ -414,7 +419,7 @@ impl Game {
             }
         }
         if os_input.key_pressed(VirtualKeyCode::F11) {
-            self.players[player].debug = DebugPlayer {
+            self.debug_players[player] = DebugPlayer {
                 physics:        true,
                 input:          true,
                 input_diff:     true,
@@ -429,7 +434,7 @@ impl Game {
             }
         }
         if os_input.key_pressed(VirtualKeyCode::F12) {
-            self.players[player].debug = DebugPlayer::default();
+            self.debug_players[player] = DebugPlayer::default();
         }
     }
 
@@ -516,7 +521,8 @@ impl Game {
         for (i, player) in self.players.iter().enumerate() {
             let fighter = &package.fighters[self.selected_fighters[i]];
             let player_input = &player_inputs[i];
-            player.debug_print(fighter, player_input, i);
+            let debug_player = &self.debug_players[i];
+            player.debug_print(fighter, player_input, debug_player, i);
         }
     }
 
@@ -551,12 +557,14 @@ impl Game {
                     _ => { },
                 }
             }
-            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i], selected_colboxes, selected)));
 
-            if player.debug.cam_area {
+            let debug = self.debug_players[i].clone();
+            if debug.cam_area {
                 let cam_area = &player.cam_area(&package.stages[self.selected_stage].camera);
                 entities.push(RenderEntity::Area(area_to_render(cam_area)));
             }
+
+            entities.push(RenderEntity::Player(player.render(self.selected_fighters[i], selected_colboxes, selected, debug)));
         }
 
         // stage areas
