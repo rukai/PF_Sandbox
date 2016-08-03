@@ -110,15 +110,26 @@ impl Player {
             _   => -fighter_frame.ecb_h / 2.0,
         };
 
-        match action {
-            Some(Action::SpawnIdle) | Some(Action::Fall) | Some(Action::AerialFall) |
-            Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | 
-            Some(Action::JumpAerialB)                 => { self.aerial_action(input, fighter); },
-            Some(Action::Idle) | Some(Action::Crouch) => { self.ground_idle_action(input, fighter); },
-            Some(Action::Dash)                        => { self.dash_action(input, fighter); },
-            Some(Action::Run)                         => { self.run_action(input, fighter); },
-            _                                         => { },
+        if let Some(action) = action {
+            match action {
+                Action::SpawnIdle | Action::Fall | Action::AerialFall |
+                Action::JumpF | Action::JumpB | Action::JumpAerialF |
+                Action::JumpAerialB => { self.aerial_action(input, fighter); },
+                Action::Crouch      => { self.crouch_action(input, fighter); },
+                Action::Idle   | Action::CrouchStart |
+                Action::CrouchEnd => { self.ground_idle_action(input, fighter); },
+                Action::Dash      => { self.dash_action(input, fighter); },
+                Action::Run       => { self.run_action(input, fighter); },
+                _ => { },
+            }
         }
+    }
+
+    fn crouch_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if input.stick_y.value > -0.3 {
+            self.set_action(Action::CrouchEnd);
+        }
+        self.ground_idle_action(input, fighter);
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -151,7 +162,12 @@ impl Player {
 
     fn ground_idle_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         if input.stick_y.value < -0.3 { // TODO: refine
-            self.set_action(Action::Crouch);
+            if let Some(action) = Action::from_u64(self.action) {
+                match action {
+                    Action::CrouchStart | Action::Crouch | Action::CrouchEnd => { },
+                    _ => { self.set_action(Action::CrouchStart); }
+                }
+            }
         }
         else if input.stick_x.diff > 0.1 && input.stick_x.value > 0.1 {
             self.face_right = true;
@@ -233,7 +249,7 @@ impl Player {
         }
         else {
             // Placeholder logic, needs research
-            let acc = self.relative_f(fighter.dash_run_acc_b);
+            let acc = self.relative_f(fighter.dash_run_acc_a + fighter.dash_run_acc_b);
             if self.x_vel + acc <= fighter.dash_run_term_vel {
                 self.x_acc = acc;
             }
@@ -252,7 +268,11 @@ impl Player {
             Some(Action::Spawn)     => { self.set_action(Action::SpawnIdle); },
             Some(Action::SpawnIdle) => { self.set_action(Action::SpawnIdle); },
             Some(Action::Idle)      => { self.set_action(Action::Idle);      },
-            Some(Action::Crouch)    => { self.set_action(Action::Crouch);    },
+
+            // crouch
+            Some(Action::CrouchStart) => { self.set_action(Action::Crouch);    },
+            Some(Action::Crouch)      => { self.set_action(Action::Crouch); },
+            Some(Action::CrouchEnd)   => { self.set_action(Action::Idle);      },
 
             // Movement
             Some(Action::Fall)        => { self.set_action(Action::Fall);       },
@@ -267,7 +287,6 @@ impl Player {
             Some(Action::Run)         => { self.set_action(Action::Run);        },
             Some(Action::RunEnd)      => { self.set_action(Action::Idle);       },
             Some(Action::JumpSquat)   => {
-
                 self.airbourne = true;
 
                 let shorthop = input.x.value || input.y.value || input.stick_y.value > 0.15; // TODO: refine
