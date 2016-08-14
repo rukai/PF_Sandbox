@@ -14,7 +14,7 @@ impl Fighter {
             iasa:   0,
         };
         let mut action_defs: Vec<ActionDef> = Vec::new();
-        for _ in 0..((Action::CrouchEnd as usize)+1) { // TODO: Super gross but what is a man to do?
+        for _ in 0..((Action::TurnRun as usize)+1) { // TODO: Super gross but what is a man to do?
             action_defs.push(action_def.clone());
         }
         
@@ -208,6 +208,10 @@ pub enum Action {
     // crouch
     CrouchStart,
     CrouchEnd,
+
+    // unsorted for compatibility with packages
+    PassPlatform,
+    TurnRun,
 }
 }
 

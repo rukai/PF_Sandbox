@@ -120,16 +120,11 @@ impl Player {
                 Action::CrouchEnd => { self.ground_idle_action(input, fighter); },
                 Action::Dash      => { self.dash_action(input, fighter); },
                 Action::Run       => { self.run_action(input, fighter); },
+                Action::Turn      => { self.turn_action(input); }
+                Action::JumpSquat => { self.check_grab(input); }
                 _ => { },
             }
         }
-    }
-
-    fn crouch_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if input.stick_y.value > -0.3 {
-            self.set_action(Action::CrouchEnd);
-        }
-        self.ground_idle_action(input, fighter);
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -139,7 +134,7 @@ impl Player {
         else if input.b.press {
             // special attack
         }
-        else if self.check_jump(input) && self.air_jumps_left > 0 {
+        else if self.jump_input(input) && self.air_jumps_left > 0 {
             self.air_jumps_left -= 1;
             self.y_vel = fighter.jump_y_init_vel;
 
@@ -160,58 +155,35 @@ impl Player {
         self.pass_through = input.stick_y.value < -0.2; // TODO: refine
     }
 
-    fn ground_idle_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if input.stick_y.value < -0.3 { // TODO: refine
-            if let Some(action) = Action::from_u64(self.action) {
-                match action {
-                    Action::CrouchStart | Action::Crouch | Action::CrouchEnd => { },
-                    _ => { self.set_action(Action::CrouchStart); }
-                }
-            }
+    // TODO: Turns always complete on frame 11, hardcoded or coincidence?
+    fn turn_action(&mut self, input: &PlayerInput) {
+        if self.frame == 0 && self.dash_input(input) {
+            self.set_action(Action::Dash);
         }
-        else if input.stick_x.diff > 0.1 && input.stick_x.value > 0.1 {
-            self.face_right = true;
-            self.dash(fighter);
-        }
-        else if input.stick_x.diff < -0.1 && input.stick_x.value < -0.1 {
-            self.face_right = false;
-            self.dash(fighter);
-        }
+        self.check_taunt(input);
+        self.check_jump(input);
+        self.check_smash(input);
+        self.check_attack(input);
+        self.check_grab(input);
+        self.check_special(input); // TODO: No neutral special
+    }
 
-        if self.check_jump(input) {
-            self.set_action(Action::JumpSquat);
+    fn crouch_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if input.stick_y.value > -0.3 {
+            self.set_action(Action::CrouchEnd);
         }
-        else if input.a.press {
-            self.set_action(Action::Jab);
-        }
-        else if input.b.press {
-            // special attack
-        }
-        else if input.z.press {
-            self.set_action(Action::Grab);
-        }
-        else if input.c_stick_x.value.abs() > 0.2 { // TODO: hmmmm how do I want to stop smashes from auto-spamming
-            self.face_right = input.c_stick_x.value > 0.0;
-            self.set_action(Action::Fsmash);
-        }
-        else if input.c_stick_y.value > 0.2 {
-            self.set_action(Action::Usmash);
-        }
-        else if input.c_stick_y.value < -0.2 {
-            self.set_action(Action::Dsmash);
-        }
-        else if input.up.press {
-            self.set_action(Action::TauntUp);
-        }
-        else if input.down.press {
-            self.set_action(Action::TauntDown);
-        }
-        else if input.left.press {
-            self.set_action(Action::TauntLeft);
-        }
-        else if input.right.press {
-            self.set_action(Action::TauntRight);
-        }
+        self.ground_idle_action(input, fighter);
+    }
+
+    fn ground_idle_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        self.check_taunt(input);
+        self.check_crouch(input);
+        self.check_dash(input, fighter);
+        self.check_jump(input);
+        self.check_smash(input);
+        self.check_attack(input);
+        self.check_grab(input);
+        self.check_special(input);
 
         self.pass_through = input.stick_y.diff < -0.1; // TODO: refine
     }
@@ -223,19 +195,22 @@ impl Player {
             let dash_acc = fighter.dash_run_acc_a * stick_x.abs() + fighter.dash_run_acc_b;
             self.x_acc = self.relative_f(dash_acc) * if stick_x > 0.0 { 1.0 } else { -1.0 };
         }
-
-        if input.y.press || input.x.press {
-            self.set_action(Action::JumpSquat);
-        }
         if self.relative_f(input.stick_x.value) < -0.35 { // TODO: refine
-            self.face_right = !self.face_right;
-            self.dash(fighter);
+            self.turn();
         }
+        else if input.a.press {
+            self.set_action(Action::DashAttack);
+        }
+        else if input.z.press {
+            self.set_action(Action::DashGrab);
+        }
+        self.check_jump(input);
     }
 
     fn run_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if self.check_jump(input) {
-            self.set_action(Action::JumpSquat);
+        self.check_jump(input);
+        if self.relative_f(input.stick_x.value) <= -0.4 { // TODO: refine
+            self.set_action(Action::TurnRun);
         }
         // verified horizontally stick_x <= 0.61250 ends dash
         else if self.relative_f(input.stick_x.value) <= 0.61300 {
@@ -254,10 +229,90 @@ impl Player {
                 self.x_acc = acc;
             }
         }
+        self.check_jump(input);
     }
 
-    fn check_jump(&self, input: &PlayerInput) -> bool {
+    fn check_grab(&mut self, input: &PlayerInput) {
+        if input.z.press {
+            self.set_action(Action::Grab);
+        }
+    }
+
+    fn check_crouch(&mut self, input: &PlayerInput) {
+        if input.stick_y.value < -0.3 { // TODO: refine
+            if let Some(action) = Action::from_u64(self.action) {
+                match action {
+                    Action::CrouchStart | Action::Crouch | Action::CrouchEnd => { },
+                    _ => { self.set_action(Action::CrouchStart); }
+                }
+            }
+        }
+    }
+
+    fn check_dash(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if self.dash_input(input) {
+            let stick_face_right = input.stick_x.value > 0.0;
+            if stick_face_right == self.face_right {
+                self.dash(fighter);
+            }
+            else {
+                self.turn();
+            }
+        }
+    }
+
+    fn check_jump(&mut self, input: &PlayerInput) {
+        if self.jump_input(input) {
+            self.set_action(Action::JumpSquat);
+        }
+    }
+
+    fn check_attack(&mut self, input: &PlayerInput) {
+        if input.a.press {
+            self.set_action(Action::Jab);
+        }
+    }
+
+    fn check_special(&mut self, input: &PlayerInput) {
+        if input.b.press {
+            // special attack
+        }
+    }
+
+    fn check_smash(&mut self, input: &PlayerInput) {
+        if input.c_stick_x.value.abs() > 0.2 { // TODO: hmmmm how do I want to stop smashes from auto-spamming
+            self.face_right = input.c_stick_x.value > 0.0;
+            self.set_action(Action::Fsmash);
+        }
+        else if input.c_stick_y.value > 0.2 {
+            self.set_action(Action::Usmash);
+        }
+        else if input.c_stick_y.value < -0.2 {
+            self.set_action(Action::Dsmash);
+        }
+    }
+
+    fn check_taunt(&mut self, input: &PlayerInput) {
+        if input.up.press {
+            self.set_action(Action::TauntUp);
+        }
+        else if input.down.press {
+            self.set_action(Action::TauntDown);
+        }
+        else if input.left.press {
+            self.set_action(Action::TauntLeft);
+        }
+        else if input.right.press {
+            self.set_action(Action::TauntRight);
+        }
+    }
+
+    fn jump_input(&self, input: &PlayerInput) -> bool {
         input.x.press || input.y.press || (input.stick_y.diff > 0.4 && input.stick_y.value > 0.1) // TODO: refine
+    }
+
+    fn dash_input(&self, input: &PlayerInput) -> bool {
+        input.stick_x.value.abs() > 0.1 // TODO: refine
     }
 
     fn action_expired(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -270,23 +325,25 @@ impl Player {
             Some(Action::Idle)      => { self.set_action(Action::Idle);      },
 
             // crouch
-            Some(Action::CrouchStart) => { self.set_action(Action::Crouch);    },
+            Some(Action::CrouchStart) => { self.set_action(Action::Crouch); },
             Some(Action::Crouch)      => { self.set_action(Action::Crouch); },
-            Some(Action::CrouchEnd)   => { self.set_action(Action::Idle);      },
+            Some(Action::CrouchEnd)   => { self.set_action(Action::Idle);   },
 
             // Movement
-            Some(Action::Fall)        => { self.set_action(Action::Fall);       },
-            Some(Action::AerialFall)  => { self.set_action(Action::AerialFall); },
-            Some(Action::Land)        => { self.set_action(Action::Idle);       },
-            Some(Action::JumpF)       => { self.set_action(Action::Fall);       },
-            Some(Action::JumpB)       => { self.set_action(Action::Fall);       },
-            Some(Action::JumpAerialF) => { self.set_action(Action::AerialFall); },
-            Some(Action::JumpAerialB) => { self.set_action(Action::AerialFall); },
-            Some(Action::Turn)        => { self.set_action(Action::Turn);       }, // TODO: I guess this is highly dependent on some other state
-            Some(Action::Dash)        => { self.set_action(Action::Run);        },
-            Some(Action::Run)         => { self.set_action(Action::Run);        },
-            Some(Action::RunEnd)      => { self.set_action(Action::Idle);       },
-            Some(Action::JumpSquat)   => {
+            Some(Action::Fall)         => { self.set_action(Action::Fall);       },
+            Some(Action::AerialFall)   => { self.set_action(Action::AerialFall); },
+            Some(Action::Land)         => { self.set_action(Action::Idle);       },
+            Some(Action::JumpF)        => { self.set_action(Action::Fall);       },
+            Some(Action::JumpB)        => { self.set_action(Action::Fall);       },
+            Some(Action::JumpAerialF)  => { self.set_action(Action::AerialFall); },
+            Some(Action::JumpAerialB)  => { self.set_action(Action::AerialFall); },
+            Some(Action::Turn)         => { self.set_action(Action::Idle);       }, // TODO: Next state is decided based on inputs this frame
+            Some(Action::TurnRun)      => { self.set_action(Action::Idle);       },
+            Some(Action::Dash)         => { self.set_action(Action::Run);        },
+            Some(Action::Run)          => { self.set_action(Action::Run);        },
+            Some(Action::RunEnd)       => { self.set_action(Action::Idle);       },
+            Some(Action::PassPlatform) => { self.set_action(Action::AerialFall); },
+            Some(Action::JumpSquat)    => {
                 self.airbourne = true;
 
                 let shorthop = input.x.value || input.y.value || input.stick_y.value > 0.15; // TODO: refine
@@ -463,6 +520,7 @@ impl Player {
 
             if ecb_x > plat_x1 && ecb_x < plat_x2 && ecb_y > plat_y1 && ecb_y < plat_y2 {
                 return Some(platform)
+                // TODO: GAH, need to refactor to set PassPlatform state
             }
         }
         None
@@ -531,6 +589,11 @@ impl Player {
     fn dash(&mut self, fighter: &Fighter) {
         self.x_acc = self.relative_f(fighter.dash_init_vel);
         self.set_action(Action::Dash);
+    }
+
+    fn turn(&mut self) {
+        self.face_right = !self.face_right;
+        self.set_action(Action::Turn);
     }
 
     fn fall(&mut self) {
