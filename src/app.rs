@@ -4,6 +4,7 @@ use ::cli::CLIChoice;
 use ::game::{Game, RenderGame};
 use ::graphics::{Graphics, GraphicsMessage};
 use ::input::{Input};
+use ::network::Network;
 
 use libusb::Context;
 use glium::glutin::VirtualKeyCode;
@@ -16,10 +17,12 @@ pub fn run(mut state: AppState) {
     let mut package = Package::open_or_generate("base_package");
     let (graphics_tx, mut os_input) = Graphics::init(&package);
     let mut next_state: Option<AppState> = None;
+    let mut network = Network::new();
 
     loop {
         let frame_start = Instant::now();
 
+        network.update(&package);
         input.update();
         os_input.update();
 

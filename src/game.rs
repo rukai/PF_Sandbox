@@ -74,6 +74,9 @@ impl Game {
     }
 
     pub fn step(&mut self, package: &mut Package, input: &mut Input, os_input: &OsInput) {
+
+        // TODO: run remote commands
+
         match self.state.clone() {
             GameState::Local           => { self.step_local(package, input, os_input); },
             GameState::Netplay         => { self.step_netplay(package, input); },
@@ -119,7 +122,6 @@ impl Game {
         input.game_update(self.current_frame);
         let player_inputs = &input.players(self.current_frame);
         self.step_game(package, player_inputs);
-
     }
 
     fn step_pause(&mut self, package: &mut Package, input: &mut Input, os_input: &OsInput) {

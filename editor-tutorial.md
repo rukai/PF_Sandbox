@@ -1,5 +1,7 @@
 # Tutorial
 
+## Editor
+
 Following this tutorial is a great way to get started with PF ENGINE.
 For a full reference of every operation check out the [documentation]().
 
@@ -16,3 +18,12 @@ The hitbox should be fully green.
 
 Press the A key to move the selected hitbox.
 Move your mouse and left click to confirm the position.
+
+## Command Line
+
+A command looks like this:
+
+`pf packages <packagename> create`
+
+The square brackets indicate something that you need to fill in.
+You can enter this example into your systems command line and hit enter to run it.
