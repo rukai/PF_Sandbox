@@ -22,7 +22,7 @@ pub fn run(mut state: AppState) {
     loop {
         let frame_start = Instant::now();
 
-        network.update(&package);
+        network.update(&mut package);
         input.update();
         os_input.update();
 

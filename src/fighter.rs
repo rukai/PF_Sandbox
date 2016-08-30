@@ -1,3 +1,5 @@
+use node::{Node, NodeRunner};
+
 impl Fighter {
     pub fn base() -> Fighter {
         let action_frame1 = ActionFrame {
@@ -26,6 +28,7 @@ impl Fighter {
             css_frame:  0,
             css_point1: (0.0, 0.0),
             css_point2: (0.0, 0.0),
+            css_hide:   false,
 
             //in game attributes
             air_jumps:             1,
@@ -59,6 +62,7 @@ pub struct Fighter {
     pub css_frame:  u64,
     pub css_point1: (f32, f32),
     pub css_point2: (f32, f32),
+    pub css_hide:   bool,
 
     //in game attributes
     pub air_jumps:             u64,
@@ -221,7 +225,6 @@ pub enum FrameEffect {
     Acceleration {x: f32, y: f32},
 }
 
-
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct CollisionBox {
     pub point:  (f32, f32),
@@ -256,7 +259,7 @@ pub struct HurtBox {
     pub damage_mod:    u64,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Default)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Default, PFObject)]
 pub struct HitBox {
     pub shield_damage: u64,
     pub damage:        u64,
@@ -280,4 +283,10 @@ pub enum HitboxEffect {
 
 impl Default for HitboxEffect {
     fn default() -> HitboxEffect { HitboxEffect::None }
+}
+
+impl Node for Fighter {
+    fn node_step(&mut self, runner: NodeRunner) -> String {
+        String::from("This is a fighter")
+    }
 }

@@ -136,7 +136,7 @@ Then come back and learn the rules that commands follow and how to construct you
 Lets give a quick breakdown of an example command.
 This command sets the weight of someFighter in the package myPackage to 1.2:
 
-`pf packages.myPackage.fighters.someFighter.weight set 1.2`
+`pf packages["myPackage"].fighters["someFighter"].weight.set 1.2`
 
 *   pf          - the program name, tells your OS what command you want to run
 *   packages    - attribute
@@ -158,16 +158,20 @@ They contain attributes which can be any of the following value types:
 *   float   - a number with a decimal point
 *   bool    - a true or false value
 *   object  - another object
+*   list    - a list of objects
+*   dict    - a dictionary of objects
+
+Full [object reference](link_to_resource)
 
 ### Actions
 
 Different objects support different actions:
 
 All objects support the following actions:
-*   <attribute> set <value> - change an attribute to the specified size
-*   <attribute> get <depth> - display an attribute, the depth argument is optional and specifies how deeply nested object attributes should be shown.
-*   <attribute> copy        - copy the specified attribute
-*   <attribute> paste       - paste the copied attribute to the specified attribute (Must be the same type)
+*   <attribute>.set <value> - change an attribute to the specified size
+*   <attribute>.get <depth> - display an attribute, the depth argument is optional and specifies how deeply nested object attributes should be shown.
+*   <attribute>.copy        - copy the specified attribute
+*   <attribute>.paste       - paste the copied attribute to the specified attribute (Must be the same type)
 
 Attributes that are assigned some point in space can use the following
 *   <attribute>.rotate <degrees> - rotate the object, around some central point, the specified number of degrees
@@ -176,6 +180,7 @@ Attributes that are assigned some point in space can use the following
 
 Objects contain other objects creating a large tree:
 
+[Replace with a nice diagram that doesnt look like death]
 *   Players
 *   Debug
 *   Packages
@@ -193,45 +198,49 @@ Objects contain other objects creating a large tree:
     +   Stages
     +   Rules
 
-### Object attributes
+### Getter
 
-Show full detail of each object here:
-Could probably script this.
+Get objects using dot notation
+`pf package[packagename].fighter[fightername].action[actionID_or_ActionName].frame[frameIndex].hitbox[2].size set 50`
+
+`pf package["M"].fighter["Foo"].action[10].frame[0].hitbox[2].size set 50`
+
+### Indexing
+
+The indexer is powerful:
+
+*   `packages["M"]`            dictionaries can be accessed via strings
+*   `actions[0]`               select package 0
+*   `actions[0, 1-5]`          select packages 0 and packages between 1 and 5 inclusive
+*   `actions[2-4].fighters[*]` select all fighters in packages 2, 3 and 4
+*   `actions[*]`               select all packages
+*   `actions[?]`               select based on [context](link_to_context_section)
+*   `actions[?+1]`             OH MAN THIS WOULD BE SWEET!
+*   `actions[2, ?-1]`          ... plz
 
 ### Context
 
-The context of PF ENGINE (e.g. selected hitboxes) will automatically prefix the commands with the required context.
-This means you can run the command:
+There are many contexts available that allow you to quickly hook into the object you want to modify.
+Setting some hitboxes to size 50 can be done the primitive way.
+Objects are chained together with '.' and indexed by [] like this:
 
-`pf size set 50`
+`pf packages[1].fighters[4].actions[0].frames[0].hitboxes[1,5-7].size set 50`
 
-Instead of:
+However how are you supposed to know all of these indexes? o.0
+Instead you can let PF engine use context to know what you want to modify.
+Select the hitboxes you want in game then run:
 
-`pf packages <selected package> fighters <selected fighter> actions <current action> frames <current frameIndex> hitboxes <selected hitbox> size set 50`
+`pf packages[?]fighters[?].actions[?]frames[?]hitboxes[?]size.set 50`
 
-### Stepping Back Context
+### Aliases
 
-TODO: How to handle clash of attribute names in context? Options include:
-*   automatically choose the one that is nested deeper or shallower
-*   syntax to force deepest or shallowest.
-*   error without completing action
+Its super long to type in all this junk just to get to some hitboxes
+Take advantage of your shell and add this to your .bashrc
+alias pf-hitboxes="`pf packages[?]fighters[?].actions[?]frames[?]hitboxes[?]`
 
-You can choose to step back the context any amount:
+Eh, this wont work exactly because the alias will only activate if there is a space between it and the argument.
 
-`pf frame.0.hitbox.2.size set 50`
+### Issues
 
-Will run:
-
-`pf packages.<selected package>.fighters.<selected fighter>.actions.<current action>.frames.<current frameIndex>.hitboxes.2 size set 50`
-
-### Multiple Selections
-
-If you have multiple selections, then the command will be run on every selection:
-This means if you have selected hitboxes 2 and 4 and run:
-
-`pf size set 50`
-
-will run:
-
-`pf package.<packagename>.fighter.<fightername>.action.<actionID or ActionName>.frame.<frameIndex>.hitbox.2 size set 50`
-`pf package.<packagename>.fighter.<fightername>.action.<actionID or ActionName>.frame.<frameIndex>.hitbox.4 size set 50`
+Storing context in the fighter struct is weird... It shouldnt be responsible for storing game state o.0
+Otherwise I could have a context structure that keeps track of the context of various objects

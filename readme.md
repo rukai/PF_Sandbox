@@ -1,6 +1,6 @@
-# PF ENGINE
+# ProtoForm Fighter
 
-A platform fighter engine, with tightly integrated gameplay and character editor.
+A classic platform fighter engine, with tightly integrated gameplay and character editor.
 
 ## Requirements:
 

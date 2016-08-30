@@ -7,6 +7,7 @@ use rustc_serialize::{Encodable, Decodable};
 use rustc_serialize::json::{self, Encoder, DecodeResult};
 
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType};
+use ::node::{Node, NodeRunner, NodeToken};
 use ::rules::Rules;
 use ::stage::Stage;
 
@@ -291,6 +292,22 @@ impl Package {
         return package_updates;
     }
 }
+
+impl Node for Package {
+    fn node_step(&mut self, mut runner: NodeRunner) -> String {
+        match runner.step() {
+            NodeToken::ChainProperty (property) => {
+                println!("{}", property);
+                match property.as_str() {
+                    "fighters" => { self.fighters.node_step(runner) }
+                    prop       => format!("Package does not have a property '{}'", prop)
+                }
+            }
+            action => { format!("Package cannot '{:?}'", action) }
+        }
+    }
+}
+
 
 // Finer grained changes are used when speed is needed
 #[derive(Clone)]

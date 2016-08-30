@@ -1,3 +1,5 @@
+#![feature(custom_derive)]
+
 extern crate libusb;
 extern crate num;
 extern crate rustc_serialize;
@@ -16,6 +18,7 @@ pub mod graphics;
 pub mod input;
 pub mod menu;
 pub mod network;
+pub mod node;
 pub mod os_input;
 pub mod package;
 pub mod player;
