@@ -300,6 +300,8 @@ impl Node for Package {
                 println!("{}", property);
                 match property.as_str() {
                     "fighters" => { self.fighters.node_step(runner) }
+                    //"stages"   => { self.stages.node_step(runner) }
+                    "rules"    => { self.rules.node_step(runner) }
                     prop       => format!("Package does not have a property '{}'", prop)
                 }
             }

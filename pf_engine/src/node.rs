@@ -18,16 +18,50 @@ impl<U> Node for Vec<U> where U: Node {
     }
 }
 
-impl Node for usize {
-    fn node_step(&mut self, mut runner: NodeRunner) -> String {
-        match runner.step() {
-            NodeToken::Get         => { return (*self).to_string() }
-            NodeToken::Set (value) => { *self = value.parse().unwrap() }
-            action                  => { return format!("usize cannot '{:?}'", action) }
-        };
-        String::from("")
+macro_rules! int_node {
+    ($e:ty) => {
+        impl Node for $e {
+            fn node_step(&mut self, mut runner: NodeRunner) -> String {
+                match runner.step() {
+                    NodeToken::Get         => { (*self).to_string() }
+                    NodeToken::Set (value) => { *self = value.parse().unwrap(); String::from("") }
+                    action                 => { format!("usize cannot '{:?}'", action) }
+                }
+            }
+        }
     }
 }
+
+impl Node for bool {
+    fn node_step(&mut self, mut runner: NodeRunner) -> String {
+        match runner.step() {
+            NodeToken::Get         => { if *self { String::from("true") } else { String::from("false") } }
+            NodeToken::Set (value) => { *self = value.as_str() == "true"; String::from("") }
+            action                 => { format!("bool cannot '{:?}'", action) }
+        }
+    }
+}
+
+impl Node for String {
+    fn node_step(&mut self, mut runner: NodeRunner) -> String {
+        match runner.step() {
+            NodeToken::Get         => { (*self).clone() }
+            NodeToken::Set (value) => { *self = value; String::from("") }
+            action                 => { format!("String cannot '{:?}'", action) }
+        }
+    }
+}
+
+int_node!(i64);
+int_node!(u64);
+int_node!(i32);
+int_node!(u32);
+int_node!(i16);
+int_node!(u16);
+int_node!(i8);
+int_node!(u8);
+int_node!(isize);
+int_node!(usize);
 
 pub struct NodeRunner {
     tokens: Vec<NodeToken>
