@@ -8,6 +8,7 @@ dependencies = [
  "libusb 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "treeflection 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -484,6 +485,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "treeflection"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "user32-sys"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -630,6 +636,7 @@ dependencies = [
 "checksum shell32-sys 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "72f20b8f3c060374edb8046591ba28f62448c369ccbdc7b02075103fb3a9e38d"
 "checksum smallvec 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c6f6c83ba92e9fb79e978b33b3ca68960b73e768e929ae48f15ef7b6a98ba8fd"
 "checksum tempfile 2.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ada516e2350e8beaa84751caaced89916fdb3b78a36de0a23d3ad7859c66bb61"
+"checksum treeflection 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "531cea3cc5b971e86a0552428f28e8f586d2409405363d68cfb224f49aad3a75"
 "checksum user32-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6717129de5ac253f5642fc78a51d0c7de6f9f53d617fc94e9bae7f6e71cf5504"
 "checksum wayland-client 0.5.12 (registry+https://github.com/rust-lang/crates.io-index)" = "ced3094c157b5cc0a08d40530e1a627d9f88b9a436971338d2646439128a559e"
 "checksum wayland-kbd 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "73bc10e84c1da90777beffecd24742baea17564ffc2a9918af41871c748eb050"

@@ -1,4 +1,4 @@
-use node::{Node, NodeRunner};
+use treeflection::{Node, NodeRunner};
 
 impl Fighter {
     pub fn base() -> Fighter {

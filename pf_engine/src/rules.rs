@@ -1,4 +1,4 @@
-use node::{Node, NodeRunner, NodeToken};
+use treeflection::{Node, NodeRunner, NodeToken};
 
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct Rules {

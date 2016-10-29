@@ -1,5 +1,6 @@
+use treeflection::{Node, NodeRunner};
+
 use package::Package;
-use node::{Node, NodeRunner};
 
 /// Run the passed command
 /// Return any output it generates

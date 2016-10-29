@@ -5,9 +5,9 @@ use std::path::{PathBuf, Path};
 use std::collections::HashSet;
 use rustc_serialize::{Encodable, Decodable};
 use rustc_serialize::json::{self, Encoder, DecodeResult};
+use treeflection::{Node, NodeRunner, NodeToken};
 
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType};
-use ::node::{Node, NodeRunner, NodeToken};
 use ::rules::Rules;
 use ::stage::Stage;
 
@@ -309,7 +309,6 @@ impl Node for Package {
         }
     }
 }
-
 
 // Finer grained changes are used when speed is needed
 #[derive(Clone)]

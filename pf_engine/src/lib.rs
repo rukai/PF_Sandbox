@@ -4,6 +4,7 @@ extern crate libusb;
 extern crate num;
 extern crate rustc_serialize;
 extern crate getopts;
+extern crate treeflection;
 #[macro_use] extern crate enum_primitive;
 #[macro_use] extern crate glium;
 
@@ -18,7 +19,6 @@ pub mod graphics;
 pub mod input;
 pub mod menu;
 pub mod network;
-pub mod node;
 pub mod os_input;
 pub mod package;
 pub mod player;
