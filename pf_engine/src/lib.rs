@@ -1,4 +1,4 @@
-#![feature(custom_derive)]
+#![feature(proc_macro)]
 
 extern crate libusb;
 extern crate num;
@@ -7,6 +7,7 @@ extern crate getopts;
 extern crate treeflection;
 #[macro_use] extern crate enum_primitive;
 #[macro_use] extern crate glium;
+#[macro_use] extern crate treeflection_derive;
 
 pub mod app;
 pub mod buffers;

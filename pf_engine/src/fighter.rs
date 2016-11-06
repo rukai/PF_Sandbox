@@ -1,4 +1,4 @@
-use treeflection::{Node, NodeRunner};
+use treeflection::{Node, NodeRunner, NodeToken};
 
 impl Fighter {
     pub fn base() -> Fighter {
@@ -219,7 +219,7 @@ pub enum Action {
 }
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Node)]
 pub enum FrameEffect {
     Velocity     {x: f32, y: f32},
     Acceleration {x: f32, y: f32},
@@ -253,13 +253,13 @@ pub enum CollisionBoxRole {
     Absorb,         // absorb projectiles
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Default)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Default, Node)]
 pub struct HurtBox {
     pub knockback_mod: u64,
     pub damage_mod:    u64,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Default, PFObject)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Default)]
 pub struct HitBox {
     pub shield_damage: u64,
     pub damage:        u64,
@@ -283,10 +283,4 @@ pub enum HitboxEffect {
 
 impl Default for HitboxEffect {
     fn default() -> HitboxEffect { HitboxEffect::None }
-}
-
-impl Node for Fighter {
-    fn node_step(&mut self, runner: NodeRunner) -> String {
-        String::from("This is a fighter")
-    }
 }
