@@ -1,9 +1,9 @@
 use treeflection::{Node, NodeRunner, NodeToken};
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Node)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
 pub struct Rules {
     pub title:         String,
-    goal:              Goal,
+    pub goal:          Goal,
     pub stock_count:   u64,
     pub time_limit:    u64,
     pub best_of:       u64,
@@ -27,7 +27,7 @@ impl Rules {
     }
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
 pub enum Goal {
     Training,
     Time,

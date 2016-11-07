@@ -13,15 +13,15 @@ use ::stage::Stage;
 
 #[derive(Clone)]
 pub struct Package {
-    pub path:               PathBuf,
+        path:               PathBuf,
     pub meta:               PackageMeta,
     pub rules:              Rules,
 
     pub stages:             Vec<Stage>,
     pub fighters:           Vec<Fighter>,
-    pub stages_filenames:   Vec<String>,
-    pub fighters_filenames: Vec<String>,
-    pub package_updates:    Vec<PackageUpdate>,
+        stages_filenames:   Vec<String>,
+        fighters_filenames: Vec<String>,
+        package_updates:    Vec<PackageUpdate>,
 }
 
 impl Package {
@@ -299,8 +299,9 @@ impl Node for Package {
             NodeToken::ChainProperty (property) => {
                 println!("{}", property);
                 match property.as_str() {
-                    //"fighters" => { self.fighters.node_step(runner) }
-                    //"stages"   => { self.stages.node_step(runner) }
+                    "fighters" => { self.fighters.node_step(runner) }
+                    "stages"   => { self.stages.node_step(runner) }
+                    "meta"     => { self.meta.node_step(runner) }
                     "rules"    => { self.rules.node_step(runner) }
                     prop       => format!("Package does not have a property '{}'", prop)
                 }
@@ -320,7 +321,8 @@ pub enum PackageUpdate {
     InsertStage { stage_index: usize, stage: Stage },
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable)]
+// TODO: Why the seperate struct?
+#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
 pub struct PackageMeta {
     pub version:   u64,    // increment every release, 
     pub title:     String, // User readable title

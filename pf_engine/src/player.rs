@@ -4,8 +4,9 @@ use ::stage::{Stage, Platform, Area};
 
 use num::FromPrimitive;
 use std::collections::HashSet;
+use treeflection::{Node, NodeRunner, NodeToken};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Player {
     pub action:         u64,
     action_new:         u64,

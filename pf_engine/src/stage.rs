@@ -1,6 +1,6 @@
 use treeflection::{Node, NodeRunner, NodeToken};
 
-#[derive(Clone, RustcEncodable, RustcDecodable)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
 pub struct Stage {
     pub title:        String,
     pub platforms:    Vec<Platform>,
@@ -54,7 +54,7 @@ impl Stage {
     }
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Node)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
 pub struct Platform {
     pub x:            f32,
     pub y:            f32,
@@ -63,7 +63,7 @@ pub struct Platform {
     pub pass_through: bool,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Node, Debug)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node, Debug)]
 pub struct Area {
     pub left:  f32,
     pub right: f32,
