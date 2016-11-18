@@ -284,6 +284,12 @@ impl Package {
         });
     }
 
+    // TODO: Refactor to use a reference would be way faster
+    pub fn force_update_entire_package(&mut self) {
+        let package_update = PackageUpdate::Package(self.clone());
+        self.package_updates.push(package_update);
+    }
+
     // TODO: Swaparino
     pub fn updates(&mut self) -> Vec<PackageUpdate> {
         let package_updates = self.package_updates.clone();
