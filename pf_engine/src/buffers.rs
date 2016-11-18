@@ -32,7 +32,7 @@ impl Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
-        for platform in &stage.platforms {
+        for platform in &stage.platforms[..] {
             let x1 = platform.x - platform.w / 2.0;
             let y1 = platform.y - platform.h / 2.0;
             let x2 = platform.x + platform.w / 2.0;
@@ -77,7 +77,7 @@ impl Buffers {
         let mut index_count = 0;
         let triangles = 20;
 
-        for colbox in &frame.colboxes {
+        for colbox in &frame.colboxes[..] {
             // Draw a colbox, at the point
             // triangles are drawn meeting at the centre, forming a circle
             let point = &colbox.point;
@@ -209,11 +209,11 @@ impl PackageBuffers {
                     self.stages = vec!();
                     self.fighters = vec!();
 
-                    for fighter in package.fighters {
+                    for fighter in &package.fighters[..] { // TODO: Whats up with the deref coercion?
                         let mut action_buffers: Vec<Vec<Buffers>> = vec!();
-                        for action in &fighter.action_defs {
+                        for action in &fighter.action_defs[..] {
                             let mut frame_buffers: Vec<Buffers> = vec!();
-                            for frame in &action.frames {
+                            for frame in &action.frames[..] {
                                 frame_buffers.push(Buffers::new_fighter_frame(display, frame));
                             }
                             action_buffers.push(frame_buffers);
@@ -221,7 +221,7 @@ impl PackageBuffers {
                         self.fighters.push(action_buffers);
                     }
 
-                    for stage in package.stages {
+                    for stage in &package.stages[..] {
                         self.stages.push(Buffers::new_stage(display, &stage));
                     }
                 }

@@ -3,9 +3,9 @@ use std::io::Read;
 use std::io::Write;
 use std::path::{PathBuf, Path};
 use std::collections::HashSet;
-use rustc_serialize::{Encodable, Decodable};
-use rustc_serialize::json::{self, Encoder, DecodeResult};
-use treeflection::{Node, NodeRunner, NodeToken};
+use serde::{Serialize, Deserialize};
+use serde_json;
+use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType};
 use ::rules::Rules;
@@ -17,8 +17,8 @@ pub struct Package {
     pub meta:               PackageMeta,
     pub rules:              Rules,
 
-    pub stages:             Vec<Stage>,
-    pub fighters:           Vec<Fighter>,
+    pub stages:             ContextVec<Stage>,
+    pub fighters:           ContextVec<Fighter>,
         stages_filenames:   Vec<String>,
         fighters_filenames: Vec<String>,
         package_updates:    Vec<PackageUpdate>,
@@ -41,8 +41,8 @@ impl Package {
             meta:               meta,
             path:               path,
             rules:              Rules::base(),
-            stages:             vec!(),
-            fighters:           vec!(),
+            stages:             ContextVec::new(),
+            fighters:           ContextVec::new(),
             fighters_filenames: vec!(),
             stages_filenames:   vec!(),
             package_updates:    vec!(),
@@ -66,9 +66,9 @@ impl Package {
         let package = Package {
             meta:               meta,
             rules:              Rules::base(),
-            stages:             vec!(Stage::base()),
+            stages:             ContextVec::from_vec(vec!(Stage::base())),
             stages_filenames:   vec!(path.join("Stages").join("base_stage.json").to_str().unwrap().to_string()),
-            fighters:           vec!(Fighter::base()),
+            fighters:           ContextVec::from_vec(vec!(Fighter::base())),
             fighters_filenames: vec!(path.join("Fighters").join("base_fighter.json").to_str().unwrap().to_string()),
             path:               path,
             package_updates:    vec!(),
@@ -110,8 +110,8 @@ impl Package {
     }
 
     pub fn load(&mut self) {
-        self.rules = Package::load_struct(self.path.join("rules.json")).unwrap();
-        self.meta = Package::load_struct(self.path.join("package_meta.json")).unwrap();
+        self.rules = Package::load_struct(self.path.join("rules.json"));
+        self.meta = Package::load_struct(self.path.join("package_meta.json"));
 
         for path in fs::read_dir(self.path.join("Fighters")).unwrap() {
             // TODO: Use magic rust powers to filter out non .json files and form a vec of fighter_filenames
@@ -120,33 +120,32 @@ impl Package {
             let full_path = path.unwrap().path();
             self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
 
-            self.fighters.push(Package::load_struct(full_path).unwrap());
+            self.fighters.push(Package::load_struct(full_path));
         }
 
         for path in fs::read_dir(self.path.join("Stages")).unwrap() {
             let full_path = path.unwrap().path();
             self.stages_filenames.push(full_path.to_str().unwrap().to_string());
 
-            self.stages.push(Package::load_struct(full_path).unwrap());
+            self.stages.push(Package::load_struct(full_path));
         }
     }
     
     // Save a struct to the given file name
-    fn save_struct<T: Encodable>(filename: PathBuf, object: &T) {
-        let mut json = String::new();
-        object.encode(&mut Encoder::new_pretty(&mut json)).expect("Failed");
-        File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap()
+    fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
+        let json = serde_json::to_string(object).unwrap();
+        File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
     }
 
     // Load a struct from the given file name
-    fn load_struct<T: Decodable>(filename: PathBuf) -> DecodeResult<T> {
+    fn load_struct<T: Deserialize>(filename: PathBuf) -> T {
         let mut json = String::new();
         File::open(filename).unwrap().read_to_string(&mut json).unwrap();
-        json::decode(&json)
+        serde_json::from_str(&json).unwrap()
     }
 
     pub fn verify(&self) -> bool {
-        true //It's fine, I triple checked
+        true // It's fine, I triple checked
     }
 
     pub fn new_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) {
@@ -322,7 +321,7 @@ pub enum PackageUpdate {
 }
 
 // TODO: Why the seperate struct?
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct PackageMeta {
     pub version:   u64,    // increment every release, 
     pub title:     String, // User readable title

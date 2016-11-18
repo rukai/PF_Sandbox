@@ -1,12 +1,12 @@
-use treeflection::{Node, NodeRunner, NodeToken};
+use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Stage {
     pub title:        String,
-    pub platforms:    Vec<Platform>,
+    pub platforms:    ContextVec<Platform>,
     pub blast:        Area,
     pub camera:       Area,
-    pub spawn_points: Vec<(f32, f32)>,
+    pub spawn_points: ContextVec<(f32, f32)>,
 }
 
 impl Stage {
@@ -43,18 +43,18 @@ impl Stage {
 
         Stage {
             title:         "Base Stage".to_string(),
-            platforms:     vec!(main_platform, second_platform),
+            platforms:     ContextVec::from_vec(vec!(main_platform, second_platform)),
             blast:         blast,
             camera:        camera,
-            spawn_points:  vec!(
+            spawn_points:  ContextVec::from_vec(vec!(
                 (-50.0, 50.0), (50.0, 50.0),
                 (-50.0, 80.0), (50.0, 80.0),
-            ),
+            )),
         }
     }
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Platform {
     pub x:            f32,
     pub y:            f32,
@@ -63,7 +63,7 @@ pub struct Platform {
     pub pass_through: bool,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node, Debug)]
+#[derive(Clone, Serialize, Deserialize, Node, Debug)]
 pub struct Area {
     pub left:  f32,
     pub right: f32,

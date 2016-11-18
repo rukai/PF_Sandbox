@@ -2,7 +2,6 @@
 
 extern crate libusb;
 extern crate num;
-extern crate rustc_serialize;
 extern crate getopts;
 extern crate treeflection;
 extern crate serde;

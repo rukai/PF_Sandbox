@@ -5,12 +5,11 @@ authors = ["Rukai <rubickent@gmail.com>"]
 
 [dependencies]
 glium = "0.15.0"
-rustc-serialize = "0.3.19"
 getopts = "0.2.14"
 libusb = "0.2"
 enum_primitive = "0.1.0"
 num = "0.1.32"
-treeflection = "0.1.3"
+treeflection = "0.1.5"
 treeflection_derive = "0.1.4"
 serde = "0.8"
 serde_derive = "0.8"

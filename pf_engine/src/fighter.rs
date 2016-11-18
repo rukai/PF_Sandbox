@@ -1,9 +1,9 @@
-use treeflection::{Node, NodeRunner, NodeToken};
+use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
 impl Fighter {
     pub fn base() -> Fighter {
         let action_frame1 = ActionFrame {
-            colboxes:     vec!(),
+            colboxes:     ContextVec::new(),
             colbox_links: vec!(),
             effects:      vec!(),
             ecb_w:        3.5,
@@ -12,10 +12,10 @@ impl Fighter {
         };
 
         let action_def = ActionDef {
-            frames: vec!(action_frame1),
+            frames: ContextVec::from_vec(vec!(action_frame1)),
             iasa:   0,
         };
-        let mut action_defs: Vec<ActionDef> = Vec::new();
+        let mut action_defs: ContextVec<ActionDef> = ContextVec::new();
         for _ in 0..((Action::TurnRun as usize)+1) { // TODO: Super gross but what is a man to do?
             action_defs.push(action_def.clone());
         }
@@ -53,7 +53,7 @@ impl Fighter {
     }
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Fighter {
     //css render
     pub name:       String,
@@ -82,18 +82,18 @@ pub struct Fighter {
     pub dash_run_acc_b:        f32,
     pub dash_run_term_vel:     f32,
     pub friction:              f32,
-    pub action_defs:           Vec<ActionDef>,
+    pub action_defs:           ContextVec<ActionDef>,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct ActionDef {
-    pub frames: Vec<ActionFrame>,
+    pub frames: ContextVec<ActionFrame>,
     pub iasa:   u64,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct ActionFrame {
-    pub colboxes:     Vec<CollisionBox>,
+    pub colboxes:     ContextVec<CollisionBox>,
     pub colbox_links: Vec<CollisionBoxLink>,
     pub effects:      Vec<FrameEffect>,
     pub ecb_w:        f32,
@@ -101,7 +101,7 @@ pub struct ActionFrame {
     pub ecb_y:        f32,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct CollisionBoxLink {
     pub one:       usize,
     pub two:       usize,
@@ -137,14 +137,14 @@ impl CollisionBoxLink {
     }
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub enum LinkType {
     Meld,
     Simple,
 }
 
 enum_from_primitive! {
-#[derive(Clone, RustcEncodable, RustcDecodable, PartialEq, Debug, Serialize, Deserialize, Node)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, Node)]
 pub enum Action {
     // Idle
     Spawn,
@@ -219,13 +219,13 @@ pub enum Action {
 }
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub enum FrameEffect {
     Velocity     {x: f32, y: f32},
     Acceleration {x: f32, y: f32},
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct CollisionBox {
     pub point:  (f32, f32),
     pub radius: f32,
@@ -242,7 +242,7 @@ impl CollisionBox {
     }
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub enum CollisionBoxRole {
     Hurt (HurtBox), // a target
     Hit  (HitBox),  // a launching attack
@@ -253,13 +253,13 @@ pub enum CollisionBoxRole {
     Absorb,         // absorb projectiles
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct HurtBox {
     pub knockback_mod: u64,
     pub damage_mod:    u64,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct HitBox {
     pub shield_damage: u64,
     pub damage:        u64,
@@ -270,7 +270,7 @@ pub struct HitBox {
     pub effect:        HitboxEffect,
 }
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub enum HitboxEffect {
     Fire,
     Electric,

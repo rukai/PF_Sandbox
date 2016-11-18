@@ -421,7 +421,7 @@ impl Player {
         let mut frame = frame.clone();
 
         // fix hitboxes
-        for mut colbox in &mut frame.colboxes {
+        for mut colbox in &mut frame.colboxes[..] {
             let (x, y) = colbox.point;
             colbox.point = (self.relative_f(x), y);
         }
@@ -506,7 +506,7 @@ impl Player {
             return None;
         }
 
-        for platform in &stage.platforms {
+        for platform in &stage.platforms[..] {
             if platform.pass_through && self.pass_through {
                 continue;
             }
