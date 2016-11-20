@@ -211,7 +211,7 @@ impl PackageBuffers {
 
                     for fighter in &package.fighters[..] { // TODO: Whats up with the deref coercion?
                         let mut action_buffers: Vec<Vec<Buffers>> = vec!();
-                        for action in &fighter.action_defs[..] {
+                        for action in &fighter.actions[..] {
                             let mut frame_buffers: Vec<Buffers> = vec!();
                             for frame in &action.frames[..] {
                                 frame_buffers.push(Buffers::new_fighter_frame(display, frame));

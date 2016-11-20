@@ -74,25 +74,48 @@ impl Game {
     }
 
     pub fn step(&mut self, package: &mut Package, input: &mut Input, os_input: &OsInput) {
+        {
+            match self.state.clone() {
+                GameState::Local           => { self.step_local(package, input, os_input); },
+                GameState::Netplay         => { self.step_netplay(package, input); },
+                GameState::Results         => { self.step_results(); },
+                GameState::ReplayForwards  => { self.step_replay_forwards(package, input, os_input); },
+                GameState::ReplayBackwards => { self.step_replay_backwards(input, os_input); },
+                GameState::Paused          => { self.step_pause(package, input, &os_input); },
+            }
 
-        // TODO: run remote commands
+            let stage = &package.stages[self.selected_stage];
+            self.camera.update(os_input, &self.players, stage);
 
-        match self.state.clone() {
-            GameState::Local           => { self.step_local(package, input, os_input); },
-            GameState::Netplay         => { self.step_netplay(package, input); },
-            GameState::Results         => { self.step_results(); },
-            GameState::ReplayForwards  => { self.step_replay_forwards(package, input, os_input); },
-            GameState::ReplayBackwards => { self.step_replay_backwards(input, os_input); },
-            GameState::Paused          => { self.step_pause(package, input, &os_input); },
+            if self.debug_output_this_step {
+                self.debug_output_this_step = false;
+                self.debug_output(package, input);
+            }
         }
 
-        let stage = &package.stages[self.selected_stage];
-        self.camera.update(os_input, &self.players, stage);
+        // set treeflection context
+        match self.edit {
+            Edit::Fighter (player) => {
+                let player_fighter = self.selected_fighters[player];
+                let player_action = self.players[player].action as usize;
+                let player_frame  = self.players[player].frame as usize;
+                let player_colboxes = self.selector.colboxes_vec();
 
-        if self.debug_output_this_step {
-            self.debug_output_this_step = false;
-            self.debug_output(package, input);
+                let fighters = &mut package.fighters;
+                fighters.set_context(player_fighter);
+
+                let actions = &mut fighters[player_fighter].actions;
+                actions.set_context(player_action);
+
+                let frames = &mut actions[player_action].frames;
+                frames.set_context(player_frame);
+
+                let colboxes = &mut frames[player_frame].colboxes;
+                colboxes.set_context_vec(player_colboxes);
+            }
+            _ => { }
         }
+        package.stages.set_context(self.selected_stage);
     }
 
     fn step_local(&mut self, package: &Package, input: &mut Input, os_input: &OsInput) {
@@ -220,7 +243,7 @@ impl Game {
                 else {
                     // copy frame
                     if os_input.key_pressed(VirtualKeyCode::V) {
-                        let frame = package.fighters[fighter].action_defs[action].frames[frame].clone();
+                        let frame = package.fighters[fighter].actions[action].frames[frame].clone();
                         self.copied_frame = Some(frame);
                     }
                     // paste over current frame
@@ -247,7 +270,7 @@ impl Game {
                             // The player itself must handle being on a frame that has been deleted in order for replays to work.
                             for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
                                 if self.selected_fighters[i] == fighter && any_player.action as usize == action
-                                    && any_player.frame as usize == package.fighters[fighter].action_defs[action].frames.len() {
+                                    && any_player.frame as usize == package.fighters[fighter].actions[action].frames.len() {
                                     any_player.frame -= 1;
                                 }
                             }
@@ -317,7 +340,7 @@ impl Game {
                             if !os_input.held_shift() {
                                 self.selector.colboxes = HashSet::new();
                             }
-                            let frame = &package.fighters[fighter].action_defs[action].frames[frame];
+                            let frame = &package.fighters[fighter].actions[action].frames[frame];
                             let frame = self.players[player].relative_frame(frame);
                             for (i, colbox) in frame.colboxes.iter().enumerate() {
                                 let hit_x = colbox.point.0 + player_x;
@@ -350,7 +373,7 @@ impl Game {
                                 }
                                 let player_x = self.players[player].bps_x;
                                 let player_y = self.players[player].bps_y;
-                                let frame = &package.fighters[fighter].action_defs[action].frames[frame];
+                                let frame = &package.fighters[fighter].actions[action].frames[frame];
                                 let frame = self.players[player].relative_frame(frame);
 
                                 for (i, colbox) in frame.colboxes.iter().enumerate() {
@@ -623,6 +646,16 @@ pub struct Selector {
     moving:   bool,
     point:    Option<(f32, f32)>, // selector starting point
     mouse:    Option<(f32, f32)>, // used to know mouse point during render
+}
+
+impl Selector {
+    fn colboxes_vec(&self) -> Vec<usize> {
+        let mut result:Vec<usize> = vec!();
+        for value in &self.colboxes {
+            result.push(*value);
+        }
+        result
+    }
 }
 
 pub struct RenderGame {

@@ -15,9 +15,9 @@ impl Fighter {
             frames: ContextVec::from_vec(vec!(action_frame1)),
             iasa:   0,
         };
-        let mut action_defs: ContextVec<ActionDef> = ContextVec::new();
+        let mut actions: ContextVec<ActionDef> = ContextVec::new();
         for _ in 0..((Action::TurnRun as usize)+1) { // TODO: Super gross but what is a man to do?
-            action_defs.push(action_def.clone());
+            actions.push(action_def.clone());
         }
         
         Fighter {
@@ -48,7 +48,7 @@ impl Fighter {
             dash_run_acc_b:        0.01,
             dash_run_term_vel:     2.3,
             friction:              0.08,
-            action_defs:           action_defs,
+            actions:           actions,
         }
     }
 }
@@ -82,7 +82,7 @@ pub struct Fighter {
     pub dash_run_acc_b:        f32,
     pub dash_run_term_vel:     f32,
     pub friction:              f32,
-    pub action_defs:           ContextVec<ActionDef>,
+    pub actions:           ContextVec<ActionDef>, // TODO: rename to something less anoying to type all the time in commands
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]

@@ -86,7 +86,7 @@ impl Player {
      */
 
     fn input_step(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64;
+        let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
         // handles a frame index that no longer exists by jumping to the last existing frame
         if self.frame >= action_frames - 1 {
@@ -97,7 +97,7 @@ impl Player {
             self.action_expired(input, fighter);
         }
 
-        let fighter_frame = &fighter.action_defs[self.action as usize].frames[self.frame as usize];
+        let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
         let action = Action::from_u64(self.action);
 
         // update ecb
@@ -645,15 +645,15 @@ impl Player {
 
         if debug.action {
             let action = Action::from_u64(self.action).unwrap();
-            let action_frames = fighter.action_defs[self.action as usize].frames.len() as u64 - 1;
-            let iasa = fighter.action_defs[self.action as usize].iasa;
+            let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
+            let iasa = fighter.actions[self.action as usize].iasa;
 
             println!("Player: {}    action: {:?}    airbourne: {}    frame: {}/{}    IASA: {}",
                 index, action, self.airbourne, self.frame, action_frames, iasa);
         }
 
         if debug.frame {
-            let frames = &fighter.action_defs[self.action as usize].frames;
+            let frames = &fighter.actions[self.action as usize].frames;
             if frames.len() > self.frame as usize {
                 let frame = &frames[self.frame as usize];
                 let hitbox_count = frame.colboxes.len();

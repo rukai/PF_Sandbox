@@ -10,7 +10,7 @@ dependencies = [
  "serde 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "treeflection 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "treeflection 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "treeflection_derive 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "treeflection"
-version = "0.1.5"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "serde 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -867,7 +867,7 @@ dependencies = [
 "checksum tempfile 2.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "9270837a93bad1b1dac18fe67e786b3c960513af86231f6f4f57fddd594ff0c8"
 "checksum thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a9539db560102d1cef46b8b78ce737ff0bb64e7e18d35b2a5688f7d097d0ff03"
 "checksum thread_local 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "8576dbbfcaef9641452d5cf0df9b0e7eeab7694956dd33bb61515fb8f18cfdd5"
-"checksum treeflection 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "f856e4d9dc1ee3cf5b908d50acc8e244a2ef31533a3ed54e1ed70fcde909bad2"
+"checksum treeflection 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "ba1877aad338b584ad1e63b2b38de5263c4864e3e1df44f85d3a4db092387bc9"
 "checksum treeflection_derive 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "429297ea390570112319c9aed9ee08c422da674a6ee5d5c82e1563d0f8988ec6"
 "checksum unicode-xid 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "36dff09cafb4ec7c8cf0023eb0b686cb6ce65499116a12201c9e11840ca01beb"
 "checksum user32-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6717129de5ac253f5642fc78a51d0c7de6f9f53d617fc94e9bae7f6e71cf5504"

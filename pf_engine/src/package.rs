@@ -150,14 +150,14 @@ impl Package {
 
     pub fn new_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) {
         let new_frame = {
-            let action_frames = &self.fighters[fighter].action_defs[action].frames;
+            let action_frames = &self.fighters[fighter].actions[action].frames;
             action_frames[frame].clone()
         };
         self.insert_fighter_frame(fighter, action, frame, new_frame);
     }
 
     pub fn insert_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize, action_frame: ActionFrame) {
-        let mut action_frames = &mut self.fighters[fighter].action_defs[action].frames;
+        let mut action_frames = &mut self.fighters[fighter].actions[action].frames;
 
         action_frames.insert(frame, action_frame.clone());
 
@@ -170,7 +170,7 @@ impl Package {
     }
 
     pub fn delete_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) -> bool {
-        let mut action_frames = &mut self.fighters[fighter].action_defs[action].frames;
+        let mut action_frames = &mut self.fighters[fighter].actions[action].frames;
 
         if action_frames.len() > 1 {
             action_frames.remove(frame);
@@ -193,7 +193,7 @@ impl Package {
         &mut self, fighter: usize, action: usize, frame: usize,
         new_colbox: CollisionBox, link_to: &HashSet<usize>, link_type: LinkType
     ) -> usize {
-        let mut fighter_frame = &mut self.fighters[fighter].action_defs[action].frames[frame];
+        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         let new_colbox_index = fighter_frame.colboxes.len();
         fighter_frame.colboxes.push(new_colbox);
 
@@ -221,7 +221,7 @@ impl Package {
     }
 
     pub fn delete_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, delete_boxes: &HashSet<usize>) {
-        let mut fighter_frame = &mut self.fighters[fighter].action_defs[action].frames[frame];
+        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             let mut colboxes = &mut fighter_frame.colboxes;
 
@@ -260,7 +260,7 @@ impl Package {
     }
 
     pub fn move_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, moved_colboxes: &HashSet<usize>, distance: (f32, f32)) {
-        let mut fighter_frame = &mut self.fighters[fighter].action_defs[action].frames[frame];
+        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             let mut colboxes = &mut fighter_frame.colboxes;
             let (d_x, d_y) = distance;
