@@ -133,7 +133,7 @@ impl Package {
     
     // Save a struct to the given file name
     fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
-        let json = serde_json::to_string(object).unwrap();
+        let json = serde_json::to_string_pretty(object).unwrap();
         File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
     }
 

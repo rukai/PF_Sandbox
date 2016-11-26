@@ -2,7 +2,7 @@ use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Stage {
-    pub title:        String,
+    pub name:         String,
     pub platforms:    ContextVec<Platform>,
     pub blast:        Area,
     pub camera:       Area,
@@ -42,7 +42,7 @@ impl Stage {
         };
 
         Stage {
-            title:         "Base Stage".to_string(),
+            name:          "Base Stage".to_string(),
             platforms:     ContextVec::from_vec(vec!(main_platform, second_platform)),
             blast:         blast,
             camera:        camera,

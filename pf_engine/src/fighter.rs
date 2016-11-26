@@ -48,7 +48,7 @@ impl Fighter {
             dash_run_acc_b:        0.01,
             dash_run_term_vel:     2.3,
             friction:              0.08,
-            actions:           actions,
+            actions:               actions,
         }
     }
 }
@@ -82,7 +82,7 @@ pub struct Fighter {
     pub dash_run_acc_b:        f32,
     pub dash_run_term_vel:     f32,
     pub friction:              f32,
-    pub actions:           ContextVec<ActionDef>, // TODO: rename to something less anoying to type all the time in commands
+    pub actions:               ContextVec<ActionDef>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]
@@ -99,6 +99,8 @@ pub struct ActionFrame {
     pub ecb_w:        f32,
     pub ecb_h:        f32,
     pub ecb_y:        f32,
+    //pub item_hold_pos: (f32, f32),
+    //pub grab_hold_pos: (f32, f32),
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]
@@ -246,7 +248,7 @@ impl CollisionBox {
 pub enum CollisionBoxRole {
     Hurt (HurtBox), // a target
     Hit  (HitBox),  // a launching attack
-    Grab,
+    Grab,           // a grabbing attack
     Intangible,     // cannot be interacted with
     Invincible,     // cannot receive damage or knockback.
     Reflect,        // reflects projectiles
