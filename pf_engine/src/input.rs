@@ -1,9 +1,9 @@
 use libusb::{Context, Device, DeviceHandle, Error};
+use std::ops::Index;
 use std::time::Duration;
 
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
-    empty_inputs:    Vec<ControllerInput>,
     current_inputs:  Vec<ControllerInput>,      // inputs for this frame
     game_inputs:     Vec<Vec<ControllerInput>>, // game past and (potentially) future inputs, frame 0 has index 2
     prev_start:      bool,
@@ -45,16 +45,8 @@ impl<'a> Input<'a> {
             }
         }
 
-        let mut empty_inputs: Vec<ControllerInput> = vec!();
-        for _ in &adapter_handles {
-            for _ in 0..4 {
-                empty_inputs.push(ControllerInput::empty());
-            }
-        }
-
         let input = Input {
             adapter_handles: adapter_handles,
-            empty_inputs:    empty_inputs,
             game_inputs:     vec!(),
             current_inputs:  vec!(),
             prev_start:      false,
@@ -109,36 +101,34 @@ impl<'a> Input<'a> {
     /// Return game inputs at current index into history
     pub fn players(&self, frame: usize) -> Vec<PlayerInput> {
         let mut result_inputs: Vec<PlayerInput> = vec!();
-        let frame = frame as i64;
-        let inputs      = self.get_inputs(frame);
-        let prev_inputs = self.get_inputs(frame-1);
 
-        for (i, input) in inputs.iter().enumerate() {
-            let prev_input = &prev_inputs[i];
-            if input.plugged_in {
+        for i in 0..4 { // TODO: retrieve number of controllers from frame history
+            let inputs = self.get_player_inputs(i, frame as i64);
+            if inputs[0].plugged_in {
                 result_inputs.push(PlayerInput {
                     plugged_in: true,
 
-                    up:    Button { value: input.up,    press: input.up    && !prev_input.up },
-                    down:  Button { value: input.down,  press: input.down  && !prev_input.down },
-                    right: Button { value: input.right, press: input.right && !prev_input.right },
-                    left:  Button { value: input.left,  press: input.left  && !prev_input.left },
-                    y:     Button { value: input.y,     press: input.y     && !prev_input.y },
-                    x:     Button { value: input.x,     press: input.x     && !prev_input.x },
-                    b:     Button { value: input.b,     press: input.b     && !prev_input.b },
-                    a:     Button { value: input.a,     press: input.a     && !prev_input.a },
-                    l:     Button { value: input.l,     press: input.l     && !prev_input.l },
-                    r:     Button { value: input.r,     press: input.r     && !prev_input.r },
-                    z:     Button { value: input.z,     press: input.z     && !prev_input.z },
-                    start: Button { value: input.start, press: input.start && !prev_input.start },
+                    up:    Button { value: inputs[0].up,    press: inputs[0].up    && !inputs[1].up },
+                    down:  Button { value: inputs[0].down,  press: inputs[0].down  && !inputs[1].down },
+                    right: Button { value: inputs[0].right, press: inputs[0].right && !inputs[1].right },
+                    left:  Button { value: inputs[0].left,  press: inputs[0].left  && !inputs[1].left },
+                    y:     Button { value: inputs[0].y,     press: inputs[0].y     && !inputs[1].y },
+                    x:     Button { value: inputs[0].x,     press: inputs[0].x     && !inputs[1].x },
+                    b:     Button { value: inputs[0].b,     press: inputs[0].b     && !inputs[1].b },
+                    a:     Button { value: inputs[0].a,     press: inputs[0].a     && !inputs[1].a },
+                    l:     Button { value: inputs[0].l,     press: inputs[0].l     && !inputs[1].l },
+                    r:     Button { value: inputs[0].r,     press: inputs[0].r     && !inputs[1].r },
+                    z:     Button { value: inputs[0].z,     press: inputs[0].z     && !inputs[1].z },
+                    start: Button { value: inputs[0].start, press: inputs[0].start && !inputs[1].start },
 
-                    stick_x:   Stick { value: input.stick_x,   diff: input.stick_x   - prev_input.stick_x },
-                    stick_y:   Stick { value: input.stick_y,   diff: input.stick_y   - prev_input.stick_y },
-                    c_stick_x: Stick { value: input.c_stick_x, diff: input.c_stick_x - prev_input.c_stick_x },
-                    c_stick_y: Stick { value: input.c_stick_y, diff: input.c_stick_y - prev_input.c_stick_y },
+                    stick_x:   Stick { value: inputs[0].stick_x,   diff: inputs[0].stick_x   - inputs[1].stick_x },
+                    stick_y:   Stick { value: inputs[0].stick_y,   diff: inputs[0].stick_y   - inputs[1].stick_y },
+                    c_stick_x: Stick { value: inputs[0].c_stick_x, diff: inputs[0].c_stick_x - inputs[1].c_stick_x },
+                    c_stick_y: Stick { value: inputs[0].c_stick_y, diff: inputs[0].c_stick_y - inputs[1].c_stick_y },
 
-                    l_trigger:  Trigger { value: input.l_trigger, diff: input.l_trigger - prev_input.l_trigger },
-                    r_trigger:  Trigger { value: input.r_trigger, diff: input.r_trigger - prev_input.r_trigger },
+                    l_trigger:  Trigger { value: inputs[0].l_trigger, diff: inputs[0].l_trigger - inputs[1].l_trigger },
+                    r_trigger:  Trigger { value: inputs[0].r_trigger, diff: inputs[0].r_trigger - inputs[1].r_trigger },
+                    history: inputs,
                 });
             }
             else {
@@ -148,19 +138,25 @@ impl<'a> Input<'a> {
         result_inputs
     }
 
-    fn get_inputs(&self, frame: i64) -> &Vec<ControllerInput> {
-        // when players(0) is called it requests inputs on frames 0 and -1
-        // when players(1) is called it requests inputs on frames 1 and 0
-        // empty inputs are returned for 0 and -1 as:
-        // *    frame 0 has no inputs
-        // *    frame 1 has no diff
-        if frame == 0 || frame == -1 {
-            &self.empty_inputs
+    fn get_player_inputs(&self, player: usize, frame: i64) -> Vec<ControllerInput> {
+        let mut result: Vec<ControllerInput> = vec!();
+
+        for i in (frame-8..frame).rev() {
+            result.push(
+                if i < 0 {
+                    ControllerInput::empty()
+                }
+                else {
+                    match self.game_inputs[i as usize].get(player) {
+                        Some(value) => value.clone(),
+                        None        => ControllerInput::empty()
+                    }
+                }
+            );
         }
-        else {
-            let index = frame as usize - 1;
-            &self.game_inputs.get(index).unwrap()
-        }
+
+        assert!(result.len() == 8, "get_player_inputs needs to return a vector of size 8 but it was {}", result.len());
+        result
     }
 
     /// Check for start button press
@@ -254,6 +250,7 @@ impl PlayerInput {
 
             l_trigger:  Trigger { value: 0.0, diff: 0.0 },
             r_trigger:  Trigger { value: 0.0, diff: 0.0 },
+            history: vec!(ControllerInput::empty(); 8),
         }
     }
 }
@@ -337,7 +334,7 @@ fn trigger_filter(trigger: u8) -> f32 {
 
 /// Internal input storage
 #[derive(Clone)]
-struct ControllerInput {
+pub struct ControllerInput {
     pub plugged_in: bool,
 
     pub a:     bool,
@@ -384,7 +381,18 @@ pub struct PlayerInput {
     pub c_stick_y: Stick,
     pub r_trigger:  Trigger,
     pub l_trigger:  Trigger,
+    history: Vec<ControllerInput>, // guaranteed to contain 8 elements
 }
+
+impl Index<usize> for PlayerInput {
+    type Output = ControllerInput;
+
+    fn index(&self, index: usize) -> &ControllerInput {
+        &self.history[index]
+    }
+}
+
+// TODO: now we that we have history we could remove the value from these, turning them into primitive values
 
 pub struct Button {
     pub value: bool, // on
