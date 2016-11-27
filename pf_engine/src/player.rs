@@ -8,53 +8,59 @@ use treeflection::{Node, NodeRunner, NodeToken};
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Player {
-    pub action:         u64,
-    action_new:         u64,
-    action_set:         bool,
-    pub frame:          u64,
-    pub stocks:         u64,
-    pub damage:         u64,
-    pub bps_x:          f32,
-    pub bps_y:          f32,
-    pub spawn:          (f32, f32),
-    pub x_vel:          f32,
-    pub y_vel:          f32,
-    pub x_acc:          f32,
-    pub y_acc:          f32,
-    pub ecb_w:          f32,
-    pub ecb_y:          f32, // relative to bps.y. when 0, the bottom of the ecb touches the bps
-    pub ecb_top:        f32, // Relative to ecb_y
-    pub ecb_bottom:     f32, // Relative to ecb_y
-    pub face_right:     bool,
-    pub airbourne:      bool,
-    pub pass_through:   bool,
-    pub air_jumps_left: u64,
+    pub action:           u64,
+    action_new:           u64,
+    action_set:           bool,
+    pub frame:            u64,
+    pub stocks:           u64,
+    pub damage:           u64,
+    pub bps_x:            f32,
+    pub bps_y:            f32,
+    pub spawn:            (f32, f32),
+    pub x_vel:            f32,
+    pub y_vel:            f32,
+    pub kb_x_vel:         f32,
+    pub kb_y_vel:         f32,
+    pub ecb_w:            f32,
+    pub ecb_y:            f32, // relative to bps.y. when 0, the bottom of the ecb touches the bps
+    pub ecb_top:          f32, // Relative to ecb_y
+    pub ecb_bottom:       f32, // Relative to ecb_y
+    pub face_right:       bool,
+    pub airbourne:        bool,
+    pub pass_through:     bool,
+    pub fastfall:         bool,
+    pub air_jumps_left:   u64,
+    pub jumpsquat_button: bool,
+    pub turn_dash_buffer: bool,
 }
 
 impl Player {
     pub fn new(spawn: (f32, f32), stocks: u64) -> Player {
         Player {
-            action:         Action::Spawn as u64,
-            action_new:     Action::Spawn as u64,
-            action_set:     false,
-            frame:          0,
-            stocks:         stocks,
-            damage:         0,
-            bps_x:          spawn.0,
-            bps_y:          spawn.1,
-            spawn:          spawn,
-            x_vel:          0.0,
-            y_vel:          0.0,
-            x_acc:          0.0,
-            y_acc:          0.0,
-            ecb_w:          0.0,
-            ecb_y:          0.0,
-            ecb_top:        0.0,
-            ecb_bottom:     0.0,
-            face_right:     true,
-            airbourne:      true,
-            pass_through:   false,
-            air_jumps_left: 0,
+            action:           Action::Spawn as u64,
+            action_new:       Action::Spawn as u64,
+            action_set:       false,
+            frame:            0,
+            stocks:           stocks,
+            damage:           0,
+            bps_x:            spawn.0,
+            bps_y:            spawn.1,
+            spawn:            spawn,
+            x_vel:            0.0,
+            y_vel:            0.0,
+            kb_x_vel:         0.0,
+            kb_y_vel:         0.0,
+            ecb_w:            0.0,
+            ecb_y:            0.0,
+            ecb_top:          0.0,
+            ecb_bottom:       0.0,
+            face_right:       true,
+            airbourne:        true,
+            pass_through:     false,
+            fastfall:         false,
+            air_jumps_left:   0,
+            jumpsquat_button: false,
+            turn_dash_buffer: false,
         }
     }
 
@@ -126,6 +132,10 @@ impl Player {
                 _ => { },
             }
         }
+
+        if input[0].stick_y < -0.65 && input[3].stick_y > -0.1 && self.y_vel < 0.0 {
+            self.fastfall = true;
+        }
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -135,9 +145,10 @@ impl Player {
         else if input.b.press {
             // special attack
         }
-        else if self.jump_input(input) && self.air_jumps_left > 0 {
+        else if self.jump_input(input).jump() && self.air_jumps_left > 0 {
             self.air_jumps_left -= 1;
             self.y_vel = fighter.jump_y_init_vel;
+            self.fastfall = false;
 
             if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
                 self.set_action(Action::JumpAerialB);
@@ -177,9 +188,11 @@ impl Player {
     }
 
     fn ground_idle_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        self.apply_friction(fighter);
         self.check_taunt(input);
         self.check_crouch(input);
         self.check_dash(input, fighter);
+        self.check_turn(input);
         self.check_jump(input);
         self.check_smash(input);
         self.check_attack(input);
@@ -190,11 +203,35 @@ impl Player {
     }
 
     fn dash_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        let stick_x = self.relative_f(input.stick_x.value);
-        if stick_x >= 0.8 || stick_x <= 0.4 { // verified horizontally only
-            // TODO: Implement terminal velocity
-            let dash_acc = fighter.dash_run_acc_a * stick_x.abs() + fighter.dash_run_acc_b;
-            self.x_acc = self.relative_f(dash_acc) * if stick_x > 0.0 { 1.0 } else { -1.0 };
+        if self.frame == 2 {
+            self.x_vel = self.relative_f(fighter.dash_init_vel);
+            if self.x_vel.abs() > fighter.dash_run_term_vel {
+                self.x_vel = fighter.dash_run_term_vel;
+            }
+        }
+
+        if self.frame > 1 {
+            if input[0].stick_x.abs() < 0.3 {
+                self.apply_friction(fighter);
+            }
+            else {
+                let vel_max = input[0].stick_x * fighter.dash_run_term_vel;
+                let acc     = input[0].stick_x * fighter.dash_run_acc_a;
+
+                self.x_vel += acc;
+                if (vel_max > 0.0 && self.x_vel > vel_max) || (vel_max < 0.0 && self.x_vel < vel_max) {
+                    self.apply_friction(fighter);
+                    if (vel_max > 0.0 && self.x_vel < vel_max) || (vel_max < 0.0 && self.x_vel > vel_max) {
+                        self.x_vel = vel_max;
+                    }
+                }
+                else {
+                    self.x_vel += acc;
+                    if (vel_max > 0.0 && self.x_vel > vel_max) || (vel_max < 0.0 && self.x_vel < vel_max) {
+                        self.x_vel = vel_max;
+                    }
+                }
+            }
         }
         if self.relative_f(input.stick_x.value) < -0.35 { // TODO: refine
             self.turn();
@@ -210,11 +247,11 @@ impl Player {
 
     fn run_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         self.check_jump(input);
-        if self.relative_f(input.stick_x.value) <= -0.4 { // TODO: refine
+        if self.relative_f(input.stick_x.value) <= -0.3 {
             self.set_action(Action::TurnRun);
         }
-        // verified horizontally stick_x <= 0.61250 ends dash
-        else if self.relative_f(input.stick_x.value) <= 0.61300 {
+        // verified horizontally stick_x <= 0.61250 ends run
+        else if self.relative_f(input.stick_x.value) < 0.62 {
             self.set_action(Action::RunEnd);
         }
         else if input.a.press {
@@ -224,10 +261,14 @@ impl Player {
             self.set_action(Action::DashGrab);
         }
         else {
-            // Placeholder logic, needs research
-            let acc = self.relative_f(fighter.dash_run_acc_a + fighter.dash_run_acc_b);
-            if self.x_vel + acc <= fighter.dash_run_term_vel {
-                self.x_acc = acc;
+            let vel_max = input[0].stick_x * fighter.dash_run_term_vel;
+            let acc = (vel_max - self.x_vel)
+                    * (fighter.dash_run_acc_a + (fighter.dash_run_acc_b * input[0].stick_x.signum()))
+                    / (fighter.dash_run_term_vel * 2.5);
+
+            self.x_vel += acc;
+            if self.relative_f(self.x_vel) > self.relative_f(vel_max) {
+                self.x_vel = vel_max;
             }
         }
         self.check_jump(input);
@@ -240,7 +281,7 @@ impl Player {
     }
 
     fn check_crouch(&mut self, input: &PlayerInput) {
-        if input.stick_y.value < -0.3 { // TODO: refine
+        if input.stick_y.value < -0.69 {
             if let Some(action) = Action::from_u64(self.action) {
                 match action {
                     Action::CrouchStart | Action::Crouch | Action::CrouchEnd => { },
@@ -257,14 +298,29 @@ impl Player {
                 self.dash(fighter);
             }
             else {
-                self.turn();
+                self.turn_dash();
             }
         }
     }
 
+    fn check_turn(&mut self, input: &PlayerInput) {
+        if self.relative_f(input[0].stick_x) < -0.3 {
+            self.turn();
+        }
+        self.turn_dash_buffer =  self.relative_f(input[1].stick_x) > -0.3;
+    }
+
     fn check_jump(&mut self, input: &PlayerInput) {
-        if self.jump_input(input) {
-            self.set_action(Action::JumpSquat);
+        match self.jump_input(input) {
+            JumpResult::Button => {
+                self.jumpsquat_button = true;
+                self.set_action(Action::JumpSquat);
+            }
+            JumpResult::Stick => {
+                self.jumpsquat_button = false;
+                self.set_action(Action::JumpSquat);
+            }
+            JumpResult::None => { }
         }
     }
 
@@ -308,12 +364,20 @@ impl Player {
         }
     }
 
-    fn jump_input(&self, input: &PlayerInput) -> bool {
-        input.x.press || input.y.press || (input.stick_y.diff > 0.4 && input.stick_y.value > 0.1) // TODO: refine
+    fn jump_input(&self, input: &PlayerInput) -> JumpResult {
+        if input.x.press || input.y.press {
+            JumpResult::Button
+        }
+        else if input[0].stick_y > 0.66 && input[3].stick_y < 0.2 {
+            JumpResult::Stick
+        }
+        else {
+            JumpResult::None
+        }
     }
 
     fn dash_input(&self, input: &PlayerInput) -> bool {
-        input.stick_x.value.abs() > 0.1 // TODO: refine
+        input[0].stick_x.abs() > 0.79 && input[2].stick_x.abs() < 0.3
     }
 
     fn action_expired(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -338,28 +402,43 @@ impl Player {
             Some(Action::JumpB)        => { self.set_action(Action::Fall);       },
             Some(Action::JumpAerialF)  => { self.set_action(Action::AerialFall); },
             Some(Action::JumpAerialB)  => { self.set_action(Action::AerialFall); },
-            Some(Action::Turn)         => { self.set_action(Action::Idle);       }, // TODO: Next state is decided based on inputs this frame
+            Some(Action::TurnDash)     => { self.set_action(Action::Dash);       },
             Some(Action::TurnRun)      => { self.set_action(Action::Idle);       },
             Some(Action::Dash)         => { self.set_action(Action::Run);        },
             Some(Action::Run)          => { self.set_action(Action::Run);        },
             Some(Action::RunEnd)       => { self.set_action(Action::Idle);       },
             Some(Action::PassPlatform) => { self.set_action(Action::AerialFall); },
-            Some(Action::JumpSquat)    => {
-                self.airbourne = true;
-
-                let shorthop = input.x.value || input.y.value || input.stick_y.value > 0.15; // TODO: refine
-
-                if shorthop {
-                    self.y_vel = fighter.jump_y_init_vel;
-                } else {
-                    self.y_vel = fighter.jump_y_init_vel_short;
-                }
-
-                if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
-                    self.set_action(Action::JumpB);
+            Some(Action::Turn) => {
+                let new_action = if self.relative_f(input[0].stick_x) > 0.79 && self.turn_dash_buffer {
+                    Action::Dash
                 }
                 else {
+                    Action::Idle
+                };
+                self.set_action(new_action);
+            },
+            Some(Action::JumpSquat) => {
+                self.airbourne = true;
+
+                let shorthop = if self.jumpsquat_button {
+                    !input[0].x && !input[0].y
+                }
+                else {
+                    input[0].stick_y < 0.67
+                };
+
+                if shorthop {
+                    self.y_vel = fighter.jump_y_init_vel_short;
+                }
+                else {
+                    self.y_vel = fighter.jump_y_init_vel;
+                }
+
+                if self.relative_f(input[2].stick_x) >= -0.3 {
                     self.set_action(Action::JumpF);
+                }
+                else {
+                    self.set_action(Action::JumpB);
                 }
             },
 
@@ -448,9 +527,14 @@ impl Player {
     fn physics_step(&mut self, fighter: &Fighter, stage: &Stage) {
         // movement
         if self.airbourne {
-            self.y_vel += fighter.gravity;
-            if self.y_vel < fighter.terminal_vel {
-                self.y_vel = fighter.terminal_vel;
+            if self.fastfall {
+                self.y_vel = fighter.fastfall_terminal_vel;
+            }
+            else {
+                self.y_vel += fighter.gravity;
+                if self.y_vel < fighter.terminal_vel {
+                    self.y_vel = fighter.terminal_vel;
+                }
             }
 
             self.bps_x += self.x_vel;
@@ -465,21 +549,7 @@ impl Player {
             };
         }
         else {
-            if self.x_acc == 0.0 { // Careful, float equality >:/
-                if fighter.friction > self.x_vel.abs() {
-                    self.x_vel = 0.0;
-                } else if self.x_vel > 0.0 {
-                    self.x_vel -= fighter.friction;
-                } else {
-                    self.x_vel += fighter.friction;
-                }
-            }
-            else {
-                self.x_vel += self.x_acc;
-            }
-
-            self.bps_x += self.x_vel;
-            self.x_acc = 0.0;
+            self.bps_x += self.x_vel + self.kb_x_vel;
         }
 
         // are we on a platform?
@@ -497,6 +567,21 @@ impl Player {
         let blast = &stage.blast;
         if self.bps_x < blast.left || self.bps_x > blast.right || self.bps_y < blast.bot || self.bps_y > blast.top {
             self.die(fighter);
+        }
+    }
+
+    fn apply_friction(&mut self, fighter: &Fighter) {
+        if self.x_vel > 0.0 {
+            self.x_vel -= fighter.friction;
+            if self.x_vel < 0.0 {
+                self.x_vel = 0.0;
+            }
+        }
+        else {
+            self.x_vel += fighter.friction;
+            if self.x_vel > 0.0 {
+                self.x_vel = 0.0;
+            }
         }
     }
 
@@ -575,6 +660,7 @@ impl Player {
 
     fn land(&mut self, fighter: &Fighter) {
         self.airbourne = false;
+        self.fastfall = false;
         self.air_jumps_left = fighter.air_jumps;
 
         match Action::from_u64(self.action) {
@@ -588,13 +674,18 @@ impl Player {
     }
 
     fn dash(&mut self, fighter: &Fighter) {
-        self.x_acc = self.relative_f(fighter.dash_init_vel);
+        self.x_vel = self.relative_f(fighter.dash_init_vel);
         self.set_action(Action::Dash);
     }
 
     fn turn(&mut self) {
         self.face_right = !self.face_right;
         self.set_action(Action::Turn);
+    }
+
+    fn turn_dash(&mut self) {
+        self.face_right = !self.face_right;
+        self.set_action(Action::TurnDash);
     }
 
     fn fall(&mut self) {
@@ -610,13 +701,14 @@ impl Player {
         self.y_vel = 0.0;
         self.x_vel = 0.0;
         self.air_jumps_left = fighter.air_jumps;
+        self.fastfall = false;
         self.set_action(Action::Spawn);
     }
 
     pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, debug: &DebugPlayer, index: usize) {
         if debug.physics {
-            println!("Player: {}    x: {}    y: {}    x_vel: {:.5}    y_vel: {:.5}    x_acc {:.5}",
-                index, self.bps_x, self.bps_y, self.x_vel, self.y_vel, self.x_acc);
+            println!("Player: {}    x: {}    y: {}    x_vel: {:.5}    y_vel: {:.5}    kb_x_vel: {:.5}    kb_y_vel: {:.5} ",
+                index, self.bps_x, self.bps_y, self.x_vel, self.y_vel, self.kb_x_vel, self.kb_y_vel);
         }
 
         if debug.input {
@@ -684,6 +776,21 @@ impl Player {
             face_right: self.face_right,
             selected:   selected,
             selected_colboxes: selected_colboxes,
+        }
+    }
+}
+
+enum JumpResult {
+    Button,
+    Stick,
+    None,
+}
+
+impl JumpResult {
+    fn jump(&self) -> bool {
+        match *self {
+            JumpResult::Button | JumpResult::Stick => true,
+            JumpResult::None => false
         }
     }
 }

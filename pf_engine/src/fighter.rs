@@ -35,6 +35,7 @@ impl Fighter {
             weight:                80,
             gravity:               -0.13,
             terminal_vel:          -2.0,
+            fastfall_terminal_vel: -2.5,
             jump_y_init_vel:       3.1,
             jump_y_init_vel_short: 1.9,
             jump_x_init_vel:       0.95,
@@ -69,6 +70,7 @@ pub struct Fighter {
     pub weight:                u64,
     pub gravity:               f32,
     pub terminal_vel:          f32,
+    pub fastfall_terminal_vel: f32,
     pub jump_y_init_vel:       f32,
     pub jump_y_init_vel_short: f32,
     pub jump_x_init_vel:       f32,
@@ -218,6 +220,7 @@ pub enum Action {
     // unsorted for compatibility with packages
     PassPlatform,
     TurnRun,
+    TurnDash,
 }
 }
 

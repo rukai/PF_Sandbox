@@ -10,6 +10,9 @@ pub struct Rules {
     pub teams:         bool,
     pub pause:         bool,
     pub friendly_fire: bool,
+    pub ledge_grab:     LedgeGrab,
+    pub grab_clang:     bool,
+    //pub force_user_settings: User,
 }
 
 impl Rules {
@@ -23,6 +26,8 @@ impl Rules {
             pause:         true,
             teams:         false,
             friendly_fire: false,
+            ledge_grab:    LedgeGrab::Hog,
+            grab_clang:    false,
         }
     }
 }
@@ -32,4 +37,11 @@ pub enum Goal {
     Training,
     Time,
     Stock,
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub enum LedgeGrab {
+    Hog,
+    Share,
+    Steal
 }
