@@ -1,6 +1,6 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Stage {
     pub name:         String,
     pub platforms:    ContextVec<Platform>,
@@ -54,7 +54,7 @@ impl Stage {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Platform {
     pub x:            f32,
     pub y:            f32,
@@ -63,7 +63,7 @@ pub struct Platform {
     pub pass_through: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize, Node, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Area {
     pub left:  f32,
     pub right: f32,

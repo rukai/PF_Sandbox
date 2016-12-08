@@ -10,8 +10,8 @@ dependencies = [
  "serde 0.8.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.8.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "treeflection 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "treeflection_derive 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "treeflection 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "treeflection_derive 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -648,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "treeflection"
-version = "0.1.9"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "serde 0.8.19 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "treeflection_derive"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "quote 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -845,8 +845,8 @@ dependencies = [
 "checksum tempfile 2.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "9270837a93bad1b1dac18fe67e786b3c960513af86231f6f4f57fddd594ff0c8"
 "checksum thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a9539db560102d1cef46b8b78ce737ff0bb64e7e18d35b2a5688f7d097d0ff03"
 "checksum thread_local 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "8576dbbfcaef9641452d5cf0df9b0e7eeab7694956dd33bb61515fb8f18cfdd5"
-"checksum treeflection 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "04d92752024ecf12eeb8f124e02aac1ec73a01267ad8c5448cc209d7b152da17"
-"checksum treeflection_derive 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "2a642a641ec49ccbd3c639ae996f59d65edf42dfb6d74cf86133f366cf2a7474"
+"checksum treeflection 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)" = "efd637073e13c9bb4545dffd498a0d602bab75f961132b3dee3b14ae2b934a22"
+"checksum treeflection_derive 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "d500c199e48632a64fe3b8bcb8a8168507567332b0a258e6f49043938b57dc6c"
 "checksum unicode-xid 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "36dff09cafb4ec7c8cf0023eb0b686cb6ce65499116a12201c9e11840ca01beb"
 "checksum user32-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6717129de5ac253f5642fc78a51d0c7de6f9f53d617fc94e9bae7f6e71cf5504"
 "checksum utf8-ranges 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a1ca13c08c41c9c3e04224ed9ff80461d97e121589ff27c753a16cb10830ae0f"

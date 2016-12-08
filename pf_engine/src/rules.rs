@@ -1,6 +1,6 @@
 use treeflection::{Node, NodeRunner, NodeToken};
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Rules {
     pub title:         String,
     pub goal:          Goal,
@@ -44,4 +44,16 @@ pub enum LedgeGrab {
     Hog,
     Share,
     Steal
+}
+
+impl Default for Goal {
+    fn default() -> Goal {
+        Goal::Stock
+    }
+}
+
+impl Default for LedgeGrab {
+    fn default() -> LedgeGrab {
+        LedgeGrab::Hog
+    }
 }

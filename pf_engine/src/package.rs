@@ -327,7 +327,7 @@ pub enum PackageUpdate {
 }
 
 // TODO: Why the seperate struct?
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PackageMeta {
     pub version:   u64,    // increment every release, 
     pub title:     String, // User readable title

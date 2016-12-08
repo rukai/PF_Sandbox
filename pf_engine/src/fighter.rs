@@ -1,7 +1,7 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
 impl Fighter {
-    pub fn base() -> Fighter {
+    pub fn base() -> Fighter { // TODO: Change to default
         let action_frame1 = ActionFrame {
             colboxes:     ContextVec::new(),
             colbox_links: vec!(),
@@ -32,29 +32,29 @@ impl Fighter {
 
             //in game attributes
             air_jumps:             1,
-            weight:                80,
-            gravity:               -0.13,
+            weight:                100,
+            gravity:               -0.1,
             terminal_vel:          -2.0,
-            fastfall_terminal_vel: -2.5,
-            jump_y_init_vel:       3.1,
-            jump_y_init_vel_short: 1.9,
-            jump_x_init_vel:       0.95,
+            fastfall_terminal_vel: -3.0,
+            jump_y_init_vel:       3.0,
+            jump_y_init_vel_short: 2.0,
+            jump_x_init_vel:       1.00,
             shield_size:           15.0,
             walk_init_vel:         0.2,
             walk_acc:              0.1,
-            walk_max_vel:          0.85,
-            slow_walk_max_vel:     0.85,
+            walk_max_vel:          1.00,
+            slow_walk_max_vel:     1.00,
             dash_init_vel:         2.0,
-            dash_run_acc_a:        1.5,
-            dash_run_acc_b:        0.01,
-            dash_run_term_vel:     2.3,
-            friction:              0.08,
+            dash_run_acc_a:        1.0,
+            dash_run_acc_b:        0.0,
+            dash_run_term_vel:     2.0,
+            friction:              0.10,
             actions:               actions,
         }
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Fighter {
     //css render
     pub name:       String,
@@ -87,13 +87,13 @@ pub struct Fighter {
     pub actions:               ContextVec<ActionDef>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct ActionDef {
     pub frames: ContextVec<ActionFrame>,
     pub iasa:   u64,
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct ActionFrame {
     pub colboxes:     ContextVec<CollisionBox>,
     pub colbox_links: Vec<CollisionBoxLink>,
@@ -105,7 +105,7 @@ pub struct ActionFrame {
     //pub grab_hold_pos: (f32, f32),
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct CollisionBoxLink {
     pub one:       usize,
     pub two:       usize,
@@ -145,6 +145,12 @@ impl CollisionBoxLink {
 pub enum LinkType {
     Meld,
     Simple,
+}
+
+impl Default for LinkType {
+    fn default() -> LinkType {
+        LinkType::Meld
+    }
 }
 
 enum_from_primitive! {
@@ -224,13 +230,25 @@ pub enum Action {
 }
 }
 
+impl Default for Action {
+    fn default() -> Action {
+        Action::Spawn
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub enum FrameEffect {
     Velocity     {x: f32, y: f32},
     Acceleration {x: f32, y: f32},
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+impl Default for FrameEffect {
+    fn default() -> FrameEffect {
+        FrameEffect::Velocity { x: 0.0, y: 0.0 }
+    }
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct CollisionBox {
     pub point:  (f32, f32),
     pub radius: f32,
@@ -256,6 +274,12 @@ pub enum CollisionBoxRole {
     Invincible,     // cannot receive damage or knockback.
     Reflect,        // reflects projectiles
     Absorb,         // absorb projectiles
+}
+
+impl Default for CollisionBoxRole {
+    fn default() -> CollisionBoxRole {
+        CollisionBoxRole::Hurt ( HurtBox::default())
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
@@ -287,5 +311,7 @@ pub enum HitboxEffect {
 }
 
 impl Default for HitboxEffect {
-    fn default() -> HitboxEffect { HitboxEffect::None }
+    fn default() -> HitboxEffect {
+        HitboxEffect::None
+    }
 }
