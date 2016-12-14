@@ -1,4 +1,7 @@
-use ::input::{Input};
+use ::input::Input;
+use ::package::Package;
+use ::graphics::GraphicsMessage;
+use ::app::{Render, GameSetup};
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -17,13 +20,16 @@ enum MenuState {
 }
 
 pub struct Menu {
+    package:       Package,
     state:         MenuState,
     current_frame: usize,
 }
 
 impl Menu {
     pub fn new() -> Menu {
+        let package = Package::open_or_generate("base_package");
         Menu {
+            package:       package,
             state:         MenuState::CharacterSelect,
             current_frame: 0,
         }
@@ -42,12 +48,12 @@ impl Menu {
                 controllers.push(i);
             }
 
-            vec!(MenuChoice::Start {
+            vec!(MenuChoice::Start (GameSetup {
                 controllers: controllers,
                 fighters:    selected_fighters,
                 stage:       0,
                 netplay:     false,
-            })
+            }))
         }
         else {
             vec!()
@@ -80,11 +86,21 @@ impl Menu {
             state: self.state.clone(),
         }
     }
+
+    pub fn graphics_message(&mut self) -> GraphicsMessage {
+        GraphicsMessage {
+            package_updates: self.package.updates(),
+            render: Render::Menu (self.render())
+        }
+    }
+
+    pub fn reclaim(self) -> Package {
+        self.package
+    }
 }
 
 pub enum MenuChoice {
-    ChangePackage (String),
-    Start { controllers: Vec<usize>, fighters: Vec<usize>, stage: usize , netplay: bool},
+    Start (GameSetup)
 }
 
 #[allow(dead_code)]

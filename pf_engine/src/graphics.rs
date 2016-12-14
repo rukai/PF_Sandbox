@@ -3,7 +3,7 @@ use ::buffers::{Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
 use ::os_input::OsInput;
 use ::menu::RenderMenu;
-use ::package::{Package, PackageUpdate};
+use ::package::PackageUpdate;
 
 use glium::{DisplayBuild, Surface, self};
 use glium::glutin::Event;
@@ -25,24 +25,19 @@ pub struct Graphics {
     render_rx:       Receiver<GraphicsMessage>,
 }
 
-#[allow(unused_variables)]
 impl Graphics {
-    pub fn init(package: &Package) -> (Sender<GraphicsMessage>, OsInput) {
-        let fighters = package.fighters.clone();
-        let stages   = package.stages.clone();
+    pub fn init() -> (Sender<GraphicsMessage>, OsInput) {
         let (render_tx, render_rx) = channel();
         let (os_input, os_input_tx) = OsInput::new();
-        let package = package.clone();
 
         thread::spawn(move || {
-            let mut graphics = Graphics::new(package, os_input_tx, render_rx);
+            let mut graphics = Graphics::new(os_input_tx, render_rx);
             graphics.run();
         });
         (render_tx, os_input)
     }
 
     fn new(
-        package: Package,
         os_input_tx: Sender<Event>,
         render_rx: Receiver<GraphicsMessage>,
     ) -> Graphics {
@@ -53,7 +48,7 @@ impl Graphics {
 
         Graphics {
             shaders:         Graphics::load_shaders(),
-            package_buffers: PackageBuffers::new(&display, package),
+            package_buffers: PackageBuffers::new(),
             display:         display,
             os_input_tx:     os_input_tx,
             render_rx:       render_rx,
@@ -193,8 +188,8 @@ impl Graphics {
         target.finish().unwrap();
     }
 
+    #[allow(unused_variables)]
     fn menu_render(&mut self, render: RenderMenu) {
-
     }
 
     fn handle_events(&mut self) {

@@ -1,7 +1,7 @@
 use ::stage::Stage;
 use ::fighter::{ActionFrame, LinkType};
 use ::player::RenderPlayer;
-use ::package::{Package, PackageUpdate};
+use ::package::{PackageUpdate};
 use ::game::RenderRect;
 
 use glium;
@@ -193,12 +193,11 @@ pub struct PackageBuffers {
 }
 
 impl PackageBuffers {
-    pub fn new(display: &GlutinFacade, package: Package) -> PackageBuffers {
-        let mut package_buffers = PackageBuffers {
+    pub fn new() -> PackageBuffers {
+        let package_buffers = PackageBuffers {
             stages:   vec!(),
             fighters: vec!(),
         };
-        package_buffers.update(display, vec!(PackageUpdate::Package(package)));
         package_buffers
     }
 

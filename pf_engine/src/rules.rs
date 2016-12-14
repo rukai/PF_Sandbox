@@ -10,8 +10,8 @@ pub struct Rules {
     pub teams:         bool,
     pub pause:         bool,
     pub friendly_fire: bool,
-    pub ledge_grab:     LedgeGrab,
-    pub grab_clang:     bool,
+    pub ledge_grab:    LedgeGrab,
+    pub grab_clang:    bool,
     //pub force_user_settings: User,
 }
 

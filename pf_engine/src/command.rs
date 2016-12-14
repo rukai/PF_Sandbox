@@ -14,6 +14,6 @@ pub fn run(command: &str, package: &mut Package) -> String {
             package.force_update_entire_package();
             result
         },
-        Err(msg)   => msg
+        Err(msg) => msg
     }
 }

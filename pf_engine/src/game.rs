@@ -5,12 +5,16 @@ use ::player::{Player, RenderPlayer, DebugPlayer};
 use ::fighter::{ActionFrame, CollisionBox, LinkType};
 use ::camera::Camera;
 use ::stage::Area;
+use ::network::Network;
+use ::graphics::GraphicsMessage;
+use ::app::Render;
 
 use ::std::collections::HashSet;
 
 use glium::glutin::VirtualKeyCode;
 
 pub struct Game {
+    package:                Package,
     state:                  GameState,
     player_history:         Vec<Vec<Player>>,
     current_frame:          usize,
@@ -25,6 +29,7 @@ pub struct Game {
     selector:               Selector,
     copied_frame:           Option<ActionFrame>,
     camera:                 Camera,
+    network:                Network,
 }
 
 /// Frame 0 refers to the initial state of the game.
@@ -33,16 +38,18 @@ pub struct Game {
 /// All previous frame state is used to calculate the next frame then the current_frame is incremented
 
 impl Game {
-    pub fn new(package: &Package, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
+    pub fn new(package: Package, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
         // generate players
         let mut players:       Vec<Player>      = vec!();
         let mut debug_players: Vec<DebugPlayer> = vec!();
-        let spawn_points = &package.stages[selected_stage].spawn_points;
-        for (i, _) in selected_controllers.iter().enumerate() {
-            // Stages can have less spawn points then players
-            let spawn = spawn_points[i % spawn_points.len()].clone();
-            players.push(Player::new(spawn, package.rules.stock_count));
-            debug_players.push(Default::default());
+        {
+            let spawn_points = &package.stages[selected_stage].spawn_points;
+            for (i, _) in selected_controllers.iter().enumerate() {
+                // Stages can have less spawn points then players
+                let spawn = spawn_points[i % spawn_points.len()].clone();
+                players.push(Player::new(spawn, package.rules.stock_count));
+                debug_players.push(Default::default());
+            }
         }
 
         // The CLI allows for selected_fighters to be shorter then players
@@ -56,6 +63,7 @@ impl Game {
         }
 
         Game {
+            package:                package,
             state:                  if netplay { GameState::Netplay } else { GameState::Local },
             player_history:         vec!(),
             current_frame:          0,
@@ -70,26 +78,29 @@ impl Game {
             selector:               Default::default(),
             copied_frame:           None,
             camera:                 Camera::new(),
+            network:                Network::new()
         }
     }
 
-    pub fn step(&mut self, package: &mut Package, input: &mut Input, os_input: &OsInput) {
+    pub fn step(&mut self, input: &mut Input, os_input: &OsInput) -> GameState {
+        self.network.update(&mut self.package);
         {
             match self.state.clone() {
-                GameState::Local           => { self.step_local(package, input, os_input); },
-                GameState::Netplay         => { self.step_netplay(package, input); },
-                GameState::Results         => { self.step_results(); },
-                GameState::ReplayForwards  => { self.step_replay_forwards(package, input, os_input); },
-                GameState::ReplayBackwards => { self.step_replay_backwards(input, os_input); },
-                GameState::Paused          => { self.step_pause(package, input, &os_input); },
+                GameState::Local           => { self.step_local(input, os_input); }
+                GameState::Netplay         => { self.step_netplay(input); }
+                GameState::ReplayForwards  => { self.step_replay_forwards(input, os_input); }
+                GameState::ReplayBackwards => { self.step_replay_backwards(input, os_input); }
+                GameState::Paused          => { self.step_pause(input, &os_input); }
+                GameState::Results         => { panic!("No more steps should occur after state is set to Results") }
             }
-
-            let stage = &package.stages[self.selected_stage];
-            self.camera.update(os_input, &self.players, stage);
+            {
+                let stage = &self.package.stages[self.selected_stage];
+                self.camera.update(os_input, &self.players, stage);
+            }
 
             if self.debug_output_this_step {
                 self.debug_output_this_step = false;
-                self.debug_output(package, input);
+                self.debug_output(input);
             }
         }
 
@@ -101,7 +112,7 @@ impl Game {
                 let player_frame  = self.players[player].frame as usize;
                 let player_colboxes = self.selector.colboxes_vec();
 
-                let fighters = &mut package.fighters;
+                let fighters = &mut self.package.fighters;
                 fighters.set_context(player_fighter);
 
                 let actions = &mut fighters[player_fighter].actions;
@@ -115,10 +126,13 @@ impl Game {
             }
             _ => { }
         }
-        package.stages.set_context(self.selected_stage);
+
+        self.package.stages.set_context(self.selected_stage);
+
+        self.state.clone()
     }
 
-    fn step_local(&mut self, package: &Package, input: &mut Input, os_input: &OsInput) {
+    fn step_local(&mut self, input: &mut Input, os_input: &OsInput) {
         self.player_history.push(self.players.clone());
         self.current_frame += 1;
 
@@ -130,7 +144,7 @@ impl Game {
         // run game loop
         input.game_update(self.current_frame);
         let player_inputs = &input.players(self.current_frame);
-        self.step_game(package, player_inputs);
+        self.step_game(player_inputs);
 
         // pause game
         if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
@@ -138,16 +152,16 @@ impl Game {
         }
     }
 
-    fn step_netplay(&mut self, package: &Package, input: &mut Input) {
+    fn step_netplay(&mut self, input: &mut Input) {
         self.player_history.push(self.players.clone());
         self.current_frame += 1;
 
         input.game_update(self.current_frame);
         let player_inputs = &input.players(self.current_frame);
-        self.step_game(package, player_inputs);
+        self.step_game(player_inputs);
     }
 
-    fn step_pause(&mut self, package: &mut Package, input: &mut Input, os_input: &OsInput) {
+    fn step_pause(&mut self, input: &mut Input, os_input: &OsInput) {
         let players_len = self.players.len();
 
         // set current edit state
@@ -189,10 +203,10 @@ impl Game {
 
         // modify package
         if os_input.key_pressed(VirtualKeyCode::E) {
-            package.save();
+            self.package.save();
         }
         if os_input.key_pressed(VirtualKeyCode::R) {
-            package.load();
+            self.package.load();
         }
 
         // game flow control
@@ -200,7 +214,7 @@ impl Game {
             self.step_replay_backwards(input, os_input);
         }
         else if os_input.key_pressed(VirtualKeyCode::K) {
-            self.step_replay_forwards(package, input, os_input);
+            self.step_replay_forwards(input, os_input);
         }
         else if os_input.key_pressed(VirtualKeyCode::H) {
             self.state = GameState::ReplayBackwards;
@@ -209,7 +223,7 @@ impl Game {
             self.state = GameState::ReplayForwards;
         }
         else if os_input.key_pressed(VirtualKeyCode::Space) {
-            self.step_local(package, input, os_input);
+            self.step_local(input, os_input);
         }
         else if os_input.key_pressed(VirtualKeyCode::U) {
             // TODO: Invalidate saved_frame when the frame it refers to is deleted.
@@ -233,7 +247,7 @@ impl Game {
                 if self.selector.moving {
                     let (d_x, d_y) = os_input.game_mouse_diff(&self.camera);
                     let distance = (self.players[player].relative_f(d_x), d_y);
-                    package.move_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, distance);
+                    self.package.move_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, distance);
 
                     // end move
                     if os_input.mouse_pressed(0) {
@@ -243,34 +257,34 @@ impl Game {
                 else {
                     // copy frame
                     if os_input.key_pressed(VirtualKeyCode::V) {
-                        let frame = package.fighters[fighter].actions[action].frames[frame].clone();
+                        let frame = self.package.fighters[fighter].actions[action].frames[frame].clone();
                         self.copied_frame = Some(frame);
                     }
                     // paste over current frame
                     if os_input.key_pressed(VirtualKeyCode::B) {
                         let action_frame = self.copied_frame.clone();
                         if let Some(action_frame) = action_frame {
-                            package.insert_fighter_frame(fighter, action, frame, action_frame);
-                            package.delete_fighter_frame(fighter, action, frame+1);
+                            self.package.insert_fighter_frame(fighter, action, frame, action_frame);
+                            self.package.delete_fighter_frame(fighter, action, frame+1);
                         }
                     }
 
                     // new frame
                     if os_input.key_pressed(VirtualKeyCode::M) {
-                        package.new_fighter_frame(fighter, action, frame);
+                        self.package.new_fighter_frame(fighter, action, frame);
                         // We want to step just the players current frame to simplify the animation work flow
                         // However we need to do a proper full step so that the history doesn't get mucked up.
-                        self.step_local(package, input, os_input);
+                        self.step_local(input, os_input);
                     }
                     // delete frame
                     if os_input.key_pressed(VirtualKeyCode::N) {
-                        if package.delete_fighter_frame(fighter, action, frame) {
+                        if self.package.delete_fighter_frame(fighter, action, frame) {
                             // Correct any players that are now on a nonexistent frame due to the frame deletion.
                             // This is purely to stay on the same action for usability.
                             // The player itself must handle being on a frame that has been deleted in order for replays to work.
                             for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
                                 if self.selected_fighters[i] == fighter && any_player.action as usize == action
-                                    && any_player.frame as usize == package.fighters[fighter].actions[action].frames.len() {
+                                    && any_player.frame as usize == self.package.fighters[fighter].actions[action].frames.len() {
                                     any_player.frame -= 1;
                                 }
                             }
@@ -290,7 +304,7 @@ impl Game {
                     }
                     // delete collisionbox
                     if os_input.key_pressed(VirtualKeyCode::D) {
-                        package.delete_fighter_colboxes(fighter, action, frame, &self.selector.colboxes);
+                        self.package.delete_fighter_colboxes(fighter, action, frame, &self.selector.colboxes);
                         self.update_frame();
                     }
                     // add collisionbox
@@ -308,7 +322,7 @@ impl Game {
                                     false => { LinkType::Meld }
                                 };
 
-                                package.append_fighter_colbox(fighter, action, frame, new_colbox, &self.selector.colboxes, link_type)
+                                self.package.append_fighter_colbox(fighter, action, frame, new_colbox, &self.selector.colboxes, link_type)
                             };
                             self.update_frame();
                             self.selector.colboxes.insert(selected);
@@ -340,7 +354,7 @@ impl Game {
                             if !os_input.held_shift() {
                                 self.selector.colboxes = HashSet::new();
                             }
-                            let frame = &package.fighters[fighter].actions[action].frames[frame];
+                            let frame = &self.package.fighters[fighter].actions[action].frames[frame];
                             let frame = self.players[player].relative_frame(frame);
                             for (i, colbox) in frame.colboxes.iter().enumerate() {
                                 let hit_x = colbox.point.0 + player_x;
@@ -373,7 +387,7 @@ impl Game {
                                 }
                                 let player_x = self.players[player].bps_x;
                                 let player_y = self.players[player].bps_y;
-                                let frame = &package.fighters[fighter].actions[action].frames[frame];
+                                let frame = &self.package.fighters[fighter].actions[action].frames[frame];
                                 let frame = self.players[player].relative_frame(frame);
 
                                 for (i, colbox) in frame.colboxes.iter().enumerate() {
@@ -466,10 +480,10 @@ impl Game {
 
     /// next frame is advanced by using the input history on the current frame
     // TODO: Allow choice between using input history and game history
-    fn step_replay_forwards(&mut self, package: &Package, input: &mut Input, os_input: &OsInput) {
+    fn step_replay_forwards(&mut self, input: &mut Input, os_input: &OsInput) {
         if self.current_frame < input.last_frame() {
             let player_inputs = &input.players(self.current_frame);
-            self.step_game(package, player_inputs);
+            self.step_game(player_inputs);
 
             // flow controls
             if os_input.key_pressed(VirtualKeyCode::H) {
@@ -519,25 +533,34 @@ impl Game {
         }
     }
 
-    fn step_game(&mut self, package: &Package, player_input: &Vec<PlayerInput>) {
-        let stage = &package.stages[self.selected_stage];
+    fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
+        {
+            let stage = &self.package.stages[self.selected_stage];
 
-        // step each player
-        for (i, player) in (&mut *self.players).iter_mut().enumerate() {
-            let fighter = &package.fighters[self.selected_fighters[i]];
-            let input = &player_input[self.selected_controllers[i]];
-            player.step(input, fighter, stage);
+            // step each player
+            for (i, player) in (&mut *self.players).iter_mut().enumerate() {
+                let fighter = &self.package.fighters[self.selected_fighters[i]];
+                let input = &player_input[self.selected_controllers[i]];
+                player.step(input, fighter, stage);
+            }
         }
 
         // handle timer
-        if (self.current_frame / 60) as u64 > package.rules.time_limit {
+        if (self.current_frame / 60) as u64 > self.package.rules.time_limit {
             self.state = GameState::Results;
+        }
+
+        // handle no stocks left
+        for player in &self.players {
+            if player.stocks <= 0 {
+                self.state = GameState::Results;
+            }
         }
 
         self.update_frame();
     }
 
-    fn debug_output(&mut self, package: &Package, input: &Input) {
+    fn debug_output(&mut self, input: &Input) {
         let frame = self.current_frame;
         let player_inputs = &input.players(frame);
 
@@ -545,14 +568,11 @@ impl Game {
         println!("Frame: {}    state: {:?}", frame, self.state);
 
         for (i, player) in self.players.iter().enumerate() {
-            let fighter = &package.fighters[self.selected_fighters[i]];
+            let fighter = &self.package.fighters[self.selected_fighters[i]];
             let player_input = &player_inputs[i];
             let debug_player = &self.debug_players[i];
             player.debug_print(fighter, player_input, debug_player, i);
         }
-    }
-
-    fn step_results(&mut self) {
     }
 
     /// Call this whenever a frame player's frame is changed, this can be from:
@@ -563,7 +583,7 @@ impl Game {
         self.debug_output_this_step = true;
     }
 
-    pub fn render(&self, package: &Package) -> RenderGame {
+    pub fn render(&self) -> RenderGame {
         let mut entities = vec!();
         for (i, player) in self.players.iter().enumerate() {
 
@@ -586,7 +606,7 @@ impl Game {
 
             let debug = self.debug_players[i].clone();
             if debug.cam_area {
-                let cam_area = &player.cam_area(&package.stages[self.selected_stage].camera);
+                let cam_area = &player.cam_area(&self.package.stages[self.selected_stage].camera);
                 entities.push(RenderEntity::Area(area_to_render(cam_area)));
             }
 
@@ -594,7 +614,7 @@ impl Game {
         }
 
         // stage areas
-        let stage = &package.stages[self.selected_stage];
+        let stage = &self.package.stages[self.selected_stage];
         entities.push(RenderEntity::Area(area_to_render(&stage.camera)));
         entities.push(RenderEntity::Area(area_to_render(&stage.blast)));
 
@@ -613,6 +633,13 @@ impl Game {
             entities: entities,
             state:    self.state.clone(),
             camera:   self.camera.clone(),
+        }
+    }
+
+    pub fn graphics_message(&mut self) -> GraphicsMessage {
+        GraphicsMessage {
+            package_updates: self.package.updates(),
+            render: Render::Game (self.render())
         }
     }
 }
