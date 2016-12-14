@@ -3,8 +3,9 @@ use player::Player;
 use stage::Stage;
 
 use glium::glutin::VirtualKeyCode;
+use treeflection::{Node, NodeRunner, NodeToken};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct Camera {
     aspect_ratio: f32,
     pub zoom:     f32,
@@ -12,10 +13,16 @@ pub struct Camera {
     pub state:    CameraState,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub enum CameraState {
     Manual,
     Auto,
+}
+
+impl Default for CameraState {
+    fn default() -> CameraState {
+        CameraState::Auto
+    }
 }
 
 impl Camera {

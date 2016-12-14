@@ -5,31 +5,32 @@ use ::player::{Player, RenderPlayer, DebugPlayer};
 use ::fighter::{ActionFrame, CollisionBox, LinkType};
 use ::camera::Camera;
 use ::stage::Area;
-use ::network::Network;
 use ::graphics::GraphicsMessage;
 use ::app::Render;
 
 use ::std::collections::HashSet;
 
 use glium::glutin::VirtualKeyCode;
+use treeflection::{Node, NodeRunner, NodeToken};
 
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Game {
-    package:                Package,
-    state:                  GameState,
-    player_history:         Vec<Vec<Player>>,
-    current_frame:          usize,
-    saved_frame:            usize,
-    players:                Vec<Player>,
-    debug_players:          Vec<DebugPlayer>,
-    selected_controllers:   Vec<usize>,
-    selected_fighters:      Vec<usize>,
-    selected_stage:         usize,
-    edit:                   Edit,
-    debug_output_this_step: bool,
-    selector:               Selector,
-    copied_frame:           Option<ActionFrame>,
-    camera:                 Camera,
-    network:                Network,
+    pub package:                Package,
+    pub state:                  GameState,
+    pub player_history:         Vec<Vec<Player>>,
+    pub current_frame:          usize,
+    pub saved_frame:            usize,
+    pub players:                Vec<Player>,
+    pub debug_players:          Vec<DebugPlayer>,
+    pub selected_controllers:   Vec<usize>,
+    pub selected_fighters:      Vec<usize>,
+    pub selected_stage:         usize,
+    pub edit:                   Edit,
+    pub debug_output_this_step: bool,
+    pub selector:               Selector,
+    copied_frame:               Option<ActionFrame>,
+    pub camera:                 Camera,
+    pub tas:                    Vec<TasInput>
 }
 
 /// Frame 0 refers to the initial state of the game.
@@ -78,12 +79,11 @@ impl Game {
             selector:               Default::default(),
             copied_frame:           None,
             camera:                 Camera::new(),
-            network:                Network::new()
+            tas:                    vec!()
         }
     }
 
     pub fn step(&mut self, input: &mut Input, os_input: &OsInput) -> GameState {
-        self.network.update(&mut self.package);
         {
             match self.state.clone() {
                 GameState::Local           => { self.step_local(input, os_input); }
@@ -651,7 +651,7 @@ fn area_to_render(area: &Area) -> RenderRect {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub enum GameState {
     Local,
     ReplayForwards,
@@ -661,13 +661,26 @@ pub enum GameState {
     Results, // Both Local and Netplay end at Results
 }
 
+impl Default for GameState {
+    fn default() -> GameState {
+        GameState::Paused
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub enum Edit {
     Fighter (usize), // index to player
     Player  (usize),
     Stage
 }
 
-#[derive(Debug, Clone, Default)]
+impl Default for Edit {
+    fn default() -> Edit {
+        Edit::Stage
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct Selector {
     colboxes: HashSet<usize>,
     moving:   bool,
@@ -697,7 +710,12 @@ pub enum RenderEntity {
     Area     (RenderRect),
 }
 
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct RenderRect {
     pub p1: (f32, f32),
     pub p2: (f32, f32),
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct TasInput {
 }

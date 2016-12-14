@@ -15,7 +15,6 @@ pub mod app;
 pub mod buffers;
 pub mod camera;
 pub mod cli;
-pub mod command;
 pub mod fighter;
 pub mod game;
 pub mod graphics;

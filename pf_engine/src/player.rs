@@ -810,8 +810,7 @@ pub struct RenderPlayer {
     pub selected_colboxes: HashSet<usize>,
 }
 
-#[derive(Clone)]
-#[derive(Default)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct DebugPlayer {
     pub physics:        bool,
     pub input:          bool,

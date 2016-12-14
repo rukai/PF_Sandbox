@@ -3,7 +3,8 @@ use ::menu::{Menu, RenderMenu, MenuChoice};
 use ::cli::CLIChoice;
 use ::game::{Game, RenderGame, GameState};
 use ::graphics::Graphics;
-use ::input::{Input};
+use ::input::Input;
+use ::network::Network;
 
 use libusb::Context;
 use glium::glutin::VirtualKeyCode;
@@ -15,6 +16,7 @@ pub fn run(mut state: AppState) {
     let mut input = Input::new(&mut context);
     let (graphics_tx, mut os_input) = Graphics::init();
     let mut next_state = NextAppState::None;
+    let mut network = Network::new();
 
     loop {
         let frame_start = Instant::now();
@@ -79,6 +81,7 @@ pub fn run(mut state: AppState) {
                     }
                     _ => { }
                 }
+                network.update(game);
                 graphics_tx.send(game.graphics_message()).unwrap();
             }
         };

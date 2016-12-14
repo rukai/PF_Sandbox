@@ -11,7 +11,7 @@ use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType};
 use ::rules::Rules;
 use ::stage::Stage;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Package {
         path:               PathBuf,
     pub meta:               PackageMeta,
@@ -22,6 +22,12 @@ pub struct Package {
         stages_filenames:   Vec<String>,
         fighters_filenames: Vec<String>,
         package_updates:    Vec<PackageUpdate>,
+}
+
+impl Default for Package {
+    fn default() -> Package {
+        Package::open_or_generate("base_package")
+    }
 }
 
 impl Package {
@@ -300,9 +306,8 @@ impl Package {
 
 impl Node for Package {
     fn node_step(&mut self, mut runner: NodeRunner) -> String {
-        match runner.step() {
+        let result = match runner.step() {
             NodeToken::ChainProperty (property) => {
-                println!("{}", property);
                 match property.as_str() {
                     "fighters" => { self.fighters.node_step(runner) }
                     "stages"   => { self.stages.node_step(runner) }
@@ -312,12 +317,15 @@ impl Node for Package {
                 }
             }
             action => { format!("Package cannot '{:?}'", action) }
-        }
+        };
+
+        self.force_update_entire_package();
+        result
     }
 }
 
 // Finer grained changes are used when speed is needed
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum PackageUpdate {
     Package (Package),
     DeleteFighterFrame { fighter: usize, action: usize, frame_index: usize },
