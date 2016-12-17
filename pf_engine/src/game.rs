@@ -1,4 +1,4 @@
-use ::input::{Input, PlayerInput};
+use ::input::{Input, PlayerInput, ControllerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer};
@@ -30,7 +30,7 @@ pub struct Game {
     pub selector:               Selector,
     copied_frame:               Option<ActionFrame>,
     pub camera:                 Camera,
-    pub tas:                    Vec<TasInput>
+    pub tas:                    Vec<ControllerInput>
 }
 
 /// Frame 0 refers to the initial state of the game.
@@ -147,7 +147,7 @@ impl Game {
         self.step_game(player_inputs);
 
         // pause game
-        if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
+        if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
             self.state = GameState::Paused;
         }
     }
@@ -232,7 +232,7 @@ impl Game {
         else if os_input.key_pressed(VirtualKeyCode::I) {
             self.jump_frame();
         }
-        else if input.start_pressed() {
+        else if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Return) {
             self.state = GameState::Local;
         }
 
@@ -489,7 +489,7 @@ impl Game {
             if os_input.key_pressed(VirtualKeyCode::H) {
                 self.state = GameState::ReplayBackwards;
             }
-            if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
+            if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
                 self.state = GameState::Paused;
             }
             self.current_frame += 1;
@@ -516,7 +516,7 @@ impl Game {
         if os_input.key_pressed(VirtualKeyCode::L) {
             self.state = GameState::ReplayForwards;
         }
-        else if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) {
+        else if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
             self.state = GameState::Paused;
             self.update_frame();
         }
@@ -716,6 +716,3 @@ pub struct RenderRect {
     pub p2: (f32, f32),
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
-pub struct TasInput {
-}

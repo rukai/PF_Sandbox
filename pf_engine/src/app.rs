@@ -21,11 +21,11 @@ pub fn run(mut state: AppState) {
     loop {
         let frame_start = Instant::now();
 
-        input.update();
         os_input.update();
 
         match &mut state {
             &mut AppState::Menu (ref mut menu) => {
+                input.update(&[]);
                 for menu_choice in menu.step(&mut input) {
                     match menu_choice {
                         MenuChoice::Start (menu_game_setup) => {
@@ -43,7 +43,7 @@ pub fn run(mut state: AppState) {
                 let netplay = false;
                 let fighters: Vec<usize> = vec!(0);
                 let mut controllers: Vec<usize> = vec!();
-                input.game_update(0);
+                input.game_update(0); // TODO: is this needed? What can I do to remove it?
                 for (i, _) in input.players(0).iter().enumerate() {
                     controllers.push(i);
                 }
@@ -75,6 +75,7 @@ pub fn run(mut state: AppState) {
             }
 
             &mut AppState::Game (ref mut game) => {
+                input.update(&game.tas);
                 match game.step(&mut input, &os_input) {
                     GameState::Results => {
                         next_state = NextAppState::Menu;

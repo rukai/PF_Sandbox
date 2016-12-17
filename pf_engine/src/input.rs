@@ -2,6 +2,8 @@ use libusb::{Context, Device, DeviceHandle, Error};
 use std::ops::Index;
 use std::time::Duration;
 
+use treeflection::{Node, NodeRunner, NodeToken};
+
 pub struct Input<'a> {
     adapter_handles: Vec<DeviceHandle<'a>>,
     current_inputs:  Vec<ControllerInput>,      // inputs for this frame
@@ -64,20 +66,24 @@ impl<'a> Input<'a> {
         match e {
             Error::Access => {
                 println!("GC adapter: Permissions error{}", access_solution);
-
             },
             _ => { println!("GC adapter: Failed to open handle: {:?}", e); },
         }
     }
 
     /// Call this once every frame
-    pub fn update(&mut self) {
+    pub fn update(&mut self, tas_inputs: &[ControllerInput]) {
         let mut inputs: Vec<ControllerInput> = Vec::new();
+
+        for input in tas_inputs.iter().rev() {
+            inputs.insert(0, input.clone());
+        }
 
         for handle in &mut self.adapter_handles {
             read_gc_adapter(handle, &mut inputs);
         }
         read_usb_controllers(&mut inputs);
+
 
         self.current_inputs = inputs;
     }
@@ -94,7 +100,7 @@ impl<'a> Input<'a> {
             self.game_inputs.pop();
         }
 
-        self.game_inputs.push(self.current_inputs.clone());
+		self.game_inputs.push(self.current_inputs.clone());
     }
 
 
@@ -333,7 +339,7 @@ fn trigger_filter(trigger: u8) -> f32 {
 }
 
 /// Internal input storage
-#[derive(Clone)]
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct ControllerInput {
     pub plugged_in: bool,
 
