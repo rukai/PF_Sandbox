@@ -7,6 +7,7 @@ use ::camera::Camera;
 use ::stage::Area;
 use ::graphics::GraphicsMessage;
 use ::app::Render;
+use ::collision::collision_check;
 
 use ::std::collections::HashSet;
 
@@ -542,6 +543,13 @@ impl Game {
                 let fighter = &self.package.fighters[self.selected_fighters[i]];
                 let input = &player_input[self.selected_controllers[i]];
                 player.step(input, fighter, stage);
+            }
+
+            // check collisions
+            let collision_results = collision_check(&self.players, &self.package.fighters, &self.selected_fighters);
+            for (i, player) in (&mut *self.players).iter_mut().enumerate() {
+                let fighter = &self.package.fighters[self.selected_fighters[i]];
+                player.step_collision(fighter, &collision_results[i]);
             }
         }
 

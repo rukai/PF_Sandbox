@@ -1,6 +1,7 @@
 use ::fighter::*;
 use ::input::{PlayerInput};
 use ::stage::{Stage, Platform, Area};
+use ::collision::CollisionResult;
 
 use num::FromPrimitive;
 use std::collections::HashSet;
@@ -13,7 +14,7 @@ pub struct Player {
     action_set:           bool,
     pub frame:            u64,
     pub stocks:           u64,
-    pub damage:           u64,
+    pub damage:           f32,
     pub bps_x:            f32,
     pub bps_y:            f32,
     pub spawn:            (f32, f32),
@@ -42,7 +43,7 @@ impl Player {
             action_set:       false,
             frame:            0,
             stocks:           stocks,
-            damage:           0,
+            damage:           0.0,
             bps_x:            spawn.0,
             bps_y:            spawn.1,
             spawn:            spawn,
@@ -68,6 +69,44 @@ impl Player {
     fn set_action(&mut self, action: Action) {
         self.action_new = action as u64;
         self.action_set = true;
+    }
+
+    pub fn step_collision(&mut self, fighter: &Fighter, col_results: &[CollisionResult]) {
+        for col_result in col_results {
+            match col_result {
+                &CollisionResult::HitDef (ref hitbox, ref hurtbox) => {
+                    let damage_done = hitbox.damage * hurtbox.damage_mult; // TODO: apply staling
+                    self.damage += damage_done;
+
+                    let damage_launch = 0.05 * (hitbox.damage * (damage_done + self.damage.floor())) + (damage_done + self.damage) * 0.1;
+                    let weight = 2.0 - (2.0 * fighter.weight) / (1.0 + fighter.weight);
+                    let kbg = hitbox.kbg + hurtbox.kbg_add;
+                    let bkb = hitbox.bkb + hurtbox.bkb_add;
+
+                    let mut kb_vel = (bkb + kbg * (damage_launch * weight * 1.4 + 18.0)).min(2500.0); // 96
+
+                    if let Some(action) = Action::from_u64(self.action) {
+                        match action {
+                            Action::Crouch => {
+                                kb_vel *= 0.67;
+                            }
+                            _ => { }
+                        }
+                    }
+
+                    self.kb_x_vel = hitbox.angle.cos() * kb_vel * 0.03;
+                    self.kb_y_vel = hitbox.angle.sin() * kb_vel * 0.03;
+
+                    if true { // airbourne
+                        self.set_action(Action::DamageFly);
+                    }
+                    else {
+                        self.set_action(Action::Damage);
+                    }
+                }
+                _ => { }
+            }
+        }
     }
 
     pub fn step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage) {
@@ -408,6 +447,9 @@ impl Player {
             Some(Action::Run)          => { self.set_action(Action::Run);        },
             Some(Action::RunEnd)       => { self.set_action(Action::Idle);       },
             Some(Action::PassPlatform) => { self.set_action(Action::AerialFall); },
+            Some(Action::Damage)       => { self.set_action(Action::Idle);       },
+            Some(Action::DamageFly)    => { self.set_action(Action::DamageFall); },
+            Some(Action::DamageFall)   => { self.set_action(Action::DamageFall); },
             Some(Action::Turn) => {
                 let new_action = if self.relative_f(input[0].stick_x) > 0.79 && self.turn_dash_buffer {
                     Action::Dash
@@ -454,6 +496,7 @@ impl Player {
             Some(Action::TechF)       => { self.set_action(Action::Idle);        },
             Some(Action::TechS)       => { self.set_action(Action::Idle);        },
             Some(Action::TechB)       => { self.set_action(Action::Idle);        },
+            Some(Action::Rebound)     => { self.set_action(Action::Idle);        },
 
             // Attack
             Some(Action::Jab)        => { self.set_action(Action::Idle); },
@@ -503,6 +546,11 @@ impl Player {
         for mut colbox in &mut frame.colboxes[..] {
             let (x, y) = colbox.point;
             colbox.point = (self.relative_f(x), y);
+            if let &mut CollisionBoxRole::Hit (ref mut hitbox) = &mut colbox.role {
+                if !self.face_right {
+                    hitbox.angle = 180.0 - hitbox.angle
+                };
+            }
         }
 
         // fix effects
@@ -581,6 +629,19 @@ impl Player {
             self.x_vel += fighter.friction;
             if self.x_vel > 0.0 {
                 self.x_vel = 0.0;
+            }
+        }
+
+        if self.kb_x_vel > 0.0 {
+            self.kb_x_vel -= fighter.friction;
+            if self.kb_x_vel < 0.0 {
+                self.kb_x_vel = 0.0;
+            }
+        }
+        else {
+            self.kb_x_vel += fighter.friction;
+            if self.kb_x_vel > 0.0 {
+                self.kb_x_vel = 0.0;
             }
         }
     }
@@ -696,10 +757,13 @@ impl Player {
 
     fn die(&mut self, fighter: &Fighter) {
         self.stocks -= 1;
+        self.damage = 0.0;
         self.bps_x = self.spawn.0;
         self.bps_y = self.spawn.1;
-        self.y_vel = 0.0;
         self.x_vel = 0.0;
+        self.y_vel = 0.0;
+        self.kb_x_vel = 0.0;
+        self.kb_y_vel = 0.0;
         self.air_jumps_left = fighter.air_jumps;
         self.fastfall = false;
         self.set_action(Action::Spawn);

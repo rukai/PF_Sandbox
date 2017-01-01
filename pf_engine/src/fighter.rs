@@ -16,7 +16,7 @@ impl Fighter {
             iasa:   0,
         };
         let mut actions: ContextVec<ActionDef> = ContextVec::new();
-        for _ in 0..((Action::TurnRun as usize)+1) { // TODO: Super gross but what is a man to do?
+        for _ in 0..((Action::CrouchEnd as usize)+1) { // TODO: Super gross but what is a man to do?
             actions.push(action_def.clone());
         }
         
@@ -32,7 +32,7 @@ impl Fighter {
 
             //in game attributes
             air_jumps:             1,
-            weight:                100,
+            weight:                1.0, // weight = old value / 100
             gravity:               -0.1,
             terminal_vel:          -2.0,
             fastfall_terminal_vel: -3.0,
@@ -67,7 +67,7 @@ pub struct Fighter {
 
     //in game attributes
     pub air_jumps:             u64,
-    pub weight:                u64,
+    pub weight:                f32,
     pub gravity:               f32,
     pub terminal_vel:          f32,
     pub fastfall_terminal_vel: f32,
@@ -107,7 +107,7 @@ pub struct ActionFrame {
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct CollisionBoxLink {
-    pub one:       usize,
+    pub one:       usize, // TODO: rename to Primary and Secondary (CollisionBoxLink takes its role from the primary CollisionBox)
     pub two:       usize,
     pub link_type: LinkType,
 }
@@ -172,9 +172,15 @@ pub enum Action {
     JumpAerialF,
     JumpAerialB,
     Turn,
+    TurnRun,
+    TurnDash,
     Dash,
     Run,
     RunEnd,
+    PassPlatform,
+    Damage,
+    DamageFly,
+    DamageFall,
 
     // Defense
     ShieldOn,
@@ -188,6 +194,7 @@ pub enum Action {
     TechF,
     TechS,
     TechB,
+    Rebound, // State after clang
 
     // Attacks
     Jab,
@@ -219,14 +226,9 @@ pub enum Action {
     TauntLeft,
     TauntRight,
 
-    // crouch
+    // Crouch
     CrouchStart,
     CrouchEnd,
-
-    // unsorted for compatibility with packages
-    PassPlatform,
-    TurnRun,
-    TurnDash,
 }
 }
 
@@ -248,7 +250,7 @@ impl Default for FrameEffect {
     }
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct CollisionBox {
     pub point:  (f32, f32),
     pub radius: f32,
@@ -256,11 +258,29 @@ pub struct CollisionBox {
 }
 
 impl CollisionBox {
-    pub fn new (point: (f32, f32)) -> CollisionBox {
+    pub fn new(point: (f32, f32)) -> CollisionBox {
         CollisionBox {
             point:  point,
-            radius: 2.0,
-            role:   CollisionBoxRole::Intangible,
+            radius: 3.0,
+            role:   CollisionBoxRole::default()
+        }
+    }
+
+    /// Warning: panics when not a hitbox
+    pub fn hitbox_ref(&self) -> &HitBox {
+        match &self.role {
+            &CollisionBoxRole::Hit (ref hitbox) => hitbox,
+            _ => panic!("Called hitbox_ref on a CollisionBox that is not a HitBox")
+        }
+    }
+}
+
+impl Default for CollisionBox {
+    fn default() -> CollisionBox {
+        CollisionBox {
+            point:  (0.0, 0.0),
+            radius: 3.0,
+            role:   CollisionBoxRole::default()
         }
     }
 }
@@ -282,24 +302,53 @@ impl Default for CollisionBoxRole {
     }
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub struct HurtBox {
-    pub knockback_mod: u64,
-    pub damage_mod:    u64,
+    pub bkb_add:     f32,
+    pub kbg_add:     f32,
+    pub damage_mult: f32,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+impl Default for HurtBox {
+    fn default() -> HurtBox {
+        HurtBox {
+            bkb_add:     0.0,
+            kbg_add:     1.0,
+            damage_mult: 1.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub struct HitBox {
-    pub shield_damage: u64,
-    pub damage:        u64,
-    pub bkb:           u64, // base knockback
-    pub kbg:           u64, // knockback growth
-    pub angle:         u64,
-    pub priority:      u64,
-    pub effect:        HitboxEffect,
+    pub shield_damage:  f32,
+    pub damage:         f32,
+    pub bkb:            f32, // base knockback
+    pub kbg:            f32, // knockback growth = old value / 100
+    pub angle:          f32,
+    pub check_order:    i64, // order collision checks take place (lower numbers are checked first)
+    pub enable_clang:   bool,
+    pub enable_rebound: bool,
+    pub effect:         HitboxEffect,
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+impl Default for HitBox {
+    fn default() -> HitBox {
+        HitBox {
+            shield_damage:  10.0,
+            damage:         10.0,
+            bkb:            60.0,
+            kbg:            1.0,
+            angle:          0.0,
+            enable_clang:   true,
+            enable_rebound: true,
+            check_order:    0,
+            effect:         HitboxEffect::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub enum HitboxEffect {
     Fire,
     Electric,
