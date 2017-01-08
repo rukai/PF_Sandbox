@@ -30,17 +30,22 @@ impl Default for Package {
     }
 }
 
+fn engine_version() -> u64 {
+    return 0;
+}
+
 impl Package {
     fn open(name: &str) -> Package {
         let mut path = PathBuf::from("packages");
         path.push(name);
 
         let meta = PackageMeta {
-            version:   0,
-            title:     "".to_string(),
-            source:    "".to_string(),
-            signature: "".to_string(),
-            read_only: false,
+            engine_version:  engine_version(),
+            save_version:    0,
+            title:           "".to_string(),
+            source:          "".to_string(),
+            signature:       "".to_string(),
+            read_only:       false,
         };
 
         let mut package = Package {
@@ -57,19 +62,22 @@ impl Package {
         package
     }
 
+    // TODO: Eventually we will just ship with some nice example package
+    // This function will be deleted and we can just load the example package everywhere this is used.
     fn generate_base(name: &str) -> Package {
         let mut path = PathBuf::from("packages");
         path.push(name);
 
         let meta = PackageMeta {
-            version:   0,
-            title:     "Base Package".to_string(),
-            source:    "example.com/base_package".to_string(),
-            signature: "".to_string(),
-            read_only: false,
+            engine_version:  engine_version(),
+            save_version:    0,
+            title:           "Base Package".to_string(),
+            source:          "example.com/base_package".to_string(),
+            signature:       "".to_string(),
+            read_only:       false,
         };
 
-        let package = Package {
+        let mut package = Package {
             meta:               meta,
             rules:              Rules::base(),
             stages:             ContextVec::from_vec(vec!(Stage::base())),
@@ -97,7 +105,8 @@ impl Package {
         package
     }
 
-    pub fn save(&self) {
+    pub fn save(&mut self) {
+        self.meta.save_version += 1;
         // Create directory structure
         DirBuilder::new().recursive(true).create(self.path.join("Fighters")).unwrap();
         DirBuilder::new().recursive(true).create(self.path.join("Stages")).unwrap();
@@ -116,8 +125,16 @@ impl Package {
     }
 
     pub fn load(&mut self) {
-        self.rules = Package::load_struct(self.path.join("rules.json"));
         self.meta = Package::load_struct(self.path.join("package_meta.json"));
+
+        if self.meta.engine_version > engine_version() {
+            panic!("Package is newer then this version of PF Engine. Please upgrade to the latest version.");
+        }
+        else if self.meta.engine_version < engine_version() {
+            // TODO: run data structure upgrades
+        }
+
+        self.rules = Package::load_struct(self.path.join("rules.json"));
 
         for path in fs::read_dir(self.path.join("Fighters")).unwrap() {
             // TODO: Use magic rust powers to filter out non .json files and form a vec of fighter_filenames
@@ -337,10 +354,11 @@ pub enum PackageUpdate {
 // TODO: Why the seperate struct?
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PackageMeta {
-    pub version:   u64,    // increment every release, 
-    pub title:     String, // User readable title
-    pub source:    String, // check "https://"+source+str(release+1)+".zip" for the next update
-    pub signature: String, // package validity + title + version will be boldly declared on the CSS screen
-    pub read_only: bool,   // read only packages must be copied before being modified
+    pub engine_version:  u64,    // compared with a value incremented by pf engine when there are breaking changes to data structures
+    pub save_version:    u64,    // incremented every time the package is saved
+    pub title:           String, // User readable title
+    pub source:          String, // check "https://"+source+str(release+1)+".zip" for the next update
+    pub signature:       String, // package validity + title + version will be boldly declared on the CSS screen
+    pub read_only:       bool,   // read only packages must be copied before being modified
     // TODO: will need to store public keys somewhere too
 }
