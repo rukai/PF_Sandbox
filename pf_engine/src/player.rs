@@ -200,10 +200,38 @@ impl Player {
             self.set_action(Action::AerialDodge);
         }
         else {
-            self.x_vel = input.stick_x.value * 2.5
+            self.air_drift(input, fighter);
         }
 
         self.pass_through = input.stick_y.value < -0.2; // TODO: refine
+    }
+
+    fn air_drift(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        let term_vel = fighter.air_x_term_vel * input[0].stick_x;
+        let drift = input[0].stick_x.abs() >= 0.3;
+        if !drift ||
+           (term_vel < 0.0 && self.x_vel < term_vel) ||
+           (term_vel > 0.0 && self.x_vel > term_vel) {
+            if self.x_vel > 0.0 {
+                self.x_vel -= fighter.air_friction;
+                if self.x_vel < 0.0 {
+                    self.x_vel = 0.0;
+                }
+            }
+            else if self.x_vel < 0.0 {
+                self.x_vel += fighter.air_friction;
+                if self.x_vel > 0.0 {
+                    self.x_vel = 0.0;
+                }
+            }
+        }
+
+        if drift {
+            if (term_vel < 0.0 && self.x_vel > term_vel) ||
+               (term_vel > 0.0 && self.x_vel < term_vel) {
+                self.x_vel += fighter.air_mobility_a * input[0].stick_x + fighter.air_mobility_b * input[0].stick_x.signum();
+            }
+        }
     }
 
     // TODO: Turns always complete on frame 11, hardcoded or coincidence?
