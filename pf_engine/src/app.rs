@@ -39,9 +39,9 @@ pub fn run(mut state: AppState) {
 
             &mut AppState::CLI(ref cli_choices) => {
                 // default values
-                let stage = 0;
+                let mut stage = 0usize;
                 let netplay = false;
-                let fighters: Vec<usize> = vec!(0);
+                let mut fighters: Vec<usize> = vec!(0);
                 let mut controllers: Vec<usize> = vec!();
                 input.game_update(0); // TODO: is this needed? What can I do to remove it?
                 for (i, _) in input.players(0).iter().enumerate() {
@@ -53,8 +53,17 @@ pub fn run(mut state: AppState) {
                 // replace with any cli_choices
                 for choice in cli_choices {
                     match choice {
-                        &CLIChoice::Package (ref name) => { load_package = Some(Package::open_or_generate(&name)); },
-                        &CLIChoice::Close => { return; },
+                        &CLIChoice::Close => { return; }
+                        &CLIChoice::FighterIndexes (ref fighters_index) => { fighters = fighters_index.clone() }
+                        &CLIChoice::FighterNames (_)                  => { panic!("Unimplemented") }
+                        &CLIChoice::StageIndex (ref stage_index)       => { stage = *stage_index }
+                        &CLIChoice::StageName (_)                      => { panic!("Unimplemented") }
+                        &CLIChoice::Package (ref name)                 => { load_package = Some(Package::open_or_generate(&name)); }
+                        &CLIChoice::TotalPlayers (total_players) => {
+                            while controllers.len() > total_players {
+                                controllers.pop();
+                            }
+                        }
                     }
                 }
 
@@ -105,8 +114,7 @@ pub fn run(mut state: AppState) {
                 input.reset_history();
                 state = AppState::Game(Game::new(package, setup.fighters, setup.stage, setup.netplay, setup.controllers));
             }
-            NextAppState::Menu => {
-            }
+            NextAppState::Menu => { }
             NextAppState::None => { }
         }
         next_state = NextAppState::None;
@@ -143,9 +151,9 @@ enum PackageSource { // TODO: maybe I could get rid of this enum by adding packa
 #[derive(Clone)]
 pub struct GameSetup {
     pub controllers: Vec<usize>,
-    pub fighters: Vec<usize>,
-    pub stage: usize,
-    pub netplay: bool,
+    pub fighters:    Vec<usize>,
+    pub stage:       usize,
+    pub netplay:     bool,
 }
 
 pub enum Render {
