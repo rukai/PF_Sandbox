@@ -322,7 +322,7 @@ impl Default for HurtBox {
     fn default() -> HurtBox {
         HurtBox {
             bkb_add:     0.0,
-            kbg_add:     1.0,
+            kbg_add:     0.0,
             damage_mult: 1.0,
         }
     }

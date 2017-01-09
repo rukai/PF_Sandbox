@@ -3,6 +3,7 @@ use ::input::{PlayerInput};
 use ::stage::{Stage, Platform, Area};
 use ::collision::CollisionResult;
 
+use std::f32;
 use num::FromPrimitive;
 use std::collections::HashSet;
 use treeflection::{Node, NodeRunner, NodeToken};
@@ -22,6 +23,8 @@ pub struct Player {
     pub y_vel:            f32,
     pub kb_x_vel:         f32,
     pub kb_y_vel:         f32,
+    pub kb_x_dec:         f32,
+    pub kb_y_dec:         f32,
     pub ecb_w:            f32,
     pub ecb_y:            f32, // relative to bps.y. when 0, the bottom of the ecb touches the bps
     pub ecb_top:          f32, // Relative to ecb_y
@@ -51,6 +54,8 @@ impl Player {
             y_vel:            0.0,
             kb_x_vel:         0.0,
             kb_y_vel:         0.0,
+            kb_x_dec:         0.0,
+            kb_y_dec:         0.0,
             ecb_w:            0.0,
             ecb_y:            0.0,
             ecb_top:          0.0,
@@ -94,8 +99,22 @@ impl Player {
                         }
                     }
 
-                    self.kb_x_vel = hitbox.angle.cos() * kb_vel * 0.03;
-                    self.kb_y_vel = hitbox.angle.sin() * kb_vel * 0.03;
+                    let angle = hitbox.angle * f32::consts::PI / 180.0;
+                    let (sin, cos) = angle.sin_cos();
+                    self.kb_x_vel = cos * kb_vel * 0.03;
+                    self.kb_y_vel = sin * kb_vel * 0.03;
+                    self.kb_x_dec = cos * 0.051;
+                    self.kb_y_dec = sin * 0.051;
+
+                    if self.kb_y_vel == 0.0 {
+                        if kb_vel >= 80.0 {
+                            self.airbourne = true;
+                            self.bps_y += 0.0001;
+                        }
+                    }
+                    else if self.kb_y_vel > 0.0 {
+                        self.airbourne = true;
+                    }
 
                     if true { // airbourne
                         self.set_action(Action::DamageFly);
@@ -698,7 +717,6 @@ impl Player {
      */
 
     fn physics_step(&mut self, fighter: &Fighter, stage: &Stage) {
-        // movement
         if self.airbourne {
             if self.fastfall {
                 self.y_vel = fighter.fastfall_terminal_vel;
@@ -710,9 +728,9 @@ impl Player {
                 }
             }
 
-            self.bps_x += self.x_vel;
-            self.bps_y += match self.land_stage_collision(stage, self.y_vel) {
-                None => { self.y_vel },
+            self.bps_x += self.x_vel + self.kb_x_vel;
+            self.bps_y += match self.land_stage_collision(stage, self.y_vel + self.kb_y_vel) {
+                None => { self.y_vel + self.kb_y_vel},
                 Some(platform) => {
                     self.land(fighter);
                     let ecb_y = self.bps_y + self.ecb_y + self.ecb_bottom;
@@ -723,6 +741,32 @@ impl Player {
         }
         else {
             self.bps_x += self.x_vel + self.kb_x_vel;
+            self.bps_y += self.y_vel + self.kb_y_vel;
+        }
+
+        if self.kb_x_vel.abs() > 0.0 {
+            let vel_dir = self.kb_x_vel.signum();
+            if self.airbourne {
+                self.kb_x_vel -= self.kb_x_dec;
+            } else {
+                self.kb_x_vel -= vel_dir * fighter.friction;
+            }
+            if vel_dir != self.kb_x_vel.signum() {
+                self.kb_x_vel = 0.0;
+            }
+        }
+
+        if self.kb_y_vel.abs() > 0.0 {
+            if self.airbourne {
+                let vel_dir = self.kb_y_vel.signum();
+                self.kb_y_vel -= self.kb_y_dec;
+                if vel_dir != self.kb_y_vel.signum() {
+                    self.kb_y_vel = 0.0;
+                }
+            }
+            else {
+                self.kb_y_vel = 0.0;
+            }
         }
 
         // are we on a platform?
@@ -754,19 +798,6 @@ impl Player {
             self.x_vel += fighter.friction;
             if self.x_vel > 0.0 {
                 self.x_vel = 0.0;
-            }
-        }
-
-        if self.kb_x_vel > 0.0 {
-            self.kb_x_vel -= fighter.friction;
-            if self.kb_x_vel < 0.0 {
-                self.kb_x_vel = 0.0;
-            }
-        }
-        else {
-            self.kb_x_vel += fighter.friction;
-            if self.kb_x_vel > 0.0 {
-                self.kb_x_vel = 0.0;
             }
         }
     }
@@ -845,6 +876,7 @@ impl Player {
     }
 
     fn land(&mut self, fighter: &Fighter) {
+        self.y_vel = 0.0;
         self.airbourne = false;
         self.fastfall = false;
         self.air_jumps_left = fighter.air_jumps;
@@ -884,7 +916,6 @@ impl Player {
     }
 
     fn fall(&mut self) {
-        self.y_vel = 0.0;
         self.airbourne = true;
         self.set_action(Action::Fall);
     }
