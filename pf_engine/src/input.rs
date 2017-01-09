@@ -319,10 +319,18 @@ fn stick_filter(in_stick_x: u8, in_stick_y: u8) -> (f32, f32) {
     let angle = (raw_stick_y).atan2(raw_stick_x);
 
     let max = (angle.cos() * 80.0).trunc();
-    let stick_x = abs_min(raw_stick_x, max) / 80.0;
+    let mut stick_x = abs_min(raw_stick_x, max) / 80.0;
 
     let max = (angle.sin() * 80.0).trunc();
-    let stick_y = abs_min(raw_stick_y, max) / 80.0;
+    let mut stick_y = abs_min(raw_stick_y, max) / 80.0;
+
+    let deadzone = 0.28;
+    if stick_x.abs() < deadzone {
+        stick_x = 0.0;
+    }
+    if stick_y.abs() < deadzone {
+        stick_y = 0.0;
+    }
 
     (stick_x, stick_y)
 }
