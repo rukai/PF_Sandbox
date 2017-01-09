@@ -185,6 +185,7 @@ pub enum Action {
     Dash,
     Run,
     RunEnd,
+    Walk,
     PassPlatform,
     Damage,
     DamageFly,
