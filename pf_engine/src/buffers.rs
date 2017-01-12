@@ -144,16 +144,11 @@ impl Buffers {
     }
 
     pub fn new_player(display: &GlutinFacade, player: &RenderPlayer) -> Buffers {
-        let ecb_w = player.ecb_w;
-        let ecb_y = player.ecb_y;
-        let ecb_top = player.ecb_top;
-        let ecb_bottom = player.ecb_bottom;
-
         // ecb
-        let vertex0 = Vertex { position: [ 0.0, ecb_y + ecb_bottom] };
-        let vertex1 = Vertex { position: [-ecb_w/2.0, ecb_y] };
-        let vertex2 = Vertex { position: [ ecb_w/2.0, ecb_y] };
-        let vertex3 = Vertex { position: [ 0.0, ecb_y + ecb_top] };
+        let vertex0 = Vertex { position: [ player.ecb.bot_x,   player.ecb.bot_y] };
+        let vertex1 = Vertex { position: [ player.ecb.left_x,  player.ecb.left_y] };
+        let vertex2 = Vertex { position: [ player.ecb.right_x, player.ecb.right_y] };
+        let vertex3 = Vertex { position: [ player.ecb.top_x,   player.ecb.top_y] };
 
         // horizontal bps
         let vertex4 = Vertex { position: [-4.0,-0.15] };

@@ -2,11 +2,19 @@ use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Stage {
-    pub name:         String,
-    pub platforms:    ContextVec<Platform>,
-    pub blast:        Area,
-    pub camera:       Area,
-    pub spawn_points: ContextVec<(f32, f32)>,
+    pub name:           String,
+    pub platforms:      ContextVec<Platform>,
+    pub blast:          Area,
+    pub camera:         Area,
+    pub spawn_points:   ContextVec<SpawnPoint>,
+    pub respawn_points: ContextVec<SpawnPoint>,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct SpawnPoint {
+    pub x:          f32,
+    pub y:          f32,
+    pub face_right: bool,
 }
 
 impl Stage {
@@ -41,15 +49,36 @@ impl Stage {
             top:   150.0,
         };
 
+        let spawn_points = ContextVec::from_vec(vec!(
+            SpawnPoint{
+                x:          -50.0,
+                y:          50.0,
+                face_right: true,
+            },
+            SpawnPoint{
+                x:          50.0,
+                y:          50.0,
+                face_right: false,
+            },
+            SpawnPoint{
+                x:          -50.0,
+                y:          80.0,
+                face_right: true,
+            },
+            SpawnPoint{
+                x:          50.0,
+                y:          80.0,
+                face_right: false,
+            },
+        ));
+
         Stage {
-            name:          "Base Stage".to_string(),
-            platforms:     ContextVec::from_vec(vec!(main_platform, second_platform)),
-            blast:         blast,
-            camera:        camera,
-            spawn_points:  ContextVec::from_vec(vec!(
-                (-50.0, 50.0), (50.0, 50.0),
-                (-50.0, 80.0), (50.0, 80.0),
-            )),
+            name:            "Base Stage".to_string(),
+            platforms:       ContextVec::from_vec(vec!(main_platform, second_platform)),
+            blast:           blast,
+            camera:          camera,
+            spawn_points:    spawn_points.clone(),
+            respawn_points:  spawn_points,
         }
     }
 }

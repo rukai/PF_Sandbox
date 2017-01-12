@@ -1,6 +1,6 @@
 use ::fighter::*;
 use ::input::{PlayerInput};
-use ::stage::{Stage, Platform, Area};
+use ::stage::{Stage, Platform, Area, SpawnPoint};
 use ::collision::CollisionResult;
 
 use std::f32;
@@ -18,17 +18,13 @@ pub struct Player {
     pub damage:           f32,
     pub bps_x:            f32,
     pub bps_y:            f32,
-    pub spawn:            (f32, f32),
+    pub respawn:          SpawnPoint,
     pub x_vel:            f32,
     pub y_vel:            f32,
     pub kb_x_vel:         f32,
     pub kb_y_vel:         f32,
     pub kb_x_dec:         f32,
     pub kb_y_dec:         f32,
-    pub ecb_w:            f32,
-    pub ecb_y:            f32, // relative to bps.y. when 0, the bottom of the ecb touches the bps
-    pub ecb_top:          f32, // Relative to ecb_y
-    pub ecb_bottom:       f32, // Relative to ecb_y
     pub face_right:       bool,
     pub airbourne:        bool,
     pub pass_through:     bool,
@@ -36,10 +32,12 @@ pub struct Player {
     pub air_jumps_left:   u64,
     pub jumpsquat_button: bool,
     pub turn_dash_buffer: bool,
+    pub ecb: ECB,
 }
 
+
 impl Player {
-    pub fn new(spawn: (f32, f32), stocks: u64) -> Player {
+    pub fn new(spawn: SpawnPoint, respawn: SpawnPoint, stocks: u64) -> Player {
         Player {
             action:           Action::Spawn as u64,
             action_new:       Action::Spawn as u64,
@@ -47,20 +45,17 @@ impl Player {
             frame:            0,
             stocks:           stocks,
             damage:           0.0,
-            bps_x:            spawn.0,
-            bps_y:            spawn.1,
-            spawn:            spawn,
+            bps_x:            spawn.x,
+            bps_y:            spawn.y,
+            respawn:          respawn,
             x_vel:            0.0,
             y_vel:            0.0,
             kb_x_vel:         0.0,
             kb_y_vel:         0.0,
             kb_x_dec:         0.0,
             kb_y_dec:         0.0,
-            ecb_w:            0.0,
-            ecb_y:            0.0,
-            ecb_top:          0.0,
-            ecb_bottom:       0.0,
-            face_right:       true,
+            ecb:              ECB::default(),
+            face_right:       spawn.face_right,
             airbourne:        true,
             pass_through:     false,
             fastfall:         false,
@@ -165,15 +160,14 @@ impl Player {
         let action = Action::from_u64(self.action);
 
         // update ecb
-        self.ecb_w = fighter_frame.ecb_w;
-        self.ecb_y = fighter_frame.ecb_y;
-        self.ecb_top = fighter_frame.ecb_h / 2.0;
-        self.ecb_bottom = match action {
+        let prev_bot_y = self.ecb.bot_y;
+        self.ecb = fighter_frame.ecb.clone();
+        match action {
             //TODO: Err does this if apply to all Some()?
             Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.frame < 10
-                => self.ecb_bottom,
-            _   => -fighter_frame.ecb_h / 2.0,
-        };
+                => { self.ecb.bot_y = prev_bot_y }
+            _   => { }
+        }
 
         if let Some(action) = action {
             match action {
@@ -733,9 +727,9 @@ impl Player {
                 None => { self.y_vel + self.kb_y_vel},
                 Some(platform) => {
                     self.land(fighter);
-                    let ecb_y = self.bps_y + self.ecb_y + self.ecb_bottom;
+                    let self_y = self.bps_y + self.ecb.bot_y;
                     let plat_y = platform.y + platform.h / 2.0;
-                    plat_y - ecb_y
+                    plat_y - self_y
                 },
             };
         }
@@ -813,15 +807,15 @@ impl Player {
                 continue;
             }
 
-            let ecb_x = self.bps_x;
-            let ecb_y = self.bps_y + self.ecb_y + self.ecb_bottom + y_offset;
+            let self_x = self.bps_x;
+            let self_y = self.bps_y + self.ecb.bot_y + y_offset;
 
             let plat_x1 = platform.x - platform.w / 2.0;
             let plat_x2 = platform.x + platform.w / 2.0;
             let plat_y1 = platform.y - platform.h / 2.0;
             let plat_y2 = platform.y + platform.h / 2.0;
 
-            if ecb_x > plat_x1 && ecb_x < plat_x2 && ecb_y > plat_y1 && ecb_y < plat_y2 {
+            if self_x > plat_x1 && self_x < plat_x2 && self_y > plat_y1 && self_y < plat_y2 {
                 return Some(platform)
                 // TODO: GAH, need to refactor to set PassPlatform state
             }
@@ -923,8 +917,9 @@ impl Player {
     fn die(&mut self, fighter: &Fighter) {
         self.stocks -= 1;
         self.damage = 0.0;
-        self.bps_x = self.spawn.0;
-        self.bps_y = self.spawn.1;
+        self.bps_x = self.respawn.x;
+        self.bps_y = self.respawn.y;
+        self.face_right = self.respawn.face_right;
         self.x_vel = 0.0;
         self.y_vel = 0.0;
         self.kb_x_vel = 0.0;
@@ -979,11 +974,8 @@ impl Player {
                 let frame = &frames[self.frame as usize];
                 let hitbox_count = frame.colboxes.len();
                 let effects_count = frame.effects.len();
-                let ecb_w = frame.ecb_w;
-                let ecb_h = frame.ecb_h;
-                let ecb_y = frame.ecb_y;
-                println!("Player: {}    colboxes: {}    effects: {}    ecb_w: {:.5}    ecb_h: {:.5}    ecb_y: {:.5}",
-                    index, hitbox_count, effects_count, ecb_w, ecb_h, ecb_y);
+                println!("Player: {}    colboxes: {}    effects: {}",
+                    index, hitbox_count, effects_count);
             }
             else {
                 println!("Player: {}    frame {} does not exist.", index, self.frame);
@@ -993,17 +985,14 @@ impl Player {
 
     pub fn render(&self, fighter: usize, selected_colboxes: HashSet<usize>, selected: bool, debug: DebugPlayer) -> RenderPlayer {
         RenderPlayer {
-            debug:      debug,
-            bps:        (self.bps_x, self.bps_y),
-            ecb_w:      self.ecb_w,
-            ecb_y:      self.ecb_y,
-            ecb_top:    self.ecb_top,
-            ecb_bottom: self.ecb_bottom,
-            frame:      self.frame as usize,
-            action:     self.action as usize,
-            fighter:    fighter,
-            face_right: self.face_right,
-            selected:   selected,
+            debug:             debug,
+            bps:               (self.bps_x, self.bps_y),
+            ecb:               self.ecb.clone(),
+            frame:             self.frame as usize,
+            action:            self.action as usize,
+            fighter:           fighter,
+            face_right:        self.face_right,
+            selected:          selected,
             selected_colboxes: selected_colboxes,
         }
     }
@@ -1027,10 +1016,7 @@ impl JumpResult {
 pub struct RenderPlayer {
     pub debug:      DebugPlayer,
     pub bps:        (f32, f32),
-    pub ecb_w:      f32,
-    pub ecb_y:      f32,
-    pub ecb_top:    f32,
-    pub ecb_bottom: f32,
+    pub ecb:        ECB,
     pub frame:      usize,
     pub action:     usize,
     pub fighter:    usize,

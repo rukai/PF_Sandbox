@@ -3,12 +3,14 @@ use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 impl Fighter {
     pub fn base() -> Fighter { // TODO: Change to default
         let action_frame1 = ActionFrame {
-            colboxes:     ContextVec::new(),
-            colbox_links: vec!(),
-            effects:      vec!(),
-            ecb_w:        3.5,
-            ecb_h:        12.0,
-            ecb_y:        6.0,
+            colboxes:      ContextVec::new(),
+            colbox_links:  vec!(),
+            effects:       vec!(),
+            ecb:           ECB::default(),
+            item_hold_x: 4.0,
+            item_hold_y: 11.0,
+            grab_hold_x: 4.0,
+            grab_hold_y: 11.0,
         };
 
         let action_def = ActionDef {
@@ -103,14 +105,43 @@ pub struct ActionDef {
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct ActionFrame {
-    pub colboxes:     ContextVec<CollisionBox>,
-    pub colbox_links: Vec<CollisionBoxLink>,
-    pub effects:      Vec<FrameEffect>,
-    pub ecb_w:        f32,
-    pub ecb_h:        f32,
-    pub ecb_y:        f32,
-    //pub item_hold_pos: (f32, f32),
-    //pub grab_hold_pos: (f32, f32),
+    pub ecb:           ECB,
+    pub colboxes:      ContextVec<CollisionBox>,
+    pub colbox_links:  Vec<CollisionBoxLink>,
+    pub effects:       Vec<FrameEffect>,
+    pub item_hold_x:   f32,
+    pub item_hold_y:   f32,
+    pub grab_hold_x:   f32,
+    pub grab_hold_y:   f32,
+}
+
+// GUI Editor will need to ensure that values are kept sane, e.g. left is leftmost, top is topmost etc.
+// CLI is fine as it is easier to keep track of which point is which
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub struct ECB {
+    pub top_x:   f32,
+    pub top_y:   f32,
+    pub left_x:  f32,
+    pub left_y:  f32,
+    pub right_x: f32,
+    pub right_y: f32,
+    pub bot_x:   f32,
+    pub bot_y:   f32,
+}
+
+impl Default for ECB {
+    fn default() -> ECB {
+        ECB {
+            top_x:   0.0,
+            top_y:   16.0,
+            left_x:  -4.0,
+            left_y:  11.0,
+            right_x: 4.0,
+            right_y: 11.0,
+            bot_x:   0.0,
+            bot_y:   0.0,
+        }
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]

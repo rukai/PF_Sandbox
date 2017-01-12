@@ -46,10 +46,12 @@ impl Game {
         let mut debug_players: Vec<DebugPlayer> = vec!();
         {
             let spawn_points = &package.stages[selected_stage].spawn_points;
+            let respawn_points = &package.stages[selected_stage].respawn_points;
             for (i, _) in selected_controllers.iter().enumerate() {
                 // Stages can have less spawn points then players
                 let spawn = spawn_points[i % spawn_points.len()].clone();
-                players.push(Player::new(spawn, package.rules.stock_count));
+                let respawn = respawn_points[i % respawn_points.len()].clone();
+                players.push(Player::new(spawn, respawn, package.rules.stock_count));
                 debug_players.push(Default::default());
             }
         }
