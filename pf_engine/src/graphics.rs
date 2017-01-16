@@ -59,13 +59,20 @@ impl Graphics {
         let mut shaders: HashMap<String, String> = HashMap::new();
 
         let dir_path = PathBuf::from("shaders");
-        for path in fs::read_dir(dir_path).unwrap() {
-            let full_path = path.unwrap().path();
+        match fs::read_dir(dir_path) {
+            Ok (paths) => {
+                for path in paths {
+                    let full_path = path.unwrap().path();
 
-            let mut shader_source = String::new();
-            File::open(&full_path).unwrap().read_to_string(&mut shader_source).unwrap();
-            let key = full_path.file_stem().unwrap().to_str().unwrap().to_string();
-            shaders.insert(key, shader_source);
+                    let mut shader_source = String::new();
+                    File::open(&full_path).unwrap().read_to_string(&mut shader_source).unwrap();
+                    let key = full_path.file_stem().unwrap().to_str().unwrap().to_string();
+                    shaders.insert(key, shader_source);
+                }
+            }
+            Err (_) => {
+                panic!("Running from incorrect directory");
+            }
         }
 
         shaders

@@ -94,7 +94,24 @@ impl Player {
                         }
                     }
 
-                    let angle = hitbox.angle * f32::consts::PI / 180.0;
+                    let angle_deg = if hitbox.angle == 361.0 {
+                        if kb_vel < 32.1 {
+                            0.0
+                        }
+                        else {
+                            44.0
+                        }
+                    } else if hitbox.angle == 180.0 - 361.0 {
+                        if kb_vel < 32.1 {
+                            180.0
+                        }
+                        else {
+                            180.0 - 44.0
+                        }
+                    } else {
+                        hitbox.angle
+                    };
+                    let angle = angle_deg * f32::consts::PI / 180.0;
                     let (sin, cos) = angle.sin_cos();
                     self.kb_x_vel = cos * kb_vel * 0.03;
                     self.kb_y_vel = sin * kb_vel * 0.03;

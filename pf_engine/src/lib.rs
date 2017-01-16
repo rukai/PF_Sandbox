@@ -1,3 +1,4 @@
+#![feature(drop_types_in_const)]
 extern crate getopts;
 extern crate libusb;
 extern crate num;
