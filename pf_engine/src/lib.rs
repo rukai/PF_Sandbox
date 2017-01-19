@@ -20,6 +20,7 @@ pub mod fighter;
 pub mod game;
 pub mod graphics;
 pub mod input;
+pub mod json_upgrade;
 pub mod menu;
 pub mod network;
 pub mod os_input;

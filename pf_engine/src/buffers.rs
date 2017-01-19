@@ -95,7 +95,7 @@ impl Buffers {
 
         for link in &frame.colbox_links {
             match link.link_type {
-                LinkType::Meld => {
+                LinkType::MeldFirst | LinkType::MeldSecond => {
                     // draw a rectangle connecting two colboxes
                     let (x1, y1) = frame.colboxes[link.one].point;
                     let (x2, y2) = frame.colboxes[link.two].point;

@@ -3,13 +3,15 @@ use std::io::Read;
 use std::io::Write;
 use std::path::{PathBuf, Path};
 use std::collections::HashSet;
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
+use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType};
 use ::rules::Rules;
 use ::stage::Stage;
+use ::json_upgrade::{engine_version, upgrade_to_latest};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Package {
@@ -28,10 +30,6 @@ impl Default for Package {
     fn default() -> Package {
         Package::open_or_generate("base_package")
     }
-}
-
-fn engine_version() -> u64 {
-    return 0;
 }
 
 impl Package {
@@ -125,35 +123,47 @@ impl Package {
     }
 
     pub fn load(&mut self) {
-        self.meta = Package::load_struct(self.path.join("package_meta.json"));
+        let mut meta = Package::load_struct(self.path.join("package_meta.json"));
+        let mut rules = Package::load_struct(self.path.join("rules.json"));
 
-        if self.meta.engine_version > engine_version() {
-            panic!("Package is newer then this version of PF Engine. Please upgrade to the latest version.");
-        }
-        else if self.meta.engine_version < engine_version() {
-            // TODO: run data structure upgrades
-        }
-
-        self.rules = Package::load_struct(self.path.join("rules.json"));
-
+        let mut fighters: Vec<Value> = vec!();
         for path in fs::read_dir(self.path.join("Fighters")).unwrap() {
-            // TODO: Use magic rust powers to filter out non .json files and form a vec of fighter_filenames
-            // http://stackoverflow.com/questions/31225745/iterate-over-stdfsreaddir-and-get-only-filenames-from-paths
-
             let full_path = path.unwrap().path();
             self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
 
-            self.fighters.push(Package::load_struct(full_path));
+            fighters.push(Package::load_struct(full_path));
         }
 
+        let mut stages: Vec<Value> = vec!();
         for path in fs::read_dir(self.path.join("Stages")).unwrap() {
             let full_path = path.unwrap().path();
             self.stages_filenames.push(full_path.to_str().unwrap().to_string());
 
-            self.stages.push(Package::load_struct(full_path));
+            stages.push(Package::load_struct(full_path));
+        }
+
+        // the upgraded json is loaded into this package
+        // the user can then save the package to make the upgrade permanent
+        // some nice side effects:
+        // *    the package cannot be saved if it wont load
+        // *    the user can choose to not save, if they find issues with the upgrade
+        upgrade_to_latest(&mut meta, &mut rules, &mut fighters, &mut stages);
+        self.load_from_json(meta, rules, fighters, stages);
+    }
+
+    pub fn load_from_json(&mut self, meta: Value, rules: Value, fighters: Vec<Value>, stages: Vec<Value>) {
+        self.meta = serde_json::from_value(meta).unwrap();
+        self.rules = serde_json::from_value(rules).unwrap();
+    
+        for fighter in fighters {
+            self.fighters.push(serde_json::from_value(fighter).unwrap());
+        }
+
+        for stage in stages {
+            self.stages.push(serde_json::from_value(stage).unwrap());
         }
     }
-    
+
     // Save a struct to the given file name
     fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
         let json = serde_json::to_string_pretty(object).unwrap();
@@ -161,7 +171,7 @@ impl Package {
     }
 
     // Load a struct from the given file name
-    fn load_struct<T: Deserialize>(filename: PathBuf) -> T {
+    fn load_struct(filename: PathBuf) -> Value {
         let mut json = String::new();
         File::open(filename).unwrap().read_to_string(&mut json).unwrap();
         serde_json::from_str(&json).unwrap()

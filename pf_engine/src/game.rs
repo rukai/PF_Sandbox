@@ -322,7 +322,7 @@ impl Game {
                                 let new_colbox = CollisionBox::new(point);
                                 let link_type = match os_input.held_shift() {
                                     true  => { LinkType::Simple },
-                                    false => { LinkType::Meld }
+                                    false => { LinkType::MeldFirst }
                                 };
 
                                 self.package.append_fighter_colbox(fighter, action, frame, new_colbox, &self.selector.colboxes, link_type)

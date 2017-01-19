@@ -5,6 +5,7 @@ impl Fighter {
         let action_frame1 = ActionFrame {
             colboxes:      ContextVec::new(),
             colbox_links:  vec!(),
+            render_order:  vec!(),
             effects:       vec!(),
             ecb:           ECB::default(),
             item_hold_x: 4.0,
@@ -108,11 +109,124 @@ pub struct ActionFrame {
     pub ecb:           ECB,
     pub colboxes:      ContextVec<CollisionBox>,
     pub colbox_links:  Vec<CollisionBoxLink>,
+    pub render_order:  Vec<RenderOrder>,
     pub effects:       Vec<FrameEffect>,
     pub item_hold_x:   f32,
     pub item_hold_y:   f32,
     pub grab_hold_x:   f32,
     pub grab_hold_y:   f32,
+}
+
+impl ActionFrame {
+    pub fn get_hitboxes(&self) -> Vec<&CollisionBox> {
+        let mut result = self.get_colboxes();
+        result.retain(|x| matches!(x.role, CollisionBoxRole::Hit(_)));
+        result
+    }
+
+    pub fn get_hurtboxes(&self) -> Vec<&CollisionBox> {
+        let mut result = self.get_colboxes();
+        result.retain(|x| matches!(x.role, CollisionBoxRole::Hurt(_)));
+        result
+    }
+
+    pub fn get_colboxes(&self) -> Vec<&CollisionBox> {
+        let mut result: Vec<&CollisionBox> = vec!();
+        for (i, colbox) in self.colboxes.iter().enumerate() {
+            if self.is_unordered(&RenderOrder::Colbox(i)) {
+                result.push(colbox);
+            }
+        }
+
+        for order in &self.render_order {
+            if let &RenderOrder::Colbox (index) = order {
+                result.push(&self.colboxes[index]);
+            }
+        }
+
+        result
+    }
+
+    pub fn get_links(&self) -> Vec<&CollisionBoxLink> {
+        let mut result: Vec<&CollisionBoxLink> = vec!();
+        for (i, link) in self.colbox_links.iter().enumerate() {
+            if self.is_unordered(&RenderOrder::Link(i)) {
+                result.push(link);
+            }
+        }
+
+        for order in &self.render_order {
+            if let &RenderOrder::Link (index) = order {
+                result.push(&self.colbox_links[index]);
+            }
+        }
+
+        result
+    }
+
+    /// Returns all collisionboxes and linked collisionboxes
+    /// collisionboxes referenced by a link are not invluded individually
+    pub fn get_colboxes_and_links(&self) -> Vec<ColboxOrLink> {
+        let mut result: Vec<ColboxOrLink> = vec!();
+        for (i, colbox) in self.colboxes.iter().enumerate() {
+            if self.is_unordered(&RenderOrder::Colbox(i)) && self.is_unlinked(i) {
+                result.push(ColboxOrLink::Colbox(colbox));
+            }
+        }
+        for (i, link) in self.colbox_links.iter().enumerate() {
+            if self.is_unordered(&RenderOrder::Link(i)) {
+                result.push(ColboxOrLink::Link(link));
+            }
+        }
+
+        for order in &self.render_order {
+            match order {
+                &RenderOrder::Colbox (index) => {
+                    result.push(ColboxOrLink::Colbox(&self.colboxes[index]));
+                }
+                &RenderOrder::Link (index) => {
+                    result.push(ColboxOrLink::Link(&self.colbox_links[index]));
+                }
+            }
+        }
+
+        result
+    }
+
+    fn is_unordered(&self, check_order: &RenderOrder) -> bool {
+        for order in &self.render_order {
+            if check_order == order {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn is_unlinked(&self, i: usize) -> bool {
+        for link in &self.colbox_links {
+            if link.one == i || link.two == i {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+pub enum ColboxOrLink <'a> {
+    Colbox (&'a CollisionBox),
+    Link   (&'a CollisionBoxLink)
+}
+
+#[derive(PartialEq, Clone, Serialize, Deserialize, Node)]
+pub enum RenderOrder {
+    Colbox (usize),
+    Link   (usize)
+}
+
+impl Default for RenderOrder {
+    fn default() -> RenderOrder {
+        RenderOrder::Colbox (0)
+    }
 }
 
 // GUI Editor will need to ensure that values are kept sane, e.g. left is leftmost, top is topmost etc.
@@ -146,7 +260,7 @@ impl Default for ECB {
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct CollisionBoxLink {
-    pub one:       usize, // TODO: rename to Primary and Secondary (CollisionBoxLink takes its role from the primary CollisionBox)
+    pub one:       usize,
     pub two:       usize,
     pub link_type: LinkType,
 }
@@ -182,13 +296,14 @@ impl CollisionBoxLink {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub enum LinkType {
-    Meld,
+    MeldFirst,
+    MeldSecond,
     Simple,
 }
 
 impl Default for LinkType {
     fn default() -> LinkType {
-        LinkType::Meld
+        LinkType::MeldFirst
     }
 }
 
@@ -366,7 +481,6 @@ pub struct HitBox {
     pub bkb:            f32, // base knockback
     pub kbg:            f32, // knockback growth = old value / 100
     pub angle:          f32,
-    pub check_order:    i64, // order collision checks take place (lower numbers are checked first)
     pub enable_clang:   bool,
     pub enable_rebound: bool,
     pub effect:         HitboxEffect,
@@ -382,7 +496,6 @@ impl Default for HitBox {
             angle:          0.0,
             enable_clang:   true,
             enable_rebound: true,
-            check_order:    0,
             effect:         HitboxEffect::default()
         }
     }

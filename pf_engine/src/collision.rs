@@ -21,8 +21,7 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
 
                 let frame_atk = &player_atk.relative_frame(&fighter_atk.actions[player_atk.action as usize].frames[player_atk.frame as usize]);
                 let frame_def = &player_def.relative_frame(&fighter_def.actions[player_def.action as usize].frames[player_def.frame as usize]);
-                let mut colboxes_atk: Vec<&CollisionBox> = frame_atk.colboxes.iter().filter(|x| matches!(x.role, CollisionBoxRole::Hit(_))).collect();
-                colboxes_atk.sort_by_key(|x| x.hitbox_ref().check_order);
+                let colboxes_atk = frame_atk.get_hitboxes();
 
                 'hitbox_atk: for colbox_atk in &colboxes_atk {
                     // TODO: break this out into a seperate function that can be called by the link checking code
@@ -35,7 +34,7 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
                     }
 
                     if hitbox_atk.enable_clang {
-                        for colbox_def in &frame_def.colboxes[..] {
+                        for colbox_def in frame_def.get_colboxes() {
                             match &colbox_def.role {
                             // TODO: How do we only run the clang handler once?
                                 &CollisionBoxRole::Hit (ref hitbox_def) => {
@@ -62,7 +61,7 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
                         }
                     }
 
-                    for colbox_def in &frame_def.colboxes[..] {
+                    for colbox_def in &frame_def.get_colboxes() {
                         if false { // TODO: defender in hit list
                             break; // TODO: break to correct level
                         }
