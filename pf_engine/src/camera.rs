@@ -2,7 +2,7 @@ use os_input::OsInput;
 use player::Player;
 use stage::Stage;
 
-use glium::glutin::VirtualKeyCode;
+use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]

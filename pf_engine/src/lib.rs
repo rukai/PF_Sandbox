@@ -5,11 +5,14 @@ extern crate num;
 extern crate serde;
 extern crate serde_json;
 extern crate treeflection;
+extern crate winit;
+extern crate vulkano_win;
+#[macro_use] extern crate vulkano;
 #[macro_use] extern crate enum_primitive;
-#[macro_use] extern crate glium;
 #[macro_use] extern crate matches;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate treeflection_derive;
+
 
 pub mod app;
 pub mod buffers;

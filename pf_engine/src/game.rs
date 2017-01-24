@@ -11,7 +11,7 @@ use ::collision::collision_check;
 
 use ::std::collections::HashSet;
 
-use glium::glutin::VirtualKeyCode;
+use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]

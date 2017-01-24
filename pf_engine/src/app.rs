@@ -7,7 +7,7 @@ use ::input::Input;
 use ::network::Network;
 
 use libusb::Context;
-use glium::glutin::VirtualKeyCode;
+use winit::VirtualKeyCode;
 use std::thread;
 use std::time::{Duration, Instant};
 

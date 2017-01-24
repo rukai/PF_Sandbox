@@ -1,7 +1,7 @@
 use camera::Camera;
 
-use glium::glutin::ElementState::{Pressed, Released};
-use glium::glutin::{Event, MouseScrollDelta, VirtualKeyCode, MouseButton};
+use winit::ElementState::{Pressed, Released};
+use winit::{Event, MouseScrollDelta, VirtualKeyCode, MouseButton};
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 struct CurrentInput {
