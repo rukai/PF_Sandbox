@@ -1,7 +1,7 @@
 use ::input::{Input, PlayerInput, ControllerInput};
 use ::os_input::OsInput;
 use ::package::Package;
-use ::player::{Player, RenderPlayer, DebugPlayer};
+use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
 use ::fighter::{ActionFrame, CollisionBox, LinkType};
 use ::camera::Camera;
 use ::stage::Area;
@@ -452,10 +452,17 @@ impl Game {
                 debug.di_vector = !debug.di_vector;
             }
             if os_input.key_pressed(VirtualKeyCode::F8) {
-                debug.player = !debug.player;
+                debug.ecb = !debug.ecb;
             }
             if os_input.key_pressed(VirtualKeyCode::F9) {
-                debug.no_fighter = !debug.no_fighter;
+                match debug.fighter {
+                    RenderFighter::Normal => {
+                    }
+                    RenderFighter::Debug => {
+                    }
+                    RenderFighter::None => {
+                    }
+                }
             }
             if os_input.key_pressed(VirtualKeyCode::F10) {
                 debug.cam_area = !debug.cam_area;
@@ -471,8 +478,8 @@ impl Game {
                 stick_vector:   true,
                 c_stick_vector: true,
                 di_vector:      true,
-                player:         true,
-                no_fighter:     true,
+                ecb:            true,
+                fighter:        RenderFighter::Debug,
                 cam_area:       true,
             }
         }

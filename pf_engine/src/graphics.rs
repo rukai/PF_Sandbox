@@ -4,6 +4,7 @@ use ::game::{GameState, RenderEntity, RenderGame};
 use ::os_input::OsInput;
 use ::menu::RenderMenu;
 use ::package::PackageUpdate;
+use ::player::RenderFighter;
 
 use glium::{DisplayBuild, Surface, self};
 use glium::glutin::Event;
@@ -141,7 +142,7 @@ impl Graphics {
                     let dir = if player.face_right { 1.0 } else { -1.0 } as f32;
 
                     // draw fighter
-                    if !player.debug.no_fighter {
+                    if let RenderFighter::Normal = player.debug.fighter {
                         let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white, direction: dir, aspect_ratio: aspect_ratio};
                         let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
                         if player.frame < fighter_frames.len() {
@@ -159,7 +160,7 @@ impl Graphics {
                     // TODO: Edit::Stage   - render selected platforms as green
 
                     // draw player ecb
-                    if player.debug.player {
+                    if player.debug.ecb {
                         let ecb = Buffers::new_player(&self.display, &player);
                         if player.selected {
                             let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: green, direction: dir, aspect_ratio: aspect_ratio };

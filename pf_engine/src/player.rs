@@ -1052,7 +1052,20 @@ pub struct DebugPlayer {
     pub stick_vector:   bool,
     pub c_stick_vector: bool,
     pub di_vector:      bool,
-    pub player:         bool,
-    pub no_fighter:     bool,
+    pub ecb:            bool,
+    pub fighter:        RenderFighter,
     pub cam_area:       bool,
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub enum RenderFighter {
+    Normal,
+    Debug,
+    None,
+}
+
+impl Default for RenderFighter {
+    fn default() -> RenderFighter {
+        RenderFighter::Normal
+    }
 }
