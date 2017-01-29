@@ -1000,7 +1000,7 @@ impl Player {
         }
     }
 
-    pub fn render(&self, fighter: usize, selected_colboxes: HashSet<usize>, selected: bool, debug: DebugPlayer) -> RenderPlayer {
+    pub fn render(&self, fighter_color: [f32; 3], fighter: usize, selected_colboxes: HashSet<usize>, selected: bool, debug: DebugPlayer) -> RenderPlayer {
         RenderPlayer {
             debug:             debug,
             bps:               (self.bps_x, self.bps_y),
@@ -1009,6 +1009,7 @@ impl Player {
             action:            self.action as usize,
             fighter:           fighter,
             face_right:        self.face_right,
+            fighter_color:     fighter_color,
             selected:          selected,
             selected_colboxes: selected_colboxes,
         }
@@ -1031,14 +1032,15 @@ impl JumpResult {
 }
 
 pub struct RenderPlayer {
-    pub debug:      DebugPlayer,
-    pub bps:        (f32, f32),
-    pub ecb:        ECB,
-    pub frame:      usize,
-    pub action:     usize,
-    pub fighter:    usize,
-    pub face_right: bool,
-    pub selected:   bool,
+    pub debug:             DebugPlayer,
+    pub bps:               (f32, f32),
+    pub ecb:               ECB,
+    pub frame:             usize,
+    pub action:            usize,
+    pub fighter:           usize,
+    pub face_right:        bool,
+    pub fighter_color:     [f32; 3],
+    pub selected:          bool,
     pub selected_colboxes: HashSet<usize>,
 }
 

@@ -1,17 +1,30 @@
-# version 140
+#version 450
 
-in vec2 position;
-uniform vec2 position_offset;
-uniform float zoom;
-uniform float aspect_ratio;
-uniform vec3 uniform_rgb;
-uniform float direction;
-out vec3 rgb;
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_450pack : enable
+
+layout(location = 0) in vec2 position;
+layout(location = 1) in float edge;
+layout(location = 0) out vec3 v_color;
+layout(set = 0, binding = 0) uniform Data {
+    vec2  position_offset;
+    float zoom;
+    float aspect_ratio;
+    float direction;
+    vec3  edge_color;
+    vec3  color;
+} uniforms;
 
 void main() {
-    rgb = uniform_rgb;
-    vec2 pos_flipped = vec2(position[0] * direction, position[1]);
-    vec2 pos_camera = (pos_flipped + position_offset) * zoom;
-    vec2 pos_aspect = vec2(pos_camera[0], pos_camera[1] * aspect_ratio);
+    vec2 pos_flipped = vec2(position[0] * uniforms.direction, position[1]);
+    vec2 pos_camera = (pos_flipped + uniforms.position_offset) * uniforms.zoom;
+    vec2 pos_aspect = vec2(pos_camera[0], pos_camera[1] * uniforms.aspect_ratio * -1);
     gl_Position = vec4(pos_aspect, 0.0, 1.0);
+
+    if (edge == 1.0) {
+        v_color = uniforms.edge_color;
+    }
+    else {
+        v_color = uniforms.color;
+    }
 }
