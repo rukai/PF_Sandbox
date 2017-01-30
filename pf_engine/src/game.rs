@@ -605,17 +605,18 @@ impl Game {
         for (i, player) in self.players.iter().enumerate() {
 
             let mut selected_colboxes = HashSet::new();
-            let mut selected = false;
+            let mut fighter_selected = false;
+            let mut player_selected = false;
             if let GameState::Paused = self.state {
                 match self.edit {
                     Edit::Fighter (player) => {
                         if i == player {
                             selected_colboxes = self.selector.colboxes.clone();
-                            // TODO: color outline green
+                            fighter_selected = true;
                         }
                     },
                     Edit::Player (player) => {
-                        selected = player == i;
+                        player_selected = player == i;
                     },
                     _ => { },
                 }
@@ -630,10 +631,10 @@ impl Game {
                 [0.0, 90.0/255.0, 224.0/255.0],
                 [239.0/255.0, 100.0/255.0, 0.0],
                 [1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0],
+                [1.0, 0.0, 1.0],
             );
 
-            entities.push(RenderEntity::Player(player.render(player_colors[i], self.selected_fighters[i], selected_colboxes, selected, debug)));
+            entities.push(RenderEntity::Player(player.render(player_colors[i], self.selected_fighters[i], selected_colboxes, fighter_selected, player_selected, debug)));
         }
 
         // stage areas

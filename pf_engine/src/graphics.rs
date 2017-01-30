@@ -33,8 +33,8 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread;
 use std::time::Duration;
 
-mod generic_vs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/player-vertex.glsl")} }
-mod generic_fs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/player-fragment.glsl")} }
+mod generic_vs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/generic-vertex.glsl")} }
+mod generic_fs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/generic-fragment.glsl")} }
 
 mod render_pass {
     use vulkano::format::Format;
@@ -286,15 +286,18 @@ impl Graphics {
                 RenderEntity::Player(player) => {
                     let uniform = uniforms.next().unwrap();
                     {
-						// TODO: SOOOOOO LOOKS LIKE THE UNIFORM IS RESET EVERY TIME AS IT IS ONLY USED ON COMMAND_BUFFER EXECUTION
-						// TODO: CREATE A SEPERATE UNIFORM BUFFER FOR EACH DRAW
                         let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
                         buffer_content.zoom            = zoom;
                         buffer_content.aspect_ratio    = aspect_ratio;
                         buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
                         buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
-                        buffer_content.edge_color      = player.fighter_color;
                         buffer_content.color           = [1.0, 1.0, 1.0];
+                        if player.fighter_selected {
+                            buffer_content.edge_color = [0.0, 1.0, 0.0];
+                        }
+                        else {
+                            buffer_content.edge_color = player.fighter_color;
+                        }
                     }
 
                     // draw fighter
@@ -311,26 +314,34 @@ impl Graphics {
                             }
                         }
                         RenderFighter::Debug => {
-                            // TODO:
+                            // TODO: Render outlines only (e.g. to see overlapped colboxes)
                         }
                         RenderFighter::None => {}
                     }
                     // TODO: Edit::Player  - render selected player's BPS as green
-                    // TODO: Edit::Fighter - render selected hitboxes and ecb points as green on selected player
-                    // TODO: Edit::Fighter - render outline of selected player as green
+                    // TODO: Edit::Fighter - render selected hitboxes and ecb points as green on selected player (I could do a second draw with just the green hitboxes)
+                    // TODO: Edit::Fighter - render outline of selected player and ecb as green
                     // TODO: Edit::Stage   - render selected platforms as green
 
                     // draw player ecb
                     if player.debug.ecb {
-                        //let ecb = Buffers::new_player(&self.display, &player);
-                        if player.selected {
-                            //let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: green, direction: dir, aspect_ratio: aspect_ratio };
-                            //target.draw(&ecb.vertex, &ecb.index, &player_program, uniform, &Default::default()).unwrap();
+                        let buffers = Buffers::new_player(&self.device, &self.queue, &player);
+                        let uniform = uniforms.next().unwrap();
+                        {
+                            let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
+                            buffer_content.zoom            = zoom;
+                            buffer_content.aspect_ratio    = aspect_ratio;
+                            buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
+                            buffer_content.direction       = 1.0;
+                            buffer_content.edge_color      = [0.0, 1.0, 0.0];
+                            if player.fighter_selected {
+                                buffer_content.color = [0.0, 1.0, 0.0];
+                            }
+                            else {
+                                buffer_content.color = [1.0, 1.0, 1.0];
+                            }
                         }
-                        else {
-                            //let uniform = &uniform! { position_offset: position, zoom: zoom, uniform_rgb: white, direction: dir, aspect_ratio: aspect_ratio };
-                            //target.draw(&ecb.vertex, &ecb.index, &player_program, uniform, &Default::default()).unwrap();
-                        }
+                        command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
                     }
                 },
                 RenderEntity::Selector(rect) => {

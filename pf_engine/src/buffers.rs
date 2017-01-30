@@ -1,5 +1,5 @@
 use ::stage::Stage;
-use ::fighter::{ActionFrame, LinkType};
+use ::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink, CollisionBoxRole};
 use ::player::RenderPlayer;
 use ::package::{PackageUpdate};
 use ::game::RenderRect;
@@ -13,9 +13,19 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct Vertex {
     pub position: [f32; 2],
-    pub edge: f32, // maybe I can use this to determine where to render outline
+    pub edge: f32,
+    pub render_id: f32,
 }
-impl_vertex!(Vertex, position, edge);
+
+fn vertex(x: f32, y: f32) -> Vertex {
+    Vertex {
+        position: [x, y],
+        edge: 1.0,
+        render_id: 0.0,
+    }
+}
+
+impl_vertex!(Vertex, position, edge, render_id);
 
 pub struct Buffers {
     pub vertex: Arc<CpuAccessibleBuffer<[Vertex]>>,
@@ -34,15 +44,16 @@ impl Buffers {
 
         let vertices: Vec<Vertex> = vec!(
             // outer rectangle
-            Vertex { position: [min_x, min_y], edge: 0.0},
-            Vertex { position: [max_x, min_y], edge: 0.0},
-            Vertex { position: [max_x, max_y], edge: 0.0},
-            Vertex { position: [min_x, max_y], edge: 0.0},
+            vertex(min_x, min_y),
+            vertex(max_x, min_y),
+            vertex(max_x, max_y),
+            vertex(min_x, max_y),
+
             // inner rectangle
-            Vertex { position: [min_x+width, min_y+width], edge: 0.0},
-            Vertex { position: [max_x-width, min_y+width], edge: 0.0},
-            Vertex { position: [max_x-width, max_y-width], edge: 0.0},
-            Vertex { position: [min_x+width, max_y-width], edge: 0.0},
+            vertex(min_x+width, min_y+width),
+            vertex(max_x-width, min_y+width),
+            vertex(max_x-width, max_y-width),
+            vertex(min_x+width, max_y-width),
         );
         let indices: [u16; 24] = [
             0, 4, 1, 1, 4, 5, // bottom edge
@@ -66,10 +77,10 @@ impl Buffers {
             let x2 = platform.x + platform.w / 2.0;
             let y2 = platform.y + platform.h / 2.0;
 
-            vertices.push(Vertex { position: [x1, y1], edge: 0.0});
-            vertices.push(Vertex { position: [x1, y2], edge: 0.0});
-            vertices.push(Vertex { position: [x2, y1], edge: 0.0});
-            vertices.push(Vertex { position: [x2, y2], edge: 0.0});
+            vertices.push(vertex(x1, y1));
+            vertices.push(vertex(x1, y2));
+            vertices.push(vertex(x2, y1));
+            vertices.push(vertex(x2, y2));
 
             indices.push(indice_count + 0);
             indices.push(indice_count + 1);
@@ -90,95 +101,143 @@ impl Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut index_count = 0;
-        let triangles = 20;
 
         if frame.colboxes.len() == 0 {
             return None;
         }
 
-        for colbox in &frame.colboxes[..] {
-            // Draw a colbox, at the point
-            // triangles are drawn meeting at the centre, forming a circle
-            let point = &colbox.point;
-            for i in 0..triangles {
-                let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
-                let x = point.0 + angle.cos() * colbox.radius;
-                let y = point.1 + angle.sin() * colbox.radius;
-                vertices.push(Vertex { position: [x, y], edge: 1.0});
-                indices.push(index_count);
-                indices.push(index_count + i);
-                indices.push(index_count + (i + 1) % triangles);
-            }
-            index_count += triangles;
-        }
-
-        for link in &frame.colbox_links {
-            match link.link_type {
-                LinkType::MeldFirst | LinkType::MeldSecond => {
-                    // draw a rectangle connecting two colboxes
-                    let (x1, y1)   = frame.colboxes[link.one].point;
-                    let (x2, y2)   = frame.colboxes[link.two].point;
-                    let one_radius = frame.colboxes[link.one].radius;
-                    let two_radius = frame.colboxes[link.two].radius;
-
-                    let mid_angle = (y1 - y2).atan2(x1 - x2);
-
-                    let angle1 = mid_angle + consts::FRAC_PI_2;
-                    let angle2 = mid_angle - consts::FRAC_PI_2;
-
-                    // rectangle as 4 points
-                    let link_x1 = x1 + angle1.cos() * one_radius;
-                    let link_x2 = x1 + angle2.cos() * one_radius;
-                    let link_x3 = x2 + angle1.cos() * two_radius;
-                    let link_x4 = x2 + angle2.cos() * two_radius;
-
-                    let link_y1 = y1 + angle1.sin() * one_radius;
-                    let link_y2 = y1 + angle2.sin() * one_radius;
-                    let link_y3 = y2 + angle1.sin() * two_radius;
-                    let link_y4 = y2 + angle2.sin() * two_radius;
-
-                    // rectangle into buffers
-                    vertices.push(Vertex { position: [link_x1, link_y1], edge: 0.0});
-                    vertices.push(Vertex { position: [link_x2, link_y2], edge: 0.0});
-                    vertices.push(Vertex { position: [link_x3, link_y3], edge: 0.0});
-                    vertices.push(Vertex { position: [link_x4, link_y4], edge: 0.0});
-
-                    indices.push(index_count);
-                    indices.push(index_count + 1);
-                    indices.push(index_count + 2);
-
-                    indices.push(index_count + 1);
-                    indices.push(index_count + 2);
-                    indices.push(index_count + 3);
-                    index_count += 4;
-                },
-                LinkType::Simple => { },
+        for colbox_or_link in frame.get_colboxes_and_links() {
+            match colbox_or_link {
+                ColboxOrLink::Colbox (ref colbox) => {
+                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count);
+                }
+                ColboxOrLink::Link (ref link) => {
+                    let colbox1 = &frame.colboxes[link.one];
+                    let colbox2 = &frame.colboxes[link.two];
+                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox1, &mut index_count);
+                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox2, &mut index_count);
+                    Buffers::gen_link(&mut vertices, &mut indices, link, colbox1, colbox2, &mut index_count);
+                }
             }
         }
+
         Some(Buffers {
             index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
             vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
         })
     }
 
+    fn get_render_id(role: &CollisionBoxRole) -> f32 {
+        match role {
+            &CollisionBoxRole::Hurt (_)   => { 1.0 }
+            &CollisionBoxRole::Hit (_)    => { 2.0 }
+            &CollisionBoxRole::Grab       => { 3.0 }
+            &CollisionBoxRole::Intangible => { 4.0 }
+            &CollisionBoxRole::Invincible => { 5.0 }
+            &CollisionBoxRole::Reflect    => { 6.0 }
+            &CollisionBoxRole::Absorb     => { 7.0 }
+        }
+    }
+
+    pub fn gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16) {
+        // TODO: maybe bake damage into an extra field on vertex and use to change hitbox render
+        let triangles = 25;
+        let render_id = Buffers::get_render_id(&colbox.role);
+        // triangles are drawn meeting at the centre, forming a circle
+        let point = &colbox.point;
+        vertices.push(Vertex { position: [point.0, point.1], edge: 0.0, render_id: render_id});
+        for i in 0..triangles {
+            let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
+            let x = point.0 + angle.cos() * colbox.radius;
+            let y = point.1 + angle.sin() * colbox.radius;
+            vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id});
+            indices.push(*index_count);
+            indices.push(*index_count + i);
+            indices.push(*index_count + (i + 1) % triangles);
+        }
+        indices.push(*index_count);
+        indices.push(*index_count + 1);
+        indices.push(*index_count + triangles - 1);
+        *index_count += triangles + 1;
+    }
+
+    pub fn gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16) {
+        let render_id = Buffers::get_render_id(&colbox1.role);
+        match link.link_type {
+            LinkType::MeldFirst | LinkType::MeldSecond => {
+                // draw a rectangle connecting two colboxes
+                let (x1, y1)   = colbox1.point;
+                let (x2, y2)   = colbox2.point;
+                let one_radius = colbox1.radius;
+                let two_radius = colbox2.radius;
+
+                let mid_angle = (y1 - y2).atan2(x1 - x2);
+
+                let angle1 = mid_angle + consts::FRAC_PI_2;
+                let angle2 = mid_angle - consts::FRAC_PI_2;
+
+                // rectangle as 4 points
+                let link_x1 = x1 + angle1.cos() * one_radius;
+                let link_x2 = x1 + angle2.cos() * one_radius;
+                let link_x3 = x2 + angle1.cos() * two_radius;
+                let link_x4 = x2 + angle2.cos() * two_radius;
+                let link_x5 = x1;
+                let link_x6 = x2;
+
+                let link_y1 = y1 + angle1.sin() * one_radius;
+                let link_y2 = y1 + angle2.sin() * one_radius;
+                let link_y3 = y2 + angle1.sin() * two_radius;
+                let link_y4 = y2 + angle2.sin() * two_radius;
+                let link_y5 = y1;
+                let link_y6 = y2;
+
+                // rectangle into buffers
+                vertices.push(Vertex { position: [link_x1, link_y1], edge: 1.0, render_id: render_id});
+                vertices.push(Vertex { position: [link_x2, link_y2], edge: 1.0, render_id: render_id});
+                vertices.push(Vertex { position: [link_x3, link_y3], edge: 1.0, render_id: render_id});
+                vertices.push(Vertex { position: [link_x4, link_y4], edge: 1.0, render_id: render_id});
+                vertices.push(Vertex { position: [link_x5, link_y5], edge: 0.0, render_id: render_id});
+                vertices.push(Vertex { position: [link_x6, link_y6], edge: 0.0, render_id: render_id});
+
+                indices.push(*index_count);
+                indices.push(*index_count + 4);
+                indices.push(*index_count + 5);
+
+                indices.push(*index_count + 0);
+                indices.push(*index_count + 2);
+                indices.push(*index_count + 5);
+
+                indices.push(*index_count + 1);
+                indices.push(*index_count + 3);
+                indices.push(*index_count + 4);
+
+                indices.push(*index_count + 3);
+                indices.push(*index_count + 4);
+                indices.push(*index_count + 5);
+                *index_count += 6;
+            },
+            LinkType::Simple => { },
+        }
+    }
+
     pub fn new_player(device: &Arc<Device>, queue: &Arc<Queue>, player: &RenderPlayer) -> Buffers {
         // ecb
-        let vertex0 = Vertex { position: [ player.ecb.bot_x,   player.ecb.bot_y], edge: 0.0};
-        let vertex1 = Vertex { position: [ player.ecb.left_x,  player.ecb.left_y], edge: 0.0};
-        let vertex2 = Vertex { position: [ player.ecb.right_x, player.ecb.right_y], edge: 0.0};
-        let vertex3 = Vertex { position: [ player.ecb.top_x,   player.ecb.top_y], edge: 0.0};
+        let vertex0 = vertex(player.ecb.bot_x,   player.ecb.bot_y);
+        let vertex1 = vertex(player.ecb.left_x,  player.ecb.left_y);
+        let vertex2 = vertex(player.ecb.right_x, player.ecb.right_y);
+        let vertex3 = vertex(player.ecb.top_x,   player.ecb.top_y);
 
         // horizontal bps
-        let vertex4 = Vertex { position: [-4.0,-0.15], edge: 0.0};
-        let vertex5 = Vertex { position: [-4.0, 0.15], edge: 0.0};
-        let vertex6 = Vertex { position: [ 4.0,-0.15], edge: 0.0};
-        let vertex7 = Vertex { position: [ 4.0, 0.15], edge: 0.0};
+        let vertex4 = vertex(-4.0, -0.15);
+        let vertex5 = vertex(-4.0,  0.15);
+        let vertex6 = vertex( 4.0, -0.15);
+        let vertex7 = vertex( 4.0,  0.15);
 
         // vertical bps
-        let vertex8  = Vertex { position: [-0.15,-4.0], edge: 0.0};
-        let vertex9  = Vertex { position: [ 0.15,-4.0], edge: 0.0};
-        let vertex10 = Vertex { position: [-0.15, 4.0], edge: 0.0};
-        let vertex11 = Vertex { position: [ 0.15, 4.0], edge: 0.0};
+        let vertex8  = vertex(-0.15, -4.0);
+        let vertex9  = vertex( 0.15, -4.0);
+        let vertex10 = vertex(-0.15,  4.0);
+        let vertex11 = vertex( 0.15,  4.0);
 
         let vertices = vec![vertex0, vertex1, vertex2, vertex3, vertex4, vertex5, vertex6, vertex7, vertex8, vertex9, vertex10, vertex11];
         let indices: [u16; 18] = [
@@ -217,15 +276,12 @@ impl PackageBuffers {
                 PackageUpdate::Package (package) => {
                     self.stages = vec!();
                     self.fighters = vec!();
-                    let mut i = 0;
 
                     for fighter in &package.fighters[..] { // TODO: Whats up with the deref coercion?
                         let mut action_buffers: Vec<Vec<Option<Buffers>>> = vec!();
                         for action in &fighter.actions[..] {
                             let mut frame_buffers: Vec<Option<Buffers>> = vec!();
                             for frame in &action.frames[..] {
-                                println!("i:{}", i);
-                                i += 1;
                                 frame_buffers.push(Buffers::new_fighter_frame(device, queue, frame));
                             }
                             action_buffers.push(frame_buffers);

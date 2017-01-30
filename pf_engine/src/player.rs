@@ -1000,7 +1000,7 @@ impl Player {
         }
     }
 
-    pub fn render(&self, fighter_color: [f32; 3], fighter: usize, selected_colboxes: HashSet<usize>, selected: bool, debug: DebugPlayer) -> RenderPlayer {
+    pub fn render(&self, fighter_color: [f32; 3], fighter: usize, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer) -> RenderPlayer {
         RenderPlayer {
             debug:             debug,
             bps:               (self.bps_x, self.bps_y),
@@ -1010,7 +1010,8 @@ impl Player {
             fighter:           fighter,
             face_right:        self.face_right,
             fighter_color:     fighter_color,
-            selected:          selected,
+            fighter_selected:  fighter_selected,
+            player_selected:   player_selected,
             selected_colboxes: selected_colboxes,
         }
     }
@@ -1040,7 +1041,8 @@ pub struct RenderPlayer {
     pub fighter:           usize,
     pub face_right:        bool,
     pub fighter_color:     [f32; 3],
-    pub selected:          bool,
+    pub fighter_selected:  bool,
+    pub player_selected:  bool,
     pub selected_colboxes: HashSet<usize>,
 }
 
