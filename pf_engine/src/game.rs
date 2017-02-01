@@ -627,11 +627,11 @@ impl Game {
                 let cam_area = &player.cam_area(&self.package.stages[self.selected_stage].camera);
                 entities.push(RenderEntity::Area(area_to_render(cam_area)));
             }
-            let player_colors: Vec<[f32; 3]> = vec!(
-                [0.0, 90.0/255.0, 224.0/255.0],
-                [239.0/255.0, 100.0/255.0, 0.0],
-                [1.0, 0.0, 0.0],
-                [1.0, 0.0, 1.0],
+            let player_colors: Vec<[f32; 4]> = vec!(
+                [0.0, 90.0/255.0, 224.0/255.0, 1.0],
+                [239.0/255.0, 100.0/255.0, 0.0, 1.0],
+                [1.0, 0.0, 0.0, 1.0],
+                [1.0, 0.0, 1.0, 1.0],
             );
 
             entities.push(RenderEntity::Player(player.render(player_colors[i], self.selected_fighters[i], selected_colboxes, fighter_selected, player_selected, debug)));

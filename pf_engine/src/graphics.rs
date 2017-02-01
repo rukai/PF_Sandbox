@@ -183,10 +183,9 @@ impl Graphics {
                     zoom:            1.0,
                     aspect_ratio:    1.0,
                     direction:       1.0,
-                    edge_color:      [1.0, 1.0, 1.0],
-                    color:           [1.0, 1.0, 1.0],
+                    edge_color:      [1.0, 1.0, 1.0, 1.0],
+                    color:           [1.0, 1.0, 1.0, 1.0],
                     _dummy0:         [0; 12],
-                    _dummy1:         [0; 4],
                 }
             ).unwrap();
 
@@ -224,7 +223,7 @@ impl Graphics {
                 multisample:     Multisample::disabled(),
                 fragment_shader: fs.main_entry_point(),
                 depth_stencil:   DepthStencil::disabled(),
-                blend:           Blend::pass_through(),
+                blend:           Blend::alpha_blending(),
                 layout:          &pipeline_layout,
                 render_pass:     Subpass::from(&render_pass, 0).unwrap(),
             }
@@ -267,6 +266,7 @@ impl Graphics {
             color: [0.0, 0.0, 0.0, 1.0]
         });
 
+        let mut uniforms = self.uniforms.iter();
         let zoom = render.camera.zoom.recip();
         let pan  = render.camera.pan;
         let (width, height) = self.window.window().get_inner_size_points().unwrap();
@@ -277,69 +277,29 @@ impl Graphics {
             GameState::Paused => {
                 // TODO: blue vaporwavey background lines on pause :D
                 // also double as measuring/scale lines
+                // configurable size via treeflection
             },
             _ => { },
         }
-        let mut uniforms = self.uniforms.iter();
+
+        let stage = 0;
+        let uniform = uniforms.next().unwrap();
+        {
+            let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
+            buffer_content.zoom            = zoom;
+            buffer_content.aspect_ratio    = aspect_ratio;
+            buffer_content.position_offset = [pan.0 as f32, pan.1 as f32];
+            buffer_content.direction       = 1.0;
+            buffer_content.edge_color      = [1.0, 1.0, 1.0, 1.0];
+            buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
+        }
+        let vertex_buffer = &self.package_buffers.stages[stage].vertex;
+        let index_buffer  = &self.package_buffers.stages[stage].index;
+        command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), &uniform.set, &());
+
         for entity in render.entities {
             match entity {
                 RenderEntity::Player(player) => {
-                    let uniform = uniforms.next().unwrap();
-                    {
-                        let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
-                        buffer_content.zoom            = zoom;
-                        buffer_content.aspect_ratio    = aspect_ratio;
-                        buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
-                        buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
-                        buffer_content.color           = [1.0, 1.0, 1.0];
-                        if player.fighter_selected {
-                            buffer_content.edge_color = [0.0, 1.0, 0.0];
-                        }
-                        else {
-                            buffer_content.edge_color = player.fighter_color;
-                        }
-                    }
-
-                    // draw fighter
-                    match player.debug.fighter {
-                        RenderFighter::Normal => {
-                            let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
-                            if player.frame < fighter_frames.len() {
-                                if let &Some(ref buffers) = &fighter_frames[player.frame] {
-                                    command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
-                                }
-                            }
-                            else {
-                                 //TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
-                            }
-                        }
-                        RenderFighter::Debug => {
-                            // TODO: Render outlines only (e.g. to see overlapped colboxes)
-                        }
-                        RenderFighter::None => {}
-                    }
-                    if player.selected_colboxes.len() > 0 {
-                        // draw selected hitboxes
-                        // I could store which element each vertex is part of and handle this in the shader but then I wouldn't be able to highlight overlapping elements.
-                        // The extra vertex generation + draw should be fast enough (this only occurs on the pause screen)
-                        let uniform = uniforms.next().unwrap();
-                        {
-                            let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
-                            buffer_content.zoom            = zoom;
-                            buffer_content.aspect_ratio    = aspect_ratio;
-                            buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
-                            buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
-                            buffer_content.edge_color      = [0.0, 1.0, 0.0];
-                            buffer_content.color           = [0.0, 1.0, 0.0];
-                        }
-                        let buffers = self.package_buffers.fighter_frame_colboxes(&self.device, &self.queue, player.fighter, player.action, player.frame, &player.selected_colboxes);
-                        command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
-                    }
-
-                    // TODO: Edit::Player  - render selected player's BPS as green
-                    // TODO: Edit::Fighter - Click and drag on ECB points
-                    // TODO: Edit::Stage   - render selected platforms as green
-
                     // draw player ecb
                     if player.debug.ecb {
                         let buffers = Buffers::new_player(&self.device, &self.queue, &player);
@@ -350,16 +310,76 @@ impl Graphics {
                             buffer_content.aspect_ratio    = aspect_ratio;
                             buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
                             buffer_content.direction       = 1.0;
-                            buffer_content.edge_color      = [0.0, 1.0, 0.0];
+                            buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
                             if player.fighter_selected {
-                                buffer_content.color = [0.0, 1.0, 0.0];
+                                buffer_content.color = [0.0, 1.0, 0.0, 1.0];
                             }
                             else {
-                                buffer_content.color = [1.0, 1.0, 1.0];
+                                buffer_content.color = [1.0, 1.0, 1.0, 1.0];
                             }
                         }
                         command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
                     }
+
+                    // setup fighter uniform
+                    let uniform = uniforms.next().unwrap();
+                    {
+                        let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
+                        buffer_content.zoom            = zoom;
+                        buffer_content.aspect_ratio    = aspect_ratio;
+                        buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
+                        buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
+                        if let RenderFighter::Debug = player.debug.fighter {
+                            buffer_content.color = [0.0, 0.0, 0.0, 0.0];
+                        }
+                        else {
+                            buffer_content.color = [1.0, 1.0, 1.0, 1.0];
+                        }
+                        if player.fighter_selected {
+                            buffer_content.edge_color = [0.0, 1.0, 0.0, 1.0];
+                        }
+                        else {
+                            buffer_content.edge_color = player.fighter_color;
+                        }
+                    }
+                    
+                    // draw fighter
+                    let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
+                    if player.frame < fighter_frames.len() {
+                        if let &Some(ref buffers) = &fighter_frames[player.frame] {
+                            match player.debug.fighter {
+                                RenderFighter::Normal | RenderFighter::Debug => {
+                                    command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
+                                }
+                                RenderFighter::None => {}
+                            }
+                        }
+                    }
+                    else {
+                         //TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
+                    }
+
+                    // draw selected hitboxes
+                    if player.selected_colboxes.len() > 0 {
+                        // I could store which element each vertex is part of and handle this in the shader but then I wouldn't be able to highlight overlapping elements.
+                        // The extra vertex generation + draw should be fast enough (this only occurs on the pause screen)
+                        let uniform = uniforms.next().unwrap();
+                        {
+                            let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
+                            buffer_content.zoom            = zoom;
+                            buffer_content.aspect_ratio    = aspect_ratio;
+                            buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
+                            buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
+                            buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
+                            buffer_content.color           = [0.0, 1.0, 0.0, 1.0];
+                        }
+                        let buffers = self.package_buffers.fighter_frame_colboxes(&self.device, &self.queue, player.fighter, player.action, player.frame, &player.selected_colboxes);
+                        command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
+                    }
+
+                    // TODO: Edit::Player  - render selected player's BPS as green
+                    // TODO: Edit::Fighter - Click and drag on ECB points
+                    // TODO: Edit::Stage   - render selected platforms as green
                 },
                 RenderEntity::Selector(rect) => {
                     let uniform = uniforms.next().unwrap();
@@ -369,8 +389,8 @@ impl Graphics {
                         buffer_content.aspect_ratio    = aspect_ratio;
                         buffer_content.position_offset = [pan.0 as f32, pan.1 as f32];
                         buffer_content.direction       = 1.0;
-                        buffer_content.edge_color      = [0.0, 1.0, 0.0];
-                        buffer_content.color           = [0.0, 1.0, 0.0];
+                        buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
+                        buffer_content.color           = [0.0, 1.0, 0.0, 1.0];
                     }
                     let buffers = Buffers::rect_buffers(&self.device, &self.queue, rect);
                     command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
@@ -383,28 +403,14 @@ impl Graphics {
                         buffer_content.aspect_ratio    = aspect_ratio;
                         buffer_content.position_offset = [pan.0 as f32, pan.1 as f32];
                         buffer_content.direction       = 1.0;
-                        buffer_content.edge_color      = [0.0, 1.0, 0.0];
-                        buffer_content.color           = [0.0, 1.0, 0.0]; // HMMM maybe i can use only the edge to get the outline from a normal rect?
+                        buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
+                        buffer_content.color           = [0.0, 1.0, 0.0, 1.0]; // HMMM maybe i can use only the edge to get the outline from a normal rect?
                     }
                     let buffers = Buffers::rect_buffers(&self.device, &self.queue, rect);
                     command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
                 },
             }
         }
-        let stage = 0;
-        let uniform = uniforms.next().unwrap();
-        {
-            let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
-            buffer_content.zoom            = zoom;
-            buffer_content.aspect_ratio    = aspect_ratio;
-            buffer_content.position_offset = [pan.0 as f32, pan.1 as f32];
-            buffer_content.direction       = 1.0;
-            buffer_content.edge_color      = [1.0, 1.0, 1.0];
-            buffer_content.color           = [1.0, 1.0, 1.0];
-        }
-        let vertex_buffer = &self.package_buffers.stages[stage].vertex;
-        let index_buffer  = &self.package_buffers.stages[stage].index;
-        command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), &uniform.set, &());
 
         let final_command_buffer = command_buffer.draw_end().build();
         self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());

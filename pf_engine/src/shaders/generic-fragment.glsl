@@ -12,20 +12,20 @@ layout(set = 0, binding = 0) uniform Data {
     float zoom;
     float aspect_ratio;
     float direction;
-    vec3  edge_color;
-    vec3  color;
+    vec4  edge_color;
+    vec4  color;
 } uniforms;
 
 void main() {
     if (render_id == 0.0) {
-        f_color = vec4(uniforms.color, 1.0);
+        f_color = uniforms.color;
     }
     else if (render_id == 1.0) {
         if (v_edge > 0.8) {
-            f_color = vec4(uniforms.edge_color, 1.0);
+            f_color = uniforms.edge_color;
         }
         else {
-            f_color = vec4(uniforms.color, 1.0);
+            f_color = uniforms.color;
         }
     }
     else if (render_id == 2.0) {

@@ -13,8 +13,8 @@ layout(set = 0, binding = 0) uniform Data {
     float zoom;
     float aspect_ratio;
     float direction;
-    vec3  edge_color;
-    vec3  color;
+    vec4  edge_color;
+    vec4  color;
 } uniforms;
 
 void main() {
