@@ -32,7 +32,7 @@ pub struct Player {
     pub air_jumps_left:   u64,
     pub jumpsquat_button: bool,
     pub turn_dash_buffer: bool,
-    pub ecb: ECB,
+    pub ecb:              ECB,
 }
 
 
@@ -1042,7 +1042,7 @@ pub struct RenderPlayer {
     pub face_right:        bool,
     pub fighter_color:     [f32; 3],
     pub fighter_selected:  bool,
-    pub player_selected:  bool,
+    pub player_selected:   bool,
     pub selected_colboxes: HashSet<usize>,
 }
 

@@ -318,9 +318,26 @@ impl Graphics {
                         }
                         RenderFighter::None => {}
                     }
+                    if player.selected_colboxes.len() > 0 {
+                        // draw selected hitboxes
+                        // I could store which element each vertex is part of and handle this in the shader but then I wouldn't be able to highlight overlapping elements.
+                        // The extra vertex generation + draw should be fast enough (this only occurs on the pause screen)
+                        let uniform = uniforms.next().unwrap();
+                        {
+                            let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
+                            buffer_content.zoom            = zoom;
+                            buffer_content.aspect_ratio    = aspect_ratio;
+                            buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
+                            buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
+                            buffer_content.edge_color      = [0.0, 1.0, 0.0];
+                            buffer_content.color           = [0.0, 1.0, 0.0];
+                        }
+                        let buffers = self.package_buffers.fighter_frame_colboxes(&self.device, &self.queue, player.fighter, player.action, player.frame, &player.selected_colboxes);
+                        command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
+                    }
+
                     // TODO: Edit::Player  - render selected player's BPS as green
-                    // TODO: Edit::Fighter - render selected hitboxes and ecb points as green on selected player (I could do a second draw with just the green hitboxes)
-                    // TODO: Edit::Fighter - render outline of selected player and ecb as green
+                    // TODO: Edit::Fighter - Click and drag on ECB points
                     // TODO: Edit::Stage   - render selected platforms as green
 
                     // draw player ecb

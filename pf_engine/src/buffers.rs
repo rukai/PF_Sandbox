@@ -1,9 +1,11 @@
 use ::stage::Stage;
 use ::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink, CollisionBoxRole};
 use ::player::RenderPlayer;
-use ::package::{PackageUpdate};
+use ::package::PackageUpdate;
 use ::game::RenderRect;
+use ::package::Package;
 
+use std::collections::HashSet;
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::{Device, Queue};
 
@@ -109,14 +111,17 @@ impl Buffers {
         for colbox_or_link in frame.get_colboxes_and_links() {
             match colbox_or_link {
                 ColboxOrLink::Colbox (ref colbox) => {
-                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count);
+                    let render_id = Buffers::get_render_id(&colbox.role);
+                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, render_id);
                 }
                 ColboxOrLink::Link (ref link) => {
                     let colbox1 = &frame.colboxes[link.one];
                     let colbox2 = &frame.colboxes[link.two];
-                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox1, &mut index_count);
-                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox2, &mut index_count);
-                    Buffers::gen_link(&mut vertices, &mut indices, link, colbox1, colbox2, &mut index_count);
+                    let render_id1 = Buffers::get_render_id(&colbox1.role);
+                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox1, &mut index_count, render_id1);
+                    let render_id2 = Buffers::get_render_id(&colbox2.role);
+                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox2, &mut index_count, render_id2);
+                    Buffers::gen_link(&mut vertices, &mut indices, link, colbox1, colbox2, &mut index_count, render_id1);
                 }
             }
         }
@@ -139,10 +144,9 @@ impl Buffers {
         }
     }
 
-    pub fn gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16) {
+    pub fn gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16, render_id: f32) {
         // TODO: maybe bake damage into an extra field on vertex and use to change hitbox render
         let triangles = 25;
-        let render_id = Buffers::get_render_id(&colbox.role);
         // triangles are drawn meeting at the centre, forming a circle
         let point = &colbox.point;
         vertices.push(Vertex { position: [point.0, point.1], edge: 0.0, render_id: render_id});
@@ -161,8 +165,7 @@ impl Buffers {
         *index_count += triangles + 1;
     }
 
-    pub fn gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16) {
-        let render_id = Buffers::get_render_id(&colbox1.role);
+    pub fn gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16, render_id: f32) {
         match link.link_type {
             LinkType::MeldFirst | LinkType::MeldSecond => {
                 // draw a rectangle connecting two colboxes
@@ -257,17 +260,18 @@ impl Buffers {
 }
 
 pub struct PackageBuffers {
-    pub stages: Vec<Buffers>,
+    pub stages:   Vec<Buffers>,
     pub fighters: Vec<Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
+    pub package:  Option<Package>,
 }
 
 impl PackageBuffers {
     pub fn new() -> PackageBuffers {
-        let package_buffers = PackageBuffers {
+        PackageBuffers {
             stages:   vec!(),
             fighters: vec!(),
-        };
-        package_buffers
+            package:  None,
+        }
     }
 
     pub fn update(&mut self, device: &Arc<Device>, queue: &Arc<Queue>, package_updates: Vec<PackageUpdate>) {
@@ -292,21 +296,55 @@ impl PackageBuffers {
                     for stage in &package.stages[..] {
                         self.stages.push(Buffers::new_stage(device, queue, &stage));
                     }
+                    self.package = Some(package);
                 }
                 PackageUpdate::DeleteFighterFrame { fighter, action, frame_index } => {
                     self.fighters[fighter][action].remove(frame_index);
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        package.fighters[fighter].actions[action].frames.remove(frame_index);
+                    }
                 }
                 PackageUpdate::InsertFighterFrame { fighter, action, frame_index, frame } => {
                     let buffers = Buffers::new_fighter_frame(device, queue, &frame);
                     self.fighters[fighter][action].insert(frame_index, buffers);
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        package.fighters[fighter].actions[action].frames.insert(frame_index, frame);
+                    }
                 }
                 PackageUpdate::DeleteStage { stage_index } => {
                     self.stages.remove(stage_index);
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        package.stages.remove(stage_index);
+                    }
                 }
                 PackageUpdate::InsertStage { stage_index, stage } => {
                     self.stages.insert(stage_index, Buffers::new_stage(device, queue, &stage));
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        package.stages.insert(stage_index, stage);
+                    }
                 }
             }
         }
     }
+
+    pub fn fighter_frame_colboxes(&self, device: &Arc<Device>, queue: &Arc<Queue>, fighter: usize, action: usize, frame: usize, selected: &HashSet<usize>) -> Buffers {
+        let mut vertices: Vec<Vertex> = vec!();
+        let mut indices: Vec<u16> = vec!();
+        let mut index_count = 0;
+
+        if let &Some(ref package) = &self.package {
+            let colboxes = &package.fighters[fighter].actions[action].frames[frame].colboxes;
+            for (i, colbox) in colboxes.iter().enumerate() {
+                if selected.contains(&i) {
+                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, 0.0);
+                }
+            }
+        }
+
+        Buffers {
+            index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+            vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
+        }
+    }
+
 }
