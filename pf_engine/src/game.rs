@@ -348,7 +348,7 @@ impl Game {
                         // TODO
                     }
 
-                    // single collisionbox selection
+                    // single click collisionbox selection
                     if os_input.mouse_pressed(0) {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             let player_x = self.players[player].bps_x;
@@ -365,8 +365,9 @@ impl Game {
 
                                 let distance = ((m_x - hit_x).powi(2) + (m_y - hit_y).powi(2)).sqrt();
                                 if distance < colbox.radius {
-                                    self.selector.colboxes.insert(i);
-                                    break;
+                                    if !self.selector.colboxes.remove(&i) {
+                                        self.selector.colboxes.insert(i);
+                                    }
                                 }
                             }
                         }
