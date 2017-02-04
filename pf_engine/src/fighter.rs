@@ -210,6 +210,16 @@ impl ActionFrame {
         }
         true
     }
+
+    pub fn get_links_containing_colbox(&self, colbox_i: usize) -> Vec<usize> {
+        let mut result: Vec<usize> = vec!();
+        for (link_i, link) in self.colbox_links.iter().enumerate() {
+            if link.one == colbox_i || link.two == colbox_i {
+                result.push(link_i);
+            }
+        }
+        result
+    }
 }
 
 pub enum ColboxOrLink <'a> {
@@ -226,6 +236,29 @@ pub enum RenderOrder {
 impl Default for RenderOrder {
     fn default() -> RenderOrder {
         RenderOrder::Colbox (0)
+    }
+}
+
+impl RenderOrder {
+    pub fn dec_greater_than(&self, check: usize) -> RenderOrder {
+        match self {
+            &RenderOrder::Colbox (i) => {
+                if i > check {
+                    RenderOrder::Colbox (i-1)
+                }
+                else {
+                    RenderOrder::Colbox (i)
+                }
+            }
+            &RenderOrder::Link (i) => {
+                if i > check {
+                    RenderOrder::Link (i-1)
+                }
+                else {
+                    RenderOrder::Link (i)
+                }
+            }
+        }
     }
 }
 

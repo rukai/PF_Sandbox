@@ -332,8 +332,11 @@ impl Game {
                         }
                     }
                     // resize collisionbox
-                    if os_input.key_pressed(VirtualKeyCode::G) {
-                        // TODO
+                    if os_input.key_pressed(VirtualKeyCode::LBracket) {
+                        self.package.resize_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, -0.1);
+                    }
+                    if os_input.key_pressed(VirtualKeyCode::RBracket) {
+                        self.package.resize_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, 0.1);
                     }
                     // meld link collisionboxes
                     if os_input.key_pressed(VirtualKeyCode::Z) {
@@ -346,6 +349,12 @@ impl Game {
                     // unlink collisionboxes
                     if os_input.key_pressed(VirtualKeyCode::C) {
                         // TODO
+                    }
+                    if os_input.key_pressed(VirtualKeyCode::Comma) {
+                        self.package.fighter_colboxes_send_to_front(fighter, action, frame, &self.selector.colboxes)
+                    }
+                    if os_input.key_pressed(VirtualKeyCode::Period) {
+                        self.package.fighter_colboxes_send_to_back(fighter, action, frame, &self.selector.colboxes)
                     }
 
                     // single click collisionbox selection
@@ -368,6 +377,9 @@ impl Game {
                                     if !self.selector.colboxes.remove(&i) {
                                         self.selector.colboxes.insert(i);
                                     }
+                                }
+                                if os_input.held_control() {
+                                    break;
                                 }
                             }
                         }
@@ -593,7 +605,7 @@ impl Game {
         }
     }
 
-    /// Call this whenever a frame player's frame is changed, this can be from:
+    /// Call this whenever a player's frame is changed, this can be from:
     /// *   the fighter's frame data is changed
     /// *   the player now refers to a different frame.
     fn update_frame(&mut self) {
