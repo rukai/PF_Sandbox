@@ -332,7 +332,7 @@ impl Player {
         if self.frame == 2 {
             self.x_vel = self.relative_f(fighter.dash_init_vel);
             if self.x_vel.abs() > fighter.dash_run_term_vel {
-                self.x_vel = fighter.dash_run_term_vel;
+                self.x_vel = self.relative_f(fighter.dash_run_term_vel);
             }
         }
 
@@ -658,7 +658,7 @@ impl Player {
             Some(Action::Jab2)       => { self.set_action(Action::Idle); },
             Some(Action::Jab3)       => { self.set_action(Action::Idle); },
             Some(Action::Utilt)      => { self.set_action(Action::Idle); },
-            Some(Action::Dtilt)      => { self.set_action(Action::Idle); },
+            Some(Action::Dtilt)      => { self.set_action(Action::Crouch); },
             Some(Action::Ftilt)      => { self.set_action(Action::Idle); },
             Some(Action::DashAttack) => { self.set_action(Action::Idle); },
             Some(Action::Usmash)     => { self.set_action(Action::Idle); },
