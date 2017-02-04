@@ -378,10 +378,16 @@ impl Game {
                                         self.selector.colboxes.insert(i);
                                     }
                                 }
-                                if os_input.held_control() {
-                                    break;
-                                }
                             }
+                        }
+
+                        // Select topmost colbox
+                        if os_input.held_control() {
+                            let mut selector_vec: Vec<usize> = self.selector.colboxes.iter().cloned().collect();
+                            selector_vec.sort();
+                            selector_vec.reverse();
+                            selector_vec.truncate(1);
+                            self.selector.colboxes = selector_vec.into_iter().collect();
                         }
                     }
 
