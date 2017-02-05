@@ -34,4 +34,16 @@ void main() {
     else if (render_id == 3.0) {
         f_color = vec4(0.76, 0.106, 0.843, 1.0);
     }
+    else if (render_id == 4.0) {
+        f_color = vec4(0.52, 0.608, 0.756, 1.0);
+    }
+    else if (render_id == 5.0) {
+        f_color = vec4(0.0, 0.64, 0.0, 1.0);
+    }
+    else if (render_id == 6.0) {
+        f_color = vec4(0.8, 0.8, 0.8, 1.0);
+    }
+    else if (render_id == 7.0) {
+        f_color = vec4(0.0, 0.0, 1.0, 1.0);
+    }
 }
