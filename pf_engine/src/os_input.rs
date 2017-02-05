@@ -209,6 +209,10 @@ impl OsInput {
         return self.key_held(VirtualKeyCode::LControl) || self.key_held(VirtualKeyCode::RControl);
     }
 
+    pub fn held_alt(&self) -> bool {
+        return self.key_held(VirtualKeyCode::LAlt) || self.key_held(VirtualKeyCode::RAlt);
+    }
+
     pub fn scroll_diff(&self) -> f32 {
         match self.current {
             Some( ref current) => { current.scroll_diff },

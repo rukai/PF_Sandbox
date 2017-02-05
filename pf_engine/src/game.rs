@@ -363,7 +363,7 @@ impl Game {
                             let player_x = self.players[player].bps_x;
                             let player_y = self.players[player].bps_y;
 
-                            if !os_input.held_shift() {
+                            if !(os_input.held_shift() || os_input.held_alt()) {
                                 self.selector.colboxes = HashSet::new();
                             }
                             let frame = &self.package.fighters[fighter].actions[action].frames[frame];
@@ -374,7 +374,8 @@ impl Game {
 
                                 let distance = ((m_x - hit_x).powi(2) + (m_y - hit_y).powi(2)).sqrt();
                                 if distance < colbox.radius {
-                                    if !self.selector.colboxes.remove(&i) {
+                                    self.selector.colboxes.remove(&i);
+                                    if !os_input.held_alt() {
                                         self.selector.colboxes.insert(i);
                                     }
                                 }
@@ -393,9 +394,8 @@ impl Game {
 
                     // begin multiple collisionbox selection
                     if os_input.mouse_pressed(1) {
-                        self.selector = Default::default();
                         if let Some(mouse) = os_input.game_mouse(&self.camera) {
-                            self.selector.point = Some(mouse);
+                            self.selector.start(mouse);
                         }
                     }
 
@@ -404,7 +404,7 @@ impl Game {
                         let (x1, y1) = selection;
                         if os_input.mouse_released(1) {
                             if let Some((x2, y2)) = os_input.game_mouse(&self.camera) {
-                                if !os_input.held_shift() {
+                                if !(os_input.held_shift() || os_input.held_alt()) {
                                     self.selector.colboxes = HashSet::new();
                                 }
                                 let player_x = self.players[player].bps_x;
@@ -419,7 +419,10 @@ impl Game {
                                     let x_check = (hit_x > x1 && hit_x < x2) || (hit_x > x2 && hit_x < x1);
                                     let y_check = (hit_y > y1 && hit_y < y2) || (hit_y > y2 && hit_y < y1);
                                     if x_check && y_check {
-                                        self.selector.colboxes.insert(i);
+                                        self.selector.colboxes.remove(&i);
+                                        if !os_input.held_alt() {
+                                            self.selector.colboxes.insert(i);
+                                        }
                                     }
                                 }
                                 self.selector.point = None;
@@ -732,12 +735,18 @@ pub struct Selector {
 }
 
 impl Selector {
-    fn colboxes_vec(&self) -> Vec<usize> {
+    fn colboxes_vec(&self) -> Vec<usize> { // TODO: LOL
         let mut result:Vec<usize> = vec!();
         for value in &self.colboxes {
             result.push(*value);
         }
         result
+    }
+
+    pub fn start(&mut self, mouse: (f32, f32)) {
+        self.point  = Some(mouse);
+        self.moving = false;
+        self.mouse  = None;
     }
 }
 
