@@ -402,10 +402,12 @@ pub enum Action {
     Uair,
     Dair,
     Fair,
+    Bair,
     Nair,
     UairLand,
     DairLand,
     FairLand,
+    BairLand,
     NairLand,
 
     // Taunts

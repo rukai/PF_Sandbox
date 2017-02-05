@@ -208,9 +208,7 @@ impl Player {
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if input.a.press || input.z.press {
-            self.set_action(Action::Nair);
-        }
+        if self.check_attacks_aerial(input) { }
         else if input.b.press {
             // special attack
         }
@@ -471,6 +469,50 @@ impl Player {
         }
     }
 
+    fn check_attacks_aerial(&mut self, input: &PlayerInput) -> bool {
+        if input.a.press || input.z.press {
+            if self.relative_f(input[0].stick_x) > 0.3 && input[0].stick_x.abs() > input[0].stick_y.abs() - 0.1 {
+                self.set_action(Action::Fair);
+            }
+            else if self.relative_f(input[0].stick_x) < -0.3 && input[0].stick_x.abs() > input[0].stick_y.abs() - 0.1 {
+                self.set_action(Action::Bair);
+            }
+            else if input[0].stick_y < -0.3 {
+                self.set_action(Action::Dair);
+            }
+            else if input[0].stick_y > 0.3 {
+                self.set_action(Action::Uair);
+            }
+            else {
+                self.set_action(Action::Nair);
+            }
+            true
+        }
+        else if self.relative_f(input[0].c_stick_x) >= 0.3 && self.relative_f(input[1].c_stick_x) < 0.3 
+            && input[0].c_stick_x.abs() > input[0].c_stick_y.abs() - 0.1
+        {
+            self.set_action(Action::Fair);
+            true
+        }
+        else if self.relative_f(input[0].c_stick_x) <= -0.3 && self.relative_f(input[1].c_stick_x) > -0.3
+            && input[0].c_stick_x.abs() > input[0].c_stick_y.abs() - 0.1
+        {
+            self.set_action(Action::Bair);
+            true
+        }
+        else if input[0].c_stick_y < -0.3 && input[1].c_stick_y > -0.3 {
+            self.set_action(Action::Dair);
+            true
+        }
+        else if input[0].c_stick_y >= 0.3 && input[1].c_stick_y < 0.3 {
+            self.set_action(Action::Uair);
+            true
+        }
+        else {
+            false
+        }
+    }
+
     fn check_attacks(&mut self, input: &PlayerInput) -> bool {
         if input.a.press {
             if self.relative_f(input[0].stick_x) > 0.3 && input[0].stick_x.abs() - input[0].stick_y.abs() > -0.05 {
@@ -671,10 +713,12 @@ impl Player {
             Some(Action::Uair)     => { self.set_action(Action::Fall); },
             Some(Action::Dair)     => { self.set_action(Action::Fall); },
             Some(Action::Fair)     => { self.set_action(Action::Fall); },
+            Some(Action::Bair)     => { self.set_action(Action::Fall); },
             Some(Action::Nair)     => { self.set_action(Action::Fall); },
             Some(Action::UairLand) => { self.set_action(Action::Idle); },
             Some(Action::DairLand) => { self.set_action(Action::Idle); },
             Some(Action::FairLand) => { self.set_action(Action::Idle); },
+            Some(Action::BairLand) => { self.set_action(Action::Idle); },
             Some(Action::NairLand) => { self.set_action(Action::Idle); },
 
             // Taunts
@@ -896,6 +940,7 @@ impl Player {
             Some(Action::Uair)      => { self.set_action(Action::UairLand) },
             Some(Action::Dair)      => { self.set_action(Action::DairLand) },
             Some(Action::Fair)      => { self.set_action(Action::FairLand) },
+            Some(Action::Bair)      => { self.set_action(Action::BairLand) },
             Some(Action::Nair)      => { self.set_action(Action::NairLand) },
             _ if self.y_vel >= -1.0 => { self.set_action(Action::Idle) }, // no impact land
             Some(_) | None          => { self.set_action(Action::Land) },
