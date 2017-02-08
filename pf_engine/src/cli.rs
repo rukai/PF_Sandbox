@@ -3,7 +3,7 @@ use std::fs;
 use std::env;
 
 fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options] [package_name]\nIf no arguments are given the GUI menu is used instead.", program);
+    let brief = format!("Usage: {} [options] [package_name]\nIf no arguments are given the GUI menu is used instead. (excluding -g)", program);
     print!("{}", opts.usage(&brief));
 }
 
@@ -18,6 +18,7 @@ pub fn cli() -> Vec<CLIChoice> {
     opts.optopt("f", "fighter",      "Use the fighters specified by names", "NAME1,NAME2,NAME3...");
     opts.optopt("F", "fighterIndex", "Use the fighters specified by indexes", "INDEX1,INDEX2,INDEX3...");
     opts.optopt("p", "players",      "Number of players in the game", "NUMPLAYERS");
+    opts.optopt("g", "graphics",     "Graphics backend to use", "[vulkan|none]");
     let matches = match opts.parse(&args[1..]) {
         Ok(m)  => { m },
         Err(_) => {
@@ -33,12 +34,15 @@ pub fn cli() -> Vec<CLIChoice> {
         return vec!(CLIChoice::Close);
     }
 
-    if matches.free.len() != 1 {
+    let mut cli_choices: Vec<CLIChoice> = vec!();
+
+    if matches.free.len() > 1 {
         print_usage(&program, opts);
         return vec!(CLIChoice::Close);
     }
-
-    let mut cli_choices: Vec<CLIChoice> = vec!();
+    else if matches.free.len() == 1 {
+        cli_choices.push(CLIChoice::Package(matches.free[0].clone()));
+    }
 
     if let Some(players) = matches.opt_str("p") {
         if let Ok(players) = players.parse::<usize>() {
@@ -75,17 +79,36 @@ pub fn cli() -> Vec<CLIChoice> {
     if let Some(stage_name) = matches.opt_str("s") {
         cli_choices.push(CLIChoice::StageName(stage_name));
     }
+    if let Some(backend_string) = matches.opt_str("g") {
+        match backend_string.to_lowercase().as_ref() {
+            "vulkan" => {
+                cli_choices.push(CLIChoice::GraphicsBackend (GraphicsBackendChoice::Vulkan));
+            }
+            "none" => {
+                cli_choices.push(CLIChoice::GraphicsBackend (GraphicsBackendChoice::None));
+            }
+            _ => {
+                print_usage(&program, opts);
+                return vec!(CLIChoice::Close);
+            }
+        }
+    }
 
-    cli_choices.push(CLIChoice::Package(matches.free[0].clone()));
     cli_choices
 }
 
 pub enum CLIChoice {
-    TotalPlayers   (usize),
-    FighterIndexes (Vec<usize>),
-    FighterNames   (Vec<String>),
-    StageIndex     (usize),
-    StageName      (String),
-    Package        (String),
+    TotalPlayers    (usize),
+    FighterIndexes  (Vec<usize>),
+    FighterNames    (Vec<String>),
+    StageIndex      (usize),
+    StageName       (String),
+    Package         (String),
+    GraphicsBackend (GraphicsBackendChoice),
     Close,
+}
+
+pub enum GraphicsBackendChoice {
+    Vulkan,
+    None,
 }

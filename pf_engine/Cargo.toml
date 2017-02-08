@@ -21,3 +21,6 @@ matches = "0.1.4"
 
 [build-dependencies]
 vulkano-shaders = "0.3.1"
+
+[features]
+vulkan = []

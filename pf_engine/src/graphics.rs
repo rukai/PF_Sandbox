@@ -2,7 +2,6 @@ use ::app::Render;
 use ::buffers::{Buffers, PackageBuffers};
 use ::buffers::Vertex;
 use ::game::{GameState, RenderEntity, RenderGame};
-use ::os_input::OsInput;
 use ::menu::RenderMenu;
 use ::package::PackageUpdate;
 use ::player::RenderFighter;
@@ -67,6 +66,7 @@ pub struct Uniform {
 }
 
 #[allow(dead_code)]
+//#[cfg(feature = "vulkan")]
 pub struct Graphics {
     package_buffers:  PackageBuffers,
     window:           vulkano_win::Window,
@@ -83,15 +83,14 @@ pub struct Graphics {
 }
 
 impl Graphics {
-    pub fn init() -> (Sender<GraphicsMessage>, OsInput) {
+    pub fn init(os_input_tx: Sender<Event>) -> Sender<GraphicsMessage> {
         let (render_tx, render_rx) = channel();
-        let (os_input, os_input_tx) = OsInput::new();
 
         thread::spawn(move || {
             let mut graphics = Graphics::new(os_input_tx, render_rx);
             graphics.run();
         });
-        (render_tx, os_input)
+        render_tx
     }
 
     fn new(os_input_tx: Sender<Event>, render_rx: Receiver<GraphicsMessage>) -> Graphics {
