@@ -5,8 +5,7 @@ use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
 use ::fighter::{ActionFrame, CollisionBox, LinkType};
 use ::camera::Camera;
 use ::stage::Area;
-use ::graphics::GraphicsMessage;
-use ::app::Render;
+use ::graphics::{GraphicsMessage, Render};
 use ::collision::collision_check;
 
 use ::std::collections::HashSet;

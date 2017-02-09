@@ -5,8 +5,6 @@ authors = ["Rukai <rubickent@gmail.com>"]
 build = "build.rs"
 
 [dependencies]
-vulkano = "0.3.1"
-vulkano-win = "0.3.1"
 winit = "0.5.8"
 getopts = "0.2.14"
 libusb = "0.2"
@@ -19,8 +17,12 @@ serde_derive = "0.8"
 serde_json = "0.8"
 matches = "0.1.4"
 
+vulkano = { version = "0.3.1", optional = true }
+vulkano-win = { version = "0.3.1", optional = true }
+
 [build-dependencies]
 vulkano-shaders = "0.3.1"
 
 [features]
-vulkan = []
+default = ["vulkan"]
+vulkan = ["vulkano", "vulkano-win"]

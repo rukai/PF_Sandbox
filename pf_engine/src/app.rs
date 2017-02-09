@@ -1,21 +1,29 @@
-use ::package::Package;
-use ::menu::{Menu, RenderMenu, MenuChoice};
-use ::cli::{CLIChoice, GraphicsBackendChoice};
-use ::game::{Game, RenderGame, GameState};
-use ::graphics::{Graphics, GraphicsMessage};
+#[cfg(feature = "vulkan")]
+use ::vulkan::Graphics;
+
+use ::cli::CLIChoice;
+#[cfg(any(feature = "vulkan"))]
+use ::cli::GraphicsBackendChoice;
+use ::game::{Game, GameState};
+#[cfg(any(feature = "vulkan"))]
+use ::graphics::GraphicsMessage;
 use ::input::Input;
+use ::menu::{Menu, MenuChoice};
 use ::network::Network;
 use ::os_input::OsInput;
+use ::package::Package;
 
 use libusb::Context;
 use winit::VirtualKeyCode;
 use std::thread;
 use std::time::{Duration, Instant};
+#[cfg(any(feature = "vulkan"))]
 use std::sync::mpsc::Sender;
 
 pub fn run(cli_choices: Vec<CLIChoice>) {
     let mut context = Context::new().unwrap();
     let mut input = Input::new(&mut context);
+    #[cfg(any(feature = "vulkan"))]
     let mut graphics_tx: Option<Sender<GraphicsMessage>> = None;
     let mut next_state = NextAppState::None;
     let mut network = Network::new();
@@ -34,30 +42,20 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
 
         let mut load_package: Option<Package> = None;
 
+        #[allow(unused_variables)]
         let (os_input, os_input_tx) = OsInput::new();
 
         // replace with any cli_choices
         let mut load_menu = true;
-        let mut set_default_graphics = true;
-        for choice in cli_choices {
-            match &choice {
+        for choice in &cli_choices {
+            match choice {
                 &CLIChoice::Close => { return; }
                 &CLIChoice::FighterIndexes (ref fighters_index) => { load_menu = false; fighters = fighters_index.clone() }
                 &CLIChoice::FighterNames (_)                    => { panic!("Unimplemented") }
                 &CLIChoice::StageIndex (ref stage_index)        => { load_menu = false; stage = *stage_index }
                 &CLIChoice::StageName (_)                       => { panic!("Unimplemented") }
                 &CLIChoice::Package (ref name)                  => { load_menu = false; load_package = Some(Package::open_or_generate(&name)); }
-                &CLIChoice::GraphicsBackend (ref backend_choice) => {
-                    match backend_choice {
-                        // use conditional compilation to choose
-                        &GraphicsBackendChoice::Vulkan => {
-                            graphics_tx = Some(Graphics::init(os_input_tx.clone()));
-                        }
-                        &GraphicsBackendChoice::None => {
-                            set_default_graphics = false;
-                        }
-                    }
-                }
+                &CLIChoice::GraphicsBackend (_) => { }
                 &CLIChoice::TotalPlayers (total_players) => {
                     load_menu = false;
                     while controllers.len() > total_players {
@@ -67,8 +65,28 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
             }
         }
 
-        if set_default_graphics {
-            graphics_tx = Some(Graphics::init(os_input_tx.clone()));
+        #[cfg(feature = "vulkan")]
+        {
+            let mut set_default_graphics = true;
+            for choice in cli_choices {
+                match &choice {
+                    &CLIChoice::GraphicsBackend (ref backend_choice) => {
+                        match backend_choice {
+                            #[cfg(feature = "vulkan")]
+                            &GraphicsBackendChoice::Vulkan => {
+                                graphics_tx = Some(Graphics::init(os_input_tx.clone()));
+                            }
+                            &GraphicsBackendChoice::None => {
+                                set_default_graphics = false;
+                            }
+                        }
+                    }
+                    _ => { }
+                }
+            }
+            if set_default_graphics {
+                graphics_tx = Some(Graphics::init(os_input_tx.clone()));
+            }
         }
 
         let package = match load_package {
@@ -99,8 +117,11 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
                         }
                     }
                 }
-                if let Some(ref tx) = graphics_tx {
-                    tx.send(menu.graphics_message()).unwrap();
+                #[cfg(any(feature = "vulkan"))]
+                {
+                    if let Some(ref tx) = graphics_tx {
+                        tx.send(menu.graphics_message()).unwrap();
+                    }
                 }
             }
             &mut AppState::Game (ref mut game) => {
@@ -112,8 +133,11 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
                     _ => { }
                 }
                 network.update(game);
-                if let Some(ref tx) = graphics_tx {
-                    tx.send(game.graphics_message()).unwrap();
+                #[cfg(any(feature = "vulkan"))]
+                {
+                    if let Some(ref tx) = graphics_tx {
+                        tx.send(game.graphics_message()).unwrap();
+                    }
                 }
             }
         };
@@ -163,9 +187,4 @@ pub struct GameSetup {
     pub fighters:    Vec<usize>,
     pub stage:       usize,
     pub netplay:     bool,
-}
-
-pub enum Render {
-    Game (RenderGame),
-    Menu (RenderMenu),
 }

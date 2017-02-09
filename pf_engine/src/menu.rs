@@ -1,7 +1,7 @@
 use ::input::Input;
 use ::package::Package;
-use ::graphics::GraphicsMessage;
-use ::app::{Render, GameSetup};
+use ::graphics::{GraphicsMessage, Render};
+use ::app::GameSetup;
 
 #[allow(dead_code)]
 #[derive(Clone)]
