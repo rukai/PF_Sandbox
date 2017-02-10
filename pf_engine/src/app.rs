@@ -1,12 +1,16 @@
 #[cfg(feature = "vulkan")]
-use ::vulkan::Graphics;
+use ::vulkan::VulkanGraphics;
+#[cfg(feature = "opengl")]
+use ::opengl::OpenGLGraphics;
+#[cfg(any(feature = "vulkan", feature = "opengl"))]
+use ::cli::GraphicsBackendChoice;
+#[cfg(any(feature = "vulkan", feature = "opengl"))]
+use ::graphics::GraphicsMessage;
+#[cfg(any(feature = "vulkan", feature = "opengl"))]
+use std::sync::mpsc::Sender;
 
 use ::cli::CLIChoice;
-#[cfg(any(feature = "vulkan"))]
-use ::cli::GraphicsBackendChoice;
 use ::game::{Game, GameState};
-#[cfg(any(feature = "vulkan"))]
-use ::graphics::GraphicsMessage;
 use ::input::Input;
 use ::menu::{Menu, MenuChoice};
 use ::network::Network;
@@ -17,13 +21,11 @@ use libusb::Context;
 use winit::VirtualKeyCode;
 use std::thread;
 use std::time::{Duration, Instant};
-#[cfg(any(feature = "vulkan"))]
-use std::sync::mpsc::Sender;
 
 pub fn run(cli_choices: Vec<CLIChoice>) {
     let mut context = Context::new().unwrap();
     let mut input = Input::new(&mut context);
-    #[cfg(any(feature = "vulkan"))]
+    #[cfg(any(feature = "vulkan", feature = "opengl"))]
     let mut graphics_tx: Option<Sender<GraphicsMessage>> = None;
     let mut next_state = NextAppState::None;
     let mut network = Network::new();
@@ -65,27 +67,37 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
             }
         }
 
-        #[cfg(feature = "vulkan")]
+        #[cfg(any(feature = "vulkan", feature = "opengl"))]
         {
             let mut set_default_graphics = true;
             for choice in cli_choices {
                 match &choice {
                     &CLIChoice::GraphicsBackend (ref backend_choice) => {
+                        set_default_graphics = false;
                         match backend_choice {
                             #[cfg(feature = "vulkan")]
                             &GraphicsBackendChoice::Vulkan => {
-                                graphics_tx = Some(Graphics::init(os_input_tx.clone()));
+                                graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone()));
                             }
-                            &GraphicsBackendChoice::None => {
-                                set_default_graphics = false;
+                            #[cfg(feature = "opengl")]
+                            &GraphicsBackendChoice::OpenGL => {
+                                graphics_tx = Some(OpenGLGraphics::init(os_input_tx.clone()));
                             }
+                            &GraphicsBackendChoice::None => {}
                         }
                     }
                     _ => { }
                 }
             }
             if set_default_graphics {
-                graphics_tx = Some(Graphics::init(os_input_tx.clone()));
+                #[cfg(feature = "vulkan")]
+                {
+                    graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone()));
+                }
+                #[cfg(all(not(feature = "vulkan"), feature = "opengl"))]
+                {
+                    graphics_tx = Some(OpenGLGraphics::init(os_input_tx.clone()));
+                }
             }
         }
 
@@ -117,7 +129,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
                         }
                     }
                 }
-                #[cfg(any(feature = "vulkan"))]
+                #[cfg(any(feature = "vulkan", feature = "opengl"))]
                 {
                     if let Some(ref tx) = graphics_tx {
                         tx.send(menu.graphics_message()).unwrap();
@@ -133,7 +145,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
                     _ => { }
                 }
                 network.update(game);
-                #[cfg(any(feature = "vulkan"))]
+                #[cfg(any(feature = "vulkan", feature = "opengl"))]
                 {
                     if let Some(ref tx) = graphics_tx {
                         tx.send(game.graphics_message()).unwrap();

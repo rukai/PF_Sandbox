@@ -18,12 +18,18 @@ pub fn cli() -> Vec<CLIChoice> {
     opts.optopt("f", "fighter",      "Use the fighters specified by names", "NAME1,NAME2,NAME3...");
     opts.optopt("F", "fighterIndex", "Use the fighters specified by indexes", "INDEX1,INDEX2,INDEX3...");
     opts.optopt("p", "players",      "Number of players in the game", "NUMPLAYERS");
-    if cfg!(features =  "vulkan") {
-        opts.optopt("g", "graphics",     "Graphics backend to use", "[vulkan|none]");
-    }
-    else {
-        opts.optopt("g", "graphics",     "Graphics backend to use", "[none]");
-    }
+    opts.optopt("g", "graphics",     "Graphics backend to use",
+        if cfg!(features =  "vulkan") && cfg!(features = "opengl") {
+            "[vulkan|opengl|none]"
+        } else if cfg!(features =  "vulkan") {
+            "[vulkan|none]"
+        } else if cfg!(features = "opengl") {
+            "[opengl|none]"
+        } else {
+            "[none]"
+        }
+    );
+
     let matches = match opts.parse(&args[1..]) {
         Ok(m)  => { m },
         Err(_) => {
@@ -90,6 +96,10 @@ pub fn cli() -> Vec<CLIChoice> {
             "vulkan" => {
                 cli_choices.push(CLIChoice::GraphicsBackend (GraphicsBackendChoice::Vulkan));
             }
+            #[cfg(feature = "opengl")]
+            "opengl" => {
+                cli_choices.push(CLIChoice::GraphicsBackend (GraphicsBackendChoice::OpenGL));
+            }
             "none" => {
                 cli_choices.push(CLIChoice::GraphicsBackend (GraphicsBackendChoice::None));
             }
@@ -117,5 +127,7 @@ pub enum CLIChoice {
 pub enum GraphicsBackendChoice {
     #[cfg(feature = "vulkan")]
     Vulkan,
+    #[cfg(feature = "opengl")]
+    OpenGL,
     None,
 }

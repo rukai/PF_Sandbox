@@ -17,12 +17,14 @@ serde_derive = "0.8"
 serde_json = "0.8"
 matches = "0.1.4"
 
-vulkano = { version = "0.3.1", optional = true }
-vulkano-win = { version = "0.3.1", optional = true }
+vulkano = { version = "0.3.2", optional = true }
+vulkano-win = { version = "0.3.2", optional = true }
+glium = { version = "0.16.0", optional = true }
 
 [build-dependencies]
-vulkano-shaders = "0.3.1"
+vulkano-shaders = { version = "0.3.2", optional = true }
 
 [features]
-default = ["vulkan"]
-vulkan = ["vulkano", "vulkano-win"]
+default = ["vulkan", "opengl"]
+vulkan = ["vulkano", "vulkano-win", "vulkano-shaders"]
+opengl = ["glium"]

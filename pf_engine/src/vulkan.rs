@@ -30,7 +30,6 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread;
 use std::time::Duration;
 
-#[cfg(feature = "vulkan")]
 mod generic_vs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/generic-vertex.glsl")} }
 mod generic_fs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/generic-fragment.glsl")} }
 
@@ -39,9 +38,9 @@ mod render_pass {
     single_pass_renderpass!{
         attachments: {
             color: {
-            load:   Clear,
-            store:  Store,
-            format: Format,
+                load:   Clear,
+                store:  Store,
+                format: Format,
             }
         },
         pass: {
@@ -65,7 +64,7 @@ pub struct Uniform {
 }
 
 #[allow(dead_code)]
-pub struct Graphics {
+pub struct VulkanGraphics {
     package_buffers:  PackageBuffers,
     window:           vulkano_win::Window,
     device:           Arc<Device>,
@@ -80,18 +79,18 @@ pub struct Graphics {
     render_rx:        Receiver<GraphicsMessage>,
 }
 
-impl Graphics {
+impl VulkanGraphics {
     pub fn init(os_input_tx: Sender<Event>) -> Sender<GraphicsMessage> {
         let (render_tx, render_rx) = channel();
 
         thread::spawn(move || {
-            let mut graphics = Graphics::new(os_input_tx, render_rx);
+            let mut graphics = VulkanGraphics::new(os_input_tx, render_rx);
             graphics.run();
         });
         render_tx
     }
 
-    fn new(os_input_tx: Sender<Event>, render_rx: Receiver<GraphicsMessage>) -> Graphics {
+    fn new(os_input_tx: Sender<Event>, render_rx: Receiver<GraphicsMessage>) -> VulkanGraphics {
         let instance = {
             let extensions = vulkano_win::required_extensions();
             Instance::new(None, &extensions, None).expect("failed to create Vulkan instance")
@@ -137,9 +136,9 @@ impl Graphics {
             }).unwrap()
         }).collect::<Vec<_>>();
 
-        let (uniforms, generic_pipeline) = Graphics::generic_pipeline(&device, &queue, &images, &render_pass);
+        let (uniforms, generic_pipeline) = VulkanGraphics::generic_pipeline(&device, &queue, &images, &render_pass);
 
-        Graphics {
+        VulkanGraphics {
             package_buffers:  PackageBuffers::new(),
             window:           window,
             device:           device,
@@ -272,9 +271,10 @@ impl Graphics {
         match render.state {
             GameState::Local  => { },
             GameState::Paused => {
-                // TODO: blue vaporwavey background lines on pause :D
+                // TODO: blue vaporwavey background lines to indicate pause :D
                 // also double as measuring/scale lines
                 // configurable size via treeflection
+                // but this might be desirable to have during normal gameplay to, hmmmm....
             },
             _ => { },
         }
@@ -297,6 +297,8 @@ impl Graphics {
         for entity in render.entities {
             match entity {
                 RenderEntity::Player(player) => {
+                    let dir = if player.face_right { 1.0 } else { -1.0 } as f32;
+                    let draw_pos = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
                     // draw player ecb
                     if player.debug.ecb {
                         let buffers = Buffers::new_player(&self.device, &self.queue, &player);
@@ -305,8 +307,8 @@ impl Graphics {
                             let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
                             buffer_content.zoom            = zoom;
                             buffer_content.aspect_ratio    = aspect_ratio;
-                            buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
-                            buffer_content.direction       = 1.0;
+                            buffer_content.position_offset = draw_pos;
+                            buffer_content.direction       = dir;
                             buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
                             if player.fighter_selected {
                                 buffer_content.color = [0.0, 1.0, 0.0, 1.0];
@@ -319,41 +321,41 @@ impl Graphics {
                     }
 
                     // setup fighter uniform
-                    let uniform = uniforms.next().unwrap();
-                    {
-                        let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
-                        buffer_content.zoom            = zoom;
-                        buffer_content.aspect_ratio    = aspect_ratio;
-                        buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
-                        buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
-                        if let RenderFighter::Debug = player.debug.fighter {
-                            buffer_content.color = [0.0, 0.0, 0.0, 0.0];
-                        }
-                        else {
-                            buffer_content.color = [1.0, 1.0, 1.0, 1.0];
-                        }
-                        if player.fighter_selected {
-                            buffer_content.edge_color = [0.0, 1.0, 0.0, 1.0];
-                        }
-                        else {
-                            buffer_content.edge_color = player.fighter_color;
-                        }
-                    }
-                    
-                    // draw fighter
-                    let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
-                    if player.frame < fighter_frames.len() {
-                        if let &Some(ref buffers) = &fighter_frames[player.frame] {
-                            match player.debug.fighter {
-                                RenderFighter::Normal | RenderFighter::Debug => {
+                    match player.debug.fighter {
+                        RenderFighter::Normal | RenderFighter::Debug => {
+                            let uniform = uniforms.next().unwrap();
+                            {
+                                let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
+                                buffer_content.zoom            = zoom;
+                                buffer_content.aspect_ratio    = aspect_ratio;
+                                buffer_content.position_offset = draw_pos;
+                                buffer_content.direction       = dir;
+                                if let RenderFighter::Debug = player.debug.fighter {
+                                    buffer_content.color = [0.0, 0.0, 0.0, 0.0];
+                                }
+                                else {
+                                    buffer_content.color = [1.0, 1.0, 1.0, 1.0];
+                                }
+                                if player.fighter_selected {
+                                    buffer_content.edge_color = [0.0, 1.0, 0.0, 1.0];
+                                }
+                                else {
+                                    buffer_content.edge_color = player.fighter_color;
+                                }
+                            }
+
+                            // draw fighter
+                            let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
+                            if player.frame < fighter_frames.len() {
+                                if let &Some(ref buffers) = &fighter_frames[player.frame] {
                                     command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
                                 }
-                                RenderFighter::None => {}
+                            }
+                            else {
+                                 //TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
                             }
                         }
-                    }
-                    else {
-                         //TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
+                        RenderFighter::None => { }
                     }
 
                     // draw selected hitboxes

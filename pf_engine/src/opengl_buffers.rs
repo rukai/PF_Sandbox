@@ -5,21 +5,19 @@ use ::package::{Package, PackageUpdate};
 use ::player::RenderPlayer;
 use ::stage::Stage;
 
-use std::collections::HashSet;
-use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
-use vulkano::device::{Device, Queue};
+use glium;
+use glium::backend::glutin_backend::GlutinFacade;
 
 use std::f32::consts;
-use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Copy, Clone)]
 pub struct Vertex {
     pub position: [f32; 2],
     pub edge: f32,
     pub render_id: f32,
 }
 
-impl_vertex!(Vertex, position, edge, render_id);
+implement_vertex!(Vertex, position, edge, render_id);
 
 fn vertex(x: f32, y: f32) -> Vertex {
     Vertex {
@@ -30,14 +28,21 @@ fn vertex(x: f32, y: f32) -> Vertex {
 }
 
 pub struct Buffers {
-    pub vertex: Arc<CpuAccessibleBuffer<[Vertex]>>,
-    pub index:  Arc<CpuAccessibleBuffer<[u16]>>,
+    pub vertex: glium::VertexBuffer<Vertex>,
+    pub index: glium::IndexBuffer<u16>,
 }
 
 impl Buffers {
+    pub fn new(display: &GlutinFacade) -> Buffers {
+        Buffers {
+            vertex: glium::VertexBuffer::empty_dynamic(display, 1000).unwrap(),
+            index: glium::IndexBuffer::empty_dynamic(display, glium::index::PrimitiveType::TrianglesList, 1000).unwrap(),
+        }
+    }
+
     /// Returns only a VertexBuffer
     /// Use with PrimitiveToplogy::LineStrip
-    pub fn rect_buffers(device: &Arc<Device>, queue: &Arc<Queue>, rect: RenderRect) -> Buffers {
+    pub fn rect_buffers(display: &GlutinFacade, rect: RenderRect) -> Buffers {
         let width = 0.5;
         let min_x = rect.p1.0.min(rect.p2.0);
         let min_y = rect.p1.1.min(rect.p2.1);
@@ -64,12 +69,12 @@ impl Buffers {
             3, 7, 0, 0, 4, 7, // left edge
         ];
         Buffers {
-            vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
-            index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+            vertex: glium::VertexBuffer::new(display, &vertices).unwrap(),
+            index: glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap(),
         }
     }
 
-    fn new_stage(device: &Arc<Device>, queue: &Arc<Queue>, stage: &Stage) -> Buffers {
+    pub fn new_stage(display: &GlutinFacade, stage: &Stage) -> Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
@@ -94,12 +99,12 @@ impl Buffers {
         }
 
         Buffers {
-            vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
-            index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+            vertex: glium::VertexBuffer::new(display, &vertices).unwrap(),
+            index: glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap(),
         }
     }
 
-    fn new_fighter_frame(device: &Arc<Device>, queue: &Arc<Queue>, frame: &ActionFrame) -> Option<Buffers> {
+    fn new_fighter_frame(display: &GlutinFacade, frame: &ActionFrame) -> Option<Buffers> {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut index_count = 0;
@@ -127,8 +132,8 @@ impl Buffers {
         }
 
         Some(Buffers {
-            index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
-            vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
+            vertex: glium::VertexBuffer::new(display, &vertices).unwrap(),
+            index: glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap(),
         })
     }
 
@@ -211,7 +216,7 @@ impl Buffers {
         }
     }
 
-    pub fn new_player(device: &Arc<Device>, queue: &Arc<Queue>, player: &RenderPlayer) -> Buffers {
+    pub fn new_player(display: &GlutinFacade, player: &RenderPlayer) -> Buffers {
         // ecb
         let vertex0 = vertex(player.ecb.bot_x,   player.ecb.bot_y);
         let vertex1 = vertex(player.ecb.left_x,  player.ecb.left_y);
@@ -230,7 +235,7 @@ impl Buffers {
         let vertex10 = vertex(-0.15,  4.0);
         let vertex11 = vertex( 0.15,  4.0);
 
-        let vertices = vec![vertex0, vertex1, vertex2, vertex3, vertex4, vertex5, vertex6, vertex7, vertex8, vertex9, vertex10, vertex11];
+        let shape = vec![vertex0, vertex1, vertex2, vertex3, vertex4, vertex5, vertex6, vertex7, vertex8, vertex9, vertex10, vertex11];
         let indices: [u16; 18] = [
             1,  2,  0,
             1,  2,  3,
@@ -240,9 +245,12 @@ impl Buffers {
             11, 10, 13,
         ];
 
+        let vertices = glium::VertexBuffer::new(display, &shape).unwrap();
+        let indices = glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap();
+
         Buffers {
-            vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
-            index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+            vertex: vertices,
+            index: indices,
         }
     }
 }
@@ -255,14 +263,15 @@ pub struct PackageBuffers {
 
 impl PackageBuffers {
     pub fn new() -> PackageBuffers {
-        PackageBuffers {
+        let package_buffers = PackageBuffers {
             stages:   vec!(),
             fighters: vec!(),
             package:  None,
-        }
+        };
+        package_buffers
     }
 
-    pub fn update(&mut self, device: &Arc<Device>, queue: &Arc<Queue>, package_updates: Vec<PackageUpdate>) {
+    pub fn update(&mut self, display: &GlutinFacade, package_updates: Vec<PackageUpdate>) {
         for update in package_updates {
             match update {
                 PackageUpdate::Package (package) => {
@@ -274,7 +283,7 @@ impl PackageBuffers {
                         for action in &fighter.actions[..] {
                             let mut frame_buffers: Vec<Option<Buffers>> = vec!();
                             for frame in &action.frames[..] {
-                                frame_buffers.push(Buffers::new_fighter_frame(device, queue, frame));
+                                frame_buffers.push(Buffers::new_fighter_frame(display, frame));
                             }
                             action_buffers.push(frame_buffers);
                         }
@@ -282,7 +291,7 @@ impl PackageBuffers {
                     }
 
                     for stage in &package.stages[..] {
-                        self.stages.push(Buffers::new_stage(device, queue, &stage));
+                        self.stages.push(Buffers::new_stage(display, &stage));
                     }
                     self.package = Some(package);
                 }
@@ -293,7 +302,7 @@ impl PackageBuffers {
                     }
                 }
                 PackageUpdate::InsertFighterFrame { fighter, action, frame_index, frame } => {
-                    let buffers = Buffers::new_fighter_frame(device, queue, &frame);
+                    let buffers = Buffers::new_fighter_frame(display, &frame);
                     self.fighters[fighter][action].insert(frame_index, buffers);
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.fighters[fighter].actions[action].frames.insert(frame_index, frame);
@@ -306,7 +315,7 @@ impl PackageBuffers {
                     }
                 }
                 PackageUpdate::InsertStage { stage_index, stage } => {
-                    self.stages.insert(stage_index, Buffers::new_stage(device, queue, &stage));
+                    self.stages.insert(stage_index, Buffers::new_stage(display, &stage));
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.stages.insert(stage_index, stage);
                     }
@@ -314,25 +323,4 @@ impl PackageBuffers {
             }
         }
     }
-
-    pub fn fighter_frame_colboxes(&self, device: &Arc<Device>, queue: &Arc<Queue>, fighter: usize, action: usize, frame: usize, selected: &HashSet<usize>) -> Buffers {
-        let mut vertices: Vec<Vertex> = vec!();
-        let mut indices: Vec<u16> = vec!();
-        let mut index_count = 0;
-
-        if let &Some(ref package) = &self.package {
-            let colboxes = &package.fighters[fighter].actions[action].frames[frame].colboxes;
-            for (i, colbox) in colboxes.iter().enumerate() {
-                if selected.contains(&i) {
-                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, 0.0);
-                }
-            }
-        }
-
-        Buffers {
-            index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
-            vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
-        }
-    }
-
 }
