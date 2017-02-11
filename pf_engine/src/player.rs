@@ -215,6 +215,7 @@ impl Player {
         else if self.jump_input(input).jump() && self.air_jumps_left > 0 {
             self.air_jumps_left -= 1;
             self.y_vel = fighter.jump_y_init_vel;
+            self.x_vel = fighter.jump_x_init_vel * input[0].stick_x;
             self.fastfall = false;
 
             if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
@@ -931,11 +932,6 @@ impl Player {
     }
 
     fn land(&mut self, fighter: &Fighter) {
-        self.y_vel = 0.0;
-        self.airbourne = false;
-        self.fastfall = false;
-        self.air_jumps_left = fighter.air_jumps;
-
         match Action::from_u64(self.action) {
             Some(Action::Uair)      => { self.set_action(Action::UairLand) },
             Some(Action::Dair)      => { self.set_action(Action::DairLand) },
@@ -945,6 +941,11 @@ impl Player {
             _ if self.y_vel >= -1.0 => { self.set_action(Action::Idle) }, // no impact land
             Some(_) | None          => { self.set_action(Action::Land) },
         }
+
+        self.y_vel = 0.0;
+        self.airbourne = false;
+        self.fastfall = false;
+        self.air_jumps_left = fighter.air_jumps;
     }
 
     fn walk(&mut self, fighter: &Fighter) {
