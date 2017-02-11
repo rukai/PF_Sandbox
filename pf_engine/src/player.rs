@@ -71,6 +71,11 @@ impl Player {
         self.action_set = true;
     }
 
+    // TODO: I could hook in a turbo mode here
+    fn interruptible(&self, fighter: &Fighter) -> bool {
+        self.frame >= fighter.actions[self.action as usize].iasa
+    }
+
     pub fn step_collision(&mut self, fighter: &Fighter, col_results: &[CollisionResult]) {
         for col_result in col_results {
             match col_result {
@@ -188,16 +193,31 @@ impl Player {
 
         if let Some(action) = action {
             match action {
-                Action::SpawnIdle | Action::Fall | Action::AerialFall |
-                Action::JumpF | Action::JumpB | Action::JumpAerialF |
+                Action::SpawnIdle  | Action::Fall |
+                Action::AerialFall | Action::JumpAerialF |
+                Action::JumpF      | Action::JumpB |
+                Action::Fair       | Action::Bair |
+                Action::Dair       | Action::Uair |
                 Action::JumpAerialB => { self.aerial_action(input, fighter) },
-                Action::Crouch      => { self.crouch_action(input, fighter) },
-                Action::Idle   | Action::CrouchStart |
-                Action::CrouchEnd => { self.ground_idle_action(input, fighter) },
-                Action::Walk      => { self.walk_action(input, fighter) },
-                Action::Dash      => { self.dash_action(input, fighter) },
-                Action::Run       => { self.run_action(input, fighter) },
-                Action::Turn      => { self.turn_action(input, fighter) }
+
+                Action::Jab       | Action::Jab2 |
+                Action::Jab3      | Action::Utilt |
+                Action::Ftilt     | Action::DashAttack |
+                Action::Dsmash    | Action::Fsmash |
+                Action::Usmash    | Action::Idle |
+                Action::Grab      | Action::DashGrab |
+                Action::CrouchEnd | Action::CrouchStart |
+                Action::FairLand  | Action::BairLand |
+                Action::UairLand  | Action::DairLand |
+                Action::Land
+                => { self.ground_idle_action(input, fighter) },
+
+                Action::Dtilt  => { self.dtilt_action(input, fighter) },
+                Action::Crouch => { self.crouch_action(input, fighter) },
+                Action::Walk   => { self.walk_action(input, fighter) },
+                Action::Dash   => { self.dash_action(input, fighter) },
+                Action::Run    => { self.run_action(input, fighter) },
+                Action::Turn   => { self.turn_action(input, fighter) }
                 _ => { },
             }
         }
@@ -208,30 +228,30 @@ impl Player {
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if self.check_attacks_aerial(input) { }
-        else if input.b.press {
-            // special attack
-        }
-        else if self.jump_input(input).jump() && self.air_jumps_left > 0 {
-            self.air_jumps_left -= 1;
-            self.y_vel = fighter.jump_y_init_vel;
-            self.x_vel = fighter.jump_x_init_vel * input[0].stick_x;
-            self.fastfall = false;
-
-            if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
-                self.set_action(Action::JumpAerialB);
+        if self.interruptible(fighter) {
+            if self.check_attacks_aerial(input) { }
+            else if input.b.press {
+                // special attack
             }
-            else {
-                self.set_action(Action::JumpAerialF);
+            else if self.jump_input(input).jump() && self.air_jumps_left > 0 {
+                self.air_jumps_left -= 1;
+                self.y_vel = fighter.jump_y_init_vel;
+                self.x_vel = fighter.jump_x_init_vel * input[0].stick_x;
+                self.fastfall = false;
+
+                if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
+                    self.set_action(Action::JumpAerialB);
+                }
+                else {
+                    self.set_action(Action::JumpAerialF);
+                }
+            }
+            else if input.l.press || input.r.press {
+                self.set_action(Action::AerialDodge);
             }
         }
-        else if input.l.press || input.r.press {
-            self.set_action(Action::AerialDodge);
-        }
-        else {
-            self.air_drift(input, fighter);
-        }
 
+        self.air_drift(input, fighter);
         self.pass_through = input.stick_y.value < -0.2; // TODO: refine
     }
 
@@ -278,23 +298,50 @@ impl Player {
     }
 
     fn crouch_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        self.apply_friction(fighter);
         if input.stick_y.value > -0.3 {
             self.set_action(Action::CrouchEnd);
         }
-        self.ground_idle_action(input, fighter);
+        if self.interruptible(fighter) {
+            if self.check_jump(input) { }
+            else if self.check_special(input) { } // TODO: no neutral/side special
+            else if self.check_smash(input) { }
+            else if self.check_attacks(input) { }
+            else if self.check_dash(input, fighter) { }
+            else if self.check_turn(input) { }
+            else if self.check_walk(input, fighter) { }
+            else if self.check_taunt(input) { }
+        }
+        self.apply_friction(fighter);
+    }
+
+    fn dtilt_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        self.apply_friction(fighter);
+        if self.interruptible(fighter) {
+            if self.check_jump(input) { }
+            else if self.check_special(input) { } // TODO: no neutral/side special
+            else if self.check_smash(input) { }
+            else if self.check_attacks(input) { }
+            else if self.check_dash(input, fighter) { }
+            else if self.check_turn(input) { }
+            else if self.check_walk(input, fighter) { }
+            else if self.check_taunt(input) { }
+        }
     }
 
     fn ground_idle_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         self.apply_friction(fighter);
-        if self.check_jump(input) { }
-        else if self.check_special(input) { }
-        else if self.check_smash(input) { }
-        else if self.check_attacks(input) { }
-        else if self.check_crouch(input) { }
-        else if self.check_dash(input, fighter) { }
-        else if self.check_turn(input) { }
-        else if self.check_walk(input, fighter) { }
-        else if self.check_taunt(input) { }
+        if self.interruptible(fighter) {
+            if self.check_jump(input) { }
+            else if self.check_special(input) { }
+            else if self.check_smash(input) { }
+            else if self.check_attacks(input) { }
+            else if self.check_crouch(input) { }
+            else if self.check_dash(input, fighter) { }
+            else if self.check_turn(input) { }
+            else if self.check_walk(input, fighter) { }
+            else if self.check_taunt(input) { }
+        }
 
         self.pass_through = input.stick_y.diff < -0.1; // TODO: refine
     }
