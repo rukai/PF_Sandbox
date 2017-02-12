@@ -106,7 +106,12 @@ impl Game {
             }
         }
 
-        // set treeflection context
+        self.set_context();
+
+        self.state.clone()
+    }
+
+    fn set_context(&mut self) {
         match self.edit {
             Edit::Fighter (player) => {
                 let player_fighter = self.selected_fighters[player];
@@ -114,13 +119,23 @@ impl Game {
                 let player_frame  = self.players[player].frame as usize;
                 let player_colboxes = self.selector.colboxes_vec();
 
+                let fighters_len = self.package.fighters.len();
                 let fighters = &mut self.package.fighters;
+                if player_fighter >= fighters_len {
+                    return
+                }
                 fighters.set_context(player_fighter);
 
                 let actions = &mut fighters[player_fighter].actions;
+                if player_action >= actions.len() {
+                    return;
+                }
                 actions.set_context(player_action);
 
                 let frames = &mut actions[player_action].frames;
+                if player_frame >= frames.len() {
+                    return;
+                }
                 frames.set_context(player_frame);
 
                 let colboxes = &mut frames[player_frame].colboxes;
@@ -128,10 +143,7 @@ impl Game {
             }
             _ => { }
         }
-
         self.package.stages.set_context(self.selected_stage);
-
-        self.state.clone()
     }
 
     fn step_local(&mut self, input: &mut Input, os_input: &OsInput) {
