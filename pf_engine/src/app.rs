@@ -18,7 +18,6 @@ use ::os_input::OsInput;
 use ::package::Package;
 
 use libusb::Context;
-use winit::VirtualKeyCode;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -170,7 +169,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
         }
         next_state = NextAppState::None;
 
-        if os_input.key_pressed(VirtualKeyCode::Escape) {
+        if os_input.quit() {
             return;
         }
 

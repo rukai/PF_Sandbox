@@ -38,9 +38,6 @@ impl CurrentInput {
 
     pub fn handle_event(&mut self, event: Event) {
         match event {
-            Event::Closed => {
-                self.key_actions.push(KeyAction::Pressed(VirtualKeyCode::Escape));
-            },
             Event::KeyboardInput (Pressed, _, Some(key_code)) => {
                 self.key_held[key_code as usize] = true;
                 self.key_actions.push(KeyAction::Pressed(key_code));
@@ -98,7 +95,8 @@ impl CurrentInput {
 
 pub struct OsInput {
     current: Option<CurrentInput>,
-    rx: Receiver<Event>,
+    quit:    bool,
+    rx:      Receiver<Event>,
 }
 
 impl OsInput {
@@ -106,7 +104,8 @@ impl OsInput {
         let (tx, rx) = channel();
         let os_input = OsInput {
             current: Some(CurrentInput::new()),
-            rx: rx,
+            quit:    false,
+            rx:      rx,
         };
         (os_input, tx)
     }
@@ -119,6 +118,7 @@ impl OsInput {
 
         while let Ok(event) = self.rx.try_recv() {
             match event {
+                Event::Closed         => { self.quit = true; },
                 Event::Focused(false) => { self.current = None; },
                 Event::Focused(true)  => { self.current = Some(CurrentInput::new()); },
                 _ => { },
@@ -263,8 +263,12 @@ impl OsInput {
     pub fn resolution(&self) -> Option<(u32, u32)> {
         match self.current {
             Some(ref current) => { Some(current.resolution) },
-            None          => { None }
+            None              => { None }
         }
+    }
+
+    pub fn quit(&self) -> bool {
+        self.quit
     }
 }
 
