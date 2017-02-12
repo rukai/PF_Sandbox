@@ -1,17 +1,55 @@
 use std::fs::{File, DirBuilder, self};
 use std::io::Read;
 use std::io::Write;
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 use std::collections::HashSet;
 use serde::Serialize;
 use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
+use std::env;
 
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType, RenderOrder};
 use ::rules::Rules;
 use ::stage::Stage;
 use ::json_upgrade::{engine_version, upgrade_to_latest};
+
+fn get_packages_path() -> PathBuf {
+    match env::home_dir() {
+        Some (mut home) => {
+            #[cfg(unix)]
+            {
+                let share = match env::var("XDG_DATA_HOME") {
+                    Ok(share) => {
+                        if share == "" {
+                            String::from(".local/share")
+                        } else {
+                            share
+                        }
+                    }
+                    Err(_) => {
+                        String::from(".local/share")
+                    }
+                };
+                home.push(&share);
+                home.push("PF_ENGINE/packages");
+                home
+            }
+            #[cfg(windows)]
+            {
+                home.push("\\AppData\\Local\\PF_ENGINE\\packages");
+                home
+            }
+            #[cfg(macos)]
+            {
+                panic!("macos is unimplemented");
+            }
+        }
+        None => {
+            panic!("could not get path of home");
+        }
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Package {
@@ -34,7 +72,7 @@ impl Default for Package {
 
 impl Package {
     fn open(name: &str) -> Package {
-        let mut path = PathBuf::from("packages");
+        let mut path = get_packages_path();
         path.push(name);
 
         let meta = PackageMeta {
@@ -63,7 +101,7 @@ impl Package {
     // TODO: Eventually we will just ship with some nice example package
     // This function will be deleted and we can just load the example package everywhere this is used.
     fn generate_base(name: &str) -> Package {
-        let mut path = PathBuf::from("packages");
+        let mut path = get_packages_path();
         path.push(name);
 
         let meta = PackageMeta {
@@ -90,7 +128,7 @@ impl Package {
     }
 
     pub fn open_or_generate(package_name: &str) -> Package {
-        let package_path = Path::new("packages").join(package_name);
+        let package_path = get_packages_path().join(package_name);
 
         // if a package does not already exist create a new one
         let mut package = match fs::metadata(package_path) {
