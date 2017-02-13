@@ -1,6 +1,10 @@
-use std::net::UdpSocket;
-use std::str;
 use std::env;
+use std::io::Read;
+use std::io::Write;
+use std::net::TcpStream;
+use std::str;
+use std::thread;
+use std::time::Duration;
 
 fn main() {
     let mut args = env::args();
@@ -8,22 +12,17 @@ fn main() {
     let out_vec: Vec<String> = args.collect();
     let out: String = format!("C{}", out_vec.join(" "));
 
-    // Using "localhost:1614" will send via ipv6 ... wat o.0
-    let socket = match UdpSocket::bind("127.0.0.1:1614") {
-        Ok(socket)  => { socket }
-        Err(_)      => { println!("Port 1614 is not available"); return; }
+    let mut stream = match TcpStream::connect("127.0.0.1:1613") {
+        Ok(stream)  => { stream }
+        Err(e)      => { println!("Could not connect to PF ENGINE host: {}", e); return; }
     };
 
-    socket.connect("127.0.0.1:1613").unwrap();
+    stream.write(out.as_bytes()).unwrap();
 
-    socket.send(out.as_bytes()).unwrap();
-
-    let mut buf = [0; 1000];
-    match socket.recv(&mut buf) {
+    let mut result = String::new();
+    match stream.read_to_string(&mut result) {
         Ok(amt) => {
-            if let Ok(string) = str::from_utf8(&buf[0..amt]) {
-                println!("{}", string);
-            }
+            println!("{}", result);
         },
         _ => { return; },
     }
