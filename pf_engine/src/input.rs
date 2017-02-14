@@ -1,6 +1,7 @@
 use libusb::{Context, Device, DeviceHandle, Error};
 use std::ops::Index;
 use std::time::Duration;
+use std::f32;
 
 use treeflection::{Node, NodeRunner, NodeToken};
 
@@ -227,6 +228,23 @@ impl ControllerInput {
             c_stick_y: 0.0,
             l_trigger: 0.0,
             r_trigger: 0.0,
+        }
+    }
+
+    pub fn stick_angle(&self) -> Option<f32> {
+        if self.stick_x == 0.0 && self.stick_y == 0.0 {
+            None
+        } else {
+            Some(self.stick_y.atan2(self.stick_x))
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn c_stick_angle(&self) -> Option<f32> {
+        if self.stick_x == 0.0 && self.stick_y == 0.0 {
+            None
+        } else {
+            Some(self.c_stick_y.atan2(self.c_stick_x))
         }
     }
 }

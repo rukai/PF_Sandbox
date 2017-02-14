@@ -35,15 +35,25 @@ void main() {
         f_color = vec4(0.76, 0.106, 0.843, 1.0);
     }
     else if (v_render_id == 4.0) {
-        f_color = vec4(0.52, 0.608, 0.756, 1.0);
+        if (v_edge > 0.8) {
+            vec4 a = uniforms.edge_color;
+            f_color = vec4(a[0], a[1], a[2], 0.5);
+        }
+        else {
+            vec4 a = uniforms.color;
+            f_color = vec4(a[0], a[1], a[3], 0.3);
+        }
     }
     else if (v_render_id == 5.0) {
-        f_color = vec4(0.0, 0.64, 0.0, 1.0);
+        f_color = vec4(0.52, 0.608, 0.756, 1.0);
     }
     else if (v_render_id == 6.0) {
-        f_color = vec4(0.8, 0.8, 0.8, 1.0);
+        f_color = vec4(0.0, 0.64, 0.0, 1.0);
     }
     else if (v_render_id == 7.0) {
+        f_color = vec4(0.8, 0.8, 0.8, 1.0);
+    }
+    else if (v_render_id == 8.0) {
         f_color = vec4(0.0, 0.0, 1.0, 1.0);
     }
 }

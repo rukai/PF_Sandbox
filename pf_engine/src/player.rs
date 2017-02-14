@@ -198,7 +198,7 @@ impl Player {
                 Action::JumpF      | Action::JumpB |
                 Action::Fair       | Action::Bair |
                 Action::Dair       | Action::Uair |
-                Action::JumpAerialB => { self.aerial_action(input, fighter) },
+                Action::JumpAerialB => { self.aerial_action(input, fighter) }
 
                 Action::Jab       | Action::Jab2 |
                 Action::Jab3      | Action::Utilt |
@@ -209,15 +209,17 @@ impl Player {
                 Action::CrouchEnd | Action::CrouchStart |
                 Action::FairLand  | Action::BairLand |
                 Action::UairLand  | Action::DairLand |
-                Action::Land
-                => { self.ground_idle_action(input, fighter) },
+                Action::Land      | Action::SpecialLand
+                => { self.ground_idle_action(input, fighter) }
 
-                Action::Dtilt  => { self.dtilt_action(input, fighter) },
-                Action::Crouch => { self.crouch_action(input, fighter) },
-                Action::Walk   => { self.walk_action(input, fighter) },
-                Action::Dash   => { self.dash_action(input, fighter) },
-                Action::Run    => { self.run_action(input, fighter) },
-                Action::Turn   => { self.turn_action(input, fighter) }
+                Action::AerialDodge => { self.aerialdodge_action(input, fighter) }
+                Action::SpecialFall => { self.air_drift(input, fighter) }
+                Action::Dtilt       => { self.dtilt_action(input, fighter) }
+                Action::Crouch      => { self.crouch_action(input, fighter) }
+                Action::Walk        => { self.walk_action(input, fighter) }
+                Action::Dash        => { self.dash_action(input, fighter) }
+                Action::Run         => { self.run_action(input, fighter) }
+                Action::Turn        => { self.turn_action(input, fighter) }
                 _ => { },
             }
         }
@@ -247,7 +249,7 @@ impl Player {
                 }
             }
             else if input.l.press || input.r.press {
-                self.set_action(Action::AerialDodge);
+                self.aerialdodge(input, fighter);
             }
         }
 
@@ -444,6 +446,31 @@ impl Player {
             }
         }
         self.check_jump(input);
+    }
+
+    fn aerialdodge(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        self.set_action(Action::AerialDodge);
+        match input[0].stick_angle() {
+            Some(angle) => {
+                self.x_vel = angle.cos() * fighter.aerialdodge_mult;
+                self.y_vel = angle.sin() * fighter.aerialdodge_mult;
+            }
+            None => {
+                self.x_vel = 0.0;
+                self.y_vel = 0.0;
+            }
+        }
+        self.fastfall = false;
+    }
+
+    fn aerialdodge_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if self.frame < fighter.aerialdodge_drift_frame {
+            self.x_vel *= 0.9;
+            self.y_vel *= 0.9;
+        }
+        else {
+            self.air_drift(input, fighter);
+        }
     }
 
     fn check_crouch(&mut self, input: &PlayerInput) -> bool {
@@ -986,7 +1013,12 @@ impl Player {
             Some(Action::Bair)      => { self.set_action(Action::BairLand) },
             Some(Action::Nair)      => { self.set_action(Action::NairLand) },
             _ if self.y_vel >= -1.0 => { self.set_action(Action::Idle) }, // no impact land
-            Some(_) | None          => { self.set_action(Action::Land) },
+
+            Some(Action::SpecialFall) |
+            Some(Action::AerialDodge) |
+            None => { self.set_action(Action::SpecialLand) },
+
+            Some(_) => { self.set_action(Action::Land) },
         }
 
         self.y_vel = 0.0;

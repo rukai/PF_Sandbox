@@ -34,29 +34,31 @@ impl Fighter {
             css_hide:   false,
 
             //in game attributes
-            air_jumps:             1,
-            weight:                1.0, // weight = old value / 100
-            gravity:               -0.1,
-            terminal_vel:          -2.0,
-            fastfall_terminal_vel: -3.0,
-            jump_y_init_vel:       3.0,
-            jump_y_init_vel_short: 2.0,
-            jump_x_init_vel:       1.0,
-            air_mobility_a:        0.04,
-            air_mobility_b:        0.02,
-            air_x_term_vel:        1.0,
-            air_friction:          0.05,
-            shield_size:           15.0,
-            walk_init_vel:         0.2,
-            walk_acc:              0.1,
-            walk_max_vel:          1.0,
-            slow_walk_max_vel:     1.0,
-            dash_init_vel:         2.0,
-            dash_run_acc_a:        0.01,
-            dash_run_acc_b:        0.2,
-            dash_run_term_vel:     2.0,
-            friction:              0.1,
-            actions:               actions,
+            air_jumps:               1,
+            weight:                  1.0, // weight = old value / 100
+            gravity:                 -0.1,
+            terminal_vel:            -2.0,
+            fastfall_terminal_vel:   -3.0,
+            jump_y_init_vel:         3.0,
+            jump_y_init_vel_short:   2.0,
+            jump_x_init_vel:         1.0,
+            air_mobility_a:          0.04,
+            air_mobility_b:          0.02,
+            air_x_term_vel:          1.0,
+            air_friction:            0.05,
+            shield_size:             15.0,
+            walk_init_vel:           0.2,
+            walk_acc:                0.1,
+            walk_max_vel:            1.0,
+            slow_walk_max_vel:       1.0,
+            dash_init_vel:           2.0,
+            dash_run_acc_a:          0.01,
+            dash_run_acc_b:          0.2,
+            dash_run_term_vel:       2.0,
+            friction:                0.1,
+            aerialdodge_mult:        3.0,
+            aerialdodge_drift_frame: 20,
+            actions:                 actions,
         }
     }
 }
@@ -73,28 +75,30 @@ pub struct Fighter {
     pub css_hide:   bool,
 
     //in game attributes
-    pub air_jumps:             u64,
-    pub weight:                f32,
-    pub gravity:               f32,
-    pub terminal_vel:          f32,
-    pub fastfall_terminal_vel: f32,
-    pub jump_y_init_vel:       f32,
-    pub jump_y_init_vel_short: f32,
-    pub jump_x_init_vel:       f32,
-    pub air_mobility_a:        f32,
-    pub air_mobility_b:        f32,
-    pub air_x_term_vel:        f32,
-    pub air_friction:          f32,
-    pub shield_size:           f32,
-    pub walk_init_vel:         f32,
-    pub walk_acc:              f32,
-    pub walk_max_vel:          f32,
-    pub slow_walk_max_vel:     f32,
-    pub dash_init_vel:         f32,
-    pub dash_run_acc_a:        f32,
-    pub dash_run_acc_b:        f32,
-    pub dash_run_term_vel:     f32,
-    pub friction:              f32,
+    pub air_jumps:               u64,
+    pub weight:                  f32,
+    pub gravity:                 f32,
+    pub terminal_vel:            f32,
+    pub fastfall_terminal_vel:   f32,
+    pub jump_y_init_vel:         f32,
+    pub jump_y_init_vel_short:   f32,
+    pub jump_x_init_vel:         f32,
+    pub air_mobility_a:          f32,
+    pub air_mobility_b:          f32,
+    pub air_x_term_vel:          f32,
+    pub air_friction:            f32,
+    pub shield_size:             f32,
+    pub walk_init_vel:           f32,
+    pub walk_acc:                f32,
+    pub walk_max_vel:            f32,
+    pub slow_walk_max_vel:       f32,
+    pub dash_init_vel:           f32,
+    pub dash_run_acc_a:          f32,
+    pub dash_run_acc_b:          f32,
+    pub dash_run_term_vel:       f32,
+    pub friction:                f32,
+    pub aerialdodge_mult:        f32,
+    pub aerialdodge_drift_frame: u64,
     pub actions:               ContextVec<ActionDef>,
 }
 
@@ -477,13 +481,14 @@ impl Default for CollisionBox {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub enum CollisionBoxRole {
-    Hurt (HurtBox), // a target
-    Hit  (HitBox),  // a launching attack
-    Grab,           // a grabbing attack
-    Intangible,     // cannot be interacted with
-    Invincible,     // cannot receive damage or knockback.
-    Reflect,        // reflects projectiles
-    Absorb,         // absorb projectiles
+    Hurt (HurtBox),   // a target
+    Hit  (HitBox),    // a launching attack
+    Grab,             // a grabbing attack
+    Intangible,       // cannot be interacted with rendered transparent with normal outline
+    IntangibleItem,   // cannot be interacted with rendered as a grey surface with no outline
+    Invincible,       // cannot receive damage or knockback.
+    Reflect,          // reflects projectiles
+    Absorb,           // absorb projectiles
 }
 
 impl Default for CollisionBoxRole {
