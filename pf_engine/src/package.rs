@@ -37,7 +37,7 @@ fn get_packages_path() -> PathBuf {
             }
             #[cfg(windows)]
             {
-                home.push("\\AppData\\Local\\PF_ENGINE\\packages");
+                home.push("AppData\\Local\\PF_ENGINE\\packages");
                 home
             }
             #[cfg(macos)]
