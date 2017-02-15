@@ -3,8 +3,6 @@ use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
 use std::str;
-use std::thread;
-use std::time::Duration;
 
 fn main() {
     let mut args = env::args();
@@ -20,10 +18,7 @@ fn main() {
     stream.write(out.as_bytes()).unwrap();
 
     let mut result = String::new();
-    match stream.read_to_string(&mut result) {
-        Ok(amt) => {
-            println!("{}", result);
-        },
-        _ => { return; },
+    if let Ok(_) = stream.read_to_string(&mut result) {
+        println!("{}", result);
     }
 }
