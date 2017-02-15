@@ -437,7 +437,7 @@ impl Player {
         else {
             let vel_max = input[0].stick_x * fighter.dash_run_term_vel;
             let acc = (vel_max - self.x_vel)
-                    * (fighter.dash_run_acc_a + (fighter.dash_run_acc_b * input[0].stick_x.signum()))
+                    * (fighter.dash_run_acc_a + (fighter.dash_run_acc_b / input[0].stick_x.abs()))
                     / (fighter.dash_run_term_vel * 2.5);
 
             self.x_vel += acc;
