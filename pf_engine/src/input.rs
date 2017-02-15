@@ -64,11 +64,25 @@ impl<'a> Input<'a> {
     echo 'SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="057e", ATTRS{idProduct}=="0337", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/51-gcadapter.rules"#
         } else { "" };
 
+        let driver_solution = if cfg!(target_os = "windows") { r#":
+    To use your GC adapter you must:
+    1. Download and run Zadig: http://zadig.akeo.ie/
+    2. Options -> List all devices
+    3. In the pulldown menu, Select WUP-028
+    4. On the right ensure WinUSB is selected
+    5. Select Replace Driver
+    6. Select yes in the dialog box
+    7. Restart PF ENGINE"#
+        } else { "" };
+
         match e {
             Error::Access => {
                 println!("GC adapter: Permissions error{}", access_solution);
-            },
-            _ => { println!("GC adapter: Failed to open handle: {:?}", e); },
+            }
+            Error::NotSupported => {
+                println!("GC adapter: Not supported error{}", driver_solution);
+            }
+            _ => { println!("GC adapter: Failed to open handle: {:?}", e); }
         }
     }
 
