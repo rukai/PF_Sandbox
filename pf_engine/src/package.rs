@@ -161,15 +161,15 @@ impl Package {
     }
 
     pub fn load(&mut self) {
-        let mut meta = Package::load_struct(self.path.join("package_meta.json"));
-        let mut rules = Package::load_struct(self.path.join("rules.json"));
+        let mut meta = Package::load_json(self.path.join("package_meta.json"));
+        let mut rules = Package::load_json(self.path.join("rules.json"));
 
         let mut fighters: Vec<Value> = vec!();
         for path in fs::read_dir(self.path.join("Fighters")).unwrap() {
             let full_path = path.unwrap().path();
             self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
 
-            fighters.push(Package::load_struct(full_path));
+            fighters.push(Package::load_json(full_path));
         }
 
         let mut stages: Vec<Value> = vec!();
@@ -177,7 +177,7 @@ impl Package {
             let full_path = path.unwrap().path();
             self.stages_filenames.push(full_path.to_str().unwrap().to_string());
 
-            stages.push(Package::load_struct(full_path));
+            stages.push(Package::load_json(full_path));
         }
 
         // the upgraded json is loaded into this package
@@ -186,10 +186,10 @@ impl Package {
         // *    the package cannot be saved if it wont load
         // *    the user can choose to not save, if they find issues with the upgrade
         upgrade_to_latest(&mut meta, &mut rules, &mut fighters, &mut stages);
-        self.load_from_json(meta, rules, fighters, stages);
+        self.json_into_structs(meta, rules, fighters, stages);
     }
 
-    pub fn load_from_json(&mut self, meta: Value, rules: Value, fighters: Vec<Value>, stages: Vec<Value>) {
+    pub fn json_into_structs(&mut self, meta: Value, rules: Value, fighters: Vec<Value>, stages: Vec<Value>) {
         self.meta = serde_json::from_value(meta).unwrap();
         self.rules = serde_json::from_value(rules).unwrap();
     
@@ -209,7 +209,7 @@ impl Package {
     }
 
     // Load a struct from the given file name
-    fn load_struct(filename: PathBuf) -> Value {
+    fn load_json(filename: PathBuf) -> Value {
         let mut json = String::new();
         File::open(filename).unwrap().read_to_string(&mut json).unwrap();
         serde_json::from_str(&json).unwrap()
