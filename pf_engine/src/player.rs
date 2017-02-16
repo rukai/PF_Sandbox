@@ -28,7 +28,7 @@ pub struct Player {
     pub face_right:       bool,
     pub airbourne:        bool,
     pub pass_through:     bool,
-    pub fastfall:         bool,
+    pub fastfalled:       bool,
     pub air_jumps_left:   u64,
     pub jumpsquat_button: bool,
     pub turn_dash_buffer: bool,
@@ -58,7 +58,7 @@ impl Player {
             face_right:       spawn.face_right,
             airbourne:        true,
             pass_through:     false,
-            fastfall:         false,
+            fastfalled:       false,
             air_jumps_left:   0,
             jumpsquat_button: false,
             turn_dash_buffer: false,
@@ -198,7 +198,8 @@ impl Player {
                 Action::JumpF      | Action::JumpB |
                 Action::Fair       | Action::Bair |
                 Action::Dair       | Action::Uair |
-                Action::JumpAerialB => { self.aerial_action(input, fighter) }
+                Action::Nair       | Action::JumpAerialB
+                => { self.aerial_action(input, fighter) }
 
                 Action::Jab       | Action::Jab2 |
                 Action::Jab3      | Action::Utilt |
@@ -223,10 +224,6 @@ impl Player {
                 _ => { },
             }
         }
-
-        if input[0].stick_y < -0.65 && input[3].stick_y > -0.1 && self.y_vel < 0.0 {
-            self.fastfall = true;
-        }
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -239,7 +236,7 @@ impl Player {
                 self.air_jumps_left -= 1;
                 self.y_vel = fighter.jump_y_init_vel;
                 self.x_vel = fighter.jump_x_init_vel * input[0].stick_x;
-                self.fastfall = false;
+                self.fastfalled = false;
 
                 if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
                     self.set_action(Action::JumpAerialB);
@@ -254,6 +251,7 @@ impl Player {
         }
 
         self.air_drift(input, fighter);
+        self.fall_action(input, fighter);
         self.pass_through = input.stick_y.value < -0.2; // TODO: refine
     }
 
@@ -460,7 +458,7 @@ impl Player {
                 self.y_vel = 0.0;
             }
         }
-        self.fastfall = false;
+        self.fastfalled = false;
     }
 
     fn aerialdodge_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -845,10 +843,10 @@ impl Player {
     /*
      *  Begin physics section
      */
-
-    fn physics_step(&mut self, fighter: &Fighter, stage: &Stage) {
-        if self.airbourne {
-            if self.fastfall {
+    fn fall_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if !self.fastfalled {
+            if input[0].stick_y < -0.65 && input[3].stick_y > -0.1 && self.y_vel < 0.0 {
+                self.fastfalled = true;
                 self.y_vel = fighter.fastfall_terminal_vel;
             }
             else {
@@ -857,7 +855,11 @@ impl Player {
                     self.y_vel = fighter.terminal_vel;
                 }
             }
+        }
+    }
 
+    fn physics_step(&mut self, fighter: &Fighter, stage: &Stage) {
+        if self.airbourne {
             self.bps_x += self.x_vel + self.kb_x_vel;
             self.bps_y += match self.land_stage_collision(stage, self.y_vel + self.kb_y_vel) {
                 None => { self.y_vel + self.kb_y_vel},
@@ -1023,7 +1025,7 @@ impl Player {
 
         self.y_vel = 0.0;
         self.airbourne = false;
-        self.fastfall = false;
+        self.fastfalled = false;
         self.air_jumps_left = fighter.air_jumps;
     }
 
@@ -1053,6 +1055,7 @@ impl Player {
 
     fn fall(&mut self) {
         self.airbourne = true;
+        self.fastfalled = false;
         self.set_action(Action::Fall);
     }
 
@@ -1067,7 +1070,7 @@ impl Player {
         self.kb_x_vel = 0.0;
         self.kb_y_vel = 0.0;
         self.air_jumps_left = fighter.air_jumps;
-        self.fastfall = false;
+        self.fastfalled = false;
         self.set_action(Action::Spawn);
     }
 
