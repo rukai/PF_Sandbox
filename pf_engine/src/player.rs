@@ -214,7 +214,7 @@ impl Player {
                 => { self.ground_idle_action(input, fighter) }
 
                 Action::AerialDodge => { self.aerialdodge_action(input, fighter) }
-                Action::SpecialFall => { self.air_drift(input, fighter) }
+                Action::SpecialFall => { self.specialfall_action(input, fighter) }
                 Action::Dtilt       => { self.dtilt_action(input, fighter) }
                 Action::Crouch      => { self.crouch_action(input, fighter) }
                 Action::Walk        => { self.walk_action(input, fighter) }
@@ -840,9 +840,11 @@ impl Player {
         frame
     }
 
-    /*
-     *  Begin physics section
-     */
+    fn specialfall_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        self.fall_action(input, fighter);
+        self.air_drift(input, fighter);
+    }
+
     fn fall_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         if !self.fastfalled {
             if input[0].stick_y < -0.65 && input[3].stick_y > -0.1 && self.y_vel < 0.0 {
@@ -857,6 +859,10 @@ impl Player {
             }
         }
     }
+
+    /*
+     *  Begin physics section
+     */
 
     fn physics_step(&mut self, fighter: &Fighter, stage: &Stage) {
         if self.airbourne {
