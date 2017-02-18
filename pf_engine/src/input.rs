@@ -20,7 +20,7 @@ impl<'a> Input<'a> {
     pub fn new(context: &'a mut  Context) -> Input<'a> {
         let mut adapter_handles: Vec<DeviceHandle> = Vec::new();
         let devices = context.devices();
-        for mut device in devices.unwrap().iter() {
+        for device in devices.unwrap().iter() {
             if let Ok(device_desc) = device.device_descriptor() {
                 if device_desc.vendor_id() == 0x057E && device_desc.product_id() == 0x0337 {
                     match device.open() {

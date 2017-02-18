@@ -3,12 +3,12 @@ extern crate getopts;
 extern crate libusb;
 extern crate num;
 extern crate serde;
-extern crate serde_json;
 extern crate treeflection;
 extern crate winit;
 #[macro_use] extern crate enum_primitive;
 #[macro_use] extern crate matches;
 #[macro_use] extern crate serde_derive;
+#[macro_use] extern crate serde_json;
 #[macro_use] extern crate treeflection_derive;
 
 pub mod app;

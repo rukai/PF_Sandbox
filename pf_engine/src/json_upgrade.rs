@@ -1,7 +1,9 @@
-use serde_json::Value;
+use serde_json::{Value, Number};
 
-pub fn engine_version() -> u64 {
-    return 1;
+pub fn engine_version() -> u64 { 2 }
+
+pub fn engine_version_json() -> Value {
+    Value::Number(Number::from_f64(engine_version() as f64).unwrap())
 }
 
 fn get_meta_engine_version(meta: &Value) -> u64 {
@@ -17,7 +19,7 @@ fn get_meta_engine_version(meta: &Value) -> u64 {
 
 fn upgrade_meta_engine_version(meta: &mut Value) {
     if let &mut Value::Object (ref mut object) = meta {
-        object.insert(String::from("engine_version"), Value::U64 (engine_version()));
+        object.insert(String::from("engine_version"), engine_version_json());
     }
 }
 
@@ -30,6 +32,7 @@ pub fn upgrade_to_latest(meta: &mut Value, rules: &mut Value, fighters: &mut Vec
     else if meta_engine_version < engine_version() {
         for upgrade_from in meta_engine_version..engine_version() {
             match upgrade_from {
+                1 => { upgrade1(fighters) }
                 0 => { upgrade0(fighters) }
                 _ => { }
             }
@@ -47,6 +50,36 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
         }
     }
     return None;
+}
+
+/// add hitstun enum to hitboxes
+fn upgrade1(fighters: &mut Vec<Value>) {
+    for fighter in fighters {
+        if let Some (actions) = get_vec(fighter, "actions") {
+            for action in actions {
+                if let Some (frames) = get_vec(action, "frames") {
+                    for frame in frames {
+                        if let Some (colboxes) = get_vec(frame, "colboxes") {
+                            for colbox in colboxes {
+                                if let &mut Value::Object (ref mut colbox) = colbox {
+                                    if let Some (role) = colbox.get_mut("role") {
+                                        if let &mut Value::Object (ref mut role) = role {
+                                            if let Some (hitbox) = role.get_mut("Hit") {
+                                                if let &mut Value::Object (ref mut hitbox) = hitbox {
+                                                    let hitstun = json!({"FramesTimesKnockback": 0.5});
+                                                    hitbox.insert(String::from("hitstun"), hitstun);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Add order vec to frame

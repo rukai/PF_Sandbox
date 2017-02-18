@@ -5,26 +5,26 @@ authors = ["Rukai <rubickent@gmail.com>"]
 build = "build.rs"
 
 [dependencies]
-winit = "0.5.8"
-getopts = "0.2.14"
-libusb = "0.2"
+getopts = "0.2"
+libusb = "0.3"
 enum_primitive = "0.1.0"
 num = "0.1.32"
-treeflection = "0.1.14"
-treeflection_derive = "0.1.10"
-serde = "0.8"
-serde_derive = "0.8"
-serde_json = "0.8"
+treeflection = "0.1.15"
+treeflection_derive = "0.1.11"
+serde = "0.9"
+serde_derive = "0.9"
+serde_json = "0.9"
 matches = "0.1.4"
 
-vulkano = { version = "0.3.2", optional = true }
-vulkano-win = { version = "0.3.2", optional = true }
-glium = { version = "0.16.0", optional = true }
+winit = { version = "0.5", optional = true }
+vulkano = { version = "0.3", optional = true }
+vulkano-win = { version = "0.3", optional = true }
+glium = { version = "0.16", optional = true }
 
 [build-dependencies]
-vulkano-shaders = { version = "0.3.2", optional = true }
+vulkano-shaders = { version = "0.3", optional = true }
 
 [features]
 default = ["vulkan", "opengl"]
-vulkan = ["vulkano", "vulkano-win", "vulkano-shaders"]
+vulkan = ["vulkano", "vulkano-win", "vulkano-shaders", "winit"]
 opengl = ["glium"]

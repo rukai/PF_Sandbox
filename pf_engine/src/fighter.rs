@@ -521,6 +521,7 @@ pub struct HitBox {
     pub bkb:            f32, // base knockback
     pub kbg:            f32, // knockback growth = old value / 100
     pub angle:          f32,
+    pub hitstun:        HitStun,
     pub enable_clang:   bool,
     pub enable_rebound: bool,
     pub effect:         HitboxEffect,
@@ -536,8 +537,21 @@ impl Default for HitBox {
             angle:          0.0,
             enable_clang:   true,
             enable_rebound: true,
+            hitstun:        HitStun::default(),
             effect:         HitboxEffect::default()
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
+pub enum HitStun {
+    FramesTimesKnockback (f32),
+    Frames (u64)
+}
+
+impl Default for HitStun {
+    fn default() -> HitStun {
+        HitStun::FramesTimesKnockback(0.5)
     }
 }
 

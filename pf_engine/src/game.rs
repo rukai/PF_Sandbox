@@ -593,6 +593,10 @@ impl Game {
                 let fighter = &self.package.fighters[self.selected_fighters[i]];
                 player.step_collision(fighter, &collision_results[i]);
             }
+
+            for player in &mut self.players {
+                player.step_action();
+            }
         }
 
         // handle timer

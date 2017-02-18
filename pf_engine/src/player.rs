@@ -25,6 +25,7 @@ pub struct Player {
     pub kb_y_vel:         f32,
     pub kb_x_dec:         f32,
     pub kb_y_dec:         f32,
+    pub hitstun:          f32,
     pub face_right:       bool,
     pub airbourne:        bool,
     pub pass_through:     bool,
@@ -54,6 +55,7 @@ impl Player {
             kb_y_vel:         0.0,
             kb_x_dec:         0.0,
             kb_y_dec:         0.0,
+            hitstun:          0.0,
             ecb:              ECB::default(),
             face_right:       spawn.face_right,
             airbourne:        true,
@@ -133,11 +135,23 @@ impl Player {
                         self.airbourne = true;
                     }
 
-                    if true { // airbourne
-                        self.set_action(Action::DamageFly);
-                    }
-                    else {
-                        self.set_action(Action::Damage);
+                    let not_grabbed = true;
+                    if not_grabbed || kb_vel > 50.0 {
+                        // TODO: escape grab
+                        self.hitstun = match hitbox.hitstun {
+                            HitStun::FramesTimesKnockback (frames) => { frames * kb_vel }
+                            HitStun::Frames               (frames) => { frames as f32 }
+                        };
+
+                        // TODO: set airbourne properly
+                        self.airbourne = true;
+
+                        if kb_vel > 80.0 {
+                            self.set_action(Action::DamageFly);
+                        }
+                        else {
+                            self.set_action(Action::Damage);
+                        }
                     }
                 }
                 _ => { }
@@ -145,13 +159,7 @@ impl Player {
         }
     }
 
-    pub fn step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage) {
-        self.input_step(input, fighter);
-        self.physics_step(fighter, stage);
-        self.action_step();
-    }
-
-    fn action_step(&mut self) {
+    pub fn step_action(&mut self) {
         if self.action_set {
             self.frame = 0;
             self.action = self.action_new;
@@ -160,6 +168,11 @@ impl Player {
         else {
             self.frame += 1;
         }
+    }
+
+    pub fn step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage) {
+        self.input_step(input, fighter);
+        self.physics_step(fighter, stage);
     }
 
     /*
@@ -198,7 +211,8 @@ impl Player {
                 Action::JumpF      | Action::JumpB |
                 Action::Fair       | Action::Bair |
                 Action::Dair       | Action::Uair |
-                Action::Nair       | Action::JumpAerialB
+                Action::Nair       | Action::JumpAerialB |
+                Action::DamageFall
                 => { self.aerial_action(input, fighter) }
 
                 Action::Jab       | Action::Jab2 |
@@ -213,6 +227,8 @@ impl Player {
                 Action::Land      | Action::SpecialLand
                 => { self.ground_idle_action(input, fighter) }
 
+                Action::DamageFly   => { self.damagefly_action(fighter) }
+                Action::Damage      => { self.damage_action(fighter) }
                 Action::AerialDodge => { self.aerialdodge_action(input, fighter) }
                 Action::SpecialFall => { self.specialfall_action(input, fighter) }
                 Action::Dtilt       => { self.dtilt_action(input, fighter) }
@@ -223,6 +239,34 @@ impl Player {
                 Action::Turn        => { self.turn_action(input, fighter) }
                 _ => { },
             }
+        }
+    }
+
+    fn damage_action(&mut self, fighter: &Fighter) {
+        self.hitstun -= 1.0;
+        if self.hitstun <= 0.0 {
+            if self.airbourne {
+                self.set_action(Action::Fall);
+            }
+            else {
+                self.set_action(Action::Idle);
+            }
+        }
+        else {
+            if self.airbourne {
+                self.fall_action(fighter);
+            }
+            else {
+                self.apply_friction(fighter);
+            }
+        }
+    }
+
+    fn damagefly_action(&mut self, fighter: &Fighter) {
+        self.hitstun -= 1.0;
+        self.fall_action(fighter);
+        if self.hitstun <= 0.0 {
+            self.set_action(Action::DamageFall);
         }
     }
 
@@ -251,7 +295,7 @@ impl Player {
         }
 
         self.air_drift(input, fighter);
-        self.fall_action(input, fighter);
+        self.fastfall_action(input, fighter);
         self.pass_through = input.stick_y.value < -0.2; // TODO: refine
     }
 
@@ -717,8 +761,8 @@ impl Player {
             Some(Action::RunEnd)       => { self.set_action(Action::Idle);       },
             Some(Action::Walk)         => { self.set_action(Action::Walk);       },
             Some(Action::PassPlatform) => { self.set_action(Action::AerialFall); },
-            Some(Action::Damage)       => { self.set_action(Action::Idle);       },
-            Some(Action::DamageFly)    => { self.set_action(Action::DamageFall); },
+            Some(Action::Damage)       => { self.set_action(Action::Damage);     },
+            Some(Action::DamageFly)    => { self.set_action(Action::DamageFly);  },
             Some(Action::DamageFall)   => { self.set_action(Action::DamageFall); },
             Some(Action::Turn) => {
                 let new_action = if self.relative_f(input[0].stick_x) > 0.79 && self.turn_dash_buffer {
@@ -841,11 +885,18 @@ impl Player {
     }
 
     fn specialfall_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        self.fall_action(input, fighter);
+        self.fall_action(fighter);
         self.air_drift(input, fighter);
     }
 
-    fn fall_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+    fn fall_action(&mut self, fighter: &Fighter) {
+        self.y_vel += fighter.gravity;
+        if self.y_vel < fighter.terminal_vel {
+            self.y_vel = fighter.terminal_vel;
+        }
+    }
+
+    fn fastfall_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         if !self.fastfalled {
             if input[0].stick_y < -0.65 && input[3].stick_y > -0.1 && self.y_vel < 0.0 {
                 self.fastfalled = true;
@@ -1075,6 +1126,7 @@ impl Player {
         self.y_vel = 0.0;
         self.kb_x_vel = 0.0;
         self.kb_y_vel = 0.0;
+        self.hitstun = 0.0;
         self.air_jumps_left = fighter.air_jumps;
         self.fastfalled = false;
         self.set_action(Action::Spawn);
