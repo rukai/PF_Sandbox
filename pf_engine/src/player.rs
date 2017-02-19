@@ -28,7 +28,6 @@ pub struct Player {
     pub hitstun:          f32,
     pub face_right:       bool,
     pub airbourne:        bool,
-    pub pass_through:     bool,
     pub fastfalled:       bool,
     pub air_jumps_left:   u64,
     pub jumpsquat_button: bool,
@@ -59,7 +58,6 @@ impl Player {
             ecb:              ECB::default(),
             face_right:       spawn.face_right,
             airbourne:        true,
-            pass_through:     false,
             fastfalled:       false,
             air_jumps_left:   0,
             jumpsquat_button: false,
@@ -172,7 +170,7 @@ impl Player {
 
     pub fn step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage) {
         self.input_step(input, fighter);
-        self.physics_step(fighter, stage);
+        self.physics_step(input, fighter, stage);
     }
 
     /*
@@ -296,7 +294,6 @@ impl Player {
 
         self.air_drift(input, fighter);
         self.fastfall_action(input, fighter);
-        self.pass_through = input.stick_y.value < -0.2; // TODO: refine
     }
 
     fn air_drift(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -386,8 +383,6 @@ impl Player {
             else if self.check_walk(input, fighter) { }
             else if self.check_taunt(input) { }
         }
-
-        self.pass_through = input.stick_y.diff < -0.1; // TODO: refine
     }
 
     fn walk_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -512,6 +507,7 @@ impl Player {
         }
         else {
             self.air_drift(input, fighter);
+            self.fastfall_action(input, fighter);
         }
     }
 
@@ -915,10 +911,10 @@ impl Player {
      *  Begin physics section
      */
 
-    fn physics_step(&mut self, fighter: &Fighter, stage: &Stage) {
+    fn physics_step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage) {
         if self.airbourne {
             self.bps_x += self.x_vel + self.kb_x_vel;
-            self.bps_y += match self.land_stage_collision(stage, self.y_vel + self.kb_y_vel) {
+            self.bps_y += match self.land_stage_collision(stage, self.y_vel + self.kb_y_vel, input) {
                 None => { self.y_vel + self.kb_y_vel},
                 Some(platform) => {
                     self.land(fighter);
@@ -959,8 +955,9 @@ impl Player {
         }
 
         // are we on a platform?
-        match self.land_stage_collision(stage, -0.001) {
+        match self.land_stage_collision(stage, -0.001, input) {
             Some(_) if self.airbourne && self.frame > 2 => { // TODO: I dunno what I want to do instead of checking self.frame ...
+                print!("registered land");
                 self.land(fighter);
             },
             None if !self.airbourne => {
@@ -992,13 +989,13 @@ impl Player {
     }
 
     /// return the platform that the player would land on if moved by y_offset
-    fn land_stage_collision<'a> (&self, stage: &'a Stage, y_offset: f32) -> Option<&'a Platform> {
+    fn land_stage_collision<'a> (&self, stage: &'a Stage, y_offset: f32, input: &PlayerInput) -> Option<&'a Platform> {
         if self.y_vel > 0.0 {
             return None;
         }
 
         for platform in &stage.platforms[..] {
-            if platform.pass_through && self.pass_through {
+            if platform.pass_through && input[0].stick_y <= -0.56 {
                 continue;
             }
 
