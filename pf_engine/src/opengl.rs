@@ -7,6 +7,7 @@ use ::player::RenderFighter;
 use glium::{DisplayBuild, Surface, self};
 use glium::glutin::Event;
 use glium::backend::glutin_backend::GlutinFacade;
+use glium::draw_parameters::DrawParameters;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::fs::{File, self};
 use std::io::Read;
@@ -133,8 +134,14 @@ impl OpenGLGraphics {
             edge_color:      [1.0f32, 1.0, 1.0, 1.0],
             color:           [1.0f32, 1.0, 1.0, 1.0]
         };
+
+        let draw_params = DrawParameters {
+            blend: glium::Blend::alpha_blending(),
+            ..Default::default()
+        };
+
         let buffers = &self.package_buffers.stages[stage];
-        target.draw(&buffers.vertex, &buffers.index, &program, uniform, &Default::default()).unwrap();
+        target.draw(&buffers.vertex, &buffers.index, &program, uniform, &draw_params).unwrap();
 
         for entity in render.entities {
             match entity {
@@ -158,7 +165,7 @@ impl OpenGLGraphics {
                             edge_color:      color,
                             color:           color
                         };
-                        target.draw(&ecb.vertex, &ecb.index, &program, uniform, &Default::default()).unwrap();
+                        target.draw(&ecb.vertex, &ecb.index, &program, uniform, &draw_params).unwrap();
                     }
 
                     // draw fighter
@@ -185,7 +192,7 @@ impl OpenGLGraphics {
                             let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
                             if player.frame < fighter_frames.len() {
                                 if let &Some(ref buffers) = &fighter_frames[player.frame] {
-                                    target.draw(&buffers.vertex, &buffers.index, &program, uniform, &Default::default()).unwrap();
+                                    target.draw(&buffers.vertex, &buffers.index, &program, uniform, &draw_params).unwrap();
                                 }
                             }
                             else {
@@ -210,7 +217,7 @@ impl OpenGLGraphics {
                         edge_color:      [0.0f32, 1.0, 0.0, 1.0],
                         color:           [0.0f32, 1.0, 0.0, 1.0]
                     };
-                    target.draw(&buffers.vertex, &buffers.index, &program, uniform, &Default::default()).unwrap();
+                    target.draw(&buffers.vertex, &buffers.index, &program, uniform, &draw_params).unwrap();
                 },
                 RenderEntity::Area(rect) => {
                     let buffers = Buffers::rect_buffers(&self.display, rect);
@@ -222,7 +229,7 @@ impl OpenGLGraphics {
                         edge_color:      [0.0f32, 1.0, 0.0, 1.0],
                         color:           [0.0f32, 1.0, 0.0, 1.0]
                     };
-                    target.draw(&buffers.vertex, &buffers.index, &program, uniform, &Default::default()).unwrap();
+                    target.draw(&buffers.vertex, &buffers.index, &program, uniform, &draw_params).unwrap();
                 },
             }
         }
