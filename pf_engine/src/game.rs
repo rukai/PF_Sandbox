@@ -772,9 +772,9 @@ pub struct RenderGame {
 }
 
 pub enum RenderEntity {
-    Player   (RenderPlayer),
-    Selector (RenderRect),
-    Area     (RenderRect),
+    Player    (RenderPlayer),
+    Selector  (RenderRect),
+    Area      (RenderRect),
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]

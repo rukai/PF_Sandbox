@@ -4,6 +4,7 @@ use ::menu::RenderMenu;
 use ::graphics::{GraphicsMessage, Render};
 use ::player::RenderFighter;
 
+use vulkano_text::{DrawText, DrawTextTrait, UpdateTextCache};
 use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
 use vulkano;
@@ -64,7 +65,7 @@ pub struct Uniform {
 }
 
 #[allow(dead_code)]
-pub struct VulkanGraphics {
+pub struct VulkanGraphics<'a> {
     package_buffers:  PackageBuffers,
     window:           vulkano_win::Window,
     device:           Arc<Device>,
@@ -75,11 +76,12 @@ pub struct VulkanGraphics {
     render_pass:      Arc<render_pass::CustomRenderPass>,
     framebuffers:     Vec<Arc<Framebuffer<render_pass::CustomRenderPass>>>,
     uniforms:         Vec<Uniform>,
+    draw_text:        DrawText<'a>,
     os_input_tx:      Sender<Event>,
     render_rx:        Receiver<GraphicsMessage>,
 }
 
-impl VulkanGraphics {
+impl<'a> VulkanGraphics<'a> {
     pub fn init(os_input_tx: Sender<Event>) -> Sender<GraphicsMessage> {
         let (render_tx, render_rx) = channel();
 
@@ -90,7 +92,7 @@ impl VulkanGraphics {
         render_tx
     }
 
-    fn new(os_input_tx: Sender<Event>, render_rx: Receiver<GraphicsMessage>) -> VulkanGraphics {
+    fn new(os_input_tx: Sender<Event>, render_rx: Receiver<GraphicsMessage>) -> VulkanGraphics<'a> {
         let instance = {
             let extensions = vulkano_win::required_extensions();
             Instance::new(None, &extensions, None).expect("failed to create Vulkan instance")
@@ -136,6 +138,8 @@ impl VulkanGraphics {
             }).unwrap()
         }).collect::<Vec<_>>();
 
+        let draw_text = DrawText::new(&device, &queue, &images);
+
         let (uniforms, generic_pipeline) = VulkanGraphics::generic_pipeline(&device, &queue, &images, &render_pass);
 
         VulkanGraphics {
@@ -149,6 +153,7 @@ impl VulkanGraphics {
             render_pass:      render_pass,
             framebuffers:     framebuffers,
             uniforms:         uniforms,
+            draw_text:        draw_text,
             os_input_tx:      os_input_tx,
             render_rx:        render_rx,
         }
@@ -255,14 +260,27 @@ impl VulkanGraphics {
         message.render
     }
 
+    fn game_hud_render(&mut self, entities: &[RenderEntity], width: u32, height: u32) {
+        let mut players = 0;
+        for entity in entities {
+            if let &RenderEntity::Player(_) = entity {
+                players += 1;
+            }
+        }
+        let distance = (width / (players + 1)) as f32;
+
+        let mut location = -100.0;
+        for entity in entities {
+            if let &RenderEntity::Player(ref player) = entity {
+                location += distance;
+                self.draw_text.queue_text(location, height as f32 - 50.0, 110.0, player.fighter_color, format!("{}%", player.damage).as_ref());
+            }
+        }
+    }
+
     fn game_render(&mut self, render: RenderGame) {
         let image_num = self.swapchain.acquire_next_image(Duration::new(1, 0)).unwrap();
-        let mut command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
-        .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
-            color: [0.0, 0.0, 0.0, 1.0]
-        });
 
-        let mut uniforms = self.uniforms.iter();
         let zoom = render.camera.zoom.recip();
         let pan  = render.camera.pan;
         let (width, height) = self.window.window().get_inner_size_points().unwrap();
@@ -275,11 +293,15 @@ impl VulkanGraphics {
                 // also double as measuring/scale lines
                 // configurable size via treeflection
                 // but this might be desirable to have during normal gameplay to, hmmmm....
+                // Just have a 5 second fade in/out time so it doesnt look clunky and can be used during frame advance
             },
             _ => { },
         }
 
+        self.game_hud_render(&render.entities, width, height);
+
         let stage = 0;
+        let mut uniforms = self.uniforms.iter();
         let uniform = uniforms.next().unwrap();
         {
             let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
@@ -292,6 +314,13 @@ impl VulkanGraphics {
         }
         let vertex_buffer = &self.package_buffers.stages[stage].vertex;
         let index_buffer  = &self.package_buffers.stages[stage].index;
+
+        let mut command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
+        .update_text_cache(&mut self.draw_text)
+        .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
+            color: [0.0, 0.0, 0.0, 1.0]
+        });
+
         command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), &uniform.set, &());
 
         for entity in render.entities {
@@ -411,7 +440,10 @@ impl VulkanGraphics {
             }
         }
 
-        let final_command_buffer = command_buffer.draw_end().build();
+        let final_command_buffer = command_buffer
+            .draw_text(&mut self.draw_text, &self.device, &self.queue, width, height)
+            .draw_end()
+            .build();
         self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
         self.swapchain.present(&self.queue, image_num).unwrap();
     }

@@ -20,11 +20,12 @@ winit = { version = "0.5", optional = true }
 vulkano = { version = "0.3", optional = true }
 vulkano-win = { version = "0.3", optional = true }
 glium = { version = "0.16", optional = true }
+vulkano_text = { version = "0.1", optional = true }
 
 [build-dependencies]
 vulkano-shaders = { version = "0.3", optional = true }
 
 [features]
 default = ["vulkan", "opengl"]
-vulkan = ["vulkano", "vulkano-win", "vulkano-shaders", "winit"]
+vulkan = ["vulkano", "vulkano-win", "vulkano-shaders", "winit", "vulkano_text"]
 opengl = ["glium"]

@@ -1186,6 +1186,8 @@ impl Player {
     pub fn render(&self, fighter_color: [f32; 4], fighter: usize, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer) -> RenderPlayer {
         RenderPlayer {
             debug:             debug,
+            damage:            self.damage,
+            stocks:            self.stocks,
             bps:               (self.bps_x, self.bps_y),
             ecb:               self.ecb.clone(),
             frame:             self.frame as usize,
@@ -1217,6 +1219,8 @@ impl JumpResult {
 
 pub struct RenderPlayer {
     pub debug:             DebugPlayer,
+    pub damage:            f32,
+    pub stocks:            u64,
     pub bps:               (f32, f32),
     pub ecb:               ECB,
     pub frame:             usize,
