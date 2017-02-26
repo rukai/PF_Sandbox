@@ -5,7 +5,6 @@ extern crate num;
 extern crate serde;
 extern crate treeflection;
 extern crate winit;
-extern crate vulkano_text;
 #[macro_use] extern crate enum_primitive;
 #[macro_use] extern crate matches;
 #[macro_use] extern crate serde_derive;
@@ -34,6 +33,8 @@ pub mod stage;
 extern crate vulkano;
 #[cfg(feature = "vulkan")]
 extern crate vulkano_win;
+#[cfg(feature = "vulkan")]
+extern crate vulkano_text;
 #[cfg(feature = "vulkan")]
 pub mod vulkan;
 #[cfg(feature = "vulkan")]
