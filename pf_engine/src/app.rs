@@ -12,7 +12,7 @@ use std::sync::mpsc::Sender;
 use ::cli::CLIChoice;
 use ::game::{Game, GameState};
 use ::input::Input;
-use ::menu::{Menu, MenuChoice};
+use ::menu::Menu;
 use ::network::Network;
 use ::os_input::OsInput;
 use ::package::Package;
@@ -121,12 +121,8 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
         match &mut state {
             &mut AppState::Menu (ref mut menu) => {
                 input.update(&[]);
-                for menu_choice in menu.step(&mut input) {
-                    match menu_choice {
-                        MenuChoice::Start (menu_game_setup) => {
-                            next_state = NextAppState::Game (menu_game_setup);
-                        }
-                    }
+                if let Some(menu_game_setup) = menu.step(&mut input) {
+                    next_state = NextAppState::Game (menu_game_setup);
                 }
                 #[cfg(any(feature = "vulkan", feature = "opengl"))]
                 {

@@ -1,6 +1,6 @@
 use ::vulkan_buffers::{Vertex, Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
-use ::menu::RenderMenu;
+use ::menu::{RenderMenu, RenderMenuState};
 use ::graphics::{GraphicsMessage, Render};
 use ::player::RenderFighter;
 
@@ -279,8 +279,6 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn game_render(&mut self, render: RenderGame) {
-        let image_num = self.swapchain.acquire_next_image(Duration::new(1, 0)).unwrap();
-
         let zoom = render.camera.zoom.recip();
         let pan  = render.camera.pan;
         let (width, height) = self.window.window().get_inner_size_points().unwrap();
@@ -315,6 +313,7 @@ impl<'a> VulkanGraphics<'a> {
         let vertex_buffer = &self.package_buffers.stages[stage].vertex;
         let index_buffer  = &self.package_buffers.stages[stage].index;
 
+        let image_num = self.swapchain.acquire_next_image(Duration::new(1, 0)).unwrap();
         let mut command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
         .update_text_cache(&mut self.draw_text)
         .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
@@ -448,8 +447,56 @@ impl<'a> VulkanGraphics<'a> {
         self.swapchain.present(&self.queue, image_num).unwrap();
     }
 
-    #[allow(unused_variables)]
     fn menu_render(&mut self, render: RenderMenu) {
+        let (width, height) = self.window.window().get_inner_size_points().unwrap();
+        match render.state {
+            RenderMenuState::CharacterSelect (selections) => {
+                if selections.iter().filter(|x| x.plugged_in).count() == 2 {
+                    let fighters = &self.package_buffers.package.as_ref().unwrap().fighters;
+                    for (i, fighter) in fighters.iter().enumerate() {
+                        self.draw_text.queue_text(100.0, 100.0 + i as f32 * 50.0, 26.0, [1.0, 1.0, 1.0, 1.0], fighter.name.as_ref());
+                    }
+                }
+                else {
+                    self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "unimplemented");
+                }
+            }
+            RenderMenuState::StageSelect (selection) => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], format!("stage select: {}", selection).as_ref());
+            }
+            RenderMenuState::SetRules => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "set rules");
+            }
+            RenderMenuState::SwitchPackages => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "switch package");
+            }
+            RenderMenuState::BrowsePackages => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "browse package");
+            }
+            RenderMenuState::CreatePackage => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "create package");
+            }
+            RenderMenuState::CreateFighter => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "create fighter");
+            }
+            RenderMenuState::StartGame => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Start game");
+            }
+        }
+
+        let image_num = self.swapchain.acquire_next_image(Duration::new(1, 0)).unwrap();
+        let command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
+        .update_text_cache(&mut self.draw_text)
+        .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
+            color: [0.0, 0.0, 0.0, 1.0]
+        });
+
+        let final_command_buffer = command_buffer
+            .draw_text(&mut self.draw_text, &self.device, &self.queue, width, height)
+            .draw_end()
+            .build();
+        self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
+        self.swapchain.present(&self.queue, image_num).unwrap();
     }
 
     fn handle_events(&mut self) {
