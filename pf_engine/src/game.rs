@@ -1,12 +1,13 @@
+use ::camera::Camera;
+use ::collision::collision_check;
+use ::config::Config;
+use ::fighter::{ActionFrame, CollisionBox, LinkType};
+use ::graphics::{GraphicsMessage, Render};
 use ::input::{Input, PlayerInput, ControllerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
-use ::fighter::{ActionFrame, CollisionBox, LinkType};
-use ::camera::Camera;
 use ::stage::Area;
-use ::graphics::{GraphicsMessage, Render};
-use ::collision::collision_check;
 
 use ::std::collections::HashSet;
 
@@ -16,6 +17,7 @@ use treeflection::{Node, NodeRunner, NodeToken};
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Game {
     pub package:                Package,
+    pub config:                 Config,
     pub state:                  GameState,
     pub player_history:         Vec<Vec<Player>>,
     pub current_frame:          usize,
@@ -39,7 +41,7 @@ pub struct Game {
 /// All previous frame state is used to calculate the next frame then the current_frame is incremented
 
 impl Game {
-    pub fn new(package: Package, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
+    pub fn new(package: Package, config: Config, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
         // generate players
         let mut players:       Vec<Player>      = vec!();
         let mut debug_players: Vec<DebugPlayer> = vec!();
@@ -67,6 +69,7 @@ impl Game {
 
         Game {
             package:                package,
+            config:                 config,
             state:                  if netplay { GameState::Netplay } else { GameState::Local },
             player_history:         vec!(),
             current_frame:          0,

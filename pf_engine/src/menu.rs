@@ -2,20 +2,22 @@ use ::input::{Input, PlayerInput};
 use ::package::Package;
 use ::graphics::{GraphicsMessage, Render};
 use ::app::GameSetup;
+use ::config::Config;
 
 pub struct Menu {
-    package:              Package,
-    state:                MenuState,
-    current_frame:        usize,
+    package:            Package,
+    config:             Config,
+    state:              MenuState,
+    current_frame:      usize,
     fighter_selections: Vec<CharacterSelect>,
-    stage_selection:      usize,
+    stage_selection:    usize,
 }
 
 impl Menu {
-    pub fn new() -> Menu {
-        let package = Package::open_or_generate("base_package");
+    pub fn new(package: Package, config: Config) -> Menu {
         Menu {
             package:              package,
+            config:               config,
             state:                MenuState::CharacterSelect,
             fighter_selections:   vec!(),
             stage_selection:      0,
@@ -98,6 +100,9 @@ impl Menu {
         self.current_frame += 1;
 
         if let MenuState::StartGame = self.state {
+            // TODO: dumb hack to create config file, delete soon
+            self.config.save();
+
             let mut selected_fighters: Vec<usize> = vec!();
             for _ in &player_inputs {
                 selected_fighters.push(0);
@@ -142,8 +147,8 @@ impl Menu {
         }
     }
 
-    pub fn reclaim(self) -> Package {
-        self.package
+    pub fn reclaim(self) -> (Package, Config) {
+        (self.package, self.config)
     }
 }
 

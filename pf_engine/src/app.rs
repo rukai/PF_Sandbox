@@ -16,6 +16,7 @@ use ::menu::Menu;
 use ::network::Network;
 use ::os_input::OsInput;
 use ::package::Package;
+use ::config::Config;
 
 use libusb::Context;
 use std::thread;
@@ -41,10 +42,11 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
             controllers.push(i);
         }
 
-        let mut load_package: Option<Package> = None;
-
         #[allow(unused_variables)]
         let (os_input, os_input_tx) = OsInput::new();
+
+        let config = Config::load();
+        let mut package_string = config.current_package.clone();
 
         // replace with any cli_choices
         let mut load_menu = true;
@@ -55,7 +57,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
                 &CLIChoice::FighterNames (_)                    => { panic!("Unimplemented") }
                 &CLIChoice::StageIndex (ref stage_index)        => { load_menu = false; stage = *stage_index }
                 &CLIChoice::StageName (_)                       => { panic!("Unimplemented") }
-                &CLIChoice::Package (ref name)                  => { load_menu = false; load_package = Some(Package::open_or_generate(&name)); }
+                &CLIChoice::Package (ref name)                  => { load_menu = false; package_string = name.clone(); }
                 &CLIChoice::GraphicsBackend (_) => { }
                 &CLIChoice::TotalPlayers (total_players) => {
                     load_menu = false;
@@ -100,15 +102,12 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
             }
         }
 
-        let package = match load_package {
-            Some(p) => p,
-            None    => Package::open_or_generate("base_package")
-        };
+        let package = Package::open_or_generate(&package_string);
 
         let state = if load_menu {
-            AppState::Menu(Menu::new())
+            AppState::Menu(Menu::new(package, config))
         } else {
-            AppState::Game(Game::new(package, fighters, stage, netplay, controllers))
+            AppState::Game(Game::new(package, config, fighters, stage, netplay, controllers))
         };
         (state, os_input)
     };
@@ -151,14 +150,14 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
 
         match next_state {
             NextAppState::Game (setup) => {
-                let package = match state {
+                let (package, config) = match state {
                     AppState::Menu (menu) => {
                         menu.reclaim()
                     }
                     AppState::Game (_) => { unreachable!() }
                 };
                 input.reset_history();
-                state = AppState::Game(Game::new(package, setup.fighters, setup.stage, setup.netplay, setup.controllers));
+                state = AppState::Game(Game::new(package, config, setup.fighters, setup.stage, setup.netplay, setup.controllers));
             }
             NextAppState::Menu => { }
             NextAppState::None => { }

@@ -1,54 +1,20 @@
-use std::fs::{File, DirBuilder, self};
-use std::io::Read;
-use std::io::Write;
+use std::fs::{DirBuilder, self};
 use std::path::PathBuf;
 use std::collections::HashSet;
-use serde::Serialize;
 use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
-use std::env;
 
+use ::files;
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType, RenderOrder};
 use ::rules::Rules;
 use ::stage::Stage;
 use ::json_upgrade::{engine_version, upgrade_to_latest};
 
 fn get_packages_path() -> PathBuf {
-    match env::home_dir() {
-        Some (mut home) => {
-            #[cfg(unix)]
-            {
-                let share = match env::var("XDG_DATA_HOME") {
-                    Ok(share) => {
-                        if share == "" {
-                            String::from(".local/share")
-                        } else {
-                            share
-                        }
-                    }
-                    Err(_) => {
-                        String::from(".local/share")
-                    }
-                };
-                home.push(&share);
-                home.push("PF_ENGINE/packages");
-                home
-            }
-            #[cfg(windows)]
-            {
-                home.push("AppData\\Local\\PF_ENGINE\\packages");
-                home
-            }
-            #[cfg(macos)]
-            {
-                panic!("macos is unimplemented");
-            }
-        }
-        None => {
-            panic!("could not get path of home");
-        }
-    }
+    let mut path = files::get_path();
+    path.push("packages");
+    path
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -66,7 +32,7 @@ pub struct Package {
 
 impl Default for Package {
     fn default() -> Package {
-        Package::open_or_generate("base_package")
+        panic!("Why would you do that >.>");
     }
 }
 
@@ -148,28 +114,28 @@ impl Package {
         DirBuilder::new().recursive(true).create(self.path.join("Stages")).unwrap();
 
         // save all json files
-        Package::save_struct(self.path.join("rules.json"), &self.rules);
-        Package::save_struct(self.path.join("package_meta.json"), &self.meta);
+        files::save_struct(self.path.join("rules.json"), &self.rules);
+        files::save_struct(self.path.join("package_meta.json"), &self.meta);
 
         for (i, filename) in self.fighters_filenames.iter().enumerate() {
-            Package::save_struct(PathBuf::from(filename), &self.fighters[i]);
+            files::save_struct(PathBuf::from(filename), &self.fighters[i]);
         }
         
         for (i, filename) in self.stages_filenames.iter().enumerate() {
-            Package::save_struct(PathBuf::from(filename), &self.stages[i]);
+            files::save_struct(PathBuf::from(filename), &self.stages[i]);
         }
     }
 
     pub fn load(&mut self) {
-        let mut meta = Package::load_json(self.path.join("package_meta.json"));
-        let mut rules = Package::load_json(self.path.join("rules.json"));
+        let mut meta = files::load_json(self.path.join("package_meta.json")).unwrap();
+        let mut rules = files::load_json(self.path.join("rules.json")).unwrap();
 
         let mut fighters: Vec<Value> = vec!();
         for path in fs::read_dir(self.path.join("Fighters")).unwrap() {
             let full_path = path.unwrap().path();
             self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
 
-            fighters.push(Package::load_json(full_path));
+            fighters.push(files::load_json(full_path).unwrap());
         }
 
         let mut stages: Vec<Value> = vec!();
@@ -177,7 +143,7 @@ impl Package {
             let full_path = path.unwrap().path();
             self.stages_filenames.push(full_path.to_str().unwrap().to_string());
 
-            stages.push(Package::load_json(full_path));
+            stages.push(files::load_json(full_path).unwrap());
         }
 
         // the upgraded json is loaded into this package
@@ -202,18 +168,6 @@ impl Package {
         }
     }
 
-    // Save a struct to the given file name
-    fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
-        let json = serde_json::to_string_pretty(object).unwrap();
-        File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
-    }
-
-    // Load a struct from the given file name
-    fn load_json(filename: PathBuf) -> Value {
-        let mut json = String::new();
-        File::open(filename).unwrap().read_to_string(&mut json).unwrap();
-        serde_json::from_str(&json).unwrap()
-    }
 
     pub fn verify(&self) -> bool {
         true // It's fine, I triple checked
