@@ -15,7 +15,8 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
         let fighter_atk_i = selected_fighters[player_atk_i];
         let fighter_atk = &fighters[fighter_atk_i];
         for (player_def_i, player_def) in players.iter().enumerate() {
-            if player_atk_i != player_def_i {
+
+            if player_atk_i != player_def_i && player_atk.hitlist.iter().all(|x| *x != player_def_i) {
                 let fighter_def_i = selected_fighters[player_def_i];
                 let fighter_def = &fighters[fighter_def_i];
 
@@ -43,10 +44,10 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
 
                                         if damage_diff >= 9 {
                                             result[player_atk_i].push(CollisionResult::Clang { rebound: hitbox_atk.enable_rebound });
-                                            result[player_def_i].push(CollisionResult::HitAtk (hitbox_atk.clone()));
+                                            result[player_def_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
                                         }
                                         else if damage_diff <= -9 {
-                                            result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone()));
+                                            result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
                                             result[player_def_i].push(CollisionResult::Clang { rebound: hitbox_def.enable_rebound });
                                         }
                                         else {
@@ -62,20 +63,16 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
                     }
 
                     for colbox_def in &frame_def.get_colboxes() {
-                        if false { // TODO: defender in hit list
-                            break; // TODO: break to correct level
-                        }
-
                         match colbox_collision_check(player_atk, colbox_atk, player_def, colbox_def) {
                             ColBoxCollisionResult::Hit => {
                                 match &colbox_def.role {
                                     &CollisionBoxRole::Hurt (ref hurtbox) => {
-                                        result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone()));
+                                        result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
                                         result[player_def_i].push(CollisionResult::HitDef (hitbox_atk.clone(), hurtbox.clone()));
                                         break;
                                     }
                                     &CollisionBoxRole::Invincible => {
-                                        result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone()));
+                                        result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
                                         break;
                                     }
                                     _ => { }
@@ -84,7 +81,7 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
                             ColBoxCollisionResult::Phantom => {
                                 match &colbox_def.role {
                                     &CollisionBoxRole::Hurt (ref hurtbox) => {
-                                        result[player_atk_i].push(CollisionResult::PhantomAtk (hitbox_atk.clone()));
+                                        result[player_atk_i].push(CollisionResult::PhantomAtk (hitbox_atk.clone(), player_def_i));
                                         result[player_def_i].push(CollisionResult::PhantomDef (hitbox_atk.clone(), hurtbox.clone()));
                                         break;
                                     }
@@ -155,9 +152,9 @@ fn colbox_shield_collision_check(player1: &Player, colbox1: &CollisionBox,  play
 #[derive(Debug)]
 pub enum CollisionResult {
     PhantomDef   (HitBox, HurtBox),
-    PhantomAtk   (HitBox),
+    PhantomAtk   (HitBox, usize),
     HitDef       (HitBox, HurtBox),
-    HitAtk       (HitBox),
+    HitAtk       (HitBox, usize),
     HitShieldAtk (HitBox),
     HitShieldDef (HitBox),
     ReflectDef   (HitBox), // TODO: add further details required for recreating projectile

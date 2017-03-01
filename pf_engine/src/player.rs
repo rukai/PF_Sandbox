@@ -33,6 +33,7 @@ pub struct Player {
     pub jumpsquat_button: bool,
     pub turn_dash_buffer: bool,
     pub ecb:              ECB,
+    pub hitlist:          Vec<usize>,
 }
 
 
@@ -55,13 +56,14 @@ impl Player {
             kb_x_dec:         0.0,
             kb_y_dec:         0.0,
             hitstun:          0.0,
-            ecb:              ECB::default(),
             face_right:       spawn.face_right,
             airbourne:        true,
             fastfalled:       false,
             air_jumps_left:   0,
             jumpsquat_button: false,
             turn_dash_buffer: false,
+            ecb:              ECB::default(),
+            hitlist:          vec!(),
         }
     }
 
@@ -69,6 +71,7 @@ impl Player {
     fn set_action(&mut self, action: Action) {
         self.action_new = action as u64;
         self.action_set = true;
+        self.hitlist.clear();
     }
 
     // TODO: I could hook in a turbo mode here
@@ -79,6 +82,9 @@ impl Player {
     pub fn step_collision(&mut self, fighter: &Fighter, col_results: &[CollisionResult]) {
         for col_result in col_results {
             match col_result {
+                &CollisionResult::HitAtk (_, player_def_i) => {
+                    self.hitlist.push(player_def_i);
+                }
                 &CollisionResult::HitDef (ref hitbox, ref hurtbox) => {
                     let damage_done = hitbox.damage * hurtbox.damage_mult; // TODO: apply staling
                     self.damage += damage_done;
@@ -200,6 +206,17 @@ impl Player {
             Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.frame < 10
                 => { self.ecb.bot_y = prev_bot_y }
             _   => { }
+        }
+
+        // TODO: also use flag on each frame to signal manual hitlist reset
+        let mut clear_hitlist = true;
+        for colbox in &fighter_frame.colboxes[..] {
+            if let CollisionBoxRole::Hit(_) = colbox.role {
+                clear_hitlist = false;
+            }
+        }
+        if clear_hitlist {
+            self.hitlist.clear();
         }
 
         if let Some(action) = action {
