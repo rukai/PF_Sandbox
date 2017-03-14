@@ -25,7 +25,6 @@ pub struct Player {
     pub kb_y_vel:         f32,
     pub kb_x_dec:         f32,
     pub kb_y_dec:         f32,
-    pub hitstun:          f32,
     pub face_right:       bool,
     pub airbourne:        bool,
     pub fastfalled:       bool,
@@ -34,6 +33,8 @@ pub struct Player {
     pub turn_dash_buffer: bool,
     pub ecb:              ECB,
     pub hitlist:          Vec<usize>,
+    pub hitlag:           f32,
+    pub hitstun:          f32,
 }
 
 
@@ -55,7 +56,6 @@ impl Player {
             kb_y_vel:         0.0,
             kb_x_dec:         0.0,
             kb_y_dec:         0.0,
-            hitstun:          0.0,
             face_right:       spawn.face_right,
             airbourne:        true,
             fastfalled:       false,
@@ -64,6 +64,8 @@ impl Player {
             turn_dash_buffer: false,
             ecb:              ECB::default(),
             hitlist:          vec!(),
+            hitlag:           0.0,
+            hitstun:          0.0,
         }
     }
 
@@ -157,6 +159,8 @@ impl Player {
                             self.set_action(Action::Damage);
                         }
                     }
+
+                    self.hitlag = hitbox.damage / 3.0 + 3.0;
                 }
                 _ => { }
             }
@@ -1143,6 +1147,8 @@ impl Player {
         self.hitstun = 0.0;
         self.air_jumps_left = fighter.air_jumps;
         self.fastfalled = false;
+        self.hitstun = 0.0;
+        self.hitlag = 0.0;
         self.set_action(Action::Spawn);
     }
 
