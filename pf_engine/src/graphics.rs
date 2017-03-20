@@ -25,3 +25,13 @@ pub fn get_render_id(role: &CollisionBoxRole) -> f32 {
         &CollisionBoxRole::Absorb         => { 8.0 }
     }
 }
+
+pub fn get_player_color(i: usize) -> [f32; 4] {
+    let colors: Vec<[f32; 4]> = vec!(
+        [0.0, 90.0/255.0, 224.0/255.0, 1.0],
+        [239.0/255.0, 100.0/255.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, 1.0, 1.0],
+    );
+    colors[i]
+}

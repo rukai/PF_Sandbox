@@ -1,7 +1,7 @@
 use ::vulkan_buffers::{Vertex, Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
-use ::menu::{RenderMenu, RenderMenuState};
-use ::graphics::{GraphicsMessage, Render};
+use ::menu::{RenderMenu, RenderMenuState, CharacterSelect};
+use ::graphics::{self, GraphicsMessage, Render};
 use ::player::RenderFighter;
 
 use vulkano_text::{DrawText, DrawTextTrait, UpdateTextCache};
@@ -79,6 +79,8 @@ pub struct VulkanGraphics<'a> {
     draw_text:        DrawText<'a>,
     os_input_tx:      Sender<Event>,
     render_rx:        Receiver<GraphicsMessage>,
+    width:            u32,
+    height:           u32,
 }
 
 impl<'a> VulkanGraphics<'a> {
@@ -156,6 +158,8 @@ impl<'a> VulkanGraphics<'a> {
             draw_text:        draw_text,
             os_input_tx:      os_input_tx,
             render_rx:        render_rx,
+            width:            0,
+            height:           0,
         }
     }
 
@@ -246,6 +250,10 @@ impl<'a> VulkanGraphics<'a> {
                     render = self.read_message(message);
                 }
 
+                let size = self.window.window().get_inner_size_points().unwrap();
+                self.width = size.0;
+                self.height = size.1;
+
                 match render {
                     Render::Game(game) => { self.game_render(game); },
                     Render::Menu(menu) => { self.menu_render(menu); },
@@ -260,20 +268,20 @@ impl<'a> VulkanGraphics<'a> {
         message.render
     }
 
-    fn game_hud_render(&mut self, entities: &[RenderEntity], width: u32, height: u32) {
+    fn game_hud_render(&mut self, entities: &[RenderEntity]) {
         let mut players = 0;
         for entity in entities {
             if let &RenderEntity::Player(_) = entity {
                 players += 1;
             }
         }
-        let distance = (width / (players + 1)) as f32;
+        let distance = (self.width / (players + 1)) as f32;
 
         let mut location = -100.0;
         for entity in entities {
             if let &RenderEntity::Player(ref player) = entity {
                 location += distance;
-                self.draw_text.queue_text(location, height as f32 - 50.0, 110.0, player.fighter_color, format!("{}%", player.damage).as_ref());
+                self.draw_text.queue_text(location, self.height as f32 - 50.0, 110.0, player.fighter_color, format!("{}%", player.damage).as_ref());
             }
         }
     }
@@ -281,8 +289,7 @@ impl<'a> VulkanGraphics<'a> {
     fn game_render(&mut self, render: RenderGame) {
         let zoom = render.camera.zoom.recip();
         let pan  = render.camera.pan;
-        let (width, height) = self.window.window().get_inner_size_points().unwrap();
-        let aspect_ratio = width as f32 / height as f32;
+        let aspect_ratio = self.width as f32 / self.height as f32;
 
         match render.state {
             GameState::Local  => { },
@@ -296,7 +303,7 @@ impl<'a> VulkanGraphics<'a> {
             _ => { },
         }
 
-        self.game_hud_render(&render.entities, width, height);
+        self.game_hud_render(&render.entities);
 
         let stage = 0;
         let mut uniforms = self.uniforms.iter();
@@ -440,7 +447,7 @@ impl<'a> VulkanGraphics<'a> {
         }
 
         let final_command_buffer = command_buffer
-            .draw_text(&mut self.draw_text, &self.device, &self.queue, width, height)
+            .draw_text(&mut self.draw_text, &self.device, &self.queue, self.width, self.height)
             .draw_end()
             .build();
         self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
@@ -448,17 +455,34 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn menu_render(&mut self, render: RenderMenu) {
-        let (width, height) = self.window.window().get_inner_size_points().unwrap();
         match render.state {
             RenderMenuState::CharacterSelect (selections) => {
-                if selections.iter().filter(|x| x.plugged_in).count() == 2 {
-                    let fighters = &self.package_buffers.package.as_ref().unwrap().fighters;
-                    for (i, fighter) in fighters.iter().enumerate() {
-                        self.draw_text.queue_text(100.0, 100.0 + i as f32 * 50.0, 26.0, [1.0, 1.0, 1.0, 1.0], fighter.name.as_ref());
+                let selections: Vec<&CharacterSelect> = selections.iter().filter(|x| x.plugged_in).collect();
+                match selections.len() {
+                    0 => {
+                        self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "There are no controllers plugged in.");
                     }
-                }
-                else {
-                    self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "unimplemented");
+                    1 => {
+                        self.draw_fighter_selector(0, selections[0], -1.0, -1.0, 1.0, 1.0);
+                    }
+                    2 => {
+                        self.draw_fighter_selector(0, selections[0], -0.9, -0.9, 0.0, 0.9);
+                        self.draw_fighter_selector(1, selections[1],  0.0, -0.9, 0.9, 0.9);
+                    }
+                    3 => {
+                        self.draw_fighter_selector(0, selections[0], -1.0, -1.0, 0.0, 0.0);
+                        self.draw_fighter_selector(1, selections[1],  0.0, -1.0, 1.0, 0.0);
+                        self.draw_fighter_selector(2, selections[2], -1.0,  0.0, 0.0, 1.0);
+                    }
+                    4 => {
+                        self.draw_fighter_selector(0, selections[0], -1.0, -1.0, 0.0, 0.0);
+                        self.draw_fighter_selector(1, selections[1],  0.0, -1.0, 1.0, 0.0);
+                        self.draw_fighter_selector(2, selections[2], -1.0,  0.0, 0.0, 1.0);
+                        self.draw_fighter_selector(3, selections[3],  0.0,  0.0, 1.0, 1.0);
+                    }
+                    _ => {
+                        self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Currently only supports up to 4 controllers. Please unplug some.");
+                    }
                 }
             }
             RenderMenuState::StageSelect (selection) => {
@@ -492,11 +516,35 @@ impl<'a> VulkanGraphics<'a> {
         });
 
         let final_command_buffer = command_buffer
-            .draw_text(&mut self.draw_text, &self.device, &self.queue, width, height)
+            .draw_text(&mut self.draw_text, &self.device, &self.queue, self.width, self.height)
             .draw_end()
             .build();
         self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
         self.swapchain.present(&self.queue, image_num).unwrap();
+    }
+
+    fn draw_fighter_selector(&mut self, selector_i: usize, selection: &CharacterSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
+        let fighters = &self.package_buffers.package.as_ref().unwrap().fighters;
+        for (i, fighter) in fighters.iter().enumerate() {
+            let start_x = if i == selection.cursor {
+                start_x + 0.1
+            } else {
+                start_x
+            };
+            let x = ((start_x+1.0) / 2.0) * self.width as f32;
+            let y = ((start_y+1.0) / 2.0) * self.height as f32 + i as f32 * 50.0;
+
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+
+            let mut color = [1.0, 1.0, 1.0, 1.0];
+            if let Some(selection_i) = selection.selection {
+                if i == selection_i {
+                    color = graphics::get_player_color(selector_i);
+                }
+            }
+
+            self.draw_text.queue_text(x, y, size, color, fighter.name.as_ref());
+        }
     }
 
     fn handle_events(&mut self) {

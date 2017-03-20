@@ -3,6 +3,8 @@ use ::package::Package;
 use ::graphics::{GraphicsMessage, Render};
 use ::app::GameSetup;
 use ::config::Config;
+use ::fighter::Fighter;
+use treeflection::ContextVec;
 
 pub struct Menu {
     package:            Package,
@@ -26,18 +28,19 @@ impl Menu {
     }
 
     fn add_remove_fighter_selections(&mut self, player_inputs: &[PlayerInput]) {
-        // TODO: add/remove fighter_selections on input add/remove
-
-        // HACK
+        // HACK to populate fighter_selections, if not done so yet
         if self.fighter_selections.len() == 0 {
             for input in player_inputs {
                 self.fighter_selections.push(CharacterSelect {
-                    plugged_in: input.plugged_in,
-                    selection:  None,
-                    cursor:     0,
+                    plugged_in:      input.plugged_in,
+                    selection:       None,
+                    cursor:          0,
+                    ticker:          MenuTicker::new(),
                 });
             }
         }
+
+        // TODO: add/remove fighter_selections on input add/remove
     }
 
     fn step_fighter_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
@@ -63,12 +66,41 @@ impl Menu {
                 if input.a.press && selection.cursor >= fighters.len() {
                     // TODO: run extra options
                 }
+
+                if input[0].stick_y > 0.4 || input[0].up {
+                    if selection.ticker.tick() {
+                        if selection.cursor == 0 {
+                            selection.cursor = Menu::fighter_select_cursor_max(fighters);
+                        }
+                        else {
+                            selection.cursor -= 1;
+                        }
+                    }
+                }
+                else if input[0].stick_y < -0.4 || input[0].down {
+                    if selection.ticker.tick() {
+                        if selection.cursor == Menu::fighter_select_cursor_max(fighters) {
+                            selection.cursor = 0;
+                        }
+                        else {
+                            selection.cursor += 1;
+                        }
+                    }
+                }
+                else {
+                    selection.ticker.reset();
+                }
             }
         }
 
         if input.start_pressed() && self.fighter_selections.iter().all(|x| !x.plugged_in || x.selection.is_some()) {
             self.state = MenuState::StageSelect;
         }
+    }
+
+    fn fighter_select_cursor_max(fighters: &ContextVec<Fighter>) -> usize {
+        fighters.len() - 1 // last index of fighters
+        + 0                // number of extra options
     }
 
     fn step_stage_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
@@ -104,8 +136,10 @@ impl Menu {
             self.config.save();
 
             let mut selected_fighters: Vec<usize> = vec!();
-            for _ in &player_inputs {
-                selected_fighters.push(0);
+            for selection in &self.fighter_selections {
+                if let Some(selection) = selection.selection {
+                    selected_fighters.push(selection);
+                }
             }
 
             let mut controllers: Vec<usize> = vec!();
@@ -177,9 +211,54 @@ pub enum RenderMenuState {
 
 #[derive(Clone)]
 pub struct CharacterSelect {
-    pub plugged_in: bool,
-    pub selection:  Option<usize>,
-    pub cursor:     usize,
+    pub plugged_in:      bool,
+    pub selection:       Option<usize>,
+    pub cursor:          usize,
+    pub ticker:          MenuTicker,
+}
+
+#[derive(Clone)]
+pub struct MenuTicker {
+    ticks_remaining: usize,
+    tick_duration_i: usize,
+    reset:           bool,
+}
+
+impl MenuTicker {
+    fn new() -> MenuTicker {
+        MenuTicker {
+            ticks_remaining: 0,
+            tick_duration_i: 0,
+            reset:           true,
+        }
+    }
+
+    fn tick(&mut self) -> bool {
+        let tick_durations = [20, 12, 10, 8, 6, 5];
+        if self.reset {
+            self.ticks_remaining = tick_durations[0];
+            self.tick_duration_i = 0;
+            self.reset = false;
+            true
+        }
+
+        else {
+            self.ticks_remaining -= 1;
+            if self.ticks_remaining <= 0 {
+                self.ticks_remaining = tick_durations[self.tick_duration_i];
+                if self.tick_duration_i < tick_durations.len() - 1 {
+                    self.tick_duration_i += 1;
+                }
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        self.reset = true;
+    }
 }
 
 pub struct RenderMenu {
