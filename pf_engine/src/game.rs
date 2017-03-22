@@ -669,7 +669,8 @@ impl Game {
                 entities.push(RenderEntity::Area(area_to_render(cam_area)));
             }
 
-            entities.push(RenderEntity::Player(player.render(graphics::get_player_color(i), self.selected_fighters[i], selected_colboxes, fighter_selected, player_selected, debug)));
+            let color = graphics::get_controller_color(self.selected_controllers[i]);
+            entities.push(RenderEntity::Player(player.render(color, self.selected_fighters[i], selected_colboxes, fighter_selected, player_selected, debug)));
         }
 
         // stage areas

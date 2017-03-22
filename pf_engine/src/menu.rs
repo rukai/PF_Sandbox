@@ -50,21 +50,17 @@ impl Menu {
             let fighters = &self.package.fighters;
             for (ref mut selection, ref input) in selections.zip(player_inputs) {
                 selection.plugged_in = input.plugged_in;
-                match selection.selection {
-                    Some (_) => {
-                        if input.b.press {
-                            selection.selection = None;
-                        }
-                    }
-                    None => {
-                        if input.a.press && selection.cursor < fighters.len() {
-                            selection.selection = Some(selection.cursor);
-                        }
-                    }
-                }
 
-                if input.a.press && selection.cursor >= fighters.len() {
-                    // TODO: run extra options
+                if input.b.press {
+                    selection.selection = None;
+                }
+                else if input.a.press {
+                    if selection.cursor < fighters.len() {
+                        selection.selection = Some(selection.cursor);
+                    }
+                    else {
+                        // TODO: run extra options
+                    }
                 }
 
                 if input[0].stick_y > 0.4 || input[0].up {
@@ -93,7 +89,7 @@ impl Menu {
             }
         }
 
-        if input.start_pressed() && self.fighter_selections.iter().all(|x| !x.plugged_in || x.selection.is_some()) {
+        if input.start_pressed() {
             self.state = MenuState::StageSelect;
         }
     }
@@ -136,15 +132,14 @@ impl Menu {
             self.config.save();
 
             let mut selected_fighters: Vec<usize> = vec!();
-            for selection in &self.fighter_selections {
+            let mut controllers: Vec<usize> = vec!();
+            for (i, selection) in (&self.fighter_selections).iter().enumerate() {
                 if let Some(selection) = selection.selection {
                     selected_fighters.push(selection);
+                    if player_inputs[i].plugged_in {
+                        controllers.push(i);
+                    }
                 }
-            }
-
-            let mut controllers: Vec<usize> = vec!();
-            for (i, _) in (&player_inputs).iter().enumerate() {
-                controllers.push(i);
             }
 
             Some(GameSetup {
