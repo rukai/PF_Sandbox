@@ -40,7 +40,7 @@ impl OpenGLGraphics {
         render_rx: Receiver<GraphicsMessage>,
     ) -> OpenGLGraphics {
         let display = glium::glutin::WindowBuilder::new()
-            .with_title("PF ENGINE")
+            .with_title("PF Sandbox")
             .build_glium()
             .unwrap();
 

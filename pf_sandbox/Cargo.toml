@@ -1,5 +1,5 @@
 [package]
-name = "pf_engine"
+name = "pf_sandbox"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 build = "build.rs"

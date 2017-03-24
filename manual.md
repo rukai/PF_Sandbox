@@ -1,4 +1,4 @@
-# PF ENGINE Manual
+# PF Sandbox Manual
 
 ## WiiU adapter setup
 
@@ -21,7 +21,7 @@ Press Backspace to return control of the camera to the game.
 
 ## Packages
 
-Packages are how unique games are made and shared in PF ENGINE.
+Packages are how unique games are made and shared in PF Sandbox.
 A package contains:
 *   Stages
 *   Fighters
@@ -125,7 +125,7 @@ Press `S` again to leave pivot mode.
 
 ## Command line
 
-While PF ENGINE is running you can send commands to it via your systems command line.
+While PF Sandbox is running you can send commands to it via your systems command line.
 
 The pf engine command line is very powerful, at the price of complexity.
 We recommend you work through the Command Line section of the [Editor Tutorial](editor-tutorial.md) first, to get a feel for what commands are.
@@ -151,7 +151,7 @@ We can see a command consists of: attributes then a command then values.
 
 ### Objects
 
-Objects are unique entities within PF ENGINE.
+Objects are unique entities within PF Sandbox.
 They contain attributes which can be any of the following value types:
 *   string  - some text
 *   integer - a number
@@ -215,8 +215,8 @@ The indexer is powerful:
 *   `actions[2-4].fighters[*]` select all fighters in packages 2, 3 and 4
 *   `actions[*]`               select all packages
 *   `actions[?]`               select based on [context](link_to_context_section)
-*   `actions[?+1]`             OH MAN THIS WOULD BE SWEET!
-*   `actions[2, ?-1]`          ... plz
+*   `actions[?+1]`             TODO
+*   `actions[2, ?-1]`          TODO
 
 ### Context
 

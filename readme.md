@@ -1,6 +1,6 @@
-# ProtoForm Fighter
+# PF Sandbox
 
-A classic platform fighter engine, with tightly integrated gameplay and character editor.
+A platform fighter sandbox featuring a character editor tightly integrated with gameplay.
 
 ## Requirements:
 
@@ -26,7 +26,7 @@ The usual manner for rust programs: run `cargo run` in the src directory.
 
 ## Goals/Features
 
-*   Package system used to distribute complete games that run on the engine.
+*   Package system used to distribute complete games that run on PF Sandbox
     +   A package includes:
         -   Fighters
         -   Stages
@@ -46,5 +46,5 @@ The usual manner for rust programs: run `cargo run` in the src directory.
 ## Non-Goals/Restrictions
 
 *   Advanced features need not be beginner Friendly (e.g. editor/frame advance/replays/TAS)
-*   Better accuracy to original platform fighters does not overrule over advantages (e.g. 2D hitboxes instead of 3D hitboxes)
-*   Restricting chracter graphics to only hitboxes reduces scope for development of the project and development of packages
+*   Ability to recreate other platform fighters does not overrule other advantages (e.g. 2D hitboxes instead of 3D hitboxes)
+*   Restricting character graphics to only hitboxes reduces scope for development of the project and development of packages

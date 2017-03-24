@@ -104,7 +104,7 @@ impl<'a> VulkanGraphics<'a> {
 
         let physical = PhysicalDevice::enumerate(&instance).next().expect("no device available");
         let window  = WindowBuilder::new().build_vk_surface(&instance).unwrap();
-        window.window().set_title("PF ENGINE");
+        window.window().set_title("PF Sandbox");
 
         let queue = physical.queue_families().find(|q| {
             q.supports_graphics() && window.surface().is_supported(q).unwrap_or(false)

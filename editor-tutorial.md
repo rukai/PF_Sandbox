@@ -2,7 +2,7 @@
 
 ## Editor
 
-Following this tutorial is a great way to get started with PF ENGINE.
+Following this tutorial is a great way to get started with PF Sandbox.
 For a full reference of every operation check out the [documentation]().
 
 First Pause a currently running game, with the spacebar key

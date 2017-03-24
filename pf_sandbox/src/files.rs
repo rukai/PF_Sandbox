@@ -46,12 +46,12 @@ pub fn get_path() -> PathBuf {
                     }
                 };
                 home.push(&share);
-                home.push("PF_ENGINE");
+                home.push("PF_Sandbox");
                 home
             }
             #[cfg(windows)]
             {
-                home.push("AppData\\Local\\PF_ENGINE");
+                home.push("AppData\\Local\\PF_Sandbox");
                 home
             }
             #[cfg(macos)]

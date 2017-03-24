@@ -27,7 +27,7 @@ fn upgrade_meta_engine_version(meta: &mut Value) {
 pub fn upgrade_to_latest(meta: &mut Value, rules: &mut Value, fighters: &mut Vec<Value>, stages: &mut Vec<Value>) {
     let meta_engine_version = get_meta_engine_version(meta);
     if meta_engine_version > engine_version() {
-        panic!("Package is newer then this version of PF Engine. Please upgrade to the latest version.");
+        panic!("Package is newer then this version of PF Sandbox. Please upgrade to the latest version.");
     }
     else if meta_engine_version < engine_version() {
         for upgrade_from in meta_engine_version..engine_version() {

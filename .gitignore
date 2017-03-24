@@ -1,5 +1,2 @@
 cli/target
-
-pf_engine/target
-pf_engine/packages
-pf_engine/src/packages
+pf_sandbox/target

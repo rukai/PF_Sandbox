@@ -12,7 +12,7 @@ fn main() {
 
     let mut stream = match TcpStream::connect("127.0.0.1:1613") {
         Ok(stream)  => { stream }
-        Err(e)      => { println!("Could not connect to PF ENGINE host: {}", e); return; }
+        Err(e)      => { println!("Could not connect to PF Sandbox host: {}", e); return; }
     };
 
     stream.write(out.as_bytes()).unwrap();

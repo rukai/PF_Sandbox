@@ -72,7 +72,7 @@ impl<'a> Input<'a> {
     4. On the right ensure WinUSB is selected
     5. Select Replace Driver
     6. Select yes in the dialog box
-    7. Restart PF ENGINE"#
+    7. Restart PF Sandbox"#
         } else { "" };
 
         match e {
