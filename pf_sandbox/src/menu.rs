@@ -3,8 +3,6 @@ use ::package::Package;
 use ::graphics::{GraphicsMessage, Render};
 use ::app::GameSetup;
 use ::config::Config;
-use ::fighter::Fighter;
-use treeflection::ContextVec;
 
 pub struct Menu {
     package:            Package,
@@ -12,30 +10,30 @@ pub struct Menu {
     state:              MenuState,
     current_frame:      usize,
     fighter_selections: Vec<CharacterSelect>,
-    stage_selection:    usize,
+    stage_ticker:       MenuTicker,
 }
 
 impl Menu {
     pub fn new(package: Package, config: Config) -> Menu {
         Menu {
-            package:              package,
             config:               config,
             state:                MenuState::CharacterSelect,
             fighter_selections:   vec!(),
-            stage_selection:      0,
+            stage_ticker:         MenuTicker::new(package.stages.len() - 1),
+            package:              package,
             current_frame:        0,
         }
     }
 
     fn add_remove_fighter_selections(&mut self, player_inputs: &[PlayerInput]) {
         // HACK to populate fighter_selections, if not done so yet
+        let cursor_max = self.fighter_select_cursor_max();
         if self.fighter_selections.len() == 0 {
             for input in player_inputs {
                 self.fighter_selections.push(CharacterSelect {
                     plugged_in:      input.plugged_in,
                     selection:       None,
-                    cursor:          0,
-                    ticker:          MenuTicker::new(),
+                    ticker:          MenuTicker::new(cursor_max),
                 });
             }
         }
@@ -55,8 +53,8 @@ impl Menu {
                     selection.selection = None;
                 }
                 else if input.a.press {
-                    if selection.cursor < fighters.len() {
-                        selection.selection = Some(selection.cursor);
+                    if selection.ticker.cursor < fighters.len() {
+                        selection.selection = Some(selection.ticker.cursor);
                     }
                     else {
                         // TODO: run extra options
@@ -64,24 +62,10 @@ impl Menu {
                 }
 
                 if input[0].stick_y > 0.4 || input[0].up {
-                    if selection.ticker.tick() {
-                        if selection.cursor == 0 {
-                            selection.cursor = Menu::fighter_select_cursor_max(fighters);
-                        }
-                        else {
-                            selection.cursor -= 1;
-                        }
-                    }
+                    selection.ticker.up();
                 }
                 else if input[0].stick_y < -0.4 || input[0].down {
-                    if selection.ticker.tick() {
-                        if selection.cursor == Menu::fighter_select_cursor_max(fighters) {
-                            selection.cursor = 0;
-                        }
-                        else {
-                            selection.cursor += 1;
-                        }
-                    }
+                    selection.ticker.down();
                 }
                 else {
                     selection.ticker.reset();
@@ -94,17 +78,27 @@ impl Menu {
         }
     }
 
-    fn fighter_select_cursor_max(fighters: &ContextVec<Fighter>) -> usize {
-        fighters.len() - 1 // last index of fighters
+    fn fighter_select_cursor_max(&self) -> usize {
+        self.package.fighters.len() - 1 // last index of fighters
         + 0                // number of extra options
     }
 
     fn step_stage_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
-        for _ in player_inputs {
+        if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
+            self.stage_ticker.up();
+        }
+        else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
+            self.stage_ticker.down();
+        }
+        else {
+            self.stage_ticker.reset();
         }
 
-        if input.start_pressed() {
+        if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
             self.state = MenuState::StartGame;
+        }
+        else if player_inputs.iter().any(|x| x.b.press) {
+            self.state = MenuState::CharacterSelect;
         }
     }
 
@@ -117,12 +111,12 @@ impl Menu {
         match self.state {
             MenuState::CharacterSelect => { self.step_fighter_select(&player_inputs, input) }
             MenuState::StageSelect     => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::SetRules        => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::SwitchPackages  => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::BrowsePackages  => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::CreatePackage   => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::CreateFighter   => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::StartGame       => { self.step_stage_select  (&player_inputs, input) }
+            MenuState::SetRules        => { }
+            MenuState::SwitchPackages  => { }
+            MenuState::BrowsePackages  => { }
+            MenuState::CreatePackage   => { }
+            MenuState::CreateFighter   => { }
+            MenuState::StartGame       => { }
         };
 
         self.current_frame += 1;
@@ -145,7 +139,7 @@ impl Menu {
             Some(GameSetup {
                 controllers: controllers,
                 fighters:    selected_fighters,
-                stage:       0,
+                stage:       self.stage_ticker.cursor,
                 netplay:     false,
             })
         }
@@ -158,7 +152,7 @@ impl Menu {
         RenderMenu {
             state: match self.state {
                 MenuState::CharacterSelect => { RenderMenuState::CharacterSelect (self.fighter_selections.clone()) }
-                MenuState::StageSelect     => { RenderMenuState::StageSelect     (self.stage_selection) }
+                MenuState::StageSelect     => { RenderMenuState::StageSelect     (self.stage_ticker.cursor) }
                 MenuState::SetRules        => { RenderMenuState::SetRules }
                 MenuState::SwitchPackages  => { RenderMenuState::SwitchPackages }
                 MenuState::BrowsePackages  => { RenderMenuState::BrowsePackages }
@@ -206,22 +200,25 @@ pub enum RenderMenuState {
 
 #[derive(Clone)]
 pub struct CharacterSelect {
-    pub plugged_in:      bool,
-    pub selection:       Option<usize>,
-    pub cursor:          usize,
-    pub ticker:          MenuTicker,
+    pub plugged_in: bool,
+    pub selection:  Option<usize>,
+    pub ticker:     MenuTicker,
 }
 
 #[derive(Clone)]
 pub struct MenuTicker {
+    pub cursor:      usize,
+    cursor_max:      usize,
     ticks_remaining: usize,
     tick_duration_i: usize,
     reset:           bool,
 }
 
 impl MenuTicker {
-    fn new() -> MenuTicker {
+    fn new(cursor_max: usize) -> MenuTicker {
         MenuTicker {
+            cursor:          0,
+            cursor_max:      cursor_max,
             ticks_remaining: 0,
             tick_duration_i: 0,
             reset:           true,
@@ -247,6 +244,28 @@ impl MenuTicker {
                 true
             } else {
                 false
+            }
+        }
+    }
+
+    fn up(&mut self) {
+        if self.tick() {
+            if self.cursor == 0 {
+                self.cursor = self.cursor_max;
+            }
+            else {
+                self.cursor -= 1;
+            }
+        }
+    }
+
+    fn down(&mut self) {
+        if self.tick() {
+            if self.cursor == self.cursor_max {
+                self.cursor = 0;
+            }
+            else {
+                self.cursor += 1;
             }
         }
     }

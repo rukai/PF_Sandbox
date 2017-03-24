@@ -184,6 +184,7 @@ impl<'a> Input<'a> {
     /// Uses a seperate state from the game inputs
     /// TODO: Maybe this should be extended to include all menu controller interaction? 
     /// TODO: Does not distinguish between start presses from different players, should it?
+    /// TODO: an inputs.iter().any(|x|.start.press) would probably have made much more sense
     pub fn start_pressed(&mut self) -> bool {
         let held = self.start_held();
         let pressed = !self.prev_start && held;

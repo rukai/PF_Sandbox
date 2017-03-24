@@ -311,7 +311,14 @@ impl<'a> VulkanGraphics<'a> {
 
         self.game_hud_render(&render.entities);
 
-        let stage = 0;
+        let image_num = self.swapchain.acquire_next_image(Duration::new(1, 0)).unwrap();
+        let mut command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
+        .update_text_cache(&mut self.draw_text)
+        .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
+            color: [0.0, 0.0, 0.0, 1.0]
+        });
+
+        let stage = render.stage;
         let mut uniforms = self.uniforms.iter();
         let uniform = uniforms.next().unwrap();
         {
@@ -325,13 +332,6 @@ impl<'a> VulkanGraphics<'a> {
         }
         let vertex_buffer = &self.package_buffers.stages[stage].vertex;
         let index_buffer  = &self.package_buffers.stages[stage].index;
-
-        let image_num = self.swapchain.acquire_next_image(Duration::new(1, 0)).unwrap();
-        let mut command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
-        .update_text_cache(&mut self.draw_text)
-        .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
-            color: [0.0, 0.0, 0.0, 1.0]
-        });
 
         command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), &uniform.set, &());
 
@@ -503,7 +503,7 @@ impl<'a> VulkanGraphics<'a> {
                 }
             }
             RenderMenuState::StageSelect (selection) => {
-                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], format!("stage select: {}", selection).as_ref());
+                self.draw_stage_selector(&mut entities, selection);
             }
             RenderMenuState::SetRules => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "set rules");
@@ -543,6 +543,11 @@ impl<'a> VulkanGraphics<'a> {
                         }
                     }
                 }
+                &MenuEntity::Stage (stage) => {
+                    let vertex_buffer = &self.package_buffers.stages[stage].vertex;
+                    let index_buffer  = &self.package_buffers.stages[stage].index;
+                    command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), uniform, &());
+                }
             }
         }
 
@@ -557,7 +562,7 @@ impl<'a> VulkanGraphics<'a> {
     fn draw_fighter_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, controller_i: usize, selection: &CharacterSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
         let fighters = &self.package_buffers.package.as_ref().unwrap().fighters;
         for (fighter_i, fighter) in fighters.iter().enumerate() {
-            let x_offset = if fighter_i == selection.cursor { 0.1 } else { 0.0 };
+            let x_offset = if fighter_i == selection.ticker.cursor { 0.1 } else { 0.0 };
             let x = ((start_x+1.0 + x_offset) / 2.0) * self.width  as f32;
             let y = ((start_y+1.0           ) / 2.0) * self.height as f32 + fighter_i as f32 * 50.0;
 
@@ -602,7 +607,6 @@ impl<'a> VulkanGraphics<'a> {
                             buffer_content.position_offset = [fighter_x_scaled, fighter_y_scaled];
                             buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
                             buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
-                            buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
                             buffer_content.edge_color      = color;
                         }
 
@@ -617,6 +621,34 @@ impl<'a> VulkanGraphics<'a> {
                 }
             }
             self.draw_text.queue_text(x, y, size, color, fighter.name.as_ref());
+        }
+    }
+
+    fn draw_stage_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, selection: usize) {
+        let stages = &self.package_buffers.package.as_ref().unwrap().stages;
+        for (stage_i, stage) in stages.iter().enumerate() {
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let x_offset = if stage_i == selection { 0.1 } else { 0.0 };
+            let x = self.width as f32 * (0.1 + x_offset);
+            let y = self.height as f32 * 0.1 + stage_i as f32 * 50.0;
+            self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], stage.name.as_ref());
+
+            if stage_i == selection {
+                let uniform = &self.uniforms[menu_entities.len()];
+                {
+                    let zoom = 100.0;
+                    let y = -0.2 * zoom;
+                    let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
+                    buffer_content.zoom            = 1.0 / zoom;
+                    buffer_content.aspect_ratio    = self.aspect_ratio();
+                    buffer_content.position_offset = [0.0, y];
+                    buffer_content.direction       = 1.0;
+                    buffer_content.edge_color      = [1.0, 1.0, 1.0, 1.0];
+                    buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
+                }
+
+                menu_entities.push(MenuEntity::Stage(selection));
+            }
         }
     }
 
@@ -635,4 +667,5 @@ impl<'a> VulkanGraphics<'a> {
 
 enum MenuEntity {
     Fighter { fighter: usize, action: usize, frame: usize },
+    Stage   (usize),
 }
