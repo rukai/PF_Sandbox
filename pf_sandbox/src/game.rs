@@ -97,7 +97,8 @@ impl Game {
                 GameState::ReplayForwards  => { self.step_replay_forwards(input, os_input); }
                 GameState::ReplayBackwards => { self.step_replay_backwards(input, os_input); }
                 GameState::Paused          => { self.step_pause(input, &os_input); }
-                GameState::Results         => { panic!("No more steps should occur after state is set to Results") }
+                GameState::ToResults (_)   => { unreachable!(); }
+                GameState::ToCSS           => { unreachable!(); }
             }
             {
                 let stage = &self.package.stages[self.selected_stage];
@@ -249,6 +250,9 @@ impl Game {
         }
         else if os_input.key_pressed(VirtualKeyCode::I) {
             self.jump_frame();
+        }
+        else if input.game_quit_held() {
+            self.state = GameState::ToCSS;
         }
         else if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Return) {
             self.state = GameState::Local;
@@ -605,13 +609,13 @@ impl Game {
 
         // handle timer
         if (self.current_frame / 60) as u64 > self.package.rules.time_limit {
-            self.state = GameState::Results;
+            self.state = GameState::ToResults (vec!());
         }
 
         // handle no stocks left
         for player in &self.players {
             if player.stocks <= 0 {
-                self.state = GameState::Results;
+                self.state = GameState::ToResults (vec!());
             }
         }
 
@@ -703,6 +707,10 @@ impl Game {
             render: Render::Game (self.render())
         }
     }
+
+    pub fn reclaim(self) -> (Package, Config) {
+        (self.package, self.config)
+    }
 }
 
 fn area_to_render(area: &Area) -> RenderRect {
@@ -718,8 +726,9 @@ pub enum GameState {
     ReplayForwards,
     ReplayBackwards,
     Netplay,
-    Paused,  // Only Local, ReplayForwards and ReplayBackwards can be paused
-    Results, // Both Local and Netplay end at Results
+    Paused, // Only Local, ReplayForwards and ReplayBackwards can be paused
+    ToResults (Vec<GameResult>), // Both Local and Netplay end at ToResults
+    ToCSS,
 }
 
 impl Default for GameState {
@@ -784,3 +793,9 @@ pub struct RenderRect {
     pub p2: (f32, f32),
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
+pub struct GameResult {
+    fighter:    usize,
+    controller: usize,
+    // TODO: ... all sorts of game statistics
+}

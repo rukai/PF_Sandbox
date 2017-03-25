@@ -99,7 +99,7 @@ impl<'a> Input<'a> {
         }
         read_usb_controllers(&mut inputs);
 
-
+        self.prev_start     = self.current_inputs.iter().any(|x| x.start);
         self.current_inputs = inputs;
     }
 
@@ -117,7 +117,6 @@ impl<'a> Input<'a> {
 
 		self.game_inputs.push(self.current_inputs.clone());
     }
-
 
     /// Return game inputs at current index into history
     pub fn players(&self, frame: usize) -> Vec<PlayerInput> {
@@ -180,30 +179,22 @@ impl<'a> Input<'a> {
         result
     }
 
-    /// Check for start button press
-    /// Uses a seperate state from the game inputs
-    /// TODO: Maybe this should be extended to include all menu controller interaction? 
-    /// TODO: Does not distinguish between start presses from different players, should it?
-    /// TODO: an inputs.iter().any(|x|.start.press) would probably have made much more sense
-    pub fn start_pressed(&mut self) -> bool {
-        let held = self.start_held();
-        let pressed = !self.prev_start && held;
-        self.prev_start = held;
-        pressed
-    }
-
-    fn start_held(&mut self) -> bool {
-        for player in &self.current_inputs {
-            if player.start {
-                return true;
-            }
-        }
-        false
-    }
-
     /// Returns the index to the last frame in history
     pub fn last_frame(&self) -> usize {
         self.game_inputs.len() - 1
+    }
+
+    /// The player input history system cannot be used when the game is paused (or it would create bogus entries into the history)
+    /// Instead we need to create custom functions for handling input when paused.
+
+    /// Check for start button press
+    pub fn start_pressed(&mut self) -> bool {
+        !self.prev_start && self.current_inputs.iter().any(|x| x.start)
+    }
+
+    /// button combination for quiting the game
+    pub fn game_quit_held(&self) -> bool {
+        self.current_inputs.iter().any(|x| x.a && x.l && x.r && x.start)
     }
 }
 

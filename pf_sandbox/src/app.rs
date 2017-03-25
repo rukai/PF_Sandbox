@@ -12,7 +12,7 @@ use std::sync::mpsc::Sender;
 use ::cli::CLIChoice;
 use ::game::{Game, GameState};
 use ::input::Input;
-use ::menu::Menu;
+use ::menu::{Menu, MenuState};
 use ::network::Network;
 use ::os_input::OsInput;
 use ::package::Package;
@@ -105,7 +105,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
         let package = Package::open_or_generate(&package_string);
 
         let state = if load_menu {
-            AppState::Menu(Menu::new(package, config))
+            AppState::Menu(Menu::new(package, config, MenuState::CharacterSelect))
         } else {
             AppState::Game(Game::new(package, config, fighters, stage, netplay, controllers))
         };
@@ -133,8 +133,11 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
             &mut AppState::Game (ref mut game) => {
                 input.update(&game.tas);
                 match game.step(&mut input, &os_input) {
-                    GameState::Results => {
-                        next_state = NextAppState::Menu;
+                    GameState::ToResults (results) => {
+                        next_state = NextAppState::Menu (MenuState::GameResults (results));
+                    }
+                    GameState::ToCSS => {
+                        next_state = NextAppState::Menu (MenuState::CharacterSelect);
                     }
                     _ => { }
                 }
@@ -151,15 +154,19 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
         match next_state {
             NextAppState::Game (setup) => {
                 let (package, config) = match state {
-                    AppState::Menu (menu) => {
-                        menu.reclaim()
-                    }
-                    AppState::Game (_) => { unreachable!() }
+                    AppState::Menu (menu) => { menu.reclaim() }
+                    AppState::Game (_)    => { unreachable!() }
                 };
                 input.reset_history();
                 state = AppState::Game(Game::new(package, config, setup.fighters, setup.stage, setup.netplay, setup.controllers));
             }
-            NextAppState::Menu => { }
+            NextAppState::Menu (menu_state) => {
+                let (package, config) = match state {
+                    AppState::Menu (_)    => { unreachable!() }
+                    AppState::Game (game) => { game.reclaim() }
+                };
+                state = AppState::Menu(Menu::new(package, config, menu_state));
+            }
             NextAppState::None => { }
         }
         next_state = NextAppState::None;
@@ -183,7 +190,7 @@ pub enum AppState {
 
 enum NextAppState {
     Game (GameSetup), // retrieve package from the menu
-    Menu,
+    Menu (MenuState),
     None
 }
 

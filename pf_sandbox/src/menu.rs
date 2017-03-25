@@ -3,21 +3,22 @@ use ::package::Package;
 use ::graphics::{GraphicsMessage, Render};
 use ::app::GameSetup;
 use ::config::Config;
+use ::game::GameResult;
 
 pub struct Menu {
-    package:            Package,
-    config:             Config,
-    state:              MenuState,
-    current_frame:      usize,
-    fighter_selections: Vec<CharacterSelect>,
-    stage_ticker:       MenuTicker,
+    package:              Package,
+    config:               Config,
+    state:                MenuState,
+    current_frame:        usize,
+    fighter_selections:   Vec<CharacterSelect>,
+    stage_ticker:         MenuTicker,
 }
 
 impl Menu {
-    pub fn new(package: Package, config: Config) -> Menu {
+    pub fn new(package: Package, config: Config, state: MenuState) -> Menu {
         Menu {
             config:               config,
-            state:                MenuState::CharacterSelect,
+            state:                state,
             fighter_selections:   vec!(),
             stage_ticker:         MenuTicker::new(package.stages.len() - 1),
             package:              package,
@@ -102,6 +103,12 @@ impl Menu {
         }
     }
 
+    fn step_results(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+        if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
+            self.state = MenuState::CharacterSelect;
+        }
+    }
+
     pub fn step(&mut self, input: &mut Input) -> Option<GameSetup> {
         input.game_update(self.current_frame);
         let player_inputs = input.players(self.current_frame);
@@ -111,6 +118,7 @@ impl Menu {
         match self.state {
             MenuState::CharacterSelect => { self.step_fighter_select(&player_inputs, input) }
             MenuState::StageSelect     => { self.step_stage_select  (&player_inputs, input) }
+            MenuState::GameResults (_) => { self.step_results       (&player_inputs, input) }
             MenuState::SetRules        => { }
             MenuState::SwitchPackages  => { }
             MenuState::BrowsePackages  => { }
@@ -151,6 +159,7 @@ impl Menu {
     pub fn render(&self) -> RenderMenu {
         RenderMenu {
             state: match self.state {
+                MenuState::GameResults (ref results) => { RenderMenuState::GameResults (results.clone()) }
                 MenuState::CharacterSelect => { RenderMenuState::CharacterSelect (self.fighter_selections.clone()) }
                 MenuState::StageSelect     => { RenderMenuState::StageSelect     (self.stage_ticker.cursor) }
                 MenuState::SetRules        => { RenderMenuState::SetRules }
@@ -179,6 +188,7 @@ impl Menu {
 pub enum MenuState {
     CharacterSelect,
     StageSelect,
+    GameResults (Vec<GameResult>),
     SetRules,
     SwitchPackages,
     BrowsePackages,
@@ -190,6 +200,7 @@ pub enum MenuState {
 pub enum RenderMenuState {
     CharacterSelect (Vec<CharacterSelect>),
     StageSelect     (usize),
+    GameResults     (Vec<GameResult>),
     SetRules,
     SwitchPackages,
     BrowsePackages,

@@ -505,6 +505,9 @@ impl<'a> VulkanGraphics<'a> {
             RenderMenuState::StageSelect (selection) => {
                 self.draw_stage_selector(&mut entities, selection);
             }
+            RenderMenuState::GameResults (results) => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Someone won!");
+            }
             RenderMenuState::SetRules => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "set rules");
             }

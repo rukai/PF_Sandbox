@@ -13,8 +13,8 @@ num = "0.1.32"
 serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9"
-treeflection = "0.1.15"
-treeflection_derive = "0.1.11"
+treeflection = "0.1"
+treeflection_derive = "0.1"
 winit = "0.5" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 
 vulkano = { version = "0.3", optional = true }
