@@ -212,14 +212,7 @@ impl Player {
             _   => { }
         }
 
-        // TODO: also use flag on each frame to signal manual hitlist reset
-        let mut clear_hitlist = true;
-        for colbox in &fighter_frame.colboxes[..] {
-            if let CollisionBoxRole::Hit(_) = colbox.role {
-                clear_hitlist = false;
-            }
-        }
-        if clear_hitlist {
+        if fighter_frame.force_hitlist_reset {
             self.hitlist.clear();
         }
 

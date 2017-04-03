@@ -797,5 +797,6 @@ pub struct RenderRect {
 pub struct GameResult {
     fighter:    usize,
     controller: usize,
+    place:      usize,
     // TODO: ... all sorts of game statistics
 }

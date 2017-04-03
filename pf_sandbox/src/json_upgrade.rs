@@ -1,6 +1,6 @@
 use serde_json::{Value, Number};
 
-pub fn engine_version() -> u64 { 2 }
+pub fn engine_version() -> u64 { 3 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from_f64(engine_version() as f64).unwrap())
@@ -32,6 +32,7 @@ pub fn upgrade_to_latest(meta: &mut Value, rules: &mut Value, fighters: &mut Vec
     else if meta_engine_version < engine_version() {
         for upgrade_from in meta_engine_version..engine_version() {
             match upgrade_from {
+                2 => { upgrade2(fighters) }
                 1 => { upgrade1(fighters) }
                 0 => { upgrade0(fighters) }
                 _ => { }
@@ -50,6 +51,23 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
         }
     }
     return None;
+}
+
+/// add force_hitlist_reset to ActionFrame
+fn upgrade2(fighters: &mut Vec<Value>) {
+    for fighter in fighters {
+        if let Some (actions) = get_vec(fighter, "actions") {
+            for action in actions {
+                if let Some (frames) = get_vec(action, "frames") {
+                    for frame in frames {
+                        if let &mut Value::Object (ref mut frame) = frame {
+                            frame.insert(String::from("force_hitlist_reset"), Value::Bool(false));
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// add hitstun enum to hitboxes

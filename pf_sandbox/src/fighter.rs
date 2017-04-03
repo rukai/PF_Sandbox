@@ -2,20 +2,8 @@ use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
 impl Fighter {
     pub fn base() -> Fighter { // TODO: Change to default
-        let action_frame1 = ActionFrame {
-            colboxes:      ContextVec::new(),
-            colbox_links:  vec!(),
-            render_order:  vec!(),
-            effects:       vec!(),
-            ecb:           ECB::default(),
-            item_hold_x: 4.0,
-            item_hold_y: 11.0,
-            grab_hold_x: 4.0,
-            grab_hold_y: 11.0,
-        };
-
         let action_def = ActionDef {
-            frames: ContextVec::from_vec(vec!(action_frame1)),
+            frames: ContextVec::from_vec(vec!(ActionFrame::default())),
             iasa:   0,
         };
         let mut actions: ContextVec<ActionDef> = ContextVec::new();
@@ -108,17 +96,35 @@ pub struct ActionDef {
     pub iasa:   u64,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct ActionFrame {
-    pub ecb:           ECB,
-    pub colboxes:      ContextVec<CollisionBox>,
-    pub colbox_links:  Vec<CollisionBoxLink>,
-    pub render_order:  Vec<RenderOrder>,
-    pub effects:       Vec<FrameEffect>,
-    pub item_hold_x:   f32,
-    pub item_hold_y:   f32,
-    pub grab_hold_x:   f32,
-    pub grab_hold_y:   f32,
+    pub ecb:          ECB,
+    pub colboxes:     ContextVec<CollisionBox>,
+    pub colbox_links: Vec<CollisionBoxLink>,
+    pub render_order: Vec<RenderOrder>,
+    pub effects:      Vec<FrameEffect>,
+    pub item_hold_x:  f32,
+    pub item_hold_y:  f32,
+    pub grab_hold_x:  f32,
+    pub grab_hold_y:  f32,
+    pub force_hitlist_reset: bool,
+}
+
+impl Default for ActionFrame {
+    fn default() -> ActionFrame {
+        ActionFrame {
+            colboxes:     ContextVec::new(),
+            colbox_links: vec!(),
+            render_order: vec!(),
+            effects:      vec!(),
+            ecb:          ECB::default(),
+            item_hold_x:  4.0,
+            item_hold_y:  11.0,
+            grab_hold_x:  4.0,
+            grab_hold_y:  11.0,
+            force_hitlist_reset: false,
+        }
+    }
 }
 
 impl ActionFrame {
