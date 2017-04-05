@@ -15,7 +15,6 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
         let fighter_atk_i = selected_fighters[player_atk_i];
         let fighter_atk = &fighters[fighter_atk_i];
         for (player_def_i, player_def) in players.iter().enumerate() {
-
             if player_atk_i != player_def_i && player_atk.hitlist.iter().all(|x| *x != player_def_i) {
                 let fighter_def_i = selected_fighters[player_def_i];
                 let fighter_def = &fighters[fighter_def_i];
@@ -69,11 +68,11 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
                                     &CollisionBoxRole::Hurt (ref hurtbox) => {
                                         result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
                                         result[player_def_i].push(CollisionResult::HitDef (hitbox_atk.clone(), hurtbox.clone()));
-                                        break;
+                                        break 'player_atk;
                                     }
                                     &CollisionBoxRole::Invincible => {
                                         result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
-                                        break;
+                                        break 'player_atk;
                                     }
                                     _ => { }
                                 }
@@ -83,7 +82,7 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
                                     &CollisionBoxRole::Hurt (ref hurtbox) => {
                                         result[player_atk_i].push(CollisionResult::PhantomAtk (hitbox_atk.clone(), player_def_i));
                                         result[player_def_i].push(CollisionResult::PhantomDef (hitbox_atk.clone(), hurtbox.clone()));
-                                        break;
+                                        break 'player_atk;
                                     }
                                     _ => { }
                                 }
@@ -100,6 +99,7 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
                                 if let ColBoxCollisionResult::Hit = colbox_collision_check(player_atk, colbox_atk, player_def, colbox_def) {
                                     result[player_atk_i].push(CollisionResult::GrabAtk (player_def_i));
                                     result[player_def_i].push(CollisionResult::GrabDef (player_atk_i));
+                                    break 'player_atk;
                                 }
                             }
                         }

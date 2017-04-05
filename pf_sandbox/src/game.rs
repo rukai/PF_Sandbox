@@ -96,7 +96,7 @@ impl Game {
                 GameState::Netplay         => { self.step_netplay(input); }
                 GameState::ReplayForwards  => { self.step_replay_forwards(input, os_input); }
                 GameState::ReplayBackwards => { self.step_replay_backwards(input, os_input); }
-                GameState::Paused          => { self.step_pause(input, &os_input); }
+                GameState::Paused          => { self.step_pause(input, os_input); }
                 GameState::ToResults (_)   => { unreachable!(); }
                 GameState::ToCSS           => { unreachable!(); }
             }
