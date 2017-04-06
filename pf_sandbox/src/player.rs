@@ -2,6 +2,7 @@ use ::fighter::*;
 use ::input::{PlayerInput};
 use ::stage::{Stage, Platform, Area, SpawnPoint};
 use ::collision::CollisionResult;
+use ::records::PlayerResult;
 
 use std::f32;
 use num::FromPrimitive;
@@ -35,6 +36,7 @@ pub struct Player {
     pub hitlist:          Vec<usize>,
     pub hitlag:           f32,
     pub hitstun:          f32,
+    pub result:           PlayerResult,
 }
 
 
@@ -66,6 +68,7 @@ impl Player {
             hitlist:          vec!(),
             hitlag:           0.0,
             hitstun:          0.0,
+            result:           PlayerResult::default(),
         }
     }
 
@@ -853,6 +856,8 @@ impl Player {
             Some(Action::TauntDown)  => { self.set_action(Action::Idle); },
             Some(Action::TauntLeft)  => { self.set_action(Action::Idle); },
             Some(Action::TauntRight) => { self.set_action(Action::Idle); },
+
+            Some(Action::Eliminated) => { },
         };
     }
 
@@ -1142,7 +1147,13 @@ impl Player {
         self.fastfalled = false;
         self.hitstun = 0.0;
         self.hitlag = 0.0;
-        self.set_action(Action::Spawn);
+
+        if self.stocks > 0 {
+            self.set_action(Action::Spawn);
+        }
+        else {
+            self.set_action(Action::Eliminated);
+        }
     }
 
     pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, debug: &DebugPlayer, index: usize) {
@@ -1215,6 +1226,10 @@ impl Player {
             player_selected:   player_selected,
             selected_colboxes: selected_colboxes,
         }
+    }
+
+    pub fn result(&self) -> PlayerResult {
+        self.result.clone()
     }
 }
 

@@ -27,6 +27,7 @@ pub mod network;
 pub mod os_input;
 pub mod package;
 pub mod player;
+pub mod records;
 pub mod rules;
 pub mod stage;
 

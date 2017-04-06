@@ -7,7 +7,7 @@ impl Fighter {
             iasa:   0,
         };
         let mut actions: ContextVec<ActionDef> = ContextVec::new();
-        for _ in 0..((Action::CrouchEnd as usize)+1) { // TODO: Super gross but what is a man to do?
+        for _ in 0..((Action::Eliminated as usize)+1) { // TODO: Super gross but what is a man to do?
             actions.push(action_def.clone());
         }
         
@@ -429,6 +429,8 @@ pub enum Action {
     // Crouch
     CrouchStart,
     CrouchEnd,
+
+    Eliminated,
 }
 }
 

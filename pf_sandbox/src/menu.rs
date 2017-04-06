@@ -3,7 +3,7 @@ use ::package::Package;
 use ::graphics::{GraphicsMessage, Render};
 use ::app::GameSetup;
 use ::config::Config;
-use ::game::GameResult;
+use ::records::GameResult;
 
 pub struct Menu {
     package:              Package,

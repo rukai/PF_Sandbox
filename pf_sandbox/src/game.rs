@@ -3,12 +3,15 @@ use ::collision::collision_check;
 use ::config::Config;
 use ::fighter::{ActionFrame, CollisionBox, LinkType};
 use ::graphics::{GraphicsMessage, Render};
+use ::graphics;
 use ::input::{Input, PlayerInput, ControllerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
+use ::records::GameResult;
+use ::records;
+use ::rules::Goal;
 use ::stage::Area;
-use ::graphics;
 
 use ::std::collections::HashSet;
 
@@ -607,16 +610,19 @@ impl Game {
             }
         }
 
-        // handle timer
-        if (self.current_frame / 60) as u64 > self.package.rules.time_limit {
-            self.state = GameState::ToResults (vec!());
-        }
-
-        // handle no stocks left
-        for player in &self.players {
-            if player.stocks <= 0 {
-                self.state = GameState::ToResults (vec!());
+        match self.package.rules.goal {
+            Goal::Time => {
+                if (self.current_frame / 60) as u64 > self.package.rules.time_limit {
+                    self.state = GameState::ToResults (records::generate_game_results(self.players.iter().map(|x| x.result()).collect()));
+                }
             }
+            Goal::Stock => {
+                if (self.current_frame / 60) as u64 > self.package.rules.time_limit
+                || self.players.iter().filter(|x| x.stocks > 0).count() == 1 {
+                    self.state = GameState::ToResults (records::generate_game_results(self.players.iter().map(|x| x.result()).collect()));
+                }
+            }
+            Goal::Training => { }
         }
 
         self.update_frame();
@@ -791,12 +797,4 @@ pub enum RenderEntity {
 pub struct RenderRect {
     pub p1: (f32, f32),
     pub p2: (f32, f32),
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
-pub struct GameResult {
-    fighter:    usize,
-    controller: usize,
-    place:      usize,
-    // TODO: ... all sorts of game statistics
 }
