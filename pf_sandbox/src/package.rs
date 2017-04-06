@@ -17,6 +17,12 @@ fn get_packages_path() -> PathBuf {
     path
 }
 
+pub fn print_list() {
+    for path in fs::read_dir(get_packages_path()).unwrap() {
+        println!("{}", path.unwrap().file_name().to_str().unwrap());
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Package {
         path:               PathBuf,
@@ -167,7 +173,6 @@ impl Package {
             self.stages.push(serde_json::from_value(stage).unwrap());
         }
     }
-
 
     pub fn verify(&self) -> bool {
         true // It's fine, I triple checked

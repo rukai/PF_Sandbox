@@ -1,5 +1,5 @@
+use ::package;
 use getopts::Options;
-use std::fs;
 use std::env;
 
 fn print_usage(program: &str, opts: Options) {
@@ -39,9 +39,7 @@ pub fn cli() -> Vec<CLIChoice> {
     };
 
     if matches.opt_present("l") {
-        for path in fs::read_dir("packages").unwrap() {
-            println!("{}", path.unwrap().file_name().to_str().unwrap());
-        }
+        package::print_list();
         return vec!(CLIChoice::Close);
     }
 
