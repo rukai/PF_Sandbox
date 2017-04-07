@@ -43,10 +43,10 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
 
                                         if damage_diff >= 9 {
                                             result[player_atk_i].push(CollisionResult::Clang { rebound: hitbox_atk.enable_rebound });
-                                            result[player_def_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
+                                            result[player_def_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i });
                                         }
                                         else if damage_diff <= -9 {
-                                            result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
+                                            result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i });
                                             result[player_def_i].push(CollisionResult::Clang { rebound: hitbox_def.enable_rebound });
                                         }
                                         else {
@@ -66,12 +66,12 @@ pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighte
                             ColBoxCollisionResult::Hit => {
                                 match &colbox_def.role {
                                     &CollisionBoxRole::Hurt (ref hurtbox) => {
-                                        result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
-                                        result[player_def_i].push(CollisionResult::HitDef (hitbox_atk.clone(), hurtbox.clone()));
+                                        result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i });
+                                        result[player_def_i].push(CollisionResult::HitDef { hitbox: hitbox_atk.clone(), hurtbox: hurtbox.clone(), player_atk_i: player_atk_i });
                                         break 'player_atk;
                                     }
                                     &CollisionBoxRole::Invincible => {
-                                        result[player_atk_i].push(CollisionResult::HitAtk (hitbox_atk.clone(), player_def_i));
+                                        result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i });
                                         break 'player_atk;
                                     }
                                     _ => { }
@@ -153,8 +153,8 @@ fn colbox_shield_collision_check(player1: &Player, colbox1: &CollisionBox,  play
 pub enum CollisionResult {
     PhantomDef   (HitBox, HurtBox),
     PhantomAtk   (HitBox, usize),
-    HitDef       (HitBox, HurtBox),
-    HitAtk       (HitBox, usize),
+    HitDef       { hitbox: HitBox, hurtbox: HurtBox, player_atk_i: usize },
+    HitAtk       { hitbox: HitBox, player_def_i: usize },
     HitShieldAtk (HitBox),
     HitShieldDef (HitBox),
     ReflectDef   (HitBox), // TODO: add further details required for recreating projectile

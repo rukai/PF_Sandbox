@@ -4,6 +4,7 @@ use ::menu::{RenderMenu, RenderMenuState, CharacterSelect};
 use ::graphics::{self, GraphicsMessage, Render};
 use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB};
+use ::records::GameResult;
 
 use vulkano_text::{DrawText, DrawTextTrait, UpdateTextCache};
 use vulkano_win;
@@ -506,7 +507,12 @@ impl<'a> VulkanGraphics<'a> {
                 self.draw_stage_selector(&mut entities, selection);
             }
             RenderMenuState::GameResults (results) => {
-                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Someone won!");
+                let max = results.len() as f32;
+                for (i, result) in results.iter().enumerate() {
+                    let i = i as f32;
+                    let start_x = i / max;
+                    self.draw_player_result(result, start_x);
+                }
             }
             RenderMenuState::SetRules => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "set rules");
@@ -560,6 +566,23 @@ impl<'a> VulkanGraphics<'a> {
             .build();
         self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
         self.swapchain.present(&self.queue, image_num).unwrap();
+    }
+
+    fn draw_player_result(&mut self, result: &GameResult, start_x: f32) {
+        let fighter_name = self.package_buffers.package.as_ref().unwrap().fighters[result.fighter].name.as_ref();
+        let color = graphics::get_controller_color(result.controller);
+        let x = (start_x + 0.05) * self.width as f32;
+        let mut y = 100.0;
+        self.draw_text.queue_text(x, y, 100.0, color, (result.place + 1).to_string().as_ref());
+
+        y += 50.0;
+        self.draw_text.queue_text(x, y, 30.0, color, fighter_name);
+        y += 30.0;
+        self.draw_text.queue_text(x, y, 30.0, color, format!("Kills: {}", result.kills.len()).as_str());
+        y += 30.0;
+        self.draw_text.queue_text(x, y, 30.0, color, format!("Deaths: {}", result.deaths.len()).as_str());
+        y += 30.0;
+        self.draw_text.queue_text(x, y, 30.0, color, format!("L-Cancel Success: {}%", result.lcancel_percent).as_str());
     }
 
     fn draw_fighter_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, controller_i: usize, selection: &CharacterSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {

@@ -12,7 +12,7 @@ impl Fighter {
         }
         
         Fighter {
-            //css render
+            // css render
             name:       "Base Fighter".to_string(),
             name_short: "BF".to_string(),
             css_action: Action::Idle,
@@ -21,7 +21,7 @@ impl Fighter {
             css_point2: (0.0, 0.0),
             css_hide:   false,
 
-            //in game attributes
+            // in game attributes
             air_jumps:               1,
             weight:                  1.0, // weight = old value / 100
             gravity:                 -0.1,
@@ -53,7 +53,7 @@ impl Fighter {
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Fighter {
-    //css render
+    // css render
     pub name:       String,
     pub name_short: String,
     pub css_action: Action,
@@ -62,7 +62,7 @@ pub struct Fighter {
     pub css_point2: (f32, f32),
     pub css_hide:   bool,
 
-    //in game attributes
+    // in game attributes
     pub air_jumps:               u64,
     pub weight:                  f32,
     pub gravity:                 f32,

@@ -8,12 +8,13 @@ use ::input::{Input, PlayerInput, ControllerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
-use ::records::GameResult;
-use ::records;
+use ::records::{GameResult, PlayerResult};
 use ::rules::Goal;
 use ::stage::Area;
 
-use ::std::collections::HashSet;
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::iter;
 
 use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};
@@ -595,7 +596,7 @@ impl Game {
             for (i, player) in (&mut *self.players).iter_mut().enumerate() {
                 let fighter = &self.package.fighters[self.selected_fighters[i]];
                 let input = &player_input[self.selected_controllers[i]];
-                player.step(input, fighter, stage);
+                player.step(input, fighter, stage, self.current_frame, self.package.rules.goal.clone());
             }
 
             // check collisions
@@ -613,19 +614,102 @@ impl Game {
         match self.package.rules.goal {
             Goal::Time => {
                 if (self.current_frame / 60) as u64 > self.package.rules.time_limit {
-                    self.state = GameState::ToResults (records::generate_game_results(self.players.iter().map(|x| x.result()).collect()));
+                    self.state = self.generate_game_results();
                 }
             }
             Goal::Stock => {
                 if (self.current_frame / 60) as u64 > self.package.rules.time_limit
                 || self.players.iter().filter(|x| x.stocks > 0).count() == 1 {
-                    self.state = GameState::ToResults (records::generate_game_results(self.players.iter().map(|x| x.result()).collect()));
+                    self.state = self.generate_game_results();
                 }
             }
             Goal::Training => { }
         }
 
         self.update_frame();
+    }
+
+    pub fn generate_game_results(&self) -> GameState {
+        let player_results: Vec<PlayerResult> = self.players.iter().map(|x| x.result()).collect();
+        let places: Vec<usize> = match self.package.rules.goal {
+            Goal::Training => {
+                iter::repeat(0).take(self.players.len()).collect()
+            }
+            Goal::Stock => {
+                // most stocks remaining wins
+                // tie-breaker:
+                //  * if both eliminated: who lost their last stock last wins
+                //  * if both alive:      lowest percentage wins
+                let mut player_results_i: Vec<(usize, &PlayerResult)> = player_results.iter().enumerate().collect();
+                player_results_i.sort_by(
+                    |a_set, b_set| {
+                        let a = a_set.1;
+                        let b = b_set.1;
+                        let a_deaths = a.deaths.len();
+                        let b_deaths = b.deaths.len();
+                        a_deaths.cmp(&b_deaths).then(
+                            if a_deaths == 0 {
+                                if let Some(death_a) = a.deaths.last() {
+                                    if let Some(death_b) = b.deaths.last() {
+                                        death_a.frame.cmp(&death_b.frame)
+                                    }
+                                    else {
+                                        Ordering::Equal
+                                    }
+                                }
+                                else {
+                                    Ordering::Equal
+                                }
+                            }
+                            else {
+                                a.final_damage.unwrap().partial_cmp(&b.final_damage.unwrap()).unwrap_or(Ordering::Equal)
+                            }
+                        )
+                    }
+                );
+                player_results_i.iter().map(|x| x.0).collect()
+            }
+            Goal::Time => {
+                // highest kills wins
+                // tie breaker: least deaths wins
+                let mut player_results_i: Vec<(usize, &PlayerResult)> = player_results.iter().enumerate().collect();
+                player_results_i.sort_by(
+                    |a_set, b_set| {
+                        // Repopulating kill lists every frame shouldnt be too bad
+                        let a_kills: Vec<usize> = vec!(); // TODO: populate
+                        let b_kills: Vec<usize> = vec!(); // TODO: populate
+                        let a = a_set.1;
+                        let b = b_set.1;
+                        let a_kills = a_kills.len();
+                        let b_kills = b_kills.len();
+                        let a_deaths = a.deaths.len();
+                        let b_deaths = b.deaths.len();
+                        b_kills.cmp(&a_kills).then(a_deaths.cmp(&b_deaths))
+                    }
+                );
+                player_results_i.iter().map(|x| x.0).collect()
+            }
+        };
+
+        let mut game_results: Vec<GameResult> = vec!();
+        for (i, player_result) in player_results.iter().enumerate() {
+            let lcancel_percent = if player_result.lcancel_attempts == 0 {
+                100.0
+            }
+            else {
+                player_result.lcancel_success as f32 / player_result.lcancel_attempts as f32
+            };
+            game_results.push(GameResult {
+                fighter:         self.selected_fighters[i],
+                controller:      self.selected_controllers[i],
+                place:           places[i],
+                kills:           vec!(), // TODO
+                deaths:          player_result.deaths.clone(),
+                lcancel_percent: lcancel_percent,
+            });
+        }
+        game_results.sort_by_key(|x| x.place);
+        GameState::ToResults (game_results)
     }
 
     fn debug_output(&mut self, input: &Input) {

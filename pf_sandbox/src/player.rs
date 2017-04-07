@@ -2,7 +2,8 @@ use ::fighter::*;
 use ::input::{PlayerInput};
 use ::stage::{Stage, Platform, Area, SpawnPoint};
 use ::collision::CollisionResult;
-use ::records::PlayerResult;
+use ::records::{PlayerResult, DeathRecord};
+use ::rules::Goal;
 
 use std::f32;
 use num::FromPrimitive;
@@ -36,6 +37,7 @@ pub struct Player {
     pub hitlist:          Vec<usize>,
     pub hitlag:           f32,
     pub hitstun:          f32,
+    pub hit_by:           Option<usize>,
     pub result:           PlayerResult,
 }
 
@@ -68,6 +70,7 @@ impl Player {
             hitlist:          vec!(),
             hitlag:           0.0,
             hitstun:          0.0,
+            hit_by:           None,
             result:           PlayerResult::default(),
         }
     }
@@ -87,10 +90,10 @@ impl Player {
     pub fn step_collision(&mut self, fighter: &Fighter, col_results: &[CollisionResult]) {
         for col_result in col_results {
             match col_result {
-                &CollisionResult::HitAtk (_, player_def_i) => {
+                &CollisionResult::HitAtk { player_def_i, .. } => {
                     self.hitlist.push(player_def_i);
                 }
-                &CollisionResult::HitDef (ref hitbox, ref hurtbox) => {
+                &CollisionResult::HitDef { ref hitbox, ref hurtbox, player_atk_i } => {
                     let damage_done = hitbox.damage * hurtbox.damage_mult; // TODO: apply staling
                     self.damage += damage_done;
 
@@ -164,6 +167,7 @@ impl Player {
                     }
 
                     self.hitlag = hitbox.damage / 3.0 + 3.0;
+                    self.hit_by = Some(player_atk_i);
                 }
                 _ => { }
             }
@@ -181,9 +185,9 @@ impl Player {
         }
     }
 
-    pub fn step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage) {
+    pub fn step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage, game_frame: usize, goal: Goal) {
         self.input_step(input, fighter);
-        self.physics_step(input, fighter, stage);
+        self.physics_step(input, fighter, stage, game_frame, goal);
     }
 
     /*
@@ -930,7 +934,7 @@ impl Player {
      *  Begin physics section
      */
 
-    fn physics_step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage) {
+    fn physics_step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage, game_frame: usize, goal: Goal) {
         if self.airbourne {
             self.bps_x += self.x_vel + self.kb_x_vel;
             self.bps_y += match self.land_stage_collision(stage, self.y_vel + self.kb_y_vel, input) {
@@ -988,7 +992,7 @@ impl Player {
         // death
         let blast = &stage.blast;
         if self.bps_x < blast.left || self.bps_x > blast.right || self.bps_y < blast.bot || self.bps_y > blast.top {
-            self.die(fighter);
+            self.die(fighter, game_frame, goal);
         }
     }
 
@@ -1100,6 +1104,7 @@ impl Player {
         self.airbourne = false;
         self.fastfalled = false;
         self.air_jumps_left = fighter.air_jumps;
+        self.hit_by = None;
     }
 
     fn walk(&mut self, fighter: &Fighter) {
@@ -1132,8 +1137,7 @@ impl Player {
         self.set_action(Action::Fall);
     }
 
-    fn die(&mut self, fighter: &Fighter) {
-        self.stocks -= 1;
+    fn die(&mut self, fighter: &Fighter, game_frame: usize, goal: Goal) {
         self.damage = 0.0;
         self.bps_x = self.respawn.x;
         self.bps_y = self.respawn.y;
@@ -1148,11 +1152,25 @@ impl Player {
         self.hitstun = 0.0;
         self.hitlag = 0.0;
 
-        if self.stocks > 0 {
-            self.set_action(Action::Spawn);
-        }
-        else {
-            self.set_action(Action::Eliminated);
+        self.result.deaths.push(DeathRecord {
+            player: self.hit_by,
+            frame: game_frame,
+        });
+
+        match goal {
+            Goal::Stock => {
+                self.stocks -= 1;
+
+                if self.stocks > 0 {
+                    self.set_action(Action::Spawn);
+                }
+                else {
+                    self.set_action(Action::Eliminated);
+                }
+            }
+            _ => {
+                self.set_action(Action::Spawn);
+            }
         }
     }
 
@@ -1229,7 +1247,9 @@ impl Player {
     }
 
     pub fn result(&self) -> PlayerResult {
-        self.result.clone()
+        let mut result = self.result.clone();
+        result.final_damage = Some(self.damage);
+        result
     }
 }
 
