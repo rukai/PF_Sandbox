@@ -15,6 +15,9 @@ serde_derive = "0.9"
 serde_json = "0.9"
 treeflection = "0.1"
 treeflection_derive = "0.1"
+rust-crypto = "0.2"
+zip = "0.2"
+curl = "0.4"
 winit = "0.5" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 
 vulkano = { version = "0.3", optional = true }

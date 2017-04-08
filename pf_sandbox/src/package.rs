@@ -4,6 +4,8 @@ use std::collections::HashSet;
 use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
 
 use ::files;
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType, RenderOrder};
@@ -51,8 +53,7 @@ impl Package {
             save_version:    0,
             title:           "".to_string(),
             source:          "".to_string(),
-            signature:       "".to_string(),
-            read_only:       false,
+            hash:            "".to_string(),
         };
 
         let mut package = Package {
@@ -80,8 +81,7 @@ impl Package {
             save_version:    0,
             title:           "Base Package".to_string(),
             source:          "example.com/base_package".to_string(),
-            signature:       "".to_string(),
-            read_only:       false,
+            hash:            "".to_string(),
         };
 
         let mut package = Package {
@@ -114,6 +114,8 @@ impl Package {
 
     pub fn save(&mut self) {
         self.meta.save_version += 1;
+        self.meta.hash = self.compute_hash();
+
         // Create directory structure
         DirBuilder::new().recursive(true).create(self.path.join("Fighters")).unwrap();
         DirBuilder::new().recursive(true).create(self.path.join("Stages")).unwrap();
@@ -173,12 +175,55 @@ impl Package {
         }
     }
 
+    pub fn download_latest_meta(&self) -> Option<PackageMeta> {
+        files::load_struct_from_url(format!("{}/package_meta.json", self.meta.source).as_str())
+    }
+
+    pub fn compute_hash(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.input_str(serde_json::to_string(&self.rules).unwrap().as_str());
+
+        for stage in self.stages.iter() {
+            hasher.input_str(serde_json::to_string(stage).unwrap().as_str());
+        }
+
+        for fighter in self.fighters.iter() {
+            hasher.input_str(serde_json::to_string(fighter).unwrap().as_str());
+        }
+
+        hasher.result_str().to_string()
+    }
+
     pub fn verify(&self) -> Verify {
-        Verify::Ok // It's fine, I triple checked
+        if let Some(latest_meta) = self.download_latest_meta() {
+            let hash = self.compute_hash();
+            if self.meta.save_version >= latest_meta.save_version {
+                if hash == latest_meta.hash {
+                    Verify::Ok
+                }
+                else {
+                    Verify::IncorrectHash
+                }
+            }
+            else {
+                Verify::UpdateAvailable
+            }
+        }
+        else {
+            Verify::CannotConnect
+        }
     }
 
     pub fn update(&mut self) {
-        // TODO: Replace existing package with latest version from self.source
+        if let Some(latest_meta) = self.download_latest_meta() {
+            if self.meta.save_version < latest_meta.save_version {
+                let zip = files::download_temp_file(format!("{}/package{}.zip", self.meta.source, latest_meta.save_version).as_str());
+                if let Some(zip) = zip {
+                    files::extract_zip(&zip, &self.path);
+                    self.load();
+                }
+            }
+        }
     }
 
     pub fn new_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) {
@@ -530,14 +575,11 @@ pub enum PackageUpdate {
     InsertStage { stage_index: usize, stage: Stage },
 }
 
-// TODO: Why the seperate struct?
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PackageMeta {
-    pub engine_version:  u64,    // compared with a value incremented by pf engine when there are breaking changes to data structures
-    pub save_version:    u64,    // incremented every time the package is saved
-    pub title:           String, // User readable title
-    pub source:          String, // check "https://"+source+str(release+1)+".zip" for the next update
-    pub signature:       String, // package validity + title + version will be boldly declared on the CSS screen
-    pub read_only:       bool,   // read only packages must be copied before being modified
-    // TODO: will need to store public keys somewhere too
+    pub engine_version:  u64, // compared with a value incremented by pf engine when there are breaking changes to data structures
+    pub save_version:    u64, // incremented every time the package is saved
+    pub title:           String,
+    pub source:          String,
+    pub hash:            String,
 }

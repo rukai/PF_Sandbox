@@ -1,4 +1,6 @@
 #![feature(drop_types_in_const)]
+extern crate crypto;
+extern crate curl;
 extern crate getopts;
 extern crate libusb;
 extern crate num;

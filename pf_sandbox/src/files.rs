@@ -1,10 +1,11 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 
-use serde::Serialize;
+use curl::easy::Easy;
+use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use serde_json;
 
@@ -26,6 +27,55 @@ pub fn load_json(filename: PathBuf) -> Option<Value> {
     else {
         None
     }
+}
+
+/// Load the json file at the passed URL directly into a struct
+pub fn load_struct_from_url<T: Deserialize>(url: &str) -> Option<T> {
+    // TODO: Attempt to force https if server supports it
+    let mut easy = Easy::new();
+    let mut json_bytes = Vec::new();
+    if let Err(_) = easy.url(url) {
+        return None
+    }
+
+    {
+        let mut transfer = easy.transfer();
+        if let Err(_) = transfer.write_function(|data| {
+            json_bytes.extend_from_slice(data);
+            Ok(data.len())
+        }) {
+            return None
+        }
+
+        if let Err(_) = transfer.perform() {
+            return None
+        }
+    }
+
+    if let Ok(json) = String::from_utf8(json_bytes) {
+        if let Ok(object) = serde_json::from_str(&json) {
+            return Some(object)
+        }
+    }
+    None
+}
+
+/// Download the file at url and store it in a temp directory
+/// Return the path to the stored file
+pub fn download_temp_file(url: &str) -> Option<PathBuf> {
+    // TODO: Download file at url
+    // TODO: Save to temp
+    // TODO: return path
+    unimplemented!();
+}
+
+/// Delete contents of destination directory
+/// Extract contents of source into destination
+pub fn extract_zip(source: &Path, destination: &Path) {
+    // Using https://github.com/mvdnes/zip-rs
+    // TODO: Nuke destination
+    // TODO: extract source into destination
+    unimplemented!();
 }
 
 pub fn get_path() -> PathBuf {
