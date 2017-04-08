@@ -1,28 +1,30 @@
 use ::input::{Input, PlayerInput};
-use ::package::Package;
+use ::package::{Package, Verify};
 use ::graphics::{GraphicsMessage, Render};
 use ::app::GameSetup;
 use ::config::Config;
 use ::records::GameResult;
 
 pub struct Menu {
-    package:              Package,
-    config:               Config,
-    state:                MenuState,
-    current_frame:        usize,
-    fighter_selections:   Vec<CharacterSelect>,
-    stage_ticker:         MenuTicker,
+    config:             Config,
+    state:              MenuState,
+    fighter_selections: Vec<CharacterSelect>,
+    stage_ticker:       MenuTicker,
+    current_frame:      usize,
+    package_verify:     Verify,
+    package:            Package,
 }
 
 impl Menu {
     pub fn new(package: Package, config: Config, state: MenuState) -> Menu {
         Menu {
-            config:               config,
-            state:                state,
-            fighter_selections:   vec!(),
-            stage_ticker:         MenuTicker::new(package.stages.len() - 1),
-            package:              package,
-            current_frame:        0,
+            config:             config,
+            state:              state,
+            fighter_selections: vec!(),
+            stage_ticker:       MenuTicker::new(package.stages.len() - 1),
+            current_frame:      0,
+            package_verify:     package.verify(),
+            package:            package,
         }
     }
 
@@ -32,9 +34,9 @@ impl Menu {
         if self.fighter_selections.len() == 0 {
             for input in player_inputs {
                 self.fighter_selections.push(CharacterSelect {
-                    plugged_in:      input.plugged_in,
-                    selection:       None,
-                    ticker:          MenuTicker::new(cursor_max),
+                    plugged_in: input.plugged_in,
+                    selection:  None,
+                    ticker:     MenuTicker::new(cursor_max),
                 });
             }
         }
@@ -168,7 +170,8 @@ impl Menu {
                 MenuState::CreatePackage   => { RenderMenuState::CreatePackage }
                 MenuState::CreateFighter   => { RenderMenuState::CreateFighter }
                 MenuState::StartGame       => { RenderMenuState::StartGame }
-            }
+            },
+            package_verify: self.package_verify.clone(),
         }
     }
 
@@ -287,5 +290,6 @@ impl MenuTicker {
 }
 
 pub struct RenderMenu {
-    pub state: RenderMenuState,
+    pub state:          RenderMenuState,
+    pub package_verify: Verify,
 }

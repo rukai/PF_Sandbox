@@ -28,7 +28,6 @@ pub struct Package {
         path:               PathBuf,
     pub meta:               PackageMeta,
     pub rules:              Rules,
-
     pub stages:             ContextVec<Stage>,
     pub fighters:           ContextVec<Fighter>,
         stages_filenames:   Vec<String>,
@@ -174,8 +173,12 @@ impl Package {
         }
     }
 
-    pub fn verify(&self) -> bool {
-        true // It's fine, I triple checked
+    pub fn verify(&self) -> Verify {
+        Verify::Ok // It's fine, I triple checked
+    }
+
+    pub fn update(&mut self) {
+        // TODO: Replace existing package with latest version from self.source
     }
 
     pub fn new_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) {
@@ -507,6 +510,14 @@ impl Node for Package {
         self.force_update_entire_package();
         result
     }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum Verify {
+    Ok,
+    IncorrectHash,
+    UpdateAvailable,
+    CannotConnect,
 }
 
 // Finer grained changes are used when speed is needed

@@ -5,6 +5,7 @@ use ::graphics::{self, GraphicsMessage, Render};
 use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB};
 use ::records::GameResult;
+use ::package::Verify;
 
 use vulkano_text::{DrawText, DrawTextTrait, UpdateTextCache};
 use vulkano_win;
@@ -502,9 +503,11 @@ impl<'a> VulkanGraphics<'a> {
                         self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Currently only supports up to 4 controllers. Please unplug some.");
                     }
                 }
+                self.draw_package_banner(&render.package_verify);
             }
             RenderMenuState::StageSelect (selection) => {
                 self.draw_stage_selector(&mut entities, selection);
+                self.draw_package_banner(&render.package_verify);
             }
             RenderMenuState::GameResults (results) => {
                 let max = results.len() as f32;
@@ -568,13 +571,38 @@ impl<'a> VulkanGraphics<'a> {
         self.swapchain.present(&self.queue, image_num).unwrap();
     }
 
+    fn draw_package_banner(&mut self, verify: &Verify) {
+        let package = &self.package_buffers.package.as_ref().unwrap();
+        let color: [f32; 4] = if let &Verify::Ok = verify {
+            [0.0, 1.0, 0.0, 1.0]
+        } else {
+            [1.0, 0.0, 0.0, 1.0]
+        };
+
+        let message = match verify {
+            &Verify::Ok => {
+                format!("{} - {}", package.meta.title, package.meta.source)
+            }
+            &Verify::IncorrectHash => {
+                format!("{} - {} - The computed hash did not match the hash given by the host", package.meta.title, package.meta.source)
+            }
+            &Verify::UpdateAvailable => {
+                format!("{} - {} - There is an update available from the host", package.meta.title, package.meta.source)
+            }
+            &Verify::CannotConnect => {
+                format!("{} - {} - Cannot connect to package host", package.meta.title, package.meta.source)
+            }
+        };
+
+        self.draw_text.queue_text(30.0, self.height as f32 - 30.0, 30.0, color, message.as_str());
+    }
+
     fn draw_player_result(&mut self, result: &GameResult, start_x: f32) {
         let fighter_name = self.package_buffers.package.as_ref().unwrap().fighters[result.fighter].name.as_ref();
         let color = graphics::get_controller_color(result.controller);
         let x = (start_x + 0.05) * self.width as f32;
         let mut y = 100.0;
         self.draw_text.queue_text(x, y, 100.0, color, (result.place + 1).to_string().as_ref());
-
         y += 50.0;
         self.draw_text.queue_text(x, y, 30.0, color, fighter_name);
         y += 30.0;
