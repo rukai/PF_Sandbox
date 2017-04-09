@@ -1,6 +1,6 @@
 use ::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
-use ::game::RenderRect;
 use ::graphics;
+use ::graphics::RenderRect;
 use ::package::{Package, PackageUpdate};
 use ::player::RenderPlayer;
 use ::stage::Stage;
@@ -35,16 +35,38 @@ pub struct Buffers {
 }
 
 impl Buffers {
-    /// Returns only a VertexBuffer
-    /// Use with PrimitiveToplogy::LineStrip
     pub fn rect_buffers(device: &Arc<Device>, queue: &Arc<Queue>, rect: RenderRect) -> Buffers {
+        let min_x = rect.p1.0.min(rect.p2.0);
+        let min_y = rect.p1.1.min(rect.p2.1);
+        let max_x = rect.p1.0.max(rect.p2.0);
+        let max_y = rect.p1.1.max(rect.p2.1);
+
+        let vertices: [Vertex; 4] = [
+            vertex(min_x, min_y),
+            vertex(max_x, min_y),
+            vertex(max_x, max_y),
+            vertex(min_x, max_y),
+        ];
+
+        let indices: [u16; 6] = [
+            0, 1, 2,
+            0, 2, 3
+        ];
+
+        Buffers {
+            vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+        }
+    }
+
+    pub fn rect_outline_buffers(device: &Arc<Device>, queue: &Arc<Queue>, rect: RenderRect) -> Buffers {
         let width = 0.5;
         let min_x = rect.p1.0.min(rect.p2.0);
         let min_y = rect.p1.1.min(rect.p2.1);
         let max_x = rect.p1.0.max(rect.p2.0);
         let max_y = rect.p1.1.max(rect.p2.1);
 
-        let vertices: Vec<Vertex> = vec!(
+        let vertices: [Vertex; 8] = [
             // outer rectangle
             vertex(min_x, min_y),
             vertex(max_x, min_y),
@@ -56,13 +78,15 @@ impl Buffers {
             vertex(max_x-width, min_y+width),
             vertex(max_x-width, max_y-width),
             vertex(min_x+width, max_y-width),
-        );
+        ];
+
         let indices: [u16; 24] = [
             0, 4, 1, 1, 4, 5, // bottom edge
             1, 5, 2, 2, 5, 6, // right edge
             2, 6, 3, 3, 7, 6, // top edge
             3, 7, 0, 0, 4, 7, // left edge
         ];
+
         Buffers {
             vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
             index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),

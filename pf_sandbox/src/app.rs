@@ -16,6 +16,7 @@ use ::menu::{Menu, MenuState};
 use ::network::Network;
 use ::os_input::OsInput;
 use ::package::Package;
+use ::package;
 use ::config::Config;
 
 use libusb::Context;
@@ -42,9 +43,10 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
             controllers.push(i);
         }
 
-        #[allow(unused_variables)]
+        #[allow(unused_variables)] // Needed for headless build
         let (os_input, os_input_tx) = OsInput::new();
 
+        package::generate_example_stub();
         let config = Config::load();
         let mut package_string = config.current_package.clone();
 
@@ -57,7 +59,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
                 &CLIChoice::FighterNames (_)                    => { panic!("Unimplemented") }
                 &CLIChoice::StageIndex (ref stage_index)        => { load_menu = false; stage = *stage_index }
                 &CLIChoice::StageName (_)                       => { panic!("Unimplemented") }
-                &CLIChoice::Package (ref name)                  => { load_menu = false; package_string = name.clone(); }
+                &CLIChoice::Package (ref name)                  => { load_menu = false; package_string = Some(name.clone()); }
                 &CLIChoice::GraphicsBackend (_) => { }
                 &CLIChoice::TotalPlayers (total_players) => {
                     load_menu = false;
@@ -102,12 +104,21 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
             }
         }
 
-        let package = Package::open_or_generate(&package_string);
+        let package = if let Some(package_string) = package_string {
+            Package::open_or_generate(&package_string)
+        } else {
+            None
+        };
+        let menu_state: MenuState = if let Some(_) = package {
+            MenuState::character_select()
+        } else {
+            MenuState::package_select()
+        };
 
         let state = if load_menu {
-            AppState::Menu(Menu::new(package, config, MenuState::CharacterSelect))
+            AppState::Menu(Menu::new(package, config, menu_state))
         } else {
-            AppState::Game(Game::new(package, config, fighters, stage, netplay, controllers))
+            AppState::Game(Game::new(package.unwrap(), config, fighters, stage, netplay, controllers)) // TODO: handle no packages nicely
         };
         (state, os_input)
     };
@@ -137,7 +148,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
                         next_state = NextAppState::Menu (MenuState::GameResults (results));
                     }
                     GameState::ToCSS => {
-                        next_state = NextAppState::Menu (MenuState::CharacterSelect);
+                        next_state = NextAppState::Menu (MenuState::character_select());
                     }
                     _ => { }
                 }
@@ -165,7 +176,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
                     AppState::Menu (_)    => { unreachable!() }
                     AppState::Game (game) => { game.reclaim() }
                 };
-                state = AppState::Menu(Menu::new(package, config, menu_state));
+                state = AppState::Menu(Menu::new(Some(package), config, menu_state));
             }
             NextAppState::None => { }
         }

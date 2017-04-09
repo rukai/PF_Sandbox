@@ -1,6 +1,6 @@
 use ::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
-use ::game::RenderRect;
 use ::graphics;
+use ::graphics::RenderRect;
 use ::package::{Package, PackageUpdate};
 use ::player::RenderPlayer;
 use ::stage::Stage;

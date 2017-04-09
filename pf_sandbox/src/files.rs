@@ -1,6 +1,7 @@
 use std::path::{PathBuf, Path};
 use std::env;
 use std::fs::File;
+use std::fs::DirBuilder;
 use std::io::Read;
 use std::io::Write;
 
@@ -10,6 +11,8 @@ use serde_json::Value;
 use serde_json;
 
 pub fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
+    DirBuilder::new().recursive(true).create(filename.parent().unwrap()).unwrap();
+
     let json = serde_json::to_string_pretty(object).unwrap();
     File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
 }

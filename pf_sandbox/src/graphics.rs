@@ -2,6 +2,7 @@ use ::menu::RenderMenu;
 use ::package::PackageUpdate;
 use ::game::RenderGame;
 use ::fighter::CollisionBoxRole;
+use treeflection::{Node, NodeRunner, NodeToken};
 
 pub struct GraphicsMessage {
     pub render: Render,
@@ -34,4 +35,10 @@ pub fn get_controller_color(i: usize) -> [f32; 4] {
         [1.0, 0.0, 1.0, 1.0],
     );
     colors[i]
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct RenderRect {
+    pub p1: (f32, f32),
+    pub p2: (f32, f32),
 }

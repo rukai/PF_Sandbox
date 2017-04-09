@@ -1,6 +1,6 @@
-use std::fs::{DirBuilder, self};
-use std::path::PathBuf;
 use std::collections::HashSet;
+use std::fs;
+use std::path::PathBuf;
 use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
@@ -19,10 +19,45 @@ fn get_packages_path() -> PathBuf {
     path
 }
 
+/// If PF_Sandbox packages path does not exist then generate a stub 'Example' package.
+/// Does not otherwise regenerate this package because the user may wish to delete it.
+pub fn generate_example_stub() {
+    if !get_packages_path().exists() {
+        let mut path = get_packages_path();
+        path.push("example");
+        path.push("package_meta.json");
+
+        let meta = PackageMeta {
+            engine_version: engine_version(),
+            save_version:   0,
+            title:          "Example Package".to_string(),
+            source:         "lucaskent.me/example_package".to_string(),
+            hash:           "".to_string(),
+        };
+        files::save_struct(path, &meta);
+    }
+}
+
+
 pub fn print_list() {
     for path in fs::read_dir(get_packages_path()).unwrap() {
         println!("{}", path.unwrap().file_name().to_str().unwrap());
     }
+}
+
+pub fn get_package_names() -> Vec<String> {
+    fs::read_dir(get_packages_path()).unwrap().map(
+        |x| x.unwrap().file_name().into_string().unwrap()
+    ).collect()
+}
+
+pub fn exists(name: &str) -> bool {
+    for path in fs::read_dir(get_packages_path()).unwrap() {
+        if path.unwrap().file_name().to_str().unwrap() == name {
+            return true;
+        }
+    }
+    false
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -44,7 +79,8 @@ impl Default for Package {
 }
 
 impl Package {
-    fn open(name: &str) -> Package {
+    // TODO: Actually handle failures to load package
+    pub fn open(name: &str) -> Package {
         let mut path = get_packages_path();
         path.push(name);
 
@@ -70,8 +106,6 @@ impl Package {
         package
     }
 
-    // TODO: Eventually we will just ship with some nice example package
-    // This function will be deleted and we can just load the example package everywhere this is used.
     fn generate_base(name: &str) -> Package {
         let mut path = get_packages_path();
         path.push(name);
@@ -79,8 +113,8 @@ impl Package {
         let meta = PackageMeta {
             engine_version:  engine_version(),
             save_version:    0,
-            title:           "Base Package".to_string(),
-            source:          "example.com/base_package".to_string(),
+            title:           "New Package".to_string(),
+            source:          "DELET THIS".to_string(), // TODO: include option to disable source functionality and use it here
             hash:            "".to_string(),
         };
 
@@ -95,30 +129,26 @@ impl Package {
             package_updates:    vec!(),
         };
         package.save();
+        package.load();
         package
     }
 
-    pub fn open_or_generate(package_name: &str) -> Package {
+    /// Opens a package if it exists
+    /// Creates and opens it if it doesnt
+    /// However if it does exist but is broken in some way it returns None
+    pub fn open_or_generate(package_name: &str) -> Option<Package> {
         let package_path = get_packages_path().join(package_name);
 
         // if a package does not already exist create a new one
-        let mut package = match fs::metadata(package_path) {
-            Ok(_)  => Package::open(package_name),
-            Err(_) => Package::generate_base(package_name),
-        };
-
-        let package_update = PackageUpdate::Package(package.clone());
-        package.package_updates.push(package_update);
-        package
+        match fs::metadata(package_path) {
+            Ok(_)  => Some(Package::open(package_name)), // TODO: Actually handle failures to load package
+            Err(_) => Some(Package::generate_base(package_name)),
+        }
     }
 
     pub fn save(&mut self) {
         self.meta.save_version += 1;
         self.meta.hash = self.compute_hash();
-
-        // Create directory structure
-        DirBuilder::new().recursive(true).create(self.path.join("Fighters")).unwrap();
-        DirBuilder::new().recursive(true).create(self.path.join("Stages")).unwrap();
 
         // save all json files
         files::save_struct(self.path.join("rules.json"), &self.rules);
@@ -134,23 +164,27 @@ impl Package {
     }
 
     pub fn load(&mut self) {
-        let mut meta = files::load_json(self.path.join("package_meta.json")).unwrap();
-        let mut rules = files::load_json(self.path.join("rules.json")).unwrap();
+        let mut meta = files::load_json(self.path.join("package_meta.json"));
+        let mut rules = files::load_json(self.path.join("rules.json"));
 
-        let mut fighters: Vec<Value> = vec!();
-        for path in fs::read_dir(self.path.join("Fighters")).unwrap() {
-            let full_path = path.unwrap().path();
-            self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
+        let mut fighters: Vec<Option<Value>> = vec!();
+        if let Ok (dir) = fs::read_dir(self.path.join("Fighters")) {
+            for path in dir {
+                let full_path = path.unwrap().path();
+                self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
 
-            fighters.push(files::load_json(full_path).unwrap());
+                fighters.push(files::load_json(full_path));
+            }
         }
 
-        let mut stages: Vec<Value> = vec!();
-        for path in fs::read_dir(self.path.join("Stages")).unwrap() {
-            let full_path = path.unwrap().path();
-            self.stages_filenames.push(full_path.to_str().unwrap().to_string());
+        let mut stages: Vec<Option<Value>> = vec!();
+        if let Ok (dir) = fs::read_dir(self.path.join("Stages")) {
+            for path in dir {
+                let full_path = path.unwrap().path();
+                self.stages_filenames.push(full_path.to_str().unwrap().to_string());
 
-            stages.push(files::load_json(full_path).unwrap());
+                stages.push(files::load_json(full_path));
+            }
         }
 
         // the upgraded json is loaded into this package
@@ -160,18 +194,41 @@ impl Package {
         // *    the user can choose to not save, if they find issues with the upgrade
         upgrade_to_latest(&mut meta, &mut rules, &mut fighters, &mut stages);
         self.json_into_structs(meta, rules, fighters, stages);
+
+        self.force_update_entire_package();
     }
 
-    pub fn json_into_structs(&mut self, meta: Value, rules: Value, fighters: Vec<Value>, stages: Vec<Value>) {
-        self.meta = serde_json::from_value(meta).unwrap();
-        self.rules = serde_json::from_value(rules).unwrap();
+    pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, fighters: Vec<Option<Value>>, stages: Vec<Option<Value>>) {
+        if let Some (meta) = meta {
+            self.meta = serde_json::from_value(meta).unwrap();
+        }
+        else {
+            self.meta = PackageMeta::default();
+        }
+
+        if let Some (rules) = rules {
+            self.rules = serde_json::from_value(rules).unwrap();
+        }
+        else {
+            self.rules = Rules::default();
+        }
     
         for fighter in fighters {
-            self.fighters.push(serde_json::from_value(fighter).unwrap());
+            if let Some (fighter) = fighter {
+                self.fighters.push(serde_json::from_value(fighter).unwrap());
+            }
+            else {
+                self.fighters.push(Fighter::default());
+            }
         }
 
         for stage in stages {
-            self.stages.push(serde_json::from_value(stage).unwrap());
+            if let Some (stage) = stage {
+                self.stages.push(serde_json::from_value(stage).unwrap());
+            }
+            else {
+                self.stages.push(Stage::default());
+            }
         }
     }
 
@@ -560,6 +617,7 @@ impl Node for Package {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Verify {
     Ok,
+    None,
     IncorrectHash,
     UpdateAvailable,
     CannotConnect,

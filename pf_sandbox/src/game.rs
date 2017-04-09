@@ -2,7 +2,7 @@ use ::camera::Camera;
 use ::collision::collision_check;
 use ::config::Config;
 use ::fighter::{ActionFrame, CollisionBox, LinkType};
-use ::graphics::{GraphicsMessage, Render};
+use ::graphics::{GraphicsMessage, Render, RenderRect};
 use ::graphics;
 use ::input::{Input, PlayerInput, ControllerInput};
 use ::os_input::OsInput;
@@ -875,10 +875,4 @@ pub enum RenderEntity {
     Player    (RenderPlayer),
     Selector  (RenderRect),
     Area      (RenderRect),
-}
-
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
-pub struct RenderRect {
-    pub p1: (f32, f32),
-    pub p2: (f32, f32),
 }

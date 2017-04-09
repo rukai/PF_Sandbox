@@ -4,10 +4,11 @@ use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken};
 
 use ::files;
+use ::package;
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Config {
-    pub current_package: String,
+    pub current_package: Option<String>,
 }
 
 impl Config {
@@ -18,13 +19,18 @@ impl Config {
     }
 
     pub fn load() -> Config {
-        if let Some(json) = files::load_json(Config::get_path()) {
-            // TODO: handle upgrades here
-
-            serde_json::from_value(json).unwrap()
-        } else {
-            Config::default()
+        if let Some (json) = files::load_json(Config::get_path()) {
+            if let Ok (mut config) = serde_json::from_value::<Config>(json) {
+                // current_package may have been deleted since config was last saved
+                if let Some (ref current_package) = config.current_package.clone() {
+                    if !package::exists(current_package.as_str()) {
+                        config.current_package = None;
+                    }
+                }
+                return config;
+            }
         }
+        Config::default()
     }
 
     pub fn save(&self) {
@@ -35,7 +41,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            current_package: String::from("base_backage")
+            current_package: None
         }
     }
 }

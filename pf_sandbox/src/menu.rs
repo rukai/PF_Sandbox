@@ -1,5 +1,6 @@
 use ::input::{Input, PlayerInput};
 use ::package::{Package, Verify};
+use ::package;
 use ::graphics::{GraphicsMessage, Render};
 use ::app::GameSetup;
 use ::config::Config;
@@ -9,22 +10,52 @@ pub struct Menu {
     config:             Config,
     state:              MenuState,
     fighter_selections: Vec<CharacterSelect>,
-    stage_ticker:       MenuTicker,
+    stage_ticker:       Option<MenuTicker>,
     current_frame:      usize,
-    package_verify:     Verify,
-    package:            Package,
+    package:            PackageHolder,
+    back_counter_max:   usize,
+}
+
+enum PackageHolder {
+    Package (Package, Verify),
+    None,
+}
+
+impl PackageHolder {
+    fn new(package: Option<Package>) -> PackageHolder {
+        if let Some(package) = package {
+            let verify = package.verify();
+            PackageHolder::Package(package, verify)
+        } else {
+            PackageHolder::None
+        }
+    }
+
+    fn get(&self) -> &Package {
+        match self {
+            &PackageHolder::Package (ref package, _) => { package }
+            &PackageHolder::None                     => { panic!("Attempted to access the package while there was none") }
+        }
+    }
+
+    fn verify(&self) -> Verify {
+        match self {
+            &PackageHolder::Package (_, ref verify) => { verify.clone() }
+            &PackageHolder::None                    => { Verify::None }
+        }
+    }
 }
 
 impl Menu {
-    pub fn new(package: Package, config: Config, state: MenuState) -> Menu {
+    pub fn new(package: Option<Package>, config: Config, state: MenuState) -> Menu {
         Menu {
             config:             config,
             state:              state,
             fighter_selections: vec!(),
-            stage_ticker:       MenuTicker::new(package.stages.len() - 1),
+            stage_ticker:       None,
             current_frame:      0,
-            package_verify:     package.verify(),
-            package:            package,
+            package:            PackageHolder::new(package),
+            back_counter_max:   90,
         }
     }
 
@@ -45,69 +76,124 @@ impl Menu {
     }
 
     fn step_fighter_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
-        {
-            // update selections
-            let mut selections = &mut self.fighter_selections.iter_mut();
-            let fighters = &self.package.fighters;
-            for (ref mut selection, ref input) in selections.zip(player_inputs) {
-                selection.plugged_in = input.plugged_in;
+        self.add_remove_fighter_selections(&player_inputs);
+        let mut new_state: Option<MenuState> = None;
+        if let &mut MenuState::CharacterSelect (ref mut back_counter) = &mut self.state {
+            let fighters = &self.package.get().fighters;
+            {
+                // update selections
+                let mut selections = &mut self.fighter_selections.iter_mut();
+                for (ref mut selection, ref input) in selections.zip(player_inputs) {
+                    selection.plugged_in = input.plugged_in;
 
-                if input.b.press {
-                    selection.selection = None;
-                }
-                else if input.a.press {
-                    if selection.ticker.cursor < fighters.len() {
-                        selection.selection = Some(selection.ticker.cursor);
+                    if input.b.press {
+                        selection.selection = None;
+                    }
+                    else if input.a.press {
+                        if selection.ticker.cursor < fighters.len() {
+                            selection.selection = Some(selection.ticker.cursor);
+                        }
+                        else {
+                            // TODO: run extra options
+                        }
+                    }
+
+                    if input[0].stick_y > 0.4 || input[0].up {
+                        selection.ticker.up();
+                    }
+                    else if input[0].stick_y < -0.4 || input[0].down {
+                        selection.ticker.down();
                     }
                     else {
-                        // TODO: run extra options
+                        selection.ticker.reset();
                     }
                 }
+            }
 
-                if input[0].stick_y > 0.4 || input[0].up {
-                    selection.ticker.up();
+            if input.start_pressed() && fighters.len() > 0 {
+                new_state = Some(MenuState::StageSelect);
+                if let None = self.stage_ticker {
+                    self.stage_ticker = Some(MenuTicker::new(self.package.get().stages.len()));
                 }
-                else if input[0].stick_y < -0.4 || input[0].down {
-                    selection.ticker.down();
+            }
+            else if player_inputs.iter().any(|x| x[0].b) {
+                if *back_counter > self.back_counter_max {
+                    new_state = Some(MenuState::package_select());
                 }
                 else {
-                    selection.ticker.reset();
+                    *back_counter += 1;
                 }
+            }
+            else {
+                *back_counter = 0;
             }
         }
 
-        if input.start_pressed() {
-            self.state = MenuState::StageSelect;
+        if let Some(state) = new_state {
+            self.state = state;
         }
     }
 
     fn fighter_select_cursor_max(&self) -> usize {
-        self.package.fighters.len() - 1 // last index of fighters
-        + 0                // number of extra options
+        self.package.get().fighters.len() // last index of fighters
+        + 0                               // number of extra options
     }
 
     fn step_stage_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+        let ticker = self.stage_ticker.as_mut().unwrap();
+
         if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
-            self.stage_ticker.up();
+            ticker.up();
         }
         else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
-            self.stage_ticker.down();
+            ticker.down();
         }
         else {
-            self.stage_ticker.reset();
+            ticker.reset();
         }
 
-        if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
+        if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && self.package.get().stages.len() > 0 {
             self.state = MenuState::StartGame;
         }
         else if player_inputs.iter().any(|x| x.b.press) {
-            self.state = MenuState::CharacterSelect;
+            self.state = MenuState::character_select();
+        }
+    }
+
+    pub fn step_package_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+        let selection = if let &mut MenuState::PackageSelect (ref package_names, ref mut ticker) = &mut self.state {
+            if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
+                ticker.up();
+            }
+            else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
+                ticker.down();
+            }
+            else {
+                ticker.reset();
+            }
+
+            if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && package_names.len() > 0 {
+                Some(package_names[ticker.cursor].clone())
+            } else {
+                None
+            }
+        } else {
+            unreachable!();
+        }; 
+
+        if let Some(selection) = selection {
+            self.package = PackageHolder::new(Some(Package::open(selection.as_str())));
+            self.fighter_selections = vec!();
+            self.stage_ticker = None;
+            self.config.current_package = Some(selection);
+            self.config.save();
+            self.state = MenuState::character_select();
         }
     }
 
     fn step_results(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
         if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
-            self.state = MenuState::CharacterSelect;
+            self.state = MenuState::character_select();
         }
     }
 
@@ -115,26 +201,21 @@ impl Menu {
         input.game_update(self.current_frame);
         let player_inputs = input.players(self.current_frame);
 
-        self.add_remove_fighter_selections(&player_inputs);
-
         match self.state {
-            MenuState::CharacterSelect => { self.step_fighter_select(&player_inputs, input) }
-            MenuState::StageSelect     => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::GameResults (_) => { self.step_results       (&player_inputs, input) }
-            MenuState::SetRules        => { }
-            MenuState::SwitchPackages  => { }
-            MenuState::BrowsePackages  => { }
-            MenuState::CreatePackage   => { }
-            MenuState::CreateFighter   => { }
-            MenuState::StartGame       => { }
+            MenuState::PackageSelect (_, _) => { self.step_package_select(&player_inputs, input) }
+            MenuState::CharacterSelect (_)  => { self.step_fighter_select(&player_inputs, input) }
+            MenuState::StageSelect          => { self.step_stage_select  (&player_inputs, input) }
+            MenuState::GameResults (_)      => { self.step_results       (&player_inputs, input) }
+            MenuState::SetRules             => { }
+            MenuState::BrowsePackages       => { }
+            MenuState::CreatePackage        => { }
+            MenuState::CreateFighter        => { }
+            MenuState::StartGame            => { }
         };
 
         self.current_frame += 1;
 
         if let MenuState::StartGame = self.state {
-            // TODO: dumb hack to create config file, delete soon
-            self.config.save();
-
             let mut selected_fighters: Vec<usize> = vec!();
             let mut controllers: Vec<usize> = vec!();
             for (i, selection) in (&self.fighter_selections).iter().enumerate() {
@@ -149,7 +230,7 @@ impl Menu {
             Some(GameSetup {
                 controllers: controllers,
                 fighters:    selected_fighters,
-                stage:       self.stage_ticker.cursor,
+                stage:       self.stage_ticker.as_ref().unwrap().cursor,
                 netplay:     false,
             })
         }
@@ -161,51 +242,74 @@ impl Menu {
     pub fn render(&self) -> RenderMenu {
         RenderMenu {
             state: match self.state {
-                MenuState::GameResults (ref results) => { RenderMenuState::GameResults (results.clone()) }
-                MenuState::CharacterSelect => { RenderMenuState::CharacterSelect (self.fighter_selections.clone()) }
-                MenuState::StageSelect     => { RenderMenuState::StageSelect     (self.stage_ticker.cursor) }
-                MenuState::SetRules        => { RenderMenuState::SetRules }
-                MenuState::SwitchPackages  => { RenderMenuState::SwitchPackages }
-                MenuState::BrowsePackages  => { RenderMenuState::BrowsePackages }
-                MenuState::CreatePackage   => { RenderMenuState::CreatePackage }
-                MenuState::CreateFighter   => { RenderMenuState::CreateFighter }
-                MenuState::StartGame       => { RenderMenuState::StartGame }
+                MenuState::PackageSelect (ref names, ref ticker) => { RenderMenuState::PackageSelect (names.clone(), ticker.cursor) }
+                MenuState::GameResults (ref results)             => { RenderMenuState::GameResults (results.clone()) }
+                MenuState::CharacterSelect (back_counter)        => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
+                MenuState::StageSelect    => { RenderMenuState::StageSelect     (self.stage_ticker.as_ref().unwrap().cursor) }
+                MenuState::SetRules       => { RenderMenuState::SetRules }
+                MenuState::BrowsePackages => { RenderMenuState::BrowsePackages }
+                MenuState::CreatePackage  => { RenderMenuState::CreatePackage }
+                MenuState::CreateFighter  => { RenderMenuState::CreateFighter }
+                MenuState::StartGame      => { RenderMenuState::StartGame }
             },
-            package_verify: self.package_verify.clone(),
+            package_verify: self.package.verify(),
         }
     }
 
     pub fn graphics_message(&mut self) -> GraphicsMessage {
+        let updates = match &mut self.package {
+            &mut PackageHolder::Package (ref mut package, _) => {
+                package.updates()
+            }
+            &mut PackageHolder::None => {
+                vec!()
+            }
+        };
+
         GraphicsMessage {
-            package_updates: self.package.updates(),
+            package_updates: updates,
             render: Render::Menu (self.render())
         }
     }
 
     pub fn reclaim(self) -> (Package, Config) {
-        (self.package, self.config)
+        match self.package {
+            PackageHolder::Package (package, _) => { (package, self.config) }
+            PackageHolder::None                 => { panic!("Attempted to access the package while there was none") }
+        }
     }
 }
 
 #[derive(Clone)]
 pub enum MenuState {
-    CharacterSelect,
+    CharacterSelect (usize),
     StageSelect,
     GameResults (Vec<GameResult>),
     SetRules,
-    SwitchPackages,
+    PackageSelect (Vec<String>, MenuTicker),
     BrowsePackages,
     CreatePackage,
     CreateFighter,
     StartGame,
 }
 
+impl MenuState {
+    pub fn package_select() -> MenuState {
+        let packages = package::get_package_names();
+        let len = packages.len();
+        MenuState::PackageSelect(packages, MenuTicker::new(len))
+    }
+    pub fn character_select() -> MenuState {
+        MenuState::CharacterSelect(0)
+    }
+}
+
 pub enum RenderMenuState {
-    CharacterSelect (Vec<CharacterSelect>),
+    CharacterSelect (Vec<CharacterSelect>, usize, usize),
     StageSelect     (usize),
     GameResults     (Vec<GameResult>),
     SetRules,
-    SwitchPackages,
+    PackageSelect   (Vec<String>, usize),
     BrowsePackages,
     CreatePackage,
     CreateFighter,
@@ -229,10 +333,10 @@ pub struct MenuTicker {
 }
 
 impl MenuTicker {
-    fn new(cursor_max: usize) -> MenuTicker {
+    fn new(item_count: usize) -> MenuTicker {
         MenuTicker {
             cursor:          0,
-            cursor_max:      cursor_max,
+            cursor_max:      if item_count > 0 { item_count - 1 } else { 0 },
             ticks_remaining: 0,
             tick_duration_i: 0,
             reset:           true,

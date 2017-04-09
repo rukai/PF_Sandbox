@@ -1,7 +1,7 @@
 use ::vulkan_buffers::{Vertex, Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
 use ::menu::{RenderMenu, RenderMenuState, CharacterSelect};
-use ::graphics::{self, GraphicsMessage, Render};
+use ::graphics::{self, GraphicsMessage, Render, RenderRect};
 use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB};
 use ::records::GameResult;
@@ -434,7 +434,7 @@ impl<'a> VulkanGraphics<'a> {
                         buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
                         buffer_content.color           = [0.0, 1.0, 0.0, 1.0];
                     }
-                    let buffers = Buffers::rect_buffers(&self.device, &self.queue, rect);
+                    let buffers = Buffers::rect_outline_buffers(&self.device, &self.queue, rect);
                     command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
                 },
                 RenderEntity::Area(rect) => {
@@ -448,7 +448,7 @@ impl<'a> VulkanGraphics<'a> {
                         buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
                         buffer_content.color           = [0.0, 1.0, 0.0, 1.0]; // HMMM maybe i can use only the edge to get the outline from a normal rect?
                     }
-                    let buffers = Buffers::rect_buffers(&self.device, &self.queue, rect);
+                    let buffers = Buffers::rect_outline_buffers(&self.device, &self.queue, rect);
                     command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
                 },
             }
@@ -465,7 +465,7 @@ impl<'a> VulkanGraphics<'a> {
     fn menu_render(&mut self, render: RenderMenu) {
         let mut entities: Vec<MenuEntity> = vec!();
         match render.state {
-            RenderMenuState::CharacterSelect (selections) => {
+            RenderMenuState::CharacterSelect (selections, back_counter, back_counter_max) => {
                 let mut plugged_in_controller_indexes: Vec<usize>            = vec!();
                 let mut plugged_in_selections:         Vec<&CharacterSelect> = vec!();
 
@@ -482,20 +482,20 @@ impl<'a> VulkanGraphics<'a> {
                         self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "There are no controllers plugged in.");
                     }
                     1 => {
-                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.9, 0.9, 0.9);
+                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.8, 0.9, 0.9);
                     }
                     2 => {
-                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.9, 0.0, 0.9);
-                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[1], plugged_in_selections[1],  0.0, -0.9, 0.9, 0.9);
+                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.8, 0.0, 0.9);
+                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[1], plugged_in_selections[1],  0.0, -0.8, 0.9, 0.9);
                     }
                     3 => {
-                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.9, 0.0, 0.0);
-                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[1], plugged_in_selections[1],  0.0, -0.9, 0.9, 0.0);
+                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.8, 0.0, 0.0);
+                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[1], plugged_in_selections[1],  0.0, -0.8, 0.9, 0.0);
                         self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[2], plugged_in_selections[2], -0.9,  0.0, 0.0, 0.9);
                     }
                     4 => {
-                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.9, 0.0, 0.0);
-                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[1], plugged_in_selections[1],  0.0, -0.9, 0.9, 0.0);
+                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.8, 0.0, 0.0);
+                        self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[1], plugged_in_selections[1],  0.0, -0.8, 0.9, 0.0);
                         self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[2], plugged_in_selections[2], -0.9,  0.0, 0.0, 0.9);
                         self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[3], plugged_in_selections[3],  0.0,  0.0, 0.9, 0.9);
                     }
@@ -503,6 +503,7 @@ impl<'a> VulkanGraphics<'a> {
                         self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Currently only supports up to 4 controllers. Please unplug some.");
                     }
                 }
+                self.draw_back_counter(&mut entities, back_counter, back_counter_max);
                 self.draw_package_banner(&render.package_verify);
             }
             RenderMenuState::StageSelect (selection) => {
@@ -520,8 +521,8 @@ impl<'a> VulkanGraphics<'a> {
             RenderMenuState::SetRules => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "set rules");
             }
-            RenderMenuState::SwitchPackages => {
-                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "switch package");
+            RenderMenuState::PackageSelect (ref names, selection) => {
+                self.draw_package_selector(names, selection);
             }
             RenderMenuState::BrowsePackages => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "browse package");
@@ -560,6 +561,10 @@ impl<'a> VulkanGraphics<'a> {
                     let index_buffer  = &self.package_buffers.stages[stage].index;
                     command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), uniform, &());
                 }
+                &MenuEntity::Rect (ref rect) => {
+                    let buffers = Buffers::rect_buffers(&self.device, &self.queue, rect.clone());
+                    command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), uniform, &());
+                }
             }
         }
 
@@ -569,6 +574,27 @@ impl<'a> VulkanGraphics<'a> {
             .build();
         self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
         self.swapchain.present(&self.queue, image_num).unwrap();
+    }
+
+    // TODO: Rewrite text rendering to be part of scene instead of just plastered on top
+    // TODO: Then this bar can be drawn on top of the package banner text
+    fn draw_back_counter(&mut self, entities: &mut Vec<MenuEntity>, back_counter: usize, back_counter_max: usize) {
+        let uniform = &self.uniforms[entities.len()];
+        {
+            let mut buffer_content = uniform.uniform.write(Duration::new(1, 0)).unwrap();
+            buffer_content.zoom            = 1.0;
+            buffer_content.aspect_ratio    = 1.0;
+            buffer_content.position_offset = [0.0, 0.0];
+            buffer_content.direction       = 1.0;
+            buffer_content.edge_color      = [1.0, 1.0, 1.0, 1.0];
+            buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
+        }
+
+        // TODO:
+        entities.push(MenuEntity::Rect (RenderRect {
+            p1: ( -1.0, -0.85),
+            p2: (back_counter as f32 / back_counter_max as f32 * 2.0 - 1.0, -1.0),
+        }));
     }
 
     fn draw_package_banner(&mut self, verify: &Verify) {
@@ -592,6 +618,9 @@ impl<'a> VulkanGraphics<'a> {
             &Verify::CannotConnect => {
                 format!("{} - {} - Cannot connect to package host", package.meta.title, package.meta.source)
             }
+            &Verify::None => {
+                unreachable!();
+            }
         };
 
         self.draw_text.queue_text(30.0, self.height as f32 - 30.0, 30.0, color, message.as_str());
@@ -614,6 +643,7 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn draw_fighter_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, controller_i: usize, selection: &CharacterSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
+        self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Fighters");
         let fighters = &self.package_buffers.package.as_ref().unwrap().fighters;
         for (fighter_i, fighter) in fighters.iter().enumerate() {
             let x_offset = if fighter_i == selection.ticker.cursor { 0.1 } else { 0.0 };
@@ -679,6 +709,7 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn draw_stage_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, selection: usize) {
+        self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Stage");
         let stages = &self.package_buffers.package.as_ref().unwrap().stages;
         for (stage_i, stage) in stages.iter().enumerate() {
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos
@@ -706,6 +737,19 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
+    fn draw_package_selector(&mut self, package_names: &[String], selection: usize) {
+        self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Package");
+        self.draw_text.queue_text(100.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], "A: Select package    X/Y: Update package");
+
+        for (package_i, name) in package_names.iter().enumerate() {
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let x_offset = if package_i == selection { 0.1 } else { 0.0 };
+            let x = self.width as f32 * (0.1 + x_offset);
+            let y = self.height as f32 * 0.1 + package_i as f32 * 50.0;
+            self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], name.as_ref());
+        }
+    }
+
     fn handle_events(&mut self) {
         // force send the current resolution
         let window = self.window.window();
@@ -722,4 +766,5 @@ impl<'a> VulkanGraphics<'a> {
 enum MenuEntity {
     Fighter { fighter: usize, action: usize, frame: usize },
     Stage   (usize),
+    Rect    (RenderRect),
 }
