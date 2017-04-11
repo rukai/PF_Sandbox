@@ -7,6 +7,7 @@ extern crate num;
 extern crate serde;
 extern crate treeflection;
 extern crate winit;
+extern crate zip;
 #[macro_use] extern crate enum_primitive;
 #[macro_use] extern crate matches;
 #[macro_use] extern crate serde_derive;

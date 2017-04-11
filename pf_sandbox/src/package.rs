@@ -274,7 +274,7 @@ impl Package {
     pub fn update(&mut self) {
         if let Some(latest_meta) = self.download_latest_meta() {
             if self.meta.save_version < latest_meta.save_version {
-                let zip = files::download_temp_file(format!("{}/package{}.zip", self.meta.source, latest_meta.save_version).as_str());
+                let zip = files::load_bin_from_url(format!("{}/package{}.zip", self.meta.source, latest_meta.save_version).as_str());
                 if let Some(zip) = zip {
                     files::extract_zip(&zip, &self.path);
                     self.load();

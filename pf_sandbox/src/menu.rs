@@ -172,8 +172,19 @@ impl Menu {
                 ticker.reset();
             }
 
-            if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && package_names.len() > 0 {
-                Some(package_names[ticker.cursor].clone())
+            let selection = package_names[ticker.cursor].clone();
+            if package_names.len() > 0 {
+                if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
+                    let mut package = Package::open(selection.as_str());
+                    package.update();
+                    self.package = PackageHolder::new(Some(package));
+                    Some(selection)
+                } else if player_inputs.iter().any(|x| x.x.press || x.y.press) {
+                    self.package = PackageHolder::new(Some(Package::open(selection.as_str())));
+                    Some(selection)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -182,7 +193,6 @@ impl Menu {
         }; 
 
         if let Some(selection) = selection {
-            self.package = PackageHolder::new(Some(Package::open(selection.as_str())));
             self.fighter_selections = vec!();
             self.stage_ticker = None;
             self.config.current_package = Some(selection);

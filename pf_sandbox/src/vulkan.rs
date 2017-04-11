@@ -739,7 +739,7 @@ impl<'a> VulkanGraphics<'a> {
 
     fn draw_package_selector(&mut self, package_names: &[String], selection: usize) {
         self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Package");
-        self.draw_text.queue_text(100.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], "A: Select package    X/Y: Update package");
+        self.draw_text.queue_text(100.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], "A: Select package    X/Y: Select Package without updating");
 
         for (package_i, name) in package_names.iter().enumerate() {
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos
