@@ -1,5 +1,7 @@
 # PF Sandbox Manual
 
+Note: Everything labeled (TODO) is planned but may or may not be added in the future.
+
 ## WiiU adapter setup
 
 Follow the steps for your OS, found under Installation at this [Dolphin Wiki page](https://wiki.dolphin-emu.org/index.php?title=How_to_use_the_Official_GameCube_Controller_Adapter_for_Wii_U_in_Dolphin)
@@ -35,7 +37,7 @@ Due to the nature of the interface it is super easy to accidentally destroy work
 To work through some examples check out the [editor-tutorial](editor-tutorial.md).
 
 The pause screen is where all the editing action occurs.
-Make sure your on the pause screen to make use of the following tools.
+Make sure you are on the pause screen to make use of the following tools.
 
 ### Game Flow
 
@@ -70,9 +72,9 @@ Use the following keys to toggle debug displays:
 *   F2 + Shift - Input difference (terminal only)
 *   F3 - Current action (terminal only)
 *   F4 - Frame (terminal only)
-*   F5 - Main stick vector
-*   F6 - CStick vector
-*   F7 - DI vector
+*   F5 - Main stick vector (TODO)
+*   F6 - CStick vector (TODO)
+*   F7 - DI vector (TODO)
 *   F8 - Display ECB and BPS
 *   F9 - Dont display fighter
 *   F10 - Display player camera area
@@ -84,8 +86,8 @@ Use the following keys to toggle debug displays:
 By default making a selection will replace the previous selection.
 To add to the previous selection hold the Shift key.
 
-*   Left click - Select one hitbox
-*   Right click - Select mutliple hitboxes
+*   Left click - Select one colbox
+*   Right click - Select mutliple colboxes
 
 ### Frame editing
 *   V - Copy frame
@@ -95,26 +97,23 @@ To add to the previous selection hold the Shift key.
 
 ### Hitbox editing
 
-Most of these operations will apply to all selected hitboxes:
+Most of these operations will apply to all selected colboxes:
 
-*   A - Move hitboxes, left click to confirm
-*   S - Toggle pivot mode
-*   D - Delete selected hitboxes
-*   F - Insert hitbox meld linked to selected hitboxes, left click to confirm
+*   A - Move colboxes, left click to confirm
+*   S - Toggle pivot mode (TODO)
+*   D - Delete selected colboxes
+*   F - Insert colbox meld linked to selected colboxes, left click to confirm
     +   Shift: simple link
-*   G - Resize hitboxes
-*   Z - Meld link hitboxes
-*   X - Simple link hitboxes
-*   C - Unlink hitboxes
+*   [ - Shrink selected colboxes
+*   ] - Grow selected colboxes
+*   Z - Meld link colboxes (TODO)
+*   X - Simple link colboxes (TODO)
+*   C - Unlink colboxes (TODO)
 
 Linking collision boxes allows them to be pivoted in pivot mode.
 Meld links combines collisionboxes into a single collisionbox.
 
-Hitbox data can be set via a command:
-*   Hitbox (damage, bkb, kbg, angle, clang)
-*   Hurtbox (armor)
-
-### Pivot mode
+### Pivot mode (TODO)
 
 When there is one collisionbox selected, pressing `S` will enter pivot mode.
 
@@ -122,6 +121,8 @@ The selected collisionbox becomes the root collision box.
 Any collisionbox can now be click and drag'ed around the root box.
 
 Press `S` again to leave pivot mode.
+
+### Stage Editing (TODO)
 
 ## Command line
 
@@ -136,18 +137,18 @@ Then come back and learn the rules that commands follow and how to construct you
 Lets give a quick breakdown of an example command.
 This command sets the weight of someFighter in the package myPackage to 1.2:
 
-`pf packages["myPackage"].fighters["someFighter"].weight.set 1.2`
+`pf packages["myPackage"].fighters["someFighter"].weight.set 1.2` (TODO: Use this as example when named packages/fighters can be addressed by name)
+`pf package.fighters[?].weight set 1.2`
 
 *   pf          - the program name, tells your OS what command you want to run
-*   packages    - attribute
-*   myPackage   - attribute
+*   package     - attribute
 *   fighters    - attribute
-*   someFighter - attribute
+*   ?           - context index
 *   weight      - attribute
 *   set         - command
 *   1.2         - value
 
-We can see a command consists of: attributes then a command then values.
+We can see a command consists of: attributes and indexes followed by a command then values.
 
 ### Objects
 
@@ -168,19 +169,20 @@ Full [object reference](link_to_resource)
 Different objects support different actions:
 
 All objects support the following actions:
-*   <attribute>.set <value> - change an attribute to the specified size
-*   <attribute>.get <depth> - display an attribute, the depth argument is optional and specifies how deeply nested object attributes should be shown.
-*   <attribute>.copy        - copy the specified attribute
-*   <attribute>.paste       - paste the copied attribute to the specified attribute (Must be the same type)
+*   <attribute> help <value> - view an objects type, its attributes and its commands
+*   <attribute> set <value>  - change an attribute to the specified size
+*   <attribute> get <depth>  - display an attribute, the depth argument is optional and specifies how deeply nested object attributes should be shown.
+*   <attribute> copy         - copy the specified attribute
+*   <attribute> paste        - paste the copied attribute to the specified attribute (Must be the same type)
 
-Attributes that are assigned some point in space can use the following
+Attributes that are assigned some point in space can use the following (TODO)
 *   <attribute>.rotate <degrees> - rotate the object, around some central point, the specified number of degrees
 
 ### Object structure
 
 Objects contain other objects creating a large tree:
 
-[Replace with a nice diagram that doesnt look like death]
+[TODO: Replace with a nice diagram that doesnt look like death]
 *   Players
 *   Debug
 *   Packages
@@ -201,19 +203,18 @@ Objects contain other objects creating a large tree:
 ### Getter
 
 Get objects using dot notation
-`pf package[packagename].fighter[fightername].action[actionID_or_ActionName].frame[frameIndex].hitbox[2].size set 50`
 
-`pf package["M"].fighter["Foo"].action[10].frame[0].hitbox[2].size set 50`
+`pf package.fighters[?].actions[?].frames[?].hitboxes[?].size set 50`
 
 ### Indexing
 
 The indexer is powerful:
 
-*   `packages["M"]`            dictionaries can be accessed via strings
+*   `packages["M"]`            dictionaries can be accessed via strings (TODO)
 *   `actions[0]`               select package 0
-*   `actions[0, 1-5]`          select packages 0 and packages between 1 and 5 inclusive
-*   `actions[2-4].fighters[*]` select all fighters in packages 2, 3 and 4
-*   `actions[*]`               select all packages
+*   `actions[0, 1-5]`          select packages 0 and packages between 1 and 5 inclusive (TODO)
+*   `actions[2-4].fighters[*]` select all fighters in packages 2, 3 and 4 (TODO)
+*   `actions[*]`               select all packages (TODO)
 *   `actions[?]`               select based on [context](link_to_context_section)
 *   `actions[?+1]`             TODO
 *   `actions[2, ?-1]`          TODO
@@ -224,23 +225,18 @@ There are many contexts available that allow you to quickly hook into the object
 Setting some hitboxes to size 50 can be done the primitive way.
 Objects are chained together with '.' and indexed by [] like this:
 
-`pf packages[1].fighters[4].actions[0].frames[0].hitboxes[1,5-7].size set 50`
+`pf package.fighters[4].actions[0].frames[0].colboxes[1,5-7].size set 50` (TODO)
 
 However how are you supposed to know all of these indexes? o.0
 Instead you can let PF engine use context to know what you want to modify.
 Select the hitboxes you want in game then run:
 
-`pf packages[?]fighters[?].actions[?]frames[?]hitboxes[?]size.set 50`
+`pf package.fighters[?].actions[?].frames[?].colboxes[?].size.set 50`
 
 ### Aliases
 
 Its super long to type in all this junk just to get to some hitboxes
 Take advantage of your shell and add this to your .bashrc
-alias pf-hitboxes="`pf packages[?]fighters[?].actions[?]frames[?]hitboxes[?]`
+alias pf-hitboxes="`pf package.fighters[?].actions[?].frames[?].colboxes[?]`
 
-Eh, this wont work exactly because the alias will only activate if there is a space between it and the argument.
-
-### Issues
-
-Storing context in the fighter struct is weird... It shouldnt be responsible for storing game state o.0
-Otherwise I could have a context structure that keeps track of the context of various objects
+Eh, this wont work exactly because the alias will only activate if there is a space between it and the argument. (TODO, will probably have to build internal shortcuts or something)
