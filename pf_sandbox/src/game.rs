@@ -500,14 +500,17 @@ impl Game {
                 debug.ecb = !debug.ecb;
             }
             if os_input.key_pressed(VirtualKeyCode::F9) {
-                match debug.fighter {
+                debug.fighter = match debug.fighter {
                     RenderFighter::Normal => {
+                        RenderFighter::Debug
                     }
                     RenderFighter::Debug => {
+                        RenderFighter::None
                     }
                     RenderFighter::None => {
+                        RenderFighter::Normal
                     }
-                }
+                };
             }
             if os_input.key_pressed(VirtualKeyCode::F10) {
                 debug.cam_area = !debug.cam_area;
