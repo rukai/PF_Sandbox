@@ -11,7 +11,7 @@ A platform fighter sandbox featuring a character editor tightly integrated with 
 
 You must use the latest nightly GNU compatible rust version. (instead of MSVC)
 
-Install [msys2](msys2.github.io).
+Install [msys2](http://www.msys2.org/).
 
 Then in the msys2 terminal run:
 `pacman -Syu mingw64/mingw-w64-x86_64-pkg-config`
