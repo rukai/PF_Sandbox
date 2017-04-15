@@ -164,6 +164,9 @@ impl Package {
     }
 
     pub fn load(&mut self) {
+        self.fighters_filenames = vec!();
+        self.stages_filenames = vec!();
+
         let mut meta = files::load_json(self.path.join("package_meta.json"));
         let mut rules = files::load_json(self.path.join("rules.json"));
 
@@ -196,6 +199,15 @@ impl Package {
         self.json_into_structs(meta, rules, fighters, stages);
 
         self.force_update_entire_package();
+
+        // failsafes
+        assert_eq!(self.fighters_filenames.len(), self.fighters.len());
+        let filenames_set: HashSet<String> = self.fighters_filenames.clone().into_iter().collect();
+        assert_eq!(filenames_set.len(), self.fighters_filenames.len());
+
+        assert_eq!(self.stages_filenames.len(), self.stages.len());
+        let filenames_set: HashSet<String> = self.stages_filenames.clone().into_iter().collect();
+        assert_eq!(filenames_set.len(), self.stages_filenames.len());
     }
 
     pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, fighters: Vec<Option<Value>>, stages: Vec<Option<Value>>) {
@@ -213,6 +225,7 @@ impl Package {
             self.rules = Rules::default();
         }
     
+        self.fighters = ContextVec::new();
         for fighter in fighters {
             if let Some (fighter) = fighter {
                 self.fighters.push(serde_json::from_value(fighter).unwrap());
@@ -222,6 +235,7 @@ impl Package {
             }
         }
 
+        self.stages = ContextVec::new();
         for stage in stages {
             if let Some (stage) = stage {
                 self.stages.push(serde_json::from_value(stage).unwrap());
