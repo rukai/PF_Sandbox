@@ -12,7 +12,7 @@ use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
 use vulkano;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::command_buffer::{PrimaryCommandBufferBuilder, Submission, DynamicState};
+use vulkano::command_buffer::{PrimaryCommandBuffer, PrimaryCommandBufferBuilder, Submission, DynamicState};
 use vulkano::command_buffer;
 use vulkano::descriptor::descriptor_set::DescriptorPool;
 use vulkano::device::{Device, Queue};
@@ -26,7 +26,7 @@ use vulkano::pipeline::multisample::Multisample;
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::{ViewportsState, Viewport, Scissor};
 use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineParams};
-use vulkano::swapchain::{Swapchain, SurfaceTransform};
+use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentError};
 use winit::{Event, WindowBuilder};
 
 use std::sync::Arc;
@@ -137,15 +137,8 @@ impl<'a> VulkanGraphics<'a> {
             &device, &render_pass::Formats { color: (images[0].format(), 1) }
         ).unwrap();
 
-        let framebuffers = images.iter().map(|image| {
-            let dimensions = [image.dimensions()[0], image.dimensions()[1], 1];
-            Framebuffer::new(&render_pass, dimensions, render_pass::AList {
-                color: image
-            }).unwrap()
-        }).collect::<Vec<_>>();
-
+        let framebuffers = VulkanGraphics::gen_framebuffers(&images, &render_pass);
         let draw_text = DrawText::new(&device, &queue, &images);
-
         let (uniforms, generic_pipeline) = VulkanGraphics::generic_pipeline(&device, &queue, &images, &render_pass);
 
         VulkanGraphics {
@@ -241,6 +234,15 @@ impl<'a> VulkanGraphics<'a> {
         (uniforms, pipeline)
     }
 
+    fn gen_framebuffers(images: &Vec<Arc<SwapchainImage>>, render_pass: &Arc<render_pass::CustomRenderPass>) -> Vec<Arc<Framebuffer<render_pass::CustomRenderPass>>> {
+        images.iter().map(|image| {
+            let dimensions = [image.dimensions()[0], image.dimensions()[1], 1];
+            Framebuffer::new(&render_pass, dimensions, render_pass::AList {
+                color: image
+            }).unwrap()
+        }).collect::<Vec<_>>()
+    }
+
     fn run(&mut self) {
         loop {
             self.submissions.retain(|s| s.destroying_would_block());
@@ -254,14 +256,11 @@ impl<'a> VulkanGraphics<'a> {
                     render = self.read_message(message);
                 }
 
-                let size = self.window.window().get_inner_size_points().unwrap();
-                self.width = size.0;
-                self.height = size.1;
-
-                match render {
-                    Render::Game(game) => { self.game_render(game); },
-                    Render::Menu(menu) => { self.menu_render(menu); },
+                let (new_width, new_height) = self.window.window().get_inner_size_points().unwrap();
+                if self.width != new_width || self.height != new_height {
+                    self.window_resize(new_width, new_height);
                 }
+                self.render(render);
             }
             self.handle_events();
         }
@@ -270,6 +269,56 @@ impl<'a> VulkanGraphics<'a> {
     fn read_message(&mut self, message: GraphicsMessage) -> Render {
         self.package_buffers.update(&self.device, &self.queue, message.package_updates);
         message.render
+    }
+
+    fn aspect_ratio(&self) -> f32 {
+        self.width as f32 / self.height as f32
+    }
+
+    // TODO: Resizing will currently crash
+    // We are waiting on the vulkano rewrite to fix this: https://github.com/tomaka/vulkano/issues/366
+    fn window_resize(&mut self, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
+        let (new_swapchain, new_images) = self.swapchain.recreate_with_dimension([width, height]).unwrap();
+        self.swapchain = new_swapchain;
+
+        self.render_pass = render_pass::CustomRenderPass::new(
+            &self.device, &render_pass::Formats { color: (new_images[0].format(), 1) }
+        ).unwrap();
+
+        self.framebuffers = VulkanGraphics::gen_framebuffers(&new_images, &self.render_pass);
+
+        let (uniforms, generic_pipeline) = VulkanGraphics::generic_pipeline(&self.device, &self.queue, &new_images, &self.render_pass);
+        self.generic_pipeline = generic_pipeline;
+        self.uniforms = uniforms;
+
+        self.draw_text = DrawText::new(&self.device, &self.queue, &new_images);
+    }
+
+    fn render(&mut self, render: Render) {
+        let image_num = match self.swapchain.acquire_next_image(Duration::new(1, 0)) {
+            Ok(img) => { img }
+            Err(AcquireError::OutOfDate) => {
+                // Just abort this render, the user wont care about losing some frames while resizing. Internal rendering size will be fixed by next frame.
+                return;
+            }
+            Err(err) => { panic!("{:?}", err) }
+        };
+
+        let final_command_buffer = match render {
+            Render::Game(game) => { self.game_render(game, image_num) },
+            Render::Menu(menu) => { self.menu_render(menu, image_num) },
+        };
+        self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
+
+        match self.swapchain.present(&self.queue, image_num) {
+            Ok(_) => { }
+            Err(PresentError::OutOfDate) => {
+                // Just abort this render, the user wont care about losing some frames while resizing. Internal rendering size will be fixed by next frame.
+            }
+            Err(err) => { panic!("{:?}", err) }
+        }
     }
 
     fn game_hud_render(&mut self, entities: &[RenderEntity]) {
@@ -290,35 +339,30 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
-    fn aspect_ratio(&self) -> f32 {
-        self.width as f32 / self.height as f32
-    }
+    fn game_render(&mut self, render: RenderGame, image_num: usize) -> Arc<PrimaryCommandBuffer> {
+        self.game_hud_render(&render.entities);
 
-    fn game_render(&mut self, render: RenderGame) {
         let zoom = render.camera.zoom.recip();
         let pan  = render.camera.pan;
         let aspect_ratio = self.aspect_ratio();
 
+        let mut command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
+        .update_text_cache(&mut self.draw_text)
+        .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
+            color: [0.0, 0.0, 0.0, 1.0]
+        });
+
         match render.state {
-            GameState::Local  => { },
+            GameState::Local  => { }
             GameState::Paused => {
                 // TODO: blue vaporwavey background lines to indicate pause :D
                 // also double as measuring/scale lines
                 // configurable size via treeflection
                 // but this might be desirable to have during normal gameplay to, hmmmm....
                 // Just have a 5 second fade in/out time so it doesnt look clunky and can be used during frame advance
-            },
-            _ => { },
+            }
+            _ => { }
         }
-
-        self.game_hud_render(&render.entities);
-
-        let image_num = self.swapchain.acquire_next_image(Duration::new(1, 0)).unwrap();
-        let mut command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
-        .update_text_cache(&mut self.draw_text)
-        .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
-            color: [0.0, 0.0, 0.0, 1.0]
-        });
 
         let stage = render.stage;
         let mut uniforms = self.uniforms.iter();
@@ -453,16 +497,10 @@ impl<'a> VulkanGraphics<'a> {
                 },
             }
         }
-
-        let final_command_buffer = command_buffer
-            .draw_text(&mut self.draw_text, &self.device, &self.queue, self.width, self.height)
-            .draw_end()
-            .build();
-        self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
-        self.swapchain.present(&self.queue, image_num).unwrap();
+        command_buffer.draw_text(&mut self.draw_text, &self.device, &self.queue, self.width, self.height).draw_end().build()
     }
 
-    fn menu_render(&mut self, render: RenderMenu) {
+    fn menu_render(&mut self, render: RenderMenu, image_num: usize) -> Arc<PrimaryCommandBuffer> {
         let mut entities: Vec<MenuEntity> = vec!();
         match render.state {
             RenderMenuState::CharacterSelect (selections, back_counter, back_counter_max) => {
@@ -473,7 +511,6 @@ impl<'a> VulkanGraphics<'a> {
                     if selection.plugged_in {
                         plugged_in_selections.push(selection);
                         plugged_in_controller_indexes.push(i);
-
                     }
                 }
 
@@ -538,7 +575,6 @@ impl<'a> VulkanGraphics<'a> {
             }
         }
 
-        let image_num = self.swapchain.acquire_next_image(Duration::new(1, 0)).unwrap();
         let mut command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
         .update_text_cache(&mut self.draw_text)
         .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
@@ -568,12 +604,7 @@ impl<'a> VulkanGraphics<'a> {
             }
         }
 
-        let final_command_buffer = command_buffer
-            .draw_text(&mut self.draw_text, &self.device, &self.queue, self.width, self.height)
-            .draw_end()
-            .build();
-        self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
-        self.swapchain.present(&self.queue, image_num).unwrap();
+        command_buffer.draw_text(&mut self.draw_text, &self.device, &self.queue, self.width, self.height).draw_end().build()
     }
 
     // TODO: Rewrite text rendering to be part of scene instead of just plastered on top
@@ -590,7 +621,6 @@ impl<'a> VulkanGraphics<'a> {
             buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
         }
 
-        // TODO:
         entities.push(MenuEntity::Rect (RenderRect {
             p1: ( -1.0, -0.85),
             p2: (back_counter as f32 / back_counter_max as f32 * 2.0 - 1.0, -1.0),
