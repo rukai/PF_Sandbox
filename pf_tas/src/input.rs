@@ -1,8 +1,6 @@
-use camera::Camera;
 
 use winit::ElementState::{Pressed, Released};
-use winit::{Event, MouseScrollDelta, VirtualKeyCode, MouseButton};
-use std::sync::mpsc::{Sender, Receiver, channel};
+use winit::{Event, MouseScrollDelta, VirtualKeyCode, MouseButton, PollEventsIterator};
 
 struct CurrentInput {
     pub mouse_actions:    Vec<MouseAction>,
@@ -73,50 +71,42 @@ impl CurrentInput {
         }
     }
 
-    /// Convert a mouse point to the corresponding in game point
-    pub fn mouse_to_game(&self, mouse_point: (i32, i32), camera: &Camera) -> (f32, f32) {
+    /// Convert a mouse point from window coorinates to between -1 and 1
+    pub fn mouse_to_float(&self, mouse_point: (i32, i32)) -> (f32, f32) {
         let (m_x, m_y) = mouse_point;
         let (m_x, m_y) = (m_x as f32, m_y as f32);
         let (w, h) = self.resolution;
         let (w, h) = (w as f32, h as f32);
 
-        let zoom = camera.zoom as f32;
-        let (pan_x, pan_y) = camera.pan;
-        let (pan_x, pan_y) = (pan_x as f32, pan_y as f32);
-
         let (width, height) = self.resolution;
         let aspect_ratio = width as f32 / height as f32;
 
-        let x = zoom * ( 2.0 * m_x / w - 1.0)                - pan_x;
-        let y = zoom * (-2.0 * m_y / h + 1.0) / aspect_ratio - pan_y;
+        let x =   2.0 * m_x / w - 1.0;
+        let y = (-2.0 * m_y / h + 1.0) / aspect_ratio;
         (x, y)
     }
 }
 
-pub struct OsInput {
+pub struct Input {
     current: Option<CurrentInput>,
     quit:    bool,
-    rx:      Receiver<Event>,
 }
 
-impl OsInput {
-    pub fn new() -> (OsInput, Sender<Event>) {
-        let (tx, rx) = channel();
-        let os_input = OsInput {
+impl Input {
+    pub fn new() -> Input {
+        Input {
             current: Some(CurrentInput::new()),
             quit:    false,
-            rx:      rx,
-        };
-        (os_input, tx)
+        }
     }
 
     /// Called every frame
-    pub fn update(&mut self) {
+    pub fn update(&mut self, events: PollEventsIterator) {
         if let Some(ref mut current) = self.current {
             current.update();
         }
 
-        while let Ok(event) = self.rx.try_recv() {
+        for event in events {
             match event {
                 Event::Closed         => { self.quit = true; },
                 Event::Focused(false) => { self.current = None; },
@@ -227,10 +217,10 @@ impl OsInput {
         }
     }
 
-    pub fn game_mouse(&self, camera: &Camera) -> Option<(f32, f32)> {
+    pub fn float_mouse(&self) -> Option<(f32, f32)> {
         if let Some(ref current) = self.current {
             if let Some(point) = current.mouse_point {
-                return Some(current.mouse_to_game(point, camera));
+                return Some(current.mouse_to_float(point));
             }
         }
         None
@@ -247,12 +237,12 @@ impl OsInput {
         (0, 0)
     }
 
-    pub fn game_mouse_diff(&self, camera: &Camera) -> (f32, f32) {
+    pub fn float_mouse_diff(&self) -> (f32, f32) {
         if let Some(ref current_input) = self.current {
             if let Some(cur) = current_input.mouse_point {
                 if let Some(prev) = current_input.mouse_point_prev {
-                    let cur  = current_input.mouse_to_game(cur, camera);
-                    let prev = current_input.mouse_to_game(prev, camera);
+                    let cur  = current_input.mouse_to_float(cur);
+                    let prev = current_input.mouse_to_float(prev);
                     return (cur.0 - prev.0, cur.1 - prev.1);
                 }
             }

@@ -1,0 +1,13 @@
+[package]
+name = "pf_tas"
+version = "0.1.0"
+authors = ["Rukai <rubickent@gmail.com>"]
+
+[dependencies]
+winit = "0.5"
+vulkano = "0.3"
+vulkano-win = "0.3"
+vulkano_text = "0.1"
+
+[build-dependencies]
+vulkano-shaders = "0.3"
