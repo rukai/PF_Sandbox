@@ -8,6 +8,9 @@ winit = "0.5"
 vulkano = "0.3"
 vulkano-win = "0.3"
 vulkano_text = "0.1"
+serde_json = "0.9"
+serde_derive = "0.9"
+serde = "0.9"
 
 [build-dependencies]
 vulkano-shaders = "0.3"

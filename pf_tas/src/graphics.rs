@@ -28,6 +28,7 @@ use std::collections::HashSet;
 
 use buffers::{Vertex, Buffers};
 use input::Input;
+use state::State;
 
 pub mod vs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/vertex.glsl")} }
 pub mod fs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/fragment.glsl")} }
@@ -224,6 +225,6 @@ impl<'a> Graphics<'a> {
         self.window.window().poll_events()
     }
 
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self, state: &State) {
     }
 }

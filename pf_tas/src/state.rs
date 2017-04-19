@@ -15,14 +15,14 @@ pub enum Flow {
 }
 
 pub struct State {
-    controllers:             Vec<Controller>,
-    current_controller:      usize,
-    display_all_controllers: bool,
-    use_aspect_ratio:        bool,
-    display_analog_as_float: bool,
-    touchtype:               bool,
-    flow:                    Flow,
-    number:                  NumberInput,
+    pub controllers:             Vec<Controller>,
+    pub current_controller:      usize,
+    pub display_all_controllers: bool,
+    pub use_aspect_ratio:        bool,
+    pub display_analog_as_float: bool,
+    pub touchtype:               bool,
+    pub flow:                    Flow,
+    number:                      NumberInput,
 }
 
 impl State {
@@ -150,6 +150,12 @@ impl State {
 
         // Key -> GC mapping
         let controller = &mut self.controllers[self.current_controller];
+
+        State::map_button(input, VirtualKeyCode::Up,    &mut controller.up);
+        State::map_button(input, VirtualKeyCode::Down,  &mut controller.down);
+        State::map_button(input, VirtualKeyCode::Left,  &mut controller.left);
+        State::map_button(input, VirtualKeyCode::Right, &mut controller.right);
+
         State::map_button(input, VirtualKeyCode::A, &mut controller.a);
         State::map_button(input, VirtualKeyCode::S, &mut controller.b);
         State::map_button(input, VirtualKeyCode::D, &mut controller.x);
@@ -176,13 +182,13 @@ impl State {
             };
         }
         else if input.key_pressed(VirtualKeyCode::Space) {
-            self.flow = Flow::StepFrames(self.number.frames());
+            self.flow = Flow::StepFrames(self.number.pop_frames());
         }
         else if input.key_pressed(VirtualKeyCode::Z) {
-            self.flow = Flow::RewindFrames(self.number.frames());
+            self.flow = Flow::RewindFrames(self.number.pop_frames());
         }
         else if input.key_pressed(VirtualKeyCode::X) {
-            self.flow = Flow::ReplayFrames(self.number.frames());
+            self.flow = Flow::ReplayFrames(self.number.pop_frames());
         }
         else if input.key_pressed(VirtualKeyCode::C) {
             self.flow = Flow::Rewind;
@@ -206,10 +212,10 @@ impl State {
     fn map_stick(input: &Input, key: VirtualKeyCode, button: &mut ElementStick, number: &mut NumberInput) {
         if input.key_pressed(key) {
             if input.held_shift() {
-                button.hold(number.stick());
+                button.hold(number.pop_stick());
             }
             else {
-                button.press(number.stick());
+                button.press(number.pop_stick());
             }
         }
     }
@@ -217,10 +223,10 @@ impl State {
     fn map_trigger(input: &Input, key: VirtualKeyCode, button: &mut ElementTrigger, number: &mut NumberInput) {
         if input.key_pressed(key) {
             if input.held_shift() {
-                button.hold(number.trigger());
+                button.hold(number.pop_trigger());
             }
             else {
-                button.press(number.trigger());
+                button.press(number.pop_trigger());
             }
         }
     }
@@ -257,19 +263,21 @@ impl NumberInput {
 
     // users
 
-    pub fn stick(&mut self) -> i8 {
+    pub fn pop_stick(&mut self) -> i8 {
         let value_i8 = cmp::min(self.value, i8::max_value() as u64) as i8;
         self.value = 0;
+        self.negative = false;
         (value_i8).saturating_mul(if self.negative { -1 } else { 1 })
     }
 
-    pub fn trigger(&mut self) -> u8 {
+    pub fn pop_trigger(&mut self) -> u8 {
         let value_u8 = cmp::min(self.value, u8::max_value() as u64) as u8;
         self.value = 0;
+        self.negative = false;
         value_u8
     }
 
-    pub fn frames(&mut self) -> u64 {
+    pub fn pop_frames(&mut self) -> u64 {
         let result = self.value;
         self.value = 0;
         if result == 0 {
