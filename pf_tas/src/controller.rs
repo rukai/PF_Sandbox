@@ -1,14 +1,17 @@
+#[derive(Debug)]
 pub enum ElementButton {
     None,
     Press,
     Hold,
 }
 
+#[derive(Debug)]
 pub enum ElementStick {
     Press (i8),
     Hold (i8),
 }
 
+#[derive(Debug)]
 pub enum ElementTrigger {
     Press (u8),
     Hold (u8),

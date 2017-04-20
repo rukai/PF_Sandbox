@@ -3,7 +3,7 @@ use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
 use vulkano;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::command_buffer::{PrimaryCommandBuffer, PrimaryCommandBufferBuilder, Submission, DynamicState};
+use vulkano::command_buffer::{PrimaryCommandBufferBuilder, Submission};
 use vulkano::command_buffer;
 use vulkano::descriptor::descriptor_set::DescriptorPool;
 use vulkano::device::{Device, Queue};
@@ -18,16 +18,12 @@ use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::{ViewportsState, Viewport, Scissor};
 use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineParams};
 use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentError};
-use winit::{Event, WindowBuilder, PollEventsIterator};
+use winit::{WindowBuilder, PollEventsIterator};
 
 use std::sync::Arc;
-use std::sync::mpsc::{Sender, Receiver, channel};
-use std::thread;
 use std::time::Duration;
-use std::collections::HashSet;
 
 use buffers::{Vertex, Buffers};
-use input::Input;
 use state::State;
 
 pub mod vs { include!{concat!(env!("OUT_DIR"), "/shaders/src/shaders/vertex.glsl")} }
@@ -225,6 +221,82 @@ impl<'a> Graphics<'a> {
         self.window.window().poll_events()
     }
 
+    // TODO: Resizing will currently crash
+    // We are waiting on the vulkano rewrite to fix this: https://github.com/tomaka/vulkano/issues/366
+    fn window_resize(&mut self, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
+        let (new_swapchain, new_images) = self.swapchain.recreate_with_dimension([width, height]).unwrap();
+        self.swapchain = new_swapchain;
+
+        self.render_pass = render_pass::CustomRenderPass::new(
+            &self.device, &render_pass::Formats { color: (new_images[0].format(), 1) }
+        ).unwrap();
+
+        self.framebuffers = Graphics::gen_framebuffers(&new_images, &self.render_pass);
+
+        let (uniforms, pipeline) = Graphics::pipeline(&self.device, &self.queue, &new_images, &self.render_pass);
+        self.pipeline = pipeline;
+        self.uniforms = uniforms;
+
+        self.draw_text = DrawText::new(&self.device, &self.queue, &new_images);
+    }
+
+    // TODO: Render nice GUI with controller diagrams etc
     pub fn draw(&mut self, state: &State) {
+        self.submissions.retain(|s| s.destroying_would_block());
+
+        let (new_width, new_height) = self.window.window().get_inner_size_points().unwrap();
+        if self.width != new_width || self.height != new_height {
+            self.window_resize(new_width, new_height);
+        }
+
+        let image_num = match self.swapchain.acquire_next_image(Duration::new(1, 0)) {
+            Ok(img) => { img }
+            Err(AcquireError::OutOfDate) => {
+                // Just abort this render, the user wont care about losing some frames while resizing. Internal rendering size will be fixed by next frame.
+                return;
+            }
+            Err(err) => { panic!("{:?}", err) }
+        };
+
+        let controller = &state.controllers[state.current_controller];
+        self.draw_text.queue_text(100.0, 20.0,  20.0, [1.0, 1.0, 1.0, 1.0], &format!("Controller port: {}/{}", state.current_controller + 1, state.controllers.len()));
+        self.draw_text.queue_text(100.0, 40.0,  20.0, [1.0, 1.0, 1.0, 1.0], &format!("A: {:?}", controller.a));
+        self.draw_text.queue_text(100.0, 60.0,  20.0, [1.0, 1.0, 1.0, 1.0], &format!("B: {:?}", controller.b));
+        self.draw_text.queue_text(100.0, 80.0,  20.0, [1.0, 1.0, 1.0, 1.0], &format!("X: {:?}", controller.x));
+        self.draw_text.queue_text(100.0, 100.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Y: {:?}", controller.y));
+        self.draw_text.queue_text(100.0, 120.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Z: {:?}", controller.z));
+        self.draw_text.queue_text(100.0, 140.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("L: {:?}", controller.l));
+        self.draw_text.queue_text(100.0, 160.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("R: {:?}", controller.r));
+        self.draw_text.queue_text(100.0, 180.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Stick X: {:?}", controller.stick_x));
+        self.draw_text.queue_text(100.0, 200.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Stick Y: {:?}", controller.stick_y));
+        self.draw_text.queue_text(100.0, 220.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("C Stick X: {:?}", controller.c_stick_y));
+        self.draw_text.queue_text(100.0, 240.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("C Stick Y: {:?}", controller.c_stick_y));
+        self.draw_text.queue_text(100.0, 260.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("L Trigger: {:?}", controller.l_trigger));
+        self.draw_text.queue_text(100.0, 280.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("R Trigger: {:?}", controller.r_trigger));
+        self.draw_text.queue_text(100.0, 300.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Dpad Left: {:?}", controller.left));
+        self.draw_text.queue_text(100.0, 320.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Dpad Right: {:?}", controller.right));
+        self.draw_text.queue_text(100.0, 340.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Dpad Down: {:?}", controller.down));
+        self.draw_text.queue_text(100.0, 360.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Dpad Up: {:?}", controller.up));
+
+        let command_buffer = PrimaryCommandBufferBuilder::new(&self.device, self.queue.family())
+        .update_text_cache(&mut self.draw_text)
+        .draw_inline(&self.render_pass, &self.framebuffers[image_num], render_pass::ClearValues {
+            color: [0.0, 0.0, 0.0, 1.0]
+        });
+
+        // TODO: Render here
+
+        let final_command_buffer = command_buffer.draw_text(&mut self.draw_text, &self.device, &self.queue, self.width, self.height).draw_end().build();
+        self.submissions.push(command_buffer::submit(&final_command_buffer, &self.queue).unwrap());
+
+        match self.swapchain.present(&self.queue, image_num) {
+            Ok(_) => { }
+            Err(PresentError::OutOfDate) => {
+                // Just abort this render, the user wont care about losing some frames while resizing. Internal rendering size will be fixed by next frame.
+            }
+            Err(err) => { panic!("{:?}", err) }
+        }
     }
 }

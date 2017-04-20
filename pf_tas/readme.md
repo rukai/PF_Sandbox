@@ -45,7 +45,8 @@ Enter a number with 1234567890 before some of these keys to change the number of
 
 ### Config
 
-*   F1-F12 select a controller
+*   F1-F12 Select a controller
+*   }/{    Add/remove controller
 
 *   Q - Toggle between display all controllers / display selected controller
 *   W - Toggle stretch display / force aspect ratio
