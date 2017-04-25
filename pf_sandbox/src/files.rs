@@ -8,7 +8,8 @@ use std::io::Write;
 use std::io::Cursor;
 
 use curl::easy::Easy;
-use serde::{Serialize, Deserialize};
+use serde::ser::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use serde_json;
 use zip::ZipArchive;
@@ -36,7 +37,7 @@ pub fn load_json(filename: PathBuf) -> Option<Value> {
 }
 
 /// Load the json file at the passed URL directly into a struct
-pub fn load_struct_from_url<T: Deserialize>(url: &str) -> Option<T> {
+pub fn load_struct_from_url<T: DeserializeOwned>(url: &str) -> Option<T> {
     if let Some(json_bytes) = load_bin_from_url(url) {
         if let Ok(json) = String::from_utf8(json_bytes) {
             if let Ok(object) = serde_json::from_str(&json) {
