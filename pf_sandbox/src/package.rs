@@ -148,8 +148,8 @@ impl Package {
 
     pub fn save(&mut self) {
         self.meta.save_version += 1;
-        self.meta.hash = self.compute_hash();
         self.meta.fighter_keys = self.fighters.keys();
+        self.meta.hash = self.compute_hash();
 
         // save all json files
         files::save_struct(self.path.join("rules.json"), &self.rules);
@@ -177,7 +177,7 @@ impl Package {
                 let key = full_path.file_name().unwrap().to_str().unwrap().to_string();
 
                 if let Some(fighter) = files::load_json(full_path) {
-                    fighters.insert(key, fighter); // TODO: Issue is probably here
+                    fighters.insert(key, fighter);
                 }
             }
         }
@@ -210,7 +210,7 @@ impl Package {
         assert_eq!(filenames_set.len(), self.stages_filenames.len());
     }
 
-    pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, fighters: HashMap<String, Value>, stages: Vec<Value>) {
+    pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, mut fighters: HashMap<String, Value>, stages: Vec<Value>) {
         if let Some (meta) = meta {
             self.meta = serde_json::from_value(meta).unwrap();
         }
@@ -225,8 +225,15 @@ impl Package {
             self.rules = Rules::default();
         }
     
-        // TODO: Use fighter_keys in package_meta to determine package order, remaining fighters are added in in any order
+        // Use meta.fighter_keys for fighter ordering
         self.fighters = KeyedContextVec::new();
+        for key in &self.meta.fighter_keys {
+            if let Some(fighter) = fighters.remove(key) {
+                self.fighters.push(key.clone(), serde_json::from_value(fighter).unwrap());
+            }
+        }
+
+        // add remaining fighters in any order
         for (key, fighter) in fighters {
             self.fighters.push(key, serde_json::from_value(fighter).unwrap());
         }
