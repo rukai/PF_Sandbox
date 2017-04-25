@@ -189,7 +189,7 @@ impl OpenGLGraphics {
                                 edge_color:      edge_color,
                                 color:           color
                             };
-                            let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
+                            let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
                             if player.frame < fighter_frames.len() {
                                 if let &Some(ref buffers) = &fighter_frames[player.frame] {
                                     target.draw(&buffers.vertex, &buffers.index, &program, uniform, &draw_params).unwrap();

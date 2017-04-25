@@ -1,3 +1,5 @@
+use treeflection::KeyedContextVec;
+
 use ::player::Player;
 use ::fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole};
 
@@ -5,19 +7,17 @@ use ::fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole};
 // atk - player who attacked
 
 /// returns a list of hit results for each player
-pub fn collision_check(players: &[Player], fighters: &[Fighter], selected_fighters: &[usize]) -> Vec<Vec<CollisionResult>> {
+pub fn collision_check(players: &[Player], fighters: &KeyedContextVec<Fighter>, selected_fighters: &[String]) -> Vec<Vec<CollisionResult>> {
     let mut result: Vec<Vec<CollisionResult>> = vec!();
     for _ in players {
         result.push(vec!());
     }
 
     'player_atk: for (player_atk_i, player_atk) in players.iter().enumerate() {
-        let fighter_atk_i = selected_fighters[player_atk_i];
-        let fighter_atk = &fighters[fighter_atk_i];
+        let fighter_atk = &fighters[selected_fighters[player_atk_i].as_ref()];
         for (player_def_i, player_def) in players.iter().enumerate() {
             if player_atk_i != player_def_i && player_atk.hitlist.iter().all(|x| *x != player_def_i) {
-                let fighter_def_i = selected_fighters[player_def_i];
-                let fighter_def = &fighters[fighter_def_i];
+                let fighter_def = &fighters[selected_fighters[player_def_i].as_ref()];
 
                 let frame_atk = &player_atk.relative_frame(&fighter_atk.actions[player_atk.action as usize].frames[player_atk.frame as usize]);
                 let frame_def = &player_def.relative_frame(&fighter_def.actions[player_def.action as usize].frames[player_def.frame as usize]);

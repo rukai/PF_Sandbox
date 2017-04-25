@@ -1228,7 +1228,7 @@ impl Player {
         }
     }
 
-    pub fn render(&self, fighter_color: [f32; 4], fighter: usize, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer) -> RenderPlayer {
+    pub fn render(&self, fighter_color: [f32; 4], fighter: String, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer) -> RenderPlayer {
         RenderPlayer {
             debug:             debug,
             damage:            self.damage,
@@ -1276,7 +1276,7 @@ pub struct RenderPlayer {
     pub ecb:               ECB,
     pub frame:             usize,
     pub action:            usize,
-    pub fighter:           usize,
+    pub fighter:           String,
     pub face_right:        bool,
     pub fighter_color:     [f32; 4],
     pub fighter_selected:  bool,

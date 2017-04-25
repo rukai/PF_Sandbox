@@ -36,7 +36,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
         // default values
         let mut stage = 0usize;
         let netplay = false;
-        let mut fighters: Vec<usize> = vec!(0);
+        let mut fighters: Vec<String> = vec!();
         let mut controllers: Vec<usize> = vec!();
         input.game_update(0); // TODO: is this needed? What can I do to remove it?
         for (i, _) in input.players(0).iter().enumerate() {
@@ -55,8 +55,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
         for choice in &cli_choices {
             match choice {
                 &CLIChoice::Close => { return; }
-                &CLIChoice::FighterIndexes (ref fighters_index) => { load_menu = false; fighters = fighters_index.clone() }
-                &CLIChoice::FighterNames (_)                    => { panic!("Unimplemented") }
+                &CLIChoice::FighterNames (ref fighters_names)   => { load_menu = false; fighters = fighters_names.clone() }
                 &CLIChoice::StageIndex (ref stage_index)        => { load_menu = false; stage = *stage_index }
                 &CLIChoice::StageName (_)                       => { panic!("Unimplemented") }
                 &CLIChoice::Package (ref name)                  => { load_menu = false; package_string = Some(name.clone()); }
@@ -208,7 +207,7 @@ enum NextAppState {
 #[derive(Clone)]
 pub struct GameSetup {
     pub controllers: Vec<usize>,
-    pub fighters:    Vec<usize>,
+    pub fighters:    Vec<String>,
     pub stage:       usize,
     pub netplay:     bool,
 }

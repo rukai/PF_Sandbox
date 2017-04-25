@@ -58,21 +58,7 @@ pub fn cli() -> Vec<CLIChoice> {
             cli_choices.push(CLIChoice::TotalPlayers(players));
         }
     }
-    if let Some(fighter_indexes) = matches.opt_str("F") {
-        let mut result: Vec<usize> = vec!();
-        for fighter_index in fighter_indexes.split(",") {
-            match fighter_index.parse::<usize>() {
-                Ok(fighter_index) => {
-                    result.push(fighter_index);
-                }
-                Err(_) => {
-                    print_usage(&program, opts);
-                    return vec!(CLIChoice::Close);
-                }
-            }
-        }
-        cli_choices.push(CLIChoice::FighterIndexes(result));
-    }
+
     if let Some(fighter_names) = matches.opt_str("f") {
         let mut result: Vec<String> = vec!();
         for fighter_name in fighter_names.split(",") {
@@ -80,6 +66,7 @@ pub fn cli() -> Vec<CLIChoice> {
         }
         cli_choices.push(CLIChoice::FighterNames(result));
     }
+
     if let Some(stage_index) = matches.opt_str("S") {
         if let Ok(stage_index) = stage_index.parse::<usize>() {
             cli_choices.push(CLIChoice::StageIndex(stage_index));
@@ -113,7 +100,6 @@ pub fn cli() -> Vec<CLIChoice> {
 
 pub enum CLIChoice {
     TotalPlayers    (usize),
-    FighterIndexes  (Vec<usize>),
     FighterNames    (Vec<String>),
     StageIndex      (usize),
     StageName       (String),

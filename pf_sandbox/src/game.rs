@@ -30,7 +30,7 @@ pub struct Game {
     pub players:                Vec<Player>,
     pub debug_players:          Vec<DebugPlayer>,
     pub selected_controllers:   Vec<usize>,
-    pub selected_fighters:      Vec<usize>,
+    pub selected_fighters:      Vec<String>,
     pub selected_stage:         usize,
     pub edit:                   Edit,
     pub debug_output_this_step: bool,
@@ -46,7 +46,7 @@ pub struct Game {
 /// All previous frame state is used to calculate the next frame then the current_frame is incremented
 
 impl Game {
-    pub fn new(package: Package, config: Config, selected_fighters: Vec<usize>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
+    pub fn new(package: Package, config: Config, selected_fighters: Vec<String>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
         // generate players
         let mut players:       Vec<Player>      = vec!();
         let mut debug_players: Vec<DebugPlayer> = vec!();
@@ -68,7 +68,7 @@ impl Game {
         if players.len() > selected_fighters.len() {
             let extra = players.len() - selected_fighters.len();
             for i in 0..extra {
-                filled_fighters.push(selected_fighters[i % wrap]);
+                filled_fighters.push(selected_fighters[i % wrap].clone());
             }
         }
 
@@ -123,17 +123,18 @@ impl Game {
     fn set_context(&mut self) {
         match self.edit {
             Edit::Fighter (player) => {
-                let player_fighter = self.selected_fighters[player];
+                let player_fighter = self.selected_fighters[player].as_ref();
                 let player_action = self.players[player].action as usize;
                 let player_frame  = self.players[player].frame as usize;
                 let player_colboxes = self.selector.colboxes_vec();
 
-                let fighters_len = self.package.fighters.len();
                 let fighters = &mut self.package.fighters;
-                if player_fighter >= fighters_len {
-                    return
+                if let Some(fighter_index) = fighters.key_to_index(player_fighter) {
+                    fighters.set_context(fighter_index);
                 }
-                fighters.set_context(player_fighter);
+                else {
+                    return;
+                }
 
                 let actions = &mut fighters[player_fighter].actions;
                 if player_action >= actions.len() {
@@ -264,7 +265,8 @@ impl Game {
 
         match self.edit {
             Edit::Fighter (player) => {
-                let fighter = self.selected_fighters[player];
+                let fighter_string = self.selected_fighters[player].clone();
+                let fighter = fighter_string.as_ref();
                 let action = self.players[player].action as usize;
                 let frame  = self.players[player].frame as usize;
                 self.set_debug(os_input, player);
@@ -309,8 +311,9 @@ impl Game {
                             // This is purely to stay on the same action for usability.
                             // The player itself must handle being on a frame that has been deleted in order for replays to work.
                             for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
-                                if self.selected_fighters[i] == fighter && any_player.action as usize == action
-                                    && any_player.frame as usize == self.package.fighters[fighter].actions[action].frames.len() {
+                                if &self.selected_fighters[i] == fighter && any_player.action as usize == action
+                                    && any_player.frame as usize == self.package.fighters[fighter].actions[action].frames.len()
+                                {
                                     any_player.frame -= 1;
                                 }
                             }
@@ -597,7 +600,7 @@ impl Game {
 
             // step each player
             for (i, player) in (&mut *self.players).iter_mut().enumerate() {
-                let fighter = &self.package.fighters[self.selected_fighters[i]];
+                let fighter = &self.package.fighters[self.selected_fighters[i].as_ref()];
                 let input = &player_input[self.selected_controllers[i]];
                 player.step(input, fighter, stage, self.current_frame, self.package.rules.goal.clone());
             }
@@ -605,7 +608,7 @@ impl Game {
             // check collisions
             let collision_results = collision_check(&self.players, &self.package.fighters, &self.selected_fighters);
             for (i, player) in (&mut *self.players).iter_mut().enumerate() {
-                let fighter = &self.package.fighters[self.selected_fighters[i]];
+                let fighter = &self.package.fighters[self.selected_fighters[i].as_ref()];
                 player.step_collision(fighter, &collision_results[i]);
             }
 
@@ -703,7 +706,7 @@ impl Game {
                 player_result.lcancel_success as f32 / player_result.lcancel_attempts as f32
             };
             game_results.push(GameResult {
-                fighter:         self.selected_fighters[i],
+                fighter:         self.selected_fighters[i].clone(),
                 controller:      self.selected_controllers[i],
                 place:           places[i],
                 kills:           vec!(), // TODO
@@ -723,7 +726,7 @@ impl Game {
         println!("Frame: {}    state: {:?}", frame, self.state);
 
         for (i, player) in self.players.iter().enumerate() {
-            let fighter = &self.package.fighters[self.selected_fighters[i]];
+            let fighter = &self.package.fighters[self.selected_fighters[i].as_ref()];
             let player_input = &player_inputs[i];
             let debug_player = &self.debug_players[i];
             player.debug_print(fighter, player_input, debug_player, i);
@@ -767,7 +770,7 @@ impl Game {
             }
 
             let color = graphics::get_controller_color(self.selected_controllers[i]);
-            entities.push(RenderEntity::Player(player.render(color, self.selected_fighters[i], selected_colboxes, fighter_selected, player_selected, debug)));
+            entities.push(RenderEntity::Player(player.render(color, self.selected_fighters[i].clone(), selected_colboxes, fighter_selected, player_selected, debug)));
         }
 
         // stage areas

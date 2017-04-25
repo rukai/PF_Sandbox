@@ -432,7 +432,7 @@ impl<'a> VulkanGraphics<'a> {
                             }
 
                             // draw fighter
-                            let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
+                            let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
                             if player.frame < fighter_frames.len() {
                                 if let &Some(ref buffers) = &fighter_frames[player.frame] {
                                     command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
@@ -459,7 +459,7 @@ impl<'a> VulkanGraphics<'a> {
                             buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
                             buffer_content.color           = [0.0, 1.0, 0.0, 1.0];
                         }
-                        let buffers = self.package_buffers.fighter_frame_colboxes(&self.device, &self.queue, player.fighter, player.action, player.frame, &player.selected_colboxes);
+                        let buffers = self.package_buffers.fighter_frame_colboxes(&self.device, &self.queue, &player.fighter, player.action, player.frame, &player.selected_colboxes);
                         command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
                     }
 
@@ -584,7 +584,7 @@ impl<'a> VulkanGraphics<'a> {
         for (i, entity) in entities.iter().enumerate() {
             let uniform = &self.uniforms[i].set;
             match entity {
-                &MenuEntity::Fighter { fighter, action, frame } => {
+                &MenuEntity::Fighter { ref fighter, action, frame } => {
                     let fighter_frames = &self.package_buffers.fighters[fighter][action];
                     if frame < fighter_frames.len() {
                         if let &Some(ref buffers) = &fighter_frames[frame] {
@@ -657,7 +657,7 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn draw_player_result(&mut self, result: &GameResult, start_x: f32) {
-        let fighter_name = self.package_buffers.package.as_ref().unwrap().fighters[result.fighter].name.as_ref();
+        let fighter_name = self.package_buffers.package.as_ref().unwrap().fighters[result.fighter.as_ref()].name.as_ref();
         let color = graphics::get_controller_color(result.controller);
         let x = (start_x + 0.05) * self.width as f32;
         let mut y = 100.0;
@@ -675,7 +675,8 @@ impl<'a> VulkanGraphics<'a> {
     fn draw_fighter_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, controller_i: usize, selection: &CharacterSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
         self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Fighters");
         let fighters = &self.package_buffers.package.as_ref().unwrap().fighters;
-        for (fighter_i, fighter) in fighters.iter().enumerate() {
+        for (fighter_i, fighter) in fighters.key_value_iter().enumerate() {
+            let (fighter_key, fighter) = fighter;
             let x_offset = if fighter_i == selection.ticker.cursor { 0.1 } else { 0.0 };
             let x = ((start_x+1.0 + x_offset) / 2.0) * self.width  as f32;
             let y = ((start_y+1.0           ) / 2.0) * self.height as f32 + fighter_i as f32 * 50.0;
@@ -696,7 +697,7 @@ impl<'a> VulkanGraphics<'a> {
                         ecb:               ECB::default(),
                         frame:             0,
                         action:            Action::Idle as usize,
-                        fighter:           fighter_i,
+                        fighter:           fighter_key.clone(),
                         face_right:        start_x < 0.0,
                         fighter_color:     color,
                         fighter_selected:  false,
@@ -705,7 +706,7 @@ impl<'a> VulkanGraphics<'a> {
                     };
 
                     // draw fighter
-                    let fighter_frames = &self.package_buffers.fighters[player.fighter][player.action];
+                    let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
                     if player.frame < fighter_frames.len() {
                         // TODO: dynamically calculate position and zoom (fit width/height of fighter into selection area)
                         let zoom = 40.0;
@@ -794,7 +795,7 @@ impl<'a> VulkanGraphics<'a> {
 }
 
 enum MenuEntity {
-    Fighter { fighter: usize, action: usize, frame: usize },
+    Fighter { fighter: String, action: usize, frame: usize },
     Stage   (usize),
     Rect    (RenderRect),
 }

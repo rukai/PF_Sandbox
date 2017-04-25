@@ -2,7 +2,7 @@ use treeflection::{Node, NodeRunner, NodeToken};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct GameResult {
-    pub fighter:          usize,
+    pub fighter:          String,
     pub controller:       usize,
     pub place:            usize,
     pub kills:            Vec<DeathRecord>,

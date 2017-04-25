@@ -5,6 +5,8 @@ use ::package::{Package, PackageUpdate};
 use ::player::RenderPlayer;
 use ::stage::Stage;
 
+use std::collections::HashMap;
+
 use glium;
 use glium::backend::glutin_backend::GlutinFacade;
 
@@ -257,7 +259,7 @@ impl Buffers {
 
 pub struct PackageBuffers {
     pub stages:   Vec<Buffers>,
-    pub fighters: Vec<Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
+    pub fighters: HashMap<String, Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
     pub package:  Option<Package>,
 }
 
@@ -265,7 +267,7 @@ impl PackageBuffers {
     pub fn new() -> PackageBuffers {
         let package_buffers = PackageBuffers {
             stages:   vec!(),
-            fighters: vec!(),
+            fighters: HashMap::new(),
             package:  None,
         };
         package_buffers
@@ -276,9 +278,9 @@ impl PackageBuffers {
             match update {
                 PackageUpdate::Package (package) => {
                     self.stages = vec!();
-                    self.fighters = vec!();
+                    self.fighters = HashMap::new();
 
-                    for fighter in &package.fighters[..] { // TODO: Whats up with the deref coercion?
+                    for (key, fighter) in package.fighters.key_value_iter() {
                         let mut action_buffers: Vec<Vec<Option<Buffers>>> = vec!();
                         for action in &fighter.actions[..] {
                             let mut frame_buffers: Vec<Option<Buffers>> = vec!();
@@ -287,7 +289,7 @@ impl PackageBuffers {
                             }
                             action_buffers.push(frame_buffers);
                         }
-                        self.fighters.push(action_buffers);
+                        self.fighters.insert(key.clone(), action_buffers);
                     }
 
                     for stage in &package.stages[..] {
@@ -296,14 +298,16 @@ impl PackageBuffers {
                     self.package = Some(package);
                 }
                 PackageUpdate::DeleteFighterFrame { fighter, action, frame_index } => {
-                    self.fighters[fighter][action].remove(frame_index);
+                    let fighter: &str = &fighter;
+                    self.fighters.get_mut(fighter).unwrap()[action].remove(frame_index);
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.fighters[fighter].actions[action].frames.remove(frame_index);
                     }
                 }
                 PackageUpdate::InsertFighterFrame { fighter, action, frame_index, frame } => {
+                    let fighter: &str = &fighter;
                     let buffers = Buffers::new_fighter_frame(display, &frame);
-                    self.fighters[fighter][action].insert(frame_index, buffers);
+                    self.fighters.get_mut(fighter).unwrap()[action].insert(frame_index, buffers);
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.fighters[fighter].actions[action].frames.insert(frame_index, frame);
                     }

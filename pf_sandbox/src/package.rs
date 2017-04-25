@@ -1,9 +1,9 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
 use serde_json::Value;
 use serde_json;
-use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
+use treeflection::{Node, NodeRunner, NodeToken, ContextVec, KeyedContextVec};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
@@ -33,6 +33,7 @@ pub fn generate_example_stub() {
             title:          "Example Package".to_string(),
             source:         "lucaskent.me/example_package".to_string(),
             hash:           "".to_string(),
+            fighter_keys:   vec!(),
         };
         files::save_struct(path, &meta);
     }
@@ -66,9 +67,8 @@ pub struct Package {
     pub meta:               PackageMeta,
     pub rules:              Rules,
     pub stages:             ContextVec<Stage>,
-    pub fighters:           ContextVec<Fighter>,
+    pub fighters:           KeyedContextVec<Fighter>,
         stages_filenames:   Vec<String>,
-        fighters_filenames: Vec<String>,
         package_updates:    Vec<PackageUpdate>,
 }
 
@@ -90,6 +90,7 @@ impl Package {
             title:           "".to_string(),
             source:          "".to_string(),
             hash:            "".to_string(),
+            fighter_keys:    vec!(),
         };
 
         let mut package = Package {
@@ -97,8 +98,7 @@ impl Package {
             path:               path,
             rules:              Rules::base(),
             stages:             ContextVec::new(),
-            fighters:           ContextVec::new(),
-            fighters_filenames: vec!(),
+            fighters:           KeyedContextVec::new(),
             stages_filenames:   vec!(),
             package_updates:    vec!(),
         };
@@ -116,6 +116,7 @@ impl Package {
             title:           "New Package".to_string(),
             source:          "DELET THIS".to_string(), // TODO: include option to disable source functionality and use it here
             hash:            "".to_string(),
+            fighter_keys:    vec!(),
         };
 
         let mut package = Package {
@@ -123,8 +124,7 @@ impl Package {
             rules:              Rules::base(),
             stages:             ContextVec::from_vec(vec!(Stage::base())),
             stages_filenames:   vec!(path.join("Stages").join("base_stage.json").to_str().unwrap().to_string()),
-            fighters:           ContextVec::from_vec(vec!(Fighter::base())),
-            fighters_filenames: vec!(path.join("Fighters").join("base_fighter.json").to_str().unwrap().to_string()),
+            fighters:           KeyedContextVec::from_vec(vec!((String::from("base_fighter.json"), Fighter::base()))),
             path:               path,
             package_updates:    vec!(),
         };
@@ -149,13 +149,14 @@ impl Package {
     pub fn save(&mut self) {
         self.meta.save_version += 1;
         self.meta.hash = self.compute_hash();
+        self.meta.fighter_keys = self.fighters.keys();
 
         // save all json files
         files::save_struct(self.path.join("rules.json"), &self.rules);
         files::save_struct(self.path.join("package_meta.json"), &self.meta);
 
-        for (i, filename) in self.fighters_filenames.iter().enumerate() {
-            files::save_struct(PathBuf::from(filename), &self.fighters[i]);
+        for (key, fighter) in self.fighters.key_value_iter() {
+            files::save_struct(self.path.join("Fighters").join(key), fighter);
         }
         
         for (i, filename) in self.stages_filenames.iter().enumerate() {
@@ -164,29 +165,32 @@ impl Package {
     }
 
     pub fn load(&mut self) {
-        self.fighters_filenames = vec!();
         self.stages_filenames = vec!();
 
         let mut meta = files::load_json(self.path.join("package_meta.json"));
         let mut rules = files::load_json(self.path.join("rules.json"));
 
-        let mut fighters: Vec<Option<Value>> = vec!();
+        let mut fighters: HashMap<String, Value> = HashMap::new();
         if let Ok (dir) = fs::read_dir(self.path.join("Fighters")) {
             for path in dir {
                 let full_path = path.unwrap().path();
-                self.fighters_filenames.push(full_path.to_str().unwrap().to_string());
+                let key = full_path.file_name().unwrap().to_str().unwrap().to_string();
 
-                fighters.push(files::load_json(full_path));
+                if let Some(fighter) = files::load_json(full_path) {
+                    fighters.insert(key, fighter); // TODO: Issue is probably here
+                }
             }
         }
 
-        let mut stages: Vec<Option<Value>> = vec!();
+        let mut stages: Vec<Value> = vec!();
         if let Ok (dir) = fs::read_dir(self.path.join("Stages")) {
             for path in dir {
                 let full_path = path.unwrap().path();
                 self.stages_filenames.push(full_path.to_str().unwrap().to_string());
 
-                stages.push(files::load_json(full_path));
+                if let Some(stage) = files::load_json(full_path) {
+                    stages.push(stage);
+                }
             }
         }
 
@@ -201,16 +205,12 @@ impl Package {
         self.force_update_entire_package();
 
         // failsafes
-        assert_eq!(self.fighters_filenames.len(), self.fighters.len());
-        let filenames_set: HashSet<String> = self.fighters_filenames.clone().into_iter().collect();
-        assert_eq!(filenames_set.len(), self.fighters_filenames.len());
-
         assert_eq!(self.stages_filenames.len(), self.stages.len());
         let filenames_set: HashSet<String> = self.stages_filenames.clone().into_iter().collect();
         assert_eq!(filenames_set.len(), self.stages_filenames.len());
     }
 
-    pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, fighters: Vec<Option<Value>>, stages: Vec<Option<Value>>) {
+    pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, fighters: HashMap<String, Value>, stages: Vec<Value>) {
         if let Some (meta) = meta {
             self.meta = serde_json::from_value(meta).unwrap();
         }
@@ -225,24 +225,15 @@ impl Package {
             self.rules = Rules::default();
         }
     
-        self.fighters = ContextVec::new();
-        for fighter in fighters {
-            if let Some (fighter) = fighter {
-                self.fighters.push(serde_json::from_value(fighter).unwrap());
-            }
-            else {
-                self.fighters.push(Fighter::default());
-            }
+        // TODO: Use fighter_keys in package_meta to determine package order, remaining fighters are added in in any order
+        self.fighters = KeyedContextVec::new();
+        for (key, fighter) in fighters {
+            self.fighters.push(key, serde_json::from_value(fighter).unwrap());
         }
 
         self.stages = ContextVec::new();
         for stage in stages {
-            if let Some (stage) = stage {
-                self.stages.push(serde_json::from_value(stage).unwrap());
-            }
-            else {
-                self.stages.push(Stage::default());
-            }
+            self.stages.push(serde_json::from_value(stage).unwrap());
         }
     }
 
@@ -297,7 +288,7 @@ impl Package {
         }
     }
 
-    pub fn new_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) {
+    pub fn new_fighter_frame(&mut self, fighter: &str, action: usize, frame: usize) {
         let new_frame = {
             let action_frames = &self.fighters[fighter].actions[action].frames;
             action_frames[frame].clone()
@@ -305,27 +296,27 @@ impl Package {
         self.insert_fighter_frame(fighter, action, frame, new_frame);
     }
 
-    pub fn insert_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize, action_frame: ActionFrame) {
+    pub fn insert_fighter_frame(&mut self, fighter: &str, action: usize, frame: usize, action_frame: ActionFrame) {
         let mut action_frames = &mut self.fighters[fighter].actions[action].frames;
 
         action_frames.insert(frame, action_frame.clone());
 
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
             frame:       action_frame,
         });
     }
 
-    pub fn delete_fighter_frame(&mut self, fighter: usize, action: usize, frame: usize) -> bool {
+    pub fn delete_fighter_frame(&mut self, fighter: &str, action: usize, frame: usize) -> bool {
         let mut action_frames = &mut self.fighters[fighter].actions[action].frames;
 
         if action_frames.len() > 1 {
             action_frames.remove(frame);
 
             self.package_updates.push(PackageUpdate::DeleteFighterFrame {
-                fighter:     fighter,
+                fighter:     fighter.to_string(),
                 action:      action,
                 frame_index: frame,
             });
@@ -339,7 +330,7 @@ impl Package {
     /// the added collisionbox is linked to the specified collisionboxes
     /// returns the index the collisionbox was added to.
     pub fn append_fighter_colbox(
-        &mut self, fighter: usize, action: usize, frame: usize,
+        &mut self, fighter: &str, action: usize, frame: usize,
         new_colbox: CollisionBox, link_to: &HashSet<usize>, link_type: LinkType
     ) -> usize {
         let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
@@ -361,12 +352,12 @@ impl Package {
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
         });
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
             frame:       fighter_frame.clone(),
@@ -375,7 +366,7 @@ impl Package {
         new_colbox_index
     }
 
-    pub fn delete_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, colboxes_to_delete: &HashSet<usize>) {
+    pub fn delete_fighter_colboxes(&mut self, fighter: &str, action: usize, frame: usize, colboxes_to_delete: &HashSet<usize>) {
         let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             let mut colboxes = &mut fighter_frame.colboxes;
@@ -419,7 +410,7 @@ impl Package {
                 }
                 fighter_frame.colbox_links = new_links;
 
-                // construct a new RendrerOrder vec that is valid after the link deletion
+                // construct a new RenderOrder vec that is valid after the link deletion
                 deleted_links.sort();
                 deleted_links.reverse();
                 for delete_link_i in deleted_links {
@@ -442,19 +433,19 @@ impl Package {
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
         });
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
             frame:       fighter_frame.clone(),
         });
     }
 
-    pub fn move_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, moved_colboxes: &HashSet<usize>, distance: (f32, f32)) {
+    pub fn move_fighter_colboxes(&mut self, fighter: &str, action: usize, frame: usize, moved_colboxes: &HashSet<usize>, distance: (f32, f32)) {
         let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             let mut colboxes = &mut fighter_frame.colboxes;
@@ -467,19 +458,19 @@ impl Package {
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
         });
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
             frame:       fighter_frame.clone(),
         });
     }
 
-    pub fn resize_fighter_colboxes(&mut self, fighter: usize, action: usize, frame: usize, resized_colboxes: &HashSet<usize>, size_diff: f32) {
+    pub fn resize_fighter_colboxes(&mut self, fighter: &str, action: usize, frame: usize, resized_colboxes: &HashSet<usize>, size_diff: f32) {
         let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             let mut colboxes = &mut fighter_frame.colboxes;
@@ -491,12 +482,12 @@ impl Package {
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
         });
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
             frame:       fighter_frame.clone(),
@@ -504,7 +495,7 @@ impl Package {
     }
 
     /// All colboxes or links containing colboxes from reordered_colboxes are sent to the back
-    pub fn fighter_colboxes_send_to_back(&mut self, fighter: usize, action: usize, frame: usize, reordered_colboxes: &HashSet<usize>) {
+    pub fn fighter_colboxes_send_to_back(&mut self, fighter: &str, action: usize, frame: usize, reordered_colboxes: &HashSet<usize>) {
         let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             for reorder_colbox_i in reordered_colboxes {
@@ -537,12 +528,12 @@ impl Package {
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
         });
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
             frame:       fighter_frame.clone(),
@@ -550,7 +541,7 @@ impl Package {
     }
 
     /// All colboxes or links containing colboxes from reordered_colboxes are sent to the front
-    pub fn fighter_colboxes_send_to_front(&mut self, fighter: usize, action: usize, frame: usize, reordered_colboxes: &HashSet<usize>) {
+    pub fn fighter_colboxes_send_to_front(&mut self, fighter: &str, action: usize, frame: usize, reordered_colboxes: &HashSet<usize>) {
         let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             for reorder_i in reordered_colboxes {
@@ -582,12 +573,12 @@ impl Package {
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
         });
         self.package_updates.push(PackageUpdate::InsertFighterFrame {
-            fighter:     fighter,
+            fighter:     fighter.to_string(),
             action:      action,
             frame_index: frame,
             frame:       fighter_frame.clone(),
@@ -641,8 +632,8 @@ pub enum Verify {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum PackageUpdate {
     Package (Package),
-    DeleteFighterFrame { fighter: usize, action: usize, frame_index: usize },
-    InsertFighterFrame { fighter: usize, action: usize, frame_index: usize, frame: ActionFrame },
+    DeleteFighterFrame { fighter: String, action: usize, frame_index: usize },
+    InsertFighterFrame { fighter: String, action: usize, frame_index: usize, frame: ActionFrame },
     DeleteStage { stage_index: usize },
     InsertStage { stage_index: usize, stage: Stage },
 }
@@ -654,4 +645,5 @@ pub struct PackageMeta {
     pub title:           String,
     pub source:          String,
     pub hash:            String,
+    pub fighter_keys:    Vec<String>,
 }

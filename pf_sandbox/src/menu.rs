@@ -226,11 +226,11 @@ impl Menu {
         self.current_frame += 1;
 
         if let MenuState::StartGame = self.state {
-            let mut selected_fighters: Vec<usize> = vec!();
+            let mut selected_fighters: Vec<String> = vec!();
             let mut controllers: Vec<usize> = vec!();
             for (i, selection) in (&self.fighter_selections).iter().enumerate() {
                 if let Some(selection) = selection.selection {
-                    selected_fighters.push(selection);
+                    selected_fighters.push(self.package.get().fighters.index_to_key(selection).unwrap());
                     if player_inputs[i].plugged_in {
                         controllers.push(i);
                     }
@@ -255,7 +255,7 @@ impl Menu {
                 MenuState::PackageSelect (ref names, ref ticker) => { RenderMenuState::PackageSelect (names.clone(), ticker.cursor) }
                 MenuState::GameResults (ref results)             => { RenderMenuState::GameResults (results.clone()) }
                 MenuState::CharacterSelect (back_counter)        => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
-                MenuState::StageSelect    => { RenderMenuState::StageSelect     (self.stage_ticker.as_ref().unwrap().cursor) }
+                MenuState::StageSelect    => { RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor) }
                 MenuState::SetRules       => { RenderMenuState::SetRules }
                 MenuState::BrowsePackages => { RenderMenuState::BrowsePackages }
                 MenuState::CreatePackage  => { RenderMenuState::CreatePackage }
@@ -309,6 +309,7 @@ impl MenuState {
         let len = packages.len();
         MenuState::PackageSelect(packages, MenuTicker::new(len))
     }
+
     pub fn character_select() -> MenuState {
         MenuState::CharacterSelect(0)
     }
