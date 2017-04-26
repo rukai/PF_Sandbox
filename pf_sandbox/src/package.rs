@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use serde_json::Value;
 use serde_json;
-use treeflection::{Node, NodeRunner, NodeToken, ContextVec, KeyedContextVec};
+use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
@@ -34,6 +34,7 @@ pub fn generate_example_stub() {
             source:         "lucaskent.me/example_package".to_string(),
             hash:           "".to_string(),
             fighter_keys:   vec!(),
+            stage_keys:     vec!(),
         };
         files::save_struct(path, &meta);
     }
@@ -66,9 +67,8 @@ pub struct Package {
         path:               PathBuf,
     pub meta:               PackageMeta,
     pub rules:              Rules,
-    pub stages:             ContextVec<Stage>,
+    pub stages:             KeyedContextVec<Stage>,
     pub fighters:           KeyedContextVec<Fighter>,
-        stages_filenames:   Vec<String>,
         package_updates:    Vec<PackageUpdate>,
 }
 
@@ -85,22 +85,22 @@ impl Package {
         path.push(name);
 
         let meta = PackageMeta {
-            engine_version:  engine_version(),
-            save_version:    0,
-            title:           "".to_string(),
-            source:          "".to_string(),
-            hash:            "".to_string(),
-            fighter_keys:    vec!(),
+            engine_version: engine_version(),
+            save_version:   0,
+            title:          "".to_string(),
+            source:         "".to_string(),
+            hash:           "".to_string(),
+            fighter_keys:   vec!(),
+            stage_keys:     vec!(),
         };
 
         let mut package = Package {
-            meta:               meta,
-            path:               path,
-            rules:              Rules::base(),
-            stages:             ContextVec::new(),
-            fighters:           KeyedContextVec::new(),
-            stages_filenames:   vec!(),
-            package_updates:    vec!(),
+            meta:            meta,
+            path:            path,
+            rules:           Rules::base(),
+            stages:          KeyedContextVec::new(),
+            fighters:        KeyedContextVec::new(),
+            package_updates: vec!(),
         };
         package.load();
         package
@@ -111,19 +111,19 @@ impl Package {
         path.push(name);
 
         let meta = PackageMeta {
-            engine_version:  engine_version(),
-            save_version:    0,
-            title:           "New Package".to_string(),
-            source:          "DELET THIS".to_string(), // TODO: include option to disable source functionality and use it here
-            hash:            "".to_string(),
-            fighter_keys:    vec!(),
+            engine_version: engine_version(),
+            save_version:   0,
+            title:          "New Package".to_string(),
+            source:         "DELET THIS".to_string(), // TODO: include option to disable source functionality and use it here
+            hash:           "".to_string(),
+            fighter_keys:   vec!(),
+            stage_keys:     vec!(),
         };
 
         let mut package = Package {
             meta:               meta,
             rules:              Rules::base(),
-            stages:             ContextVec::from_vec(vec!(Stage::base())),
-            stages_filenames:   vec!(path.join("Stages").join("base_stage.json").to_str().unwrap().to_string()),
+            stages:             KeyedContextVec::from_vec(vec!((String::from("base_stage.json"), Stage::base()))),
             fighters:           KeyedContextVec::from_vec(vec!((String::from("base_fighter.json"), Fighter::base()))),
             path:               path,
             package_updates:    vec!(),
@@ -149,6 +149,7 @@ impl Package {
     pub fn save(&mut self) {
         self.meta.save_version += 1;
         self.meta.fighter_keys = self.fighters.keys();
+        self.meta.stage_keys = self.stages.keys();
         self.meta.hash = self.compute_hash();
 
         // save all json files
@@ -159,14 +160,12 @@ impl Package {
             files::save_struct(self.path.join("Fighters").join(key), fighter);
         }
         
-        for (i, filename) in self.stages_filenames.iter().enumerate() {
-            files::save_struct(PathBuf::from(filename), &self.stages[i]);
+        for (key, stage) in self.stages.key_value_iter() {
+            files::save_struct(self.path.join("Stages").join(key), stage);
         }
     }
 
     pub fn load(&mut self) {
-        self.stages_filenames = vec!();
-
         let mut meta = files::load_json(self.path.join("package_meta.json"));
         let mut rules = files::load_json(self.path.join("rules.json"));
 
@@ -182,14 +181,14 @@ impl Package {
             }
         }
 
-        let mut stages: Vec<Value> = vec!();
+        let mut stages: HashMap<String, Value> = HashMap::new();
         if let Ok (dir) = fs::read_dir(self.path.join("Stages")) {
             for path in dir {
                 let full_path = path.unwrap().path();
-                self.stages_filenames.push(full_path.to_str().unwrap().to_string());
+                let key = full_path.file_name().unwrap().to_str().unwrap().to_string();
 
                 if let Some(stage) = files::load_json(full_path) {
-                    stages.push(stage);
+                    stages.insert(key, stage);
                 }
             }
         }
@@ -203,14 +202,9 @@ impl Package {
         self.json_into_structs(meta, rules, fighters, stages);
 
         self.force_update_entire_package();
-
-        // failsafes
-        assert_eq!(self.stages_filenames.len(), self.stages.len());
-        let filenames_set: HashSet<String> = self.stages_filenames.clone().into_iter().collect();
-        assert_eq!(filenames_set.len(), self.stages_filenames.len());
     }
 
-    pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, mut fighters: HashMap<String, Value>, stages: Vec<Value>) {
+    pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, mut fighters: HashMap<String, Value>, mut stages: HashMap<String, Value>) {
         if let Some (meta) = meta {
             self.meta = serde_json::from_value(meta).unwrap();
         }
@@ -238,9 +232,17 @@ impl Package {
             self.fighters.push(key, serde_json::from_value(fighter).unwrap());
         }
 
-        self.stages = ContextVec::new();
-        for stage in stages {
-            self.stages.push(serde_json::from_value(stage).unwrap());
+        // Use meta.stage_keys for stage ordering
+        self.stages = KeyedContextVec::new();
+        for key in &self.meta.stage_keys {
+            if let Some(stage) = stages.remove(key) {
+                self.stages.push(key.clone(), serde_json::from_value(stage).unwrap());
+            }
+        }
+
+        // add remaining stages in any order
+        for (key, stage) in stages {
+            self.stages.push(key, serde_json::from_value(stage).unwrap());
         }
     }
 
@@ -641,16 +643,17 @@ pub enum PackageUpdate {
     Package (Package),
     DeleteFighterFrame { fighter: String, action: usize, frame_index: usize },
     InsertFighterFrame { fighter: String, action: usize, frame_index: usize, frame: ActionFrame },
-    DeleteStage { stage_index: usize },
-    InsertStage { stage_index: usize, stage: Stage },
+    DeleteStage { index: usize, key: String },
+    InsertStage { index: usize, key: String, stage: Stage },
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PackageMeta {
-    pub engine_version:  u64, // compared with a value incremented by pf engine when there are breaking changes to data structures
-    pub save_version:    u64, // incremented every time the package is saved
-    pub title:           String,
-    pub source:          String,
-    pub hash:            String,
-    pub fighter_keys:    Vec<String>,
+    pub engine_version: u64, // compared with a value incremented by pf engine when there are breaking changes to data structures
+    pub save_version:   u64, // incremented every time the package is saved
+    pub title:          String,
+    pub source:         String,
+    pub hash:           String,
+    pub fighter_keys:   Vec<String>,
+    pub stage_keys:     Vec<String>,
 }

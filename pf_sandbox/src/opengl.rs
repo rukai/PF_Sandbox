@@ -124,7 +124,7 @@ impl OpenGLGraphics {
             _                 => { },
         }
 
-        let stage = 0;
+        let stage: &str = render.stage.as_ref();
 
         let uniform = &uniform! {
             position_offset: [pan.0 as f32, pan.1 as f32],

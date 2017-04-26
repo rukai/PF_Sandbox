@@ -30,7 +30,7 @@ fn upgrade_meta_engine_version(meta: &mut Option<Value>) {
 }
 
 #[allow(unused_variables)]
-pub fn upgrade_to_latest(meta: &mut Option<Value>, rules: &mut Option<Value>, fighters: &mut HashMap<String, Value>, stages: &mut Vec<Value>) {
+pub fn upgrade_to_latest(meta: &mut Option<Value>, rules: &mut Option<Value>, fighters: &mut HashMap<String, Value>, stages: &mut HashMap<String, Value>) {
     let meta_engine_version = get_meta_engine_version(meta);
     if meta_engine_version > engine_version() {
         panic!("Package is newer then this version of PF Sandbox. Please upgrade to the latest version.");

@@ -258,7 +258,7 @@ impl Buffers {
 }
 
 pub struct PackageBuffers {
-    pub stages:   Vec<Buffers>,
+    pub stages:   HashMap<String, Buffers>,
     pub fighters: HashMap<String, Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
     pub package:  Option<Package>,
 }
@@ -266,7 +266,7 @@ pub struct PackageBuffers {
 impl PackageBuffers {
     pub fn new() -> PackageBuffers {
         let package_buffers = PackageBuffers {
-            stages:   vec!(),
+            stages:   HashMap::new(),
             fighters: HashMap::new(),
             package:  None,
         };
@@ -277,7 +277,7 @@ impl PackageBuffers {
         for update in package_updates {
             match update {
                 PackageUpdate::Package (package) => {
-                    self.stages = vec!();
+                    self.stages = HashMap::new();
                     self.fighters = HashMap::new();
 
                     for (key, fighter) in package.fighters.key_value_iter() {
@@ -292,8 +292,8 @@ impl PackageBuffers {
                         self.fighters.insert(key.clone(), action_buffers);
                     }
 
-                    for stage in &package.stages[..] {
-                        self.stages.push(Buffers::new_stage(display, &stage));
+                    for (key, stage) in package.stages.key_value_iter() {
+                        self.stages.insert(key.clone(), Buffers::new_stage(display, &stage));
                     }
                     self.package = Some(package);
                 }
@@ -312,16 +312,16 @@ impl PackageBuffers {
                         package.fighters[fighter].actions[action].frames.insert(frame_index, frame);
                     }
                 }
-                PackageUpdate::DeleteStage { stage_index } => {
-                    self.stages.remove(stage_index);
+                PackageUpdate::DeleteStage { index, key } => {
+                    self.stages.remove(&key);
                     if let &mut Some(ref mut package) = &mut self.package {
-                        package.stages.remove(stage_index);
+                        package.stages.remove(index);
                     }
                 }
-                PackageUpdate::InsertStage { stage_index, stage } => {
-                    self.stages.insert(stage_index, Buffers::new_stage(display, &stage));
+                PackageUpdate::InsertStage { index, key, stage } => {
+                    self.stages.insert(key.clone(), Buffers::new_stage(display, &stage));
                     if let &mut Some(ref mut package) = &mut self.package {
-                        package.stages.insert(stage_index, stage);
+                        package.stages.insert(index, key, stage);
                     }
                 }
             }

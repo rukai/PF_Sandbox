@@ -31,7 +31,7 @@ pub struct Game {
     pub debug_players:          Vec<DebugPlayer>,
     pub selected_controllers:   Vec<usize>,
     pub selected_fighters:      Vec<String>,
-    pub selected_stage:         usize,
+    pub selected_stage:         String,
     pub edit:                   Edit,
     pub debug_output_this_step: bool,
     pub selector:               Selector,
@@ -46,13 +46,13 @@ pub struct Game {
 /// All previous frame state is used to calculate the next frame then the current_frame is incremented
 
 impl Game {
-    pub fn new(package: Package, config: Config, selected_fighters: Vec<String>, selected_stage: usize, netplay: bool, selected_controllers: Vec<usize>) -> Game {
+    pub fn new(package: Package, config: Config, selected_fighters: Vec<String>, selected_stage: String, netplay: bool, selected_controllers: Vec<usize>) -> Game {
         // generate players
         let mut players:       Vec<Player>      = vec!();
         let mut debug_players: Vec<DebugPlayer> = vec!();
         {
-            let spawn_points = &package.stages[selected_stage].spawn_points;
-            let respawn_points = &package.stages[selected_stage].respawn_points;
+            let spawn_points = &package.stages[selected_stage.as_ref()].spawn_points;
+            let respawn_points = &package.stages[selected_stage.as_ref()].respawn_points;
             for (i, _) in selected_controllers.iter().enumerate() {
                 // Stages can have less spawn points then players
                 let spawn = spawn_points[i % spawn_points.len()].clone();
@@ -105,7 +105,7 @@ impl Game {
                 GameState::ToCSS           => { unreachable!(); }
             }
             {
-                let stage = &self.package.stages[self.selected_stage];
+                let stage = &self.package.stages[self.selected_stage.as_ref()];
                 self.camera.update(os_input, &self.players, stage);
             }
 
@@ -153,7 +153,8 @@ impl Game {
             }
             _ => { }
         }
-        self.package.stages.set_context(self.selected_stage);
+        let index = self.package.stages.key_to_index(self.selected_stage.as_ref()).unwrap();
+        self.package.stages.set_context(index);
     }
 
     fn step_local(&mut self, input: &mut Input, os_input: &OsInput) {
@@ -596,7 +597,7 @@ impl Game {
 
     fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
         {
-            let stage = &self.package.stages[self.selected_stage];
+            let stage = &self.package.stages[self.selected_stage.as_ref()];
 
             // step each player
             for (i, player) in (&mut *self.players).iter_mut().enumerate() {
@@ -765,7 +766,7 @@ impl Game {
 
             let debug = self.debug_players[i].clone();
             if debug.cam_area {
-                let cam_area = &player.cam_area(&self.package.stages[self.selected_stage].camera);
+                let cam_area = &player.cam_area(&self.package.stages[self.selected_stage.as_ref()].camera);
                 entities.push(RenderEntity::Area(area_to_render(cam_area)));
             }
 
@@ -774,7 +775,7 @@ impl Game {
         }
 
         // stage areas
-        let stage = &self.package.stages[self.selected_stage];
+        let stage = &self.package.stages[self.selected_stage.as_ref()];
         entities.push(RenderEntity::Area(area_to_render(&stage.camera)));
         entities.push(RenderEntity::Area(area_to_render(&stage.blast)));
 
@@ -790,7 +791,7 @@ impl Game {
         }
 
         RenderGame {
-            stage:    self.selected_stage,
+            stage:    self.selected_stage.clone(),
             entities: entities,
             state:    self.state.clone(),
             camera:   self.camera.clone(),
@@ -871,7 +872,7 @@ impl Selector {
 }
 
 pub struct RenderGame {
-    pub stage:    usize,
+    pub stage:    String,
     pub entities: Vec<RenderEntity>,
     pub state:    GameState,
     pub camera:   Camera,

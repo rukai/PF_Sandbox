@@ -237,10 +237,12 @@ impl Menu {
                 }
             }
 
+            let stage = self.package.get().stages.index_to_key(self.stage_ticker.as_ref().unwrap().cursor).unwrap();
+
             Some(GameSetup {
                 controllers: controllers,
                 fighters:    selected_fighters,
-                stage:       self.stage_ticker.as_ref().unwrap().cursor,
+                stage:       stage,
                 netplay:     false,
             })
         }

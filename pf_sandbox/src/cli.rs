@@ -13,10 +13,8 @@ pub fn cli() -> Vec<CLIChoice> {
 
     let mut opts = Options::new();
     opts.optflag("l", "list", "List available packages and close");
-    opts.optopt("s", "stage",        "Use the stage specified by name", "NAME");
-    opts.optopt("S", "stageIndex",   "Use the stage specified by index", "INDEX");
-    opts.optopt("f", "fighter",      "Use the fighters specified by names", "NAME1,NAME2,NAME3...");
-    opts.optopt("F", "fighterIndex", "Use the fighters specified by indexes", "INDEX1,INDEX2,INDEX3...");
+    opts.optopt("s", "stage",        "Use the stage specified", "NAME");
+    opts.optopt("f", "fighter",      "Use the fighters specified", "NAME1,NAME2,NAME3...");
     opts.optopt("p", "players",      "Number of players in the game", "NUMPLAYERS");
     opts.optopt("g", "graphics",     "Graphics backend to use",
         if cfg!(features =  "vulkan") && cfg!(features = "opengl") {
@@ -67,11 +65,6 @@ pub fn cli() -> Vec<CLIChoice> {
         cli_choices.push(CLIChoice::FighterNames(result));
     }
 
-    if let Some(stage_index) = matches.opt_str("S") {
-        if let Ok(stage_index) = stage_index.parse::<usize>() {
-            cli_choices.push(CLIChoice::StageIndex(stage_index));
-        }
-    }
     if let Some(stage_name) = matches.opt_str("s") {
         cli_choices.push(CLIChoice::StageName(stage_name));
     }
@@ -101,7 +94,6 @@ pub fn cli() -> Vec<CLIChoice> {
 pub enum CLIChoice {
     TotalPlayers    (usize),
     FighterNames    (Vec<String>),
-    StageIndex      (usize),
     StageName       (String),
     Package         (String),
     GraphicsBackend (GraphicsBackendChoice),

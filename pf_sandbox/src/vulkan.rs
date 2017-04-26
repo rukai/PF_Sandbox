@@ -364,7 +364,7 @@ impl<'a> VulkanGraphics<'a> {
             _ => { }
         }
 
-        let stage = render.stage;
+        let stage: &str = render.stage.as_ref();
         let mut uniforms = self.uniforms.iter();
         let uniform = uniforms.next().unwrap();
         {
@@ -592,7 +592,8 @@ impl<'a> VulkanGraphics<'a> {
                         }
                     }
                 }
-                &MenuEntity::Stage (stage) => {
+                &MenuEntity::Stage (ref stage) => {
+                    let stage: &str = stage.as_ref();
                     let vertex_buffer = &self.package_buffers.stages[stage].vertex;
                     let index_buffer  = &self.package_buffers.stages[stage].index;
                     command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), uniform, &());
@@ -742,7 +743,8 @@ impl<'a> VulkanGraphics<'a> {
     fn draw_stage_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, selection: usize) {
         self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Stage");
         let stages = &self.package_buffers.package.as_ref().unwrap().stages;
-        for (stage_i, stage) in stages.iter().enumerate() {
+        for (stage_i, stage) in stages.key_value_iter().enumerate() {
+            let (stage_key, stage) = stage;
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos
             let x_offset = if stage_i == selection { 0.1 } else { 0.0 };
             let x = self.width as f32 * (0.1 + x_offset);
@@ -763,7 +765,7 @@ impl<'a> VulkanGraphics<'a> {
                     buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
                 }
 
-                menu_entities.push(MenuEntity::Stage(selection));
+                menu_entities.push(MenuEntity::Stage(stage_key.clone()));
             }
         }
     }
@@ -796,6 +798,6 @@ impl<'a> VulkanGraphics<'a> {
 
 enum MenuEntity {
     Fighter { fighter: String, action: usize, frame: usize },
-    Stage   (usize),
+    Stage   (String),
     Rect    (RenderRect),
 }

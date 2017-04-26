@@ -34,7 +34,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
     // CLI options
     let (mut state, mut os_input) = {
         // default values
-        let mut stage = 0usize;
+        let mut stage: Option<String> = None;
         let netplay = false;
         let mut fighters: Vec<String> = vec!();
         let mut controllers: Vec<usize> = vec!();
@@ -55,9 +55,8 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
         for choice in &cli_choices {
             match choice {
                 &CLIChoice::Close => { return; }
-                &CLIChoice::FighterNames (ref fighters_names)   => { load_menu = false; fighters = fighters_names.clone() }
-                &CLIChoice::StageIndex (ref stage_index)        => { load_menu = false; stage = *stage_index }
-                &CLIChoice::StageName (_)                       => { panic!("Unimplemented") }
+                &CLIChoice::FighterNames (ref fighters_names)   => { load_menu = false; fighters = fighters_names.clone(); }
+                &CLIChoice::StageName (ref stage_name)          => { load_menu = false; stage = Some(stage_name.clone()); }
                 &CLIChoice::Package (ref name)                  => { load_menu = false; package_string = Some(name.clone()); }
                 &CLIChoice::GraphicsBackend (_) => { }
                 &CLIChoice::TotalPlayers (total_players) => {
@@ -117,7 +116,7 @@ pub fn run(cli_choices: Vec<CLIChoice>) {
         let state = if load_menu {
             AppState::Menu(Menu::new(package, config, menu_state))
         } else {
-            AppState::Game(Game::new(package.unwrap(), config, fighters, stage, netplay, controllers)) // TODO: handle no packages nicely
+            AppState::Game(Game::new(package.unwrap(), config, fighters, stage.unwrap(), netplay, controllers)) // TODO: handle no packages nicely
         };
         (state, os_input)
     };
@@ -208,6 +207,6 @@ enum NextAppState {
 pub struct GameSetup {
     pub controllers: Vec<usize>,
     pub fighters:    Vec<String>,
-    pub stage:       usize,
+    pub stage:       String,
     pub netplay:     bool,
 }
