@@ -33,7 +33,7 @@ impl CurrentInput {
         self.mouse_actions    = vec!();
         self.key_actions      = vec!();
         self.scroll_diff      = 0.0;
-        self.mouse_point_prev = None;
+        self.mouse_point_prev = self.mouse_point;
     }
 
     pub fn handle_event(&mut self, event: Event) {
@@ -47,7 +47,6 @@ impl CurrentInput {
                 self.key_actions.push(KeyAction::Released(key_code));
             },
             Event::MouseMoved (x, y) => {
-                self.mouse_point_prev = self.mouse_point;
                 self.mouse_point = Some((x, y));
             },
             Event::MouseInput (Pressed, button) => {
@@ -77,19 +76,16 @@ impl CurrentInput {
     pub fn mouse_to_game(&self, mouse_point: (i32, i32), camera: &Camera) -> (f32, f32) {
         let (m_x, m_y) = mouse_point;
         let (m_x, m_y) = (m_x as f32, m_y as f32);
-        let (w, h) = self.resolution;
-        let (w, h) = (w as f32, h as f32);
+        let (w_w, w_h) = self.resolution;
+        let (w_w, w_h) = (w_w as f32, w_h as f32);
+        let aspect_ratio = w_w / w_h;
 
-        let zoom = camera.zoom as f32;
+        let zoom = camera.zoom;
         let (pan_x, pan_y) = camera.pan;
-        let (pan_x, pan_y) = (pan_x as f32, pan_y as f32);
 
-        let (width, height) = self.resolution;
-        let aspect_ratio = width as f32 / height as f32;
-
-        let x = zoom * ( 2.0 * m_x / w - 1.0)                - pan_x;
-        let y = zoom * (-2.0 * m_y / h + 1.0) / aspect_ratio - pan_y;
-        (x, y)
+        let g_x = zoom * ( 2.0 * m_x / w_w - 1.0)                - pan_x;
+        let g_y = zoom * (-2.0 * m_y / w_h + 1.0) / aspect_ratio - pan_y;
+        (g_x, g_y)
     }
 }
 
