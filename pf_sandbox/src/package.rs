@@ -620,6 +620,19 @@ impl Node for Package {
                     prop       => format!("Package does not have a property '{}'", prop)
                 }
             }
+            NodeToken::Help => {
+                String::from(r#"
+Package Help
+
+Commands:
+*   help - display this help
+
+Accessors:
+*   .fighters - KeyedContextVec
+*   .stages - KeyedContextVec
+*   .meta - PackageMeta
+*   .rules - Rules"#)
+            }
             action => { format!("Package cannot '{:?}'", action) }
         };
 
