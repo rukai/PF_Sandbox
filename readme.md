@@ -31,7 +31,7 @@ sudo apt-get install libssl-dev libusb-1.0-0-dev cmake libvulkan-dev vulkan-util
 
 You will also need vulkan drivers:
 *   Intel: sudo apt-get install  mesa-vulkan-drivers
-*   Nvida: TODO
+*   Nvida: No extra drivers required
 *   AMD:   TODO
 
 You will need to enable DRI3:
