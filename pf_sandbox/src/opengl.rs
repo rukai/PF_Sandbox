@@ -80,9 +80,10 @@ impl OpenGLGraphics {
         loop {
             {
                 // get the most recent render
-                let mut render = {
-                    let message = self.render_rx.recv().unwrap();
+                let mut render = if let Ok(message) = self.render_rx.recv() {
                     self.read_message(message)
+                } else {
+                    return;
                 };
                 while let Ok(message) = self.render_rx.try_recv() {
                     render = self.read_message(message);

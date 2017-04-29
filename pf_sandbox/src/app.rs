@@ -3,11 +3,13 @@ use ::vulkan::VulkanGraphics;
 #[cfg(feature = "opengl")]
 use ::opengl::OpenGLGraphics;
 #[cfg(any(feature = "vulkan", feature = "opengl"))]
+use ::cli::GraphicsBackendChoice;
+#[cfg(any(feature = "vulkan", feature = "opengl"))]
 use ::graphics::GraphicsMessage;
 #[cfg(any(feature = "vulkan", feature = "opengl"))]
 use std::sync::mpsc::Sender;
 
-use ::cli::{CLIResults, ContinueFrom, GraphicsBackendChoice};
+use ::cli::{CLIResults, ContinueFrom};
 use ::config::Config;
 use ::game::{Game, GameState};
 use ::input::Input;
