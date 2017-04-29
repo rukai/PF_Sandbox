@@ -7,14 +7,14 @@ fn print_usage(program: &str, opts: Options) {
     print!("{}", opts.usage(&brief));
 }
 
-pub fn cli() -> Vec<CLIChoice> {
+pub fn cli() -> CLIResults {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
 
     let mut opts = Options::new();
     opts.optflag("l", "list", "List available packages and close");
     opts.optopt("s", "stage",        "Use the stage specified", "NAME");
-    opts.optopt("f", "fighter",      "Use the fighters specified", "NAME1,NAME2,NAME3...");
+    opts.optopt("f", "fighters",     "Use the fighters specified", "NAME1,NAME2,NAME3...");
     opts.optopt("p", "players",      "Number of players in the game", "NUMPLAYERS");
     opts.optopt("g", "graphics",     "Graphics backend to use",
         if cfg!(features =  "vulkan") && cfg!(features = "opengl") {
@@ -28,76 +28,101 @@ pub fn cli() -> Vec<CLIChoice> {
         }
     );
 
+    let mut results = CLIResults::new();
+
     let matches = match opts.parse(&args[1..]) {
         Ok(m)  => { m },
         Err(_) => {
             print_usage(&program, opts);
-            return vec!(CLIChoice::Close);
+            results.continue_from = ContinueFrom::Close;
+            return results;
         },
     };
 
     if matches.opt_present("l") {
         package::print_list();
-        return vec!(CLIChoice::Close);
+        results.continue_from = ContinueFrom::Close;
+        return results;
     }
-
-    let mut cli_choices: Vec<CLIChoice> = vec!();
 
     if matches.free.len() > 1 {
         print_usage(&program, opts);
-        return vec!(CLIChoice::Close);
+        results.continue_from = ContinueFrom::Close;
+        return results;
     }
     else if matches.free.len() == 1 {
-        cli_choices.push(CLIChoice::Package(matches.free[0].clone()));
+        results.continue_from = ContinueFrom::Game;
+        results.package = Some(matches.free[0].clone());
     }
 
     if let Some(players) = matches.opt_str("p") {
         if let Ok(players) = players.parse::<usize>() {
-            cli_choices.push(CLIChoice::TotalPlayers(players));
+            results.continue_from = ContinueFrom::Game;
+            results.total_players = Some(players);
+        }
+        else {
+            print_usage(&program, opts);
+            results.continue_from = ContinueFrom::Close;
+            return results;
         }
     }
 
     if let Some(fighter_names) = matches.opt_str("f") {
-        let mut result: Vec<String> = vec!();
         for fighter_name in fighter_names.split(",") {
-            result.push(fighter_name.to_string());
+            results.continue_from = ContinueFrom::Game;
+            results.fighter_names.push(fighter_name.to_string());
         }
-        cli_choices.push(CLIChoice::FighterNames(result));
     }
 
-    if let Some(stage_name) = matches.opt_str("s") {
-        cli_choices.push(CLIChoice::StageName(stage_name));
+    if let Some(stage) = matches.opt_str("s") {
+        results.stage_name = Some(stage);
+        results.continue_from = ContinueFrom::Game;
     }
+
     if let Some(backend_string) = matches.opt_str("g") {
-        match backend_string.to_lowercase().as_ref() {
+        results.graphics_backend = match backend_string.to_lowercase().as_ref() {
             #[cfg(feature = "vulkan")]
-            "vulkan" => {
-                cli_choices.push(CLIChoice::GraphicsBackend (GraphicsBackendChoice::Vulkan));
-            }
+            "vulkan" => { GraphicsBackendChoice::Vulkan }
             #[cfg(feature = "opengl")]
-            "opengl" => {
-                cli_choices.push(CLIChoice::GraphicsBackend (GraphicsBackendChoice::OpenGL));
-            }
-            "none" => {
-                cli_choices.push(CLIChoice::GraphicsBackend (GraphicsBackendChoice::None));
-            }
+            "opengl" => { GraphicsBackendChoice::OpenGL }
+            "none"   => { GraphicsBackendChoice::Headless }
             _ => {
                 print_usage(&program, opts);
-                return vec!(CLIChoice::Close);
+                results.continue_from = ContinueFrom::Close;
+                return results;
             }
-        }
+        };
     }
 
-    cli_choices
+    results
 }
 
-pub enum CLIChoice {
-    TotalPlayers    (usize),
-    FighterNames    (Vec<String>),
-    StageName       (String),
-    Package         (String),
-    GraphicsBackend (GraphicsBackendChoice),
-    Close,
+pub struct CLIResults {
+    pub graphics_backend: GraphicsBackendChoice,
+    pub package:          Option<String>,
+    pub total_players:    Option<usize>,
+    pub fighter_names:    Vec<String>,
+    pub stage_name:       Option<String>,
+    pub continue_from:    ContinueFrom,
+}
+
+impl CLIResults {
+    pub fn new() -> CLIResults {
+        CLIResults {
+            graphics_backend: GraphicsBackendChoice::Default,
+            package:          None,
+            total_players:    None,
+            fighter_names:    vec!(),
+            stage_name:       None,
+            continue_from:    ContinueFrom::Menu,
+        }
+    }
+}
+
+pub enum ContinueFrom {
+    Menu,
+    Game,
+    Close
 }
 
 pub enum GraphicsBackendChoice {
@@ -105,5 +130,6 @@ pub enum GraphicsBackendChoice {
     Vulkan,
     #[cfg(feature = "opengl")]
     OpenGL,
-    None,
+    Headless,
+    Default,
 }
