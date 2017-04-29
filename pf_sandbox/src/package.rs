@@ -40,17 +40,28 @@ pub fn generate_example_stub() {
     }
 }
 
-
 pub fn print_list() {
-    for path in fs::read_dir(get_packages_path()).unwrap() {
-        println!("{}", path.unwrap().file_name().to_str().unwrap());
+    for (path, _) in get_package_metas() {
+        println!("{}", path);
     }
 }
 
-pub fn get_package_names() -> Vec<String> {
-    fs::read_dir(get_packages_path()).unwrap().map(
-        |x| x.unwrap().file_name().into_string().unwrap()
-    ).collect()
+pub fn get_package_metas() -> Vec<(String, PackageMeta)> {
+    let mut result: Vec<(String, PackageMeta)> = vec!();
+
+    for file in fs::read_dir(get_packages_path()).unwrap() {
+        if let Ok(file) = file {
+            let key = file.file_name().into_string().unwrap();
+            let mut meta_path = file.path();
+            meta_path.push("package_meta.json");
+
+            if let Some(meta) = files::load_struct(meta_path) {
+                result.push((key, meta));
+            }
+        }
+    }
+    result.sort_by_key(|x| x.1.title.clone());
+    result
 }
 
 pub fn exists(name: &str) -> bool {

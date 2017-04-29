@@ -3,7 +3,7 @@ use getopts::Options;
 use std::env;
 
 fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options] [package_name]\nIf no arguments are given the GUI menu is used instead. (excluding -g)", program);
+    let brief = format!("Usage: {} [options] [package_dir]\nIf no arguments are given the GUI menu is used instead. (excluding -g)", program);
     print!("{}", opts.usage(&brief));
 }
 

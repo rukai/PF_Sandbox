@@ -21,19 +21,24 @@ pub fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
     File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
 }
 
+pub fn load_struct<T: DeserializeOwned>(filename: PathBuf) -> Option<T> {
+    if let Ok(mut file) = File::open(filename) {
+        let mut json = String::new();
+        if file.read_to_string(&mut json).is_ok() {
+            return serde_json::from_str(&json).ok();
+        }
+    }
+    None
+}
+
 pub fn load_json(filename: PathBuf) -> Option<Value> {
     if let Ok(mut file) = File::open(filename) {
         let mut json = String::new();
         if let Ok(_) = file.read_to_string(&mut json) {
-            Some(serde_json::from_str(&json).unwrap())
-        }
-        else {
-            None
+            return Some(serde_json::from_str(&json).unwrap());
         }
     }
-    else {
-        None
-    }
+    None
 }
 
 /// Load the json file at the passed URL directly into a struct

@@ -1,5 +1,5 @@
 use ::input::{Input, PlayerInput};
-use ::package::{Package, Verify};
+use ::package::{Package, PackageMeta, Verify};
 use ::package;
 use ::graphics::{GraphicsMessage, Render};
 use ::app::GameSetup;
@@ -161,7 +161,7 @@ impl Menu {
     }
 
     pub fn step_package_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
-        let selection = if let &mut MenuState::PackageSelect (ref package_names, ref mut ticker) = &mut self.state {
+        let selection = if let &mut MenuState::PackageSelect (ref package_metas, ref mut ticker) = &mut self.state {
             if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
                 ticker.up();
             }
@@ -172,14 +172,15 @@ impl Menu {
                 ticker.reset();
             }
 
-            let selection = package_names[ticker.cursor].clone();
-            if package_names.len() > 0 {
+            if package_metas.len() > 0 {
                 if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
+                    let selection = package_metas[ticker.cursor].0.clone();
                     let mut package = Package::open(selection.as_str());
                     package.update();
                     self.package = PackageHolder::new(Some(package));
                     Some(selection)
                 } else if player_inputs.iter().any(|x| x.x.press || x.y.press) {
+                    let selection = package_metas[ticker.cursor].0.clone();
                     self.package = PackageHolder::new(Some(Package::open(selection.as_str())));
                     Some(selection)
                 } else {
@@ -254,7 +255,7 @@ impl Menu {
     pub fn render(&self) -> RenderMenu {
         RenderMenu {
             state: match self.state {
-                MenuState::PackageSelect (ref names, ref ticker) => { RenderMenuState::PackageSelect (names.clone(), ticker.cursor) }
+                MenuState::PackageSelect (ref names, ref ticker) => { RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor) }
                 MenuState::GameResults (ref results)             => { RenderMenuState::GameResults (results.clone()) }
                 MenuState::CharacterSelect (back_counter)        => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
                 MenuState::StageSelect    => { RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor) }
@@ -298,7 +299,7 @@ pub enum MenuState {
     StageSelect,
     GameResults (Vec<GameResult>),
     SetRules,
-    PackageSelect (Vec<String>, MenuTicker),
+    PackageSelect (Vec<(String, PackageMeta)>, MenuTicker),
     BrowsePackages,
     CreatePackage,
     CreateFighter,
@@ -307,7 +308,7 @@ pub enum MenuState {
 
 impl MenuState {
     pub fn package_select() -> MenuState {
-        let packages = package::get_package_names();
+        let packages = package::get_package_metas();
         let len = packages.len();
         MenuState::PackageSelect(packages, MenuTicker::new(len))
     }
