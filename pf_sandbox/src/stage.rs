@@ -52,22 +52,22 @@ impl Stage {
         let spawn_points = ContextVec::from_vec(vec!(
             SpawnPoint{
                 x:          -50.0,
-                y:          50.0,
+                y:          10.0,
                 face_right: true,
             },
             SpawnPoint{
-                x:          50.0,
-                y:          50.0,
+                x:          -25.0,
+                y:          10.0,
                 face_right: false,
             },
             SpawnPoint{
-                x:          -50.0,
-                y:          80.0,
+                x:          25.0,
+                y:          10.0,
                 face_right: true,
             },
             SpawnPoint{
                 x:          50.0,
-                y:          80.0,
+                y:          50.0,
                 face_right: false,
             },
         ));

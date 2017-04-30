@@ -34,7 +34,7 @@ You will also need vulkan drivers:
 *   Nvida: No extra drivers required
 *   AMD:   TODO
 
-You will need to enable DRI3:
+You may need to enable DRI3:
 
 Create a file /etc/X11/xorg.conf.d/20-intel.conf containing:
 Section "Device"
@@ -47,7 +47,17 @@ EndSection
 
 To run pf sandbox: run `cargo run` in the pf_sandbox directory.
 
-To run the CLI for issuing editor commands: run `cargo run` in the cli directory.
+## setup cli tool
+
+The tutorial/manual assumes that you have setup the binary for the CLI tool in your system path as the command `pf`.
+To build the CLI tool run `cargo build` in the cli directory, the resulting binary is stored at `cli/target/debug/pf_client`.
+
+However you can avoid fiddling with the system path by running `cargo run -- COMMAND` in the cli directory instead of `pf COMMAND`.
+
+## Usage Documentation
+
+*   (Get Started Tutorial)[editor-tutorial.md]
+*   (Full Reference Manual)[manual.md)
 
 ## Goals/Features
 

@@ -231,7 +231,7 @@ impl Game {
             self.package.save();
         }
         if os_input.key_pressed(VirtualKeyCode::R) {
-            self.package.load();
+            //self.package.load(); // Currently disabled to easy to bump, need some sort of UI confirmation
         }
 
         // game flow control
