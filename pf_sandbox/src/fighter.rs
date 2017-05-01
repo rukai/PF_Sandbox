@@ -34,7 +34,6 @@ impl Fighter {
             air_mobility_b:          0.02,
             air_x_term_vel:          1.0,
             air_friction:            0.05,
-            shield_size:             15.0,
             walk_init_vel:           0.2,
             walk_acc:                0.1,
             walk_max_vel:            1.0,
@@ -46,6 +45,12 @@ impl Fighter {
             friction:                0.1,
             aerialdodge_mult:        3.0,
             aerialdodge_drift_frame: 20,
+            forward_roll:            false,
+            backward_roll:           false,
+            spot_dodge:              false,
+            lcancel:                 None,
+            shield:                  None,
+            power_shield:            None,
             actions:                 actions,
         }
     }
@@ -75,7 +80,6 @@ pub struct Fighter {
     pub air_mobility_b:          f32,
     pub air_x_term_vel:          f32,
     pub air_friction:            f32,
-    pub shield_size:             f32,
     pub walk_init_vel:           f32,
     pub walk_acc:                f32,
     pub walk_max_vel:            f32,
@@ -87,7 +91,32 @@ pub struct Fighter {
     pub friction:                f32,
     pub aerialdodge_mult:        f32,
     pub aerialdodge_drift_frame: u64,
-    pub actions:               ContextVec<ActionDef>,
+    pub forward_roll:            bool,
+    pub backward_roll:           bool,
+    pub spot_dodge:              bool,
+    pub lcancel:                 Option<LCancel>,
+    pub shield:                  Option<Shield>,
+    pub power_shield:            Option<PowerShield>,
+    pub actions:                 ContextVec<ActionDef>,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct LCancel {
+    pub input_window:   u64,
+    pub lag_multiplier: f32, // use value < 1.0
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct Shield {
+    pub size:          f32,
+    pub dec_per_frame: f32,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct PowerShield {
+    pub reflect_projectiles: bool,
+    pub instant_act:         bool,
+    pub enemy_stun_frames:   u64,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
