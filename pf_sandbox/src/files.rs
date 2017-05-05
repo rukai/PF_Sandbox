@@ -7,9 +7,9 @@ use std::io::Read;
 use std::io::Write;
 use std::io::Cursor;
 
-use curl::easy::Easy;
-use serde::ser::Serialize;
+use reqwest;
 use serde::de::DeserializeOwned;
+use serde::ser::Serialize;
 use serde_json::Value;
 use serde_json;
 use zip::ZipArchive;
@@ -51,38 +51,26 @@ pub fn load_struct_from_url<T: DeserializeOwned>(url: &str) -> Option<T> {
         }
     }
     None
+    // TODO: waiting on upgrade to serde 1.0 https://github.com/seanmonstar/reqwest/pull/79
+    //if let Ok(mut response) = reqwest::get(url) {
+    //    if response.status().is_success() {
+    //        return response.json().ok();
+    //    }
+    //}
+    //None
 }
 
 /// Returns the bytes of the file stored at the url
 pub fn load_bin_from_url(url: &str) -> Option<Vec<u8>> {
-    // TODO: Attempt to force https if server supports it
-    // TODO: detect non success codes (404, 500 etc)
-    let mut easy = Easy::new();
-    let mut bytes = Vec::new();
-    if let Err(_) = easy.url(url) {
-        return None;
-    }
-
-    {
-        let mut transfer = easy.transfer();
-        if let Err(_) = transfer.write_function(|data| {
-            bytes.extend_from_slice(data);
-            Ok(data.len())
-        }) {
-            return None;
-        }
-
-
-        if let Err(_) = transfer.perform() {
-            return None;
+    if let Ok(mut response) = reqwest::get(url) {
+        if response.status().is_success() {
+            let mut buf: Vec<u8> = vec!();
+            if let Ok(_) = response.read_to_end(&mut buf) {
+                return Some(buf);
+            }
         }
     }
-
-    if let Ok(200) = easy.response_code() {
-        Some(bytes)
-    } else {
-        None
-    }
+    None
 }
 
 /// Delete contents of destination directory

@@ -31,7 +31,7 @@ pub fn generate_example_stub() {
             engine_version: engine_version(),
             save_version:   0,
             title:          "Example Package".to_string(),
-            source:         "lucaskent.me/example_package".to_string(),
+            source:         "http://lucaskent.me/example_package".to_string(),
             hash:           "".to_string(),
             fighter_keys:   vec!(),
             stage_keys:     vec!(),

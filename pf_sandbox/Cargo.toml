@@ -18,6 +18,7 @@ treeflection_derive = "0.1"
 rust-crypto = "0.2"
 zip = "0.2"
 curl = "0.4"
+reqwest = "0.5"
 winit = "0.5" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 
 vulkano = { version = "0.3", optional = true }
