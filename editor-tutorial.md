@@ -121,14 +121,14 @@ To give control of the camera back to PF Sandbox press Backspace.
 
 A command looks like this:
 
-`pf package help`
+`pf package:help`
 
 You can enter this example into your systems command line and hit enter to run it.
 We use the help command to tell us what an object is capable of and what other objects it contains.
 By looking under the Accessors section, we can see that the package contains fighters, stages, meta, and rules.
 Lets further investigate fighters.
 
-`pf package.fighters help`
+`pf package.fighters:help`
 
 ## Keys & Context
 
@@ -136,16 +136,18 @@ This is a keyed context vector of fighters, that means it contains multiple figh
 
 We can access a specific fighter via its filename, assuming you have a fighter with filename base_fighter.json then we can run:
 
-`pf package.fighters[base_fighter.json] help`
+`pf 'package.fighters["base_fighter.json"]:help'`
 
 But thats generally not useful. (We dont want to have to check the filename of the fighter we are editing.)
 Instead we make use of the context system.
 By using `?` as our key, we tell PF Sandbox to automatically choose the fighter to access via in game context.
 In this case it uses the fighter used by the player we have selected with 1234.
 
-`pf package.fighters[?] help`
+`pf package.fighters[?]:help`
 
 If this doesnt display the fighter help, ensure you are in a game, pf sandbox is paused (spacebar) and you have selected a player (1)
+
+Also note that we used single quotes earlier (pf '...') so that bash wouldnt eat our double quotes ("base_fighter.json").
 
 ## Fighter data
 
@@ -153,11 +155,11 @@ The fighter help text shows a lot of interesting fighter properties that I am su
 
 This will get the number of aerial jumps the fighter can do.
 
-`pf package.fighters[?].air_jumps get`
+`pf package.fighters[?].air_jumps:get`
 
 Run this command and try out the changes.
 
-`pf package.fighters[?].air_jumps set 99`
+`pf package.fighters[?].air_jumps:set 99`
 
 Try fiddling with this and other values you can find with the help command.
 
@@ -168,24 +170,24 @@ To find them we are going to do some exploration with the help command.
 We see that the fighter contains an `actions` property which is a context vec.
 (once again this object contains multiple actions, however they are only accessible by index and context.)
 
-`pf package.fighters[?].actions help`
+`pf package.fighters[?].actions:help`
 
 We can use an index to access a numbered element of the vector
 
-`pf package.fighters[?].actions[0] help`
+`pf package.fighters[?].actions[0]:help`
 
 However once again this is rarely useful so we stick to using context.
 This way we access the current action the selected player is in.
 
-`pf package.fighters[?].actions[?] help`
+`pf package.fighters[?].actions[?]:help`
 
 We can see two properties: iasa and frames.
 
-`pf package.fighters[?].actions[?].frames[?] help`
+`pf package.fighters[?].actions[?].frames[?]:help`
 
 We can see the colboxes property among numerous other properties.
 
-`pf package.fighters[?].actions[?].frames[?].colboxes help`
+`pf package.fighters[?].actions[?].frames[?].colboxes:help`
 
 Nice, now we know how to access colboxes, and (hopefully) better understand how frame data is structured.
 
@@ -193,20 +195,20 @@ Nice, now we know how to access colboxes, and (hopefully) better understand how 
 
 Now select a hitbox by clicking on it in pf_sandbox and run this command:
 
-`pf package.fighters[?].actions[?].frames[?].colboxes[?].radius set 10`
+`pf package.fighters[?].actions[?].frames[?].colboxes[?].radius:set 10`
 
 ## Variants & Hitboxes
 
 Select a colbox and run this command:
 
-`pf package.fighters[?].actions[?].frames[?].colboxes[?].role variant Hit
+`pf package.fighters[?].actions[?].frames[?].colboxes[?].role:variant Hit
 
 This changes the role of the colbox to be a hitbox.
 Test it out in game.
 
 Now that we have set the role to hit, we have access to more properties on the role.
 
-`pf package.fighters[?].actions[?].frames[?].colboxes[?].role[0].bkb set 9001`
+`pf package.fighters[?].actions[?].frames[?].colboxes[?].role[0].bkb:set 9001`
 
 We set the base knockback for the hitbox to 9001
 Test this out in game!

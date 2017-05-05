@@ -215,18 +215,16 @@ There are many contexts available that allow you to quickly hook into the object
 Setting a colbox to radius 10 can be done the primitive way.
 Objects are chained together with '.' and indexed by [] like this:
 
-`pf package.fighters[fighter.json].actions[0].frames[0].colboxes[2].radius set 10` (TODO)
+`pf 'package.fighters["fighter.json"].actions[0].frames[0].colboxes[2].radius:set 10'` (TODO)
 
 However how are you supposed to know all of these indexes? o.0
 Instead you can let PF engine use context to know what you want to modify.
 Select the hitboxes you want in game then run:
 
-`pf package.fighters[?].actions[?].frames[?].colboxes[?].radius set 10`
+`pf package.fighters[?].actions[?].frames[?].colboxes[?].radius:set 10`
 
 ### Aliases
 
-Its super long to type in all this junk just to get to some hitboxes
-Take advantage of your shell and add this to your .bashrc
-alias pf-hitboxes="`pf package.fighters[?].actions[?].frames[?].colboxes[?]`
-
-Eh, this wont work exactly because the alias will only activate if there is a space between it and the argument. (TODO, will probably have to build internal shortcuts or something)
+Its super long to type in all this junk just to get to some hitboxes.
+Take advantage of your shell and add something like this to your .bashrc:
+`alias colboxes="pf package.fighters[?].actions[?].frames[?].colboxes[?]: "`
