@@ -2,27 +2,33 @@
 
 A platform fighter sandbox featuring a character editor tightly integrated with gameplay.
 
-## Hardware Requirements:
-*   GC adapter for wii-u (nintendo or mayflash in wii-u mode)
-*   Follow the steps for your OS, found under Installation at this [Dolphin Wiki page](https://wiki.dolphin-emu.org/index.php?title=How_to_use_the_Official_GameCube_Controller_Adapter_for_Wii_U_in_Dolphin)
-*   regular controllers are planned but not ready yet
+## Controller requirements
 
-## setup on windows
+Controller support is currently hardcoded to the GC adapter for Wii U (Nintendo or Mayflash in Wii U mode)
+Follow the steps for your OS, found under Installation at this [Dolphin Wiki page](https://wiki.dolphin-emu.org/index.php?title=How_to_use_the_Official_GameCube_Controller_Adapter_for_Wii_U_in_Dolphin)
 
-You must use the latest nightly GNU compatible rust version. (instead of MSVC)
+## Setup on Windows
 
-Install [msys2](http://www.msys2.org/).
+Install rust via https://www.rustup.rs/
+Do a custom install and select nightly and GNU compatible rust version. (instead of MSVC)
+
+Install [msys2](http://www.msys2.org/), following ALL of the instructions.
 
 Then in the msys2 terminal run:
-`pacman -Syu mingw64/mingw-w64-x86_64-pkg-config`
-`pacman -Syu mingw64/mingw-w64-x86_64-libusb`
-`pacman -Syu mingw-w64-x86_64-openssl` (TODO: verify)
-TODO: wont these work on the same line?
+`pacman -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc`
 
 Add the msys2 mingw64 binary path to the PATH environment variable.
 In my case this was `C:\msys64\mingw64\bin`
 
-## setup on ubuntu
+### Breakdown of crates -> msys2 package dependencies
+#### Libusb:
+*   mingw64/mingw-w64-x86_64-pkg-config
+*   mingw64/mingw-w64-x86_64-libusb
+
+#### zip->(flate->miniz-sys & bzip2) & rust-crypto
+*   mingw-w64-x86_64-gcc
+
+## Setup on Ubuntu
 
 Install rust via https://www.rustup.rs/
 Do a custom install and select nightly all other settings default.
@@ -30,24 +36,25 @@ Do a custom install and select nightly all other settings default.
 sudo apt-get install libssl-dev libusb-1.0-0-dev cmake libvulkan-dev vulkan-utils
 
 You will also need vulkan drivers:
-*   Intel: sudo apt-get install  mesa-vulkan-drivers
+*   Intel: sudo apt-get install mesa-vulkan-drivers
 *   Nvida: No extra drivers required
 *   AMD:   TODO
 
-You may need to enable DRI3:
-
+If it fails to launch, you may need to enable DRI3,
 Create a file /etc/X11/xorg.conf.d/20-intel.conf containing:
+```
 Section "Device"
    Identifier  "Intel Graphics"
    Driver      "intel"
    Option      "DRI" "3"
 EndSection
+```
 
 ## Compile and run
 
 To run pf sandbox: run `cargo run` in the pf_sandbox directory.
 
-## setup cli tool
+## Setup CLI Tool
 
 The tutorial/manual assumes that you have setup the binary for the CLI tool in your system path as the command `pf`.
 To build the CLI tool run `cargo build` in the cli directory, the resulting binary is stored at `cli/target/debug/pf_client`.
@@ -56,8 +63,8 @@ However you can avoid fiddling with the system path by running `cargo run -- COM
 
 ## Usage Documentation
 
-*   (Get Started Tutorial)[editor-tutorial.md]
-*   (Full Reference Manual)[manual.md)
+*   [Get Started Tutorial](editor-tutorial.md)
+*   [Full Reference Manual](manual.md)
 
 ## Goals/Features
 
