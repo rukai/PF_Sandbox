@@ -1,7 +1,7 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
-impl Fighter {
-    pub fn base() -> Fighter { // TODO: Change to default
+impl Default for Fighter {
+    fn default() -> Fighter {
         let action_def = ActionDef {
             frames: ContextVec::from_vec(vec!(ActionFrame::default())),
             iasa:   0,
@@ -56,7 +56,7 @@ impl Fighter {
     }
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Fighter {
     // css render
     pub name:       String,

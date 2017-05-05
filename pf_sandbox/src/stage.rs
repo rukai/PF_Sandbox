@@ -1,6 +1,6 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Stage {
     pub name:           String,
     pub platforms:      ContextVec<Platform>,
@@ -17,8 +17,8 @@ pub struct SpawnPoint {
     pub face_right: bool,
 }
 
-impl Stage {
-    pub fn base() -> Stage {
+impl Default for Stage {
+    fn default() -> Stage {
         let main_platform = Platform {
             x: 0.0,
             y: 0.0,

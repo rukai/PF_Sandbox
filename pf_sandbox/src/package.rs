@@ -134,8 +134,8 @@ impl Package {
         let mut package = Package {
             meta:               meta,
             rules:              Rules::base(),
-            stages:             KeyedContextVec::from_vec(vec!((String::from("base_stage.json"), Stage::base()))),
-            fighters:           KeyedContextVec::from_vec(vec!((String::from("base_fighter.json"), Fighter::base()))),
+            stages:             KeyedContextVec::from_vec(vec!((String::from("base_stage.json"), Stage::default()))),
+            fighters:           KeyedContextVec::from_vec(vec!((String::from("base_fighter.json"), Fighter::default()))),
             path:               path,
             package_updates:    vec!(),
         };
