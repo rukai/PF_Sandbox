@@ -377,10 +377,9 @@ impl<'a> VulkanGraphics<'a> {
             buffer_content.edge_color      = [1.0, 1.0, 1.0, 1.0];
             buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
         }
-        let vertex_buffer = &self.package_buffers.stages[stage].vertex;
-        let index_buffer  = &self.package_buffers.stages[stage].index;
-
-        command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), &uniform.set, &());
+        if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
+            command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), &uniform.set, &());
+        }
 
         for entity in render.entities {
             match entity {
@@ -595,9 +594,9 @@ impl<'a> VulkanGraphics<'a> {
                 }
                 &MenuEntity::Stage (ref stage) => {
                     let stage: &str = stage.as_ref();
-                    let vertex_buffer = &self.package_buffers.stages[stage].vertex;
-                    let index_buffer  = &self.package_buffers.stages[stage].index;
-                    command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, vertex_buffer, index_buffer, &DynamicState::none(), uniform, &());
+                    if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
+                        command_buffer = command_buffer.draw_indexed(&self.generic_pipeline, &buffers.vertex, &buffers.index, &DynamicState::none(), uniform, &());
+                    }
                 }
                 &MenuEntity::Rect (ref rect) => {
                     let buffers = Buffers::rect_buffers(&self.device, &self.queue, rect.clone());

@@ -93,7 +93,11 @@ impl Buffers {
         }
     }
 
-    fn new_stage(device: &Arc<Device>, queue: &Arc<Queue>, stage: &Stage) -> Buffers {
+    fn new_stage(device: &Arc<Device>, queue: &Arc<Queue>, stage: &Stage) -> Option<Buffers> {
+        if stage.platforms.len() == 0 {
+            return None;
+        }
+
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
@@ -117,20 +121,20 @@ impl Buffers {
             indice_count += 4;
         }
 
-        Buffers {
+        Some(Buffers {
             vertex: CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
             index:  CpuAccessibleBuffer::from_iter(device, &BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
-        }
+        })
     }
 
     fn new_fighter_frame(device: &Arc<Device>, queue: &Arc<Queue>, frame: &ActionFrame) -> Option<Buffers> {
-        let mut vertices: Vec<Vertex> = vec!();
-        let mut indices: Vec<u16> = vec!();
-        let mut index_count = 0;
-
         if frame.colboxes.len() == 0 {
             return None;
         }
+
+        let mut vertices: Vec<Vertex> = vec!();
+        let mut indices: Vec<u16> = vec!();
+        let mut index_count = 0;
 
         for colbox_or_link in frame.get_colboxes_and_links() {
             match colbox_or_link {
@@ -272,7 +276,7 @@ impl Buffers {
 }
 
 pub struct PackageBuffers {
-    pub stages:   HashMap<String, Buffers>,
+    pub stages:   HashMap<String, Option<Buffers>>,
     pub fighters: HashMap<String, Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
     pub package:  Option<Package>,
 }
