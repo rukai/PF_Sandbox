@@ -1,6 +1,0 @@
-[package]
-name = "pf_client"
-version = "0.1.0"
-authors = ["Rukai <rubickent@gmail.com>"]
-
-[dependencies]

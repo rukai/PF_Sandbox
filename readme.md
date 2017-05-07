@@ -2,6 +2,9 @@
 
 A platform fighter sandbox featuring a character editor tightly integrated with gameplay.
 
+Check out [this youtube video](https://www.youtube.com/watch?v=CTrwvg56VQs) demonstrating the project.  
+[![Youtube Video](https://img.youtube.com/vi/CTrwvg56VQs/0.jpg)](https://www.youtube.com/watch?v=CTrwvg56VQs)
+
 ## Controller requirements
 
 Controller support is currently hardcoded to the GC adapter for Wii U (Nintendo or Mayflash in Wii U mode)

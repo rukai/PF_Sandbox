@@ -2,6 +2,10 @@
 name = "pf_tas"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
+description = "TAS tool for PF sandbox"
+license = "GPL-3.0"
+repository = "https://github.com/rukai/pf_sandbox"
+keywords = ["pf", "sandbox", "TAS"]
 
 [dependencies]
 winit = "0.5"

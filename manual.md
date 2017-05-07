@@ -199,9 +199,9 @@ Get object properties with dot notation.
 
 Sometimes an objects properties require an index or key to access them.
 
-*   `property[key_string]` select by key
-*   `property[0]`          select by index
-*   `property[?]`          select based on [context](link_to_context_section)
+*   `property["key_string"]` select by key
+*   `property[0]`            select by index
+*   `property[?]`            select based on [context](link_to_context_section)
 
 TODO: Planned fancy index accessors
 *   `property[0, 3]`   select 0 and 3 (TODO)
