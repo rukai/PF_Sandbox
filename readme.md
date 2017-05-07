@@ -33,6 +33,8 @@ In my case this was `C:\msys64\mingw64\bin`
 
 ## Setup on Ubuntu
 
+!!! Warning: Do not resize window on linux will bring your OS to a halt. !!!
+
 Install rust via https://www.rustup.rs/
 Do a custom install and select nightly all other settings default.
 
