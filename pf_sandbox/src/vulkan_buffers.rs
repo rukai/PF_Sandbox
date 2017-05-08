@@ -102,15 +102,10 @@ impl Buffers {
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
         for platform in &stage.platforms[..] {
-            let x1 = platform.x - platform.w / 2.0;
-            let y1 = platform.y - platform.h / 2.0;
-            let x2 = platform.x + platform.w / 2.0;
-            let y2 = platform.y + platform.h / 2.0;
-
-            vertices.push(vertex(x1, y1));
-            vertices.push(vertex(x1, y2));
-            vertices.push(vertex(x2, y1));
-            vertices.push(vertex(x2, y2));
+            vertices.push(vertex(platform.x1, platform.y1));
+            vertices.push(vertex(platform.x2, platform.y2));
+            vertices.push(vertex(platform.x1, platform.y1 - 2.0));
+            vertices.push(vertex(platform.x2, platform.y2 - 2.0));
 
             indices.push(indice_count + 0);
             indices.push(indice_count + 1);

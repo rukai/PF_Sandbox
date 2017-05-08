@@ -942,7 +942,7 @@ impl Player {
                 Some(platform) => {
                     self.land(fighter);
                     let self_y = self.bps_y + self.ecb.bot_y;
-                    let plat_y = platform.y + platform.h / 2.0;
+                    let plat_y = platform.y1;
                     plat_y - self_y
                 },
             };
@@ -1017,24 +1017,24 @@ impl Player {
             return None;
         }
 
-        for platform in &stage.platforms[..] {
-            if platform.pass_through && input[0].stick_y <= -0.56 {
-                continue;
-            }
+        //for platform in &stage.platforms[..] {
+        //    if platform.pass_through && input[0].stick_y <= -0.56 {
+        //        continue;
+        //    }
 
-            let self_x = self.bps_x;
-            let self_y = self.bps_y + self.ecb.bot_y + y_offset;
+        //    let self_x = self.bps_x;
+        //    let self_y = self.bps_y + self.ecb.bot_y + y_offset;
 
-            let plat_x1 = platform.x - platform.w / 2.0;
-            let plat_x2 = platform.x + platform.w / 2.0;
-            let plat_y1 = platform.y - platform.h / 2.0;
-            let plat_y2 = platform.y + platform.h / 2.0;
+        //    let plat_x1 = platform.x - platform.w / 2.0;
+        //    let plat_x2 = platform.x + platform.w / 2.0;
+        //    let plat_y1 = platform.y - platform.h / 2.0;
+        //    let plat_y2 = platform.y + platform.h / 2.0;
 
-            if self_x > plat_x1 && self_x < plat_x2 && self_y > plat_y1 && self_y < plat_y2 {
-                return Some(platform)
-                // TODO: GAH, need to refactor to set PassPlatform state
-            }
-        }
+        //    if self_x > plat_x1 && self_x < plat_x2 && self_y > plat_y1 && self_y < plat_y2 {
+        //        return Some(platform)
+        //        // TODO: GAH, need to refactor to set PassPlatform state
+        //    }
+        //}
         None
     }
 
