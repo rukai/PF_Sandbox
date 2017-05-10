@@ -18,8 +18,7 @@ pub struct Player {
     pub frame:            u64,
     pub stocks:           u64,
     pub damage:           f32,
-    pub bps_x:            f32,
-    pub bps_y:            f32,
+    pub location:         Location,
     pub respawn:          SpawnPoint,
     pub x_vel:            f32,
     pub y_vel:            f32,
@@ -28,7 +27,6 @@ pub struct Player {
     pub kb_x_dec:         f32,
     pub kb_y_dec:         f32,
     pub face_right:       bool,
-    pub airbourne:        bool,
     pub fastfalled:       bool,
     pub air_jumps_left:   u64,
     pub jumpsquat_button: bool,
@@ -41,6 +39,12 @@ pub struct Player {
     pub result:           PlayerResult,
 }
 
+pub enum Location {
+    Platform { platform: usize, x: usize, y: usize },
+    GrabbedPlatform (usize), // player.face_right determines which edge on the platform
+    GrabbedByPlayer (usize),
+    Airbourne { x: usize, y: usize },
+}
 
 impl Player {
     pub fn new(spawn: SpawnPoint, respawn: SpawnPoint, stocks: u64) -> Player {
@@ -51,8 +55,7 @@ impl Player {
             frame:            0,
             stocks:           stocks,
             damage:           0.0,
-            bps_x:            spawn.x,
-            bps_y:            spawn.y,
+            location:         Location::Airbourne { x: spawn.x, y: spawn.y },
             respawn:          respawn,
             x_vel:            0.0,
             y_vel:            0.0,
@@ -935,21 +938,25 @@ impl Player {
      */
 
     fn physics_step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage, game_frame: usize, goal: Goal) {
-        if self.airbourne {
-            self.bps_x += self.x_vel + self.kb_x_vel;
-            self.bps_y += match self.land_stage_collision(stage, self.y_vel + self.kb_y_vel, input) {
-                None => { self.y_vel + self.kb_y_vel},
-                Some(platform) => {
-                    self.land(fighter);
-                    let self_y = self.bps_y + self.ecb.bot_y;
-                    let plat_y = platform.y1;
-                    plat_y - self_y
-                },
-            };
-        }
-        else {
-            self.bps_x += self.x_vel + self.kb_x_vel;
-            self.bps_y += self.y_vel + self.kb_y_vel;
+        match  self.location.clone() {
+            Location::Airboune { x, y } => {
+                // TODO
+                self.bps_x += self.x_vel + self.kb_x_vel;
+                self.bps_y += match self.land_stage_collision(stage, self.y_vel + self.kb_y_vel, input) {
+                    None => { self.y_vel + self.kb_y_vel},
+                    Some(platform) => {
+                        self.land(fighter);
+                        let self_y = self.bps_y + self.ecb.bot_y;
+                        let plat_y = platform.y1;
+                        plat_y - self_y
+                    },
+                };
+            }
+            Location::Platform { platform_i, x, y } => {
+                x += self.x_vel + self.kb_x_vel;
+                y += self.y_vel + self.kb_y_vel;
+                self.location = Location::Platform { platform_i, x, y };
+            }
         }
 
         if self.kb_x_vel.abs() > 0.0 {
@@ -1101,7 +1108,7 @@ impl Player {
         }
 
         self.y_vel = 0.0;
-        self.airbourne = false;
+        self.location.to_airbourne();
         self.fastfalled = false;
         self.air_jumps_left = fighter.air_jumps;
         self.hit_by = None;

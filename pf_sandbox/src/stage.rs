@@ -106,8 +106,19 @@ impl Platform {
         (self.y1-self.y2).atan2(self.x1-self.x2)
     }
 
-    pub fn x_to_y(x: f32) -> f32 {
+    /// In terms of values offset from the center of the platform
+    /// returns the y value at the x value
+    pub fn plat_x_to_plat_y(&self, x: f32) -> f32 {
         0.0 // TODO
+    }
+
+    pub fn world_to_plat_x(&self, x: f32) -> f32 {
+        (self.x1 + self.x2) / 2.0 - x
+    }
+
+    pub fn plat_x_to_world(&self, x: f32) -> (f32, f32) {
+        let world_x = (self.x1 + self.x2) / 2.0 + x;
+        (world_x, 0.0) // TODO
     }
 }
 
