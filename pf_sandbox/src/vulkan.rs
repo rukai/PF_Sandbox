@@ -503,6 +503,14 @@ impl<'a> VulkanGraphics<'a> {
     fn menu_render(&mut self, render: RenderMenu, image_num: usize) -> Arc<PrimaryCommandBuffer> {
         let mut entities: Vec<MenuEntity> = vec!();
         match render.state {
+            RenderMenuState::GameSelect (selection) => {
+                self.draw_game_selector(selection);
+                self.draw_package_banner(&render.package_verify);
+            }
+            RenderMenuState::ReplaySelect (selection) => {
+                self.draw_replay_selector(&vec!(), selection);
+                self.draw_package_banner(&render.package_verify);
+            }
             RenderMenuState::CharacterSelect (selections, back_counter, back_counter_max) => {
                 let mut plugged_in_controller_indexes: Vec<usize>            = vec!();
                 let mut plugged_in_selections:         Vec<&CharacterSelect> = vec!();
@@ -779,6 +787,31 @@ impl<'a> VulkanGraphics<'a> {
             let x_offset = if package_i == selection { 0.1 } else { 0.0 };
             let x = self.width as f32 * (0.1 + x_offset);
             let y = self.height as f32 * 0.1 + package_i as f32 * 50.0;
+            self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], name.as_ref());
+        }
+    }
+
+    fn draw_game_selector(&mut self, selection: usize) {
+        self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Game Mode");
+
+        let modes = vec!("Local", "Host Game", "Connect To Game |AddressInputBox|", "Replays");
+        for (mode_i, name) in modes.iter().enumerate() {
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let x_offset = if mode_i == selection { 0.1 } else { 0.0 };
+            let x = self.width as f32 * (0.1 + x_offset);
+            let y = self.height as f32 * 0.1 + mode_i as f32 * 50.0;
+            self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], name.as_ref());
+        }
+    }
+
+    fn draw_replay_selector(&mut self, replay_names: &[String], selection: usize) {
+        self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Replay");
+
+        for (replay_i, name) in replay_names.iter().enumerate() {
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let x_offset = if replay_i == selection { 0.1 } else { 0.0 };
+            let x = self.width as f32 * (0.1 + x_offset);
+            let y = self.height as f32 * 0.1 + replay_i as f32 * 50.0;
             self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], name.as_ref());
         }
     }

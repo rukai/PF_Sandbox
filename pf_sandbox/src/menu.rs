@@ -10,7 +10,9 @@ pub struct Menu {
     config:             Config,
     state:              MenuState,
     fighter_selections: Vec<CharacterSelect>,
-    stage_ticker:       Option<MenuTicker>,
+    game_ticker:        MenuTicker,
+    replay_ticker:      MenuTicker,
+    stage_ticker:       Option<MenuTicker>, // Uses an option because we dont know how many stages there are at Menu creation
     current_frame:      usize,
     package:            PackageHolder,
     back_counter_max:   usize,
@@ -53,9 +55,59 @@ impl Menu {
             state:              state,
             fighter_selections: vec!(),
             stage_ticker:       None,
+            game_ticker:        MenuTicker::new(4),
+            replay_ticker:      MenuTicker::new(0),
             current_frame:      0,
             package:            PackageHolder::new(package),
             back_counter_max:   90,
+        }
+    }
+
+    pub fn step_game_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+        let ticker = &mut self.game_ticker;
+
+        if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
+            ticker.up();
+        }
+        else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
+            ticker.down();
+        }
+        else {
+            ticker.reset();
+        }
+
+        if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && self.package.get().stages.len() > 0 {
+            self.state = match ticker.cursor {
+                0 => MenuState::character_select(),
+                1 => MenuState::GameSelect,
+                2 => MenuState::GameSelect,
+                3 => MenuState::ReplaySelect,
+                _ => unreachable!()
+            }
+        }
+        else if player_inputs.iter().any(|x| x.b.press) {
+            self.state = MenuState::package_select();
+        }
+    }
+
+    pub fn step_replay_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+        let ticker = &mut self.replay_ticker;
+
+        if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
+            ticker.up();
+        }
+        else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
+            ticker.down();
+        }
+        else {
+            ticker.reset();
+        }
+
+        if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && self.package.get().stages.len() > 0 {
+            self.state = MenuState::ReplaySelect; // TODO
+        }
+        else if player_inputs.iter().any(|x| x.b.press) {
+            self.state = MenuState::GameSelect;
         }
     }
 
@@ -118,7 +170,7 @@ impl Menu {
             }
             else if player_inputs.iter().any(|x| x[0].b) {
                 if *back_counter > self.back_counter_max {
-                    new_state = Some(MenuState::package_select());
+                    new_state = Some(MenuState::GameSelect);
                 }
                 else {
                     *back_counter += 1;
@@ -198,7 +250,7 @@ impl Menu {
             self.stage_ticker = None;
             self.config.current_package = Some(selection);
             self.config.save();
-            self.state = MenuState::character_select();
+            self.state = MenuState::GameSelect;
         }
     }
 
@@ -213,6 +265,8 @@ impl Menu {
         let player_inputs = input.players(self.current_frame);
 
         match self.state {
+            MenuState::GameSelect           => { self.step_game_select   (&player_inputs, input) }
+            MenuState::ReplaySelect         => { self.step_replay_select (&player_inputs, input) }
             MenuState::PackageSelect (_, _) => { self.step_package_select(&player_inputs, input) }
             MenuState::CharacterSelect (_)  => { self.step_fighter_select(&player_inputs, input) }
             MenuState::StageSelect          => { self.step_stage_select  (&player_inputs, input) }
@@ -258,6 +312,8 @@ impl Menu {
                 MenuState::PackageSelect (ref names, ref ticker) => { RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor) }
                 MenuState::GameResults (ref results)             => { RenderMenuState::GameResults (results.clone()) }
                 MenuState::CharacterSelect (back_counter)        => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
+                MenuState::GameSelect     => { RenderMenuState::GameSelect (self.game_ticker.cursor) }
+                MenuState::ReplaySelect   => { RenderMenuState::ReplaySelect (0) }
                 MenuState::StageSelect    => { RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor) }
                 MenuState::SetRules       => { RenderMenuState::SetRules }
                 MenuState::BrowsePackages => { RenderMenuState::BrowsePackages }
@@ -295,7 +351,9 @@ impl Menu {
 
 #[derive(Clone)]
 pub enum MenuState {
-    CharacterSelect (usize),
+    GameSelect,
+    ReplaySelect,
+    CharacterSelect (usize), // TODO: name usize value as backcounter
     StageSelect,
     GameResults (Vec<GameResult>),
     SetRules,
@@ -319,6 +377,8 @@ impl MenuState {
 }
 
 pub enum RenderMenuState {
+    GameSelect      (usize),
+    ReplaySelect    (usize),
     CharacterSelect (Vec<CharacterSelect>, usize, usize),
     StageSelect     (usize),
     GameResults     (Vec<GameResult>),
