@@ -4,14 +4,16 @@ use ::stage::{Stage, Platform, Area, SpawnPoint};
 use ::collision::CollisionResult;
 use ::records::{PlayerResult, DeathRecord};
 use ::rules::Goal;
+use ::math;
 
 use std::f32;
 use num::FromPrimitive;
 use std::collections::HashSet;
-use treeflection::{Node, NodeRunner, NodeToken};
+use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Player {
+    pub fighter:          String,
     pub action:           u64,
     action_new:           u64,
     action_set:           bool,
@@ -39,16 +41,25 @@ pub struct Player {
     pub result:           PlayerResult,
 }
 
+// Describes the player location by offsets from other locations
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub enum Location {
-    Platform { platform: usize, x: usize, y: usize },
-    GrabbedPlatform (usize), // player.face_right determines which edge on the platform
+    Platform { platform_i: usize, x: f32 },
+    GrabbedLedge (usize), // player.face_right determines which edge on the platform
     GrabbedByPlayer (usize),
-    Airbourne { x: usize, y: usize },
+    Airbourne { x: f32, y: f32 },
+}
+
+impl Default for Location {
+    fn default() -> Location {
+        Location::Airbourne { x: 0.0, y: 0.0 }
+    }
 }
 
 impl Player {
-    pub fn new(spawn: SpawnPoint, respawn: SpawnPoint, stocks: u64) -> Player {
+    pub fn new(fighter: String, spawn: SpawnPoint, respawn: SpawnPoint, stocks: u64) -> Player {
         Player {
+            fighter:          fighter,
             action:           Action::Spawn as u64,
             action_new:       Action::Spawn as u64,
             action_set:       false,
@@ -64,7 +75,6 @@ impl Player {
             kb_x_dec:         0.0,
             kb_y_dec:         0.0,
             face_right:       spawn.face_right,
-            airbourne:        true,
             fastfalled:       false,
             air_jumps_left:   0,
             jumpsquat_button: false,
@@ -78,6 +88,80 @@ impl Player {
         }
     }
 
+    pub fn bps_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
+        match self.location {
+            Location::Platform { platform_i, x } => {
+                if let Some(platform) = platforms.get(platform_i) {
+                    platform.plat_x_to_world_p(x)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+            Location::GrabbedLedge (platform_i) => {
+                if let Some(platform) = platforms.get(platform_i) {
+                    let (ledge_x, ledge_y) = platform.ledge(self.face_right);
+                    let (player_x, player_y) = (3.0, 12.0); // TODO: Get from fighter
+                    (ledge_x + self.relative_f(player_x), ledge_y + player_y)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+            Location::GrabbedByPlayer (player_i) => {
+                if let Some(player) = players.get(player_i) {
+                     player.grab_xy(players, fighters, platforms)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+            Location::Airbourne { x, y } => {
+                (x, y)
+            }
+        }
+    }
+
+    pub fn grab_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
+        let (x, y) = self.bps_xy(players, fighters, platforms);
+        let fighter_frame = &fighters[self.fighter.as_ref()].actions[self.action as usize].frames[self.frame as usize];
+        (x + fighter_frame.grab_hold_x, y + fighter_frame.grab_hold_y)
+    }
+
+    pub fn is_platform(&self) -> bool {
+        if let &Location::Platform { .. } = &self.location {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_ledge(&self) -> bool {
+        if let &Location::GrabbedLedge (_) = &self.location {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_grabbed(&self) -> bool {
+        if let &Location::GrabbedByPlayer (_) = &self.location {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_airbourne(&self) -> bool {
+        if let &Location::Airbourne { .. } = &self.location {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_airbourne(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let (x, y) = self.bps_xy(players, fighters, platforms);
+        self.location = Location::Airbourne { x, y };
+    }
+
     // always change self.action through this method
     fn set_action(&mut self, action: Action) {
         self.action_new = action as u64;
@@ -85,12 +169,12 @@ impl Player {
         self.hitlist.clear();
     }
 
-    // TODO: I could hook in a turbo mode here
     fn interruptible(&self, fighter: &Fighter) -> bool {
         self.frame >= fighter.actions[self.action as usize].iasa
     }
 
-    pub fn step_collision(&mut self, fighter: &Fighter, col_results: &[CollisionResult]) {
+    pub fn step_collision(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], col_results: &[CollisionResult]) {
+        let fighter = &fighters[self.fighter.as_ref()];
         for col_result in col_results {
             match col_result {
                 &CollisionResult::HitAtk { player_def_i, .. } => {
@@ -142,12 +226,14 @@ impl Player {
 
                     if self.kb_y_vel == 0.0 {
                         if kb_vel >= 80.0 {
-                            self.airbourne = true;
-                            self.bps_y += 0.0001;
+                            self.set_airbourne(players, fighters, platforms);
+                            if let &mut Location::Airbourne { ref mut y, .. } = &mut self.location {
+                                *y += 0.0001;
+                            }
                         }
                     }
                     else if self.kb_y_vel > 0.0 {
-                        self.airbourne = true;
+                        self.set_airbourne(players, fighters, platforms);
                     }
 
                     let not_grabbed = true;
@@ -158,8 +244,7 @@ impl Player {
                             HitStun::Frames               (frames) => { frames as f32 }
                         };
 
-                        // TODO: set airbourne properly
-                        self.airbourne = true;
+                        self.set_airbourne(players, fighters, platforms);
 
                         if kb_vel > 80.0 {
                             self.set_action(Action::DamageFly);
@@ -188,16 +273,17 @@ impl Player {
         }
     }
 
-    pub fn step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage, game_frame: usize, goal: Goal) {
-        self.input_step(input, fighter);
-        self.physics_step(input, fighter, stage, game_frame, goal);
+    pub fn step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
+        self.input_step(input, players, fighters, &stage.platforms);
+        self.physics_step(input, players, fighters, stage, game_frame, goal);
     }
 
     /*
      *  Begin input section
      */
 
-    fn input_step(&mut self, input: &PlayerInput, fighter: &Fighter) {
+    fn input_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let fighter = &fighters[self.fighter.as_ref()];
         let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
         // handles a frame index that no longer exists by jumping to the last existing frame
@@ -206,7 +292,7 @@ impl Player {
         }
 
         if self.frame == action_frames - 1 {
-            self.action_expired(input, fighter);
+            self.action_expired(input, players, fighters, platforms);
         }
 
         let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
@@ -267,7 +353,7 @@ impl Player {
     fn damage_action(&mut self, fighter: &Fighter) {
         self.hitstun -= 1.0;
         if self.hitstun <= 0.0 {
-            if self.airbourne {
+            if self.is_airbourne() {
                 self.set_action(Action::Fall);
             }
             else {
@@ -275,7 +361,7 @@ impl Player {
             }
         }
         else {
-            if self.airbourne {
+            if self.is_airbourne() {
                 self.fall_action(fighter);
             }
             else {
@@ -752,7 +838,8 @@ impl Player {
         input[0].stick_x.abs() > 0.79 && input[2].stick_x.abs() < 0.3
     }
 
-    fn action_expired(&mut self, input: &PlayerInput, fighter: &Fighter) {
+    fn action_expired(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let fighter = &fighters[self.fighter.as_ref()];
         match Action::from_u64(self.action) {
             None => { panic!("Custom defined action expirations have not been implemented"); },
 
@@ -794,7 +881,7 @@ impl Player {
                 self.set_action(new_action);
             },
             Some(Action::JumpSquat) => {
-                self.airbourne = true;
+                self.set_airbourne(players, fighters, platforms);
 
                 let shorthop = if self.jumpsquat_button {
                     !input[0].x && !input[0].y
@@ -937,31 +1024,12 @@ impl Player {
      *  Begin physics section
      */
 
-    fn physics_step(&mut self, input: &PlayerInput, fighter: &Fighter, stage: &Stage, game_frame: usize, goal: Goal) {
-        match  self.location.clone() {
-            Location::Airboune { x, y } => {
-                // TODO
-                self.bps_x += self.x_vel + self.kb_x_vel;
-                self.bps_y += match self.land_stage_collision(stage, self.y_vel + self.kb_y_vel, input) {
-                    None => { self.y_vel + self.kb_y_vel},
-                    Some(platform) => {
-                        self.land(fighter);
-                        let self_y = self.bps_y + self.ecb.bot_y;
-                        let plat_y = platform.y1;
-                        plat_y - self_y
-                    },
-                };
-            }
-            Location::Platform { platform_i, x, y } => {
-                x += self.x_vel + self.kb_x_vel;
-                y += self.y_vel + self.kb_y_vel;
-                self.location = Location::Platform { platform_i, x, y };
-            }
-        }
+    fn physics_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
+        let fighter = &fighters[self.fighter.as_ref()];
 
         if self.kb_x_vel.abs() > 0.0 {
             let vel_dir = self.kb_x_vel.signum();
-            if self.airbourne {
+            if self.is_airbourne() {
                 self.kb_x_vel -= self.kb_x_dec;
             } else {
                 self.kb_x_vel -= vel_dir * fighter.friction;
@@ -972,7 +1040,7 @@ impl Player {
         }
 
         if self.kb_y_vel.abs() > 0.0 {
-            if self.airbourne {
+            if self.is_airbourne() {
                 let vel_dir = self.kb_y_vel.signum();
                 self.kb_y_vel -= self.kb_y_dec;
                 if vel_dir != self.kb_y_vel.signum() {
@@ -984,21 +1052,34 @@ impl Player {
             }
         }
 
-        // are we on a platform?
-        match self.land_stage_collision(stage, -0.001, input) {
-            Some(_) if self.airbourne && self.frame > 2 => { // TODO: I dunno what I want to do instead of checking self.frame ...
-                print!("registered land");
-                self.land(fighter);
-            },
-            None if !self.airbourne => {
-                self.fall();
-            },
-            _ => { },
+        match self.location.clone() {
+            Location::Airbourne { x, y } => {
+                let new_x = x + self.x_vel + self.kb_x_vel;
+                let new_y = y + self.y_vel + self.kb_y_vel;
+                if let Some(platform_i) = self.land_stage_collision(stage, (x, y), (new_x, new_y), input) {
+                    let x = stage.platforms[platform_i].world_x_to_plat_x(new_x);
+                    self.land(fighter, platform_i, x);
+                } else {
+                    self.location = Location::Airbourne { x: new_x, y: new_y };
+                }
+            }
+            Location::Platform { platform_i, mut x } => {
+                x += self.x_vel + self.kb_x_vel;
+                if stage.platforms.get(platform_i).map_or(false, |plat| plat.plat_x_in_bounds(x)) {
+                    self.location = Location::Platform { platform_i, x };
+                } else {
+                    self.set_airbourne(players, fighters, &stage.platforms);
+                    self.set_action(Action::Fall);
+                    self.fastfalled = false;
+                }
+            }
+            _ => { }
         }
 
         // death
         let blast = &stage.blast;
-        if self.bps_x < blast.left || self.bps_x > blast.right || self.bps_y < blast.bot || self.bps_y > blast.top {
+        let (x, y) = self.bps_xy(players, fighters, &stage.platforms);
+        if x < blast.left || x > blast.right || y < blast.bot || y > blast.top {
             self.die(fighter, game_frame, goal);
         }
     }
@@ -1018,39 +1099,33 @@ impl Player {
         }
     }
 
-    /// return the platform that the player would land on if moved by y_offset
-    fn land_stage_collision<'a> (&self, stage: &'a Stage, y_offset: f32, input: &PlayerInput) -> Option<&'a Platform> {
-        if self.y_vel > 0.0 {
+    /// returns the index platform that the player will land on
+    fn land_stage_collision(&mut self, stage: &Stage, old_p: (f32, f32), new_p: (f32, f32), input: &PlayerInput) -> Option<usize> {
+        if new_p.1 > old_p.1 {
             return None;
         }
 
-        //for platform in &stage.platforms[..] {
-        //    if platform.pass_through && input[0].stick_y <= -0.56 {
-        //        continue;
-        //    }
+        for (platform_i, platform) in stage.platforms.iter().enumerate() {
+            if platform.pass_through && input[0].stick_y <= -0.56 {
+                continue;
+            }
 
-        //    let self_x = self.bps_x;
-        //    let self_y = self.bps_y + self.ecb.bot_y + y_offset;
-
-        //    let plat_x1 = platform.x - platform.w / 2.0;
-        //    let plat_x2 = platform.x + platform.w / 2.0;
-        //    let plat_y1 = platform.y - platform.h / 2.0;
-        //    let plat_y2 = platform.y + platform.h / 2.0;
-
-        //    if self_x > plat_x1 && self_x < plat_x2 && self_y > plat_y1 && self_y < plat_y2 {
-        //        return Some(platform)
-        //        // TODO: GAH, need to refactor to set PassPlatform state
-        //    }
-        //}
+            if math::segments_intersect(old_p, new_p, platform.p1(), platform.p2()) {
+                println!("intersect! {:?}, {:?}, {:?}, {:?}", old_p, new_p, platform.p1(), platform.p2());
+                self.set_action(Action::PassPlatform);
+                return Some(platform_i)
+            }
+        }
         None
     }
 
     /// Returns the area sorounding the player that the camera must include
-    pub fn cam_area(&self, cam_max: &Area) -> Area {
-        let mut left  = self.bps_x;
-        let mut right = self.bps_x;
-        let mut bot   = self.bps_y - 5.0;
-        let mut top   = self.bps_y + 25.0;
+    pub fn cam_area(&self, cam_max: &Area, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> Area {
+        let (x, y) = self.bps_xy(players, fighters, platforms);
+        let mut left  = x;
+        let mut right = x;
+        let mut bot   = y - 5.0;
+        let mut top   = y + 25.0;
 
         if self.face_right {
             left  -= 7.0;
@@ -1091,7 +1166,7 @@ impl Player {
         }
     }
 
-    fn land(&mut self, fighter: &Fighter) {
+    fn land(&mut self, fighter: &Fighter, platform_i: usize, x: f32) {
         match Action::from_u64(self.action) {
             Some(Action::Uair)      => { self.set_action(Action::UairLand) },
             Some(Action::Dair)      => { self.set_action(Action::DairLand) },
@@ -1108,10 +1183,10 @@ impl Player {
         }
 
         self.y_vel = 0.0;
-        self.location.to_airbourne();
         self.fastfalled = false;
         self.air_jumps_left = fighter.air_jumps;
         self.hit_by = None;
+        self.location = Location::Platform { platform_i, x };
     }
 
     fn walk(&mut self, fighter: &Fighter) {
@@ -1138,16 +1213,9 @@ impl Player {
         self.set_action(Action::TurnDash);
     }
 
-    fn fall(&mut self) {
-        self.airbourne = true;
-        self.fastfalled = false;
-        self.set_action(Action::Fall);
-    }
-
     fn die(&mut self, fighter: &Fighter, game_frame: usize, goal: Goal) {
         self.damage = 0.0;
-        self.bps_x = self.respawn.x;
-        self.bps_y = self.respawn.y;
+        self.location = Location::Airbourne { x: self.respawn.x, y: self.respawn.y };
         self.face_right = self.respawn.face_right;
         self.x_vel = 0.0;
         self.y_vel = 0.0;
@@ -1183,8 +1251,8 @@ impl Player {
 
     pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, debug: &DebugPlayer, index: usize) {
         if debug.physics {
-            println!("Player: {}    x: {}    y: {}    x_vel: {:.5}    y_vel: {:.5}    kb_x_vel: {:.5}    kb_y_vel: {:.5} ",
-                index, self.bps_x, self.bps_y, self.x_vel, self.y_vel, self.kb_x_vel, self.kb_y_vel);
+            println!("Player: {}    location: {:?}    x_vel: {:.5}    y_vel: {:.5}    kb_x_vel: {:.5}    kb_y_vel: {:.5} ",
+                index, self.location, self.x_vel, self.y_vel, self.kb_x_vel, self.kb_y_vel);
         }
 
         if debug.input {
@@ -1216,8 +1284,8 @@ impl Player {
             let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
             let iasa = fighter.actions[self.action as usize].iasa;
 
-            println!("Player: {}    action: {:?}    airbourne: {}    frame: {}/{}    IASA: {}",
-                index, action, self.airbourne, self.frame, action_frames, iasa);
+            println!("Player: {}    action: {:?}    frame: {}/{}    IASA: {}",
+                index, action, self.frame, action_frames, iasa);
         }
 
         if debug.frame {
@@ -1235,16 +1303,16 @@ impl Player {
         }
     }
 
-    pub fn render(&self, fighter_color: [f32; 4], fighter: String, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer) -> RenderPlayer {
+    pub fn render(&self, fighter_color: [f32; 4], selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> RenderPlayer {
         RenderPlayer {
             debug:             debug,
             damage:            self.damage,
             stocks:            self.stocks,
-            bps:               (self.bps_x, self.bps_y),
+            bps:               self.bps_xy(players, fighters, platforms),
             ecb:               self.ecb.clone(),
             frame:             self.frame as usize,
             action:            self.action as usize,
-            fighter:           fighter,
+            fighter:           self.fighter.clone(),
             face_right:        self.face_right,
             fighter_color:     fighter_color,
             fighter_selected:  fighter_selected,
@@ -1256,6 +1324,7 @@ impl Player {
     pub fn result(&self) -> PlayerResult {
         let mut result = self.result.clone();
         result.final_damage = Some(self.damage);
+        result.ended_as_fighter = Some(self.fighter.clone());
         result
     }
 }

@@ -16,6 +16,7 @@ pub struct PlayerResult {
     pub lcancel_attempts: u64,
     pub lcancel_success:  u64,
     pub final_damage:     Option<f32>,
+    pub ended_as_fighter: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]

@@ -142,6 +142,7 @@ pub fn run(mut cli_results: CLIResults) {
                 let setup = GameSetup {
                     input_history:  vec!(),
                     player_history: vec!(),
+                    stage_history:  vec!(),
                     controllers:    controllers,
                     fighters:       cli_results.fighter_names,
                     stage:          cli_results.stage_name.unwrap(),

@@ -1,9 +1,10 @@
 use os_input::OsInput;
 use player::Player;
 use stage::Stage;
+use fighter::Fighter;
 
 use winit::VirtualKeyCode;
-use treeflection::{Node, NodeRunner, NodeToken};
+use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct Camera {
@@ -35,7 +36,7 @@ impl Camera {
         }
     }
 
-    pub fn update(&mut self, os_input: &OsInput, players: &Vec<Player>, stage: &Stage) {
+    pub fn update(&mut self, os_input: &OsInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage) {
         if let Some((width, height)) = os_input.resolution() {
             self.aspect_ratio = width as f32 / height as f32;
         }
@@ -62,7 +63,7 @@ impl Camera {
                 let mut player_iter = players.iter();
                 let mut cam_area = match player_iter.next() {
                     Some(player) => {
-                        player.cam_area(&stage.camera)
+                        player.cam_area(&stage.camera, players, fighters, &stage.platforms)
                     },
                     None => {
                         self.pan = (0.0, 0.0);
@@ -73,7 +74,7 @@ impl Camera {
 
                 // grow cam_area to cover all other players
                 for player in player_iter {
-                    let next_area = player.cam_area(&stage.camera);
+                    let next_area = player.cam_area(&stage.camera, players, fighters, &stage.platforms);
                     cam_area.left  = cam_area.left.min  (next_area.left);
                     cam_area.right = cam_area.right.max (next_area.right);
                     cam_area.bot   = cam_area.bot.min   (next_area.bot);

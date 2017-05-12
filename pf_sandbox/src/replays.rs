@@ -10,6 +10,7 @@ use player::Player;
 use game::Game;
 use input::{Input, ControllerInput};
 use package::Package;
+use stage::Stage;
 
 pub fn get_replay_names(package: &Package) -> Vec<String> {
     let mut result: Vec<String> = vec!();
@@ -72,6 +73,7 @@ pub struct Replay {
     pub timestamp:            DateTime<Local>,
     pub input_history:        Vec<Vec<ControllerInput>>,
     pub player_history:       Vec<Vec<Player>>,
+    pub stage_history:        Vec<Stage>,
     pub selected_controllers: Vec<usize>,
     pub selected_fighters:    Vec<String>,
     pub selected_stage:       String,
@@ -83,8 +85,9 @@ impl Replay {
             timestamp:            Local::now(),
             input_history:        input.get_history(),
             player_history:       game.player_history.clone(),
+            stage_history:        game.stage_history.clone(),
             selected_controllers: game.selected_controllers.clone(),
-            selected_fighters:    game.selected_fighters.clone(),
+            selected_fighters:    game.players.iter().map(|x| x.fighter.clone()).collect(),
             selected_stage:       game.selected_stage.clone(),
         }
     }

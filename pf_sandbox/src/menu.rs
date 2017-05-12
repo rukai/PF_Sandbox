@@ -109,6 +109,7 @@ impl Menu {
                     self.game_setup = Some(GameSetup {
                         input_history:  replay.input_history,
                         player_history: replay.player_history,
+                        stage_history:  replay.stage_history,
                         controllers:    replay.selected_controllers,
                         fighters:       replay.selected_fighters,
                         stage:          replay.selected_stage,
@@ -247,6 +248,7 @@ impl Menu {
         self.game_setup = Some(GameSetup {
             input_history:  vec!(),
             player_history: vec!(),
+            stage_history:  vec!(),
             controllers:    controllers,
             fighters:       selected_fighters,
             stage:          stage,

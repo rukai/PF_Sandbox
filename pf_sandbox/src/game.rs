@@ -11,7 +11,7 @@ use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
 use ::records::{GameResult, PlayerResult};
 use ::replays;
 use ::rules::Goal;
-use ::stage::Area;
+use ::stage::{Area, Stage};
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -26,12 +26,13 @@ pub struct Game {
     pub config:                 Config,
     pub state:                  GameState,
     pub player_history:         Vec<Vec<Player>>,
+    pub stage_history:          Vec<Stage>,
     pub current_frame:          usize,
     pub saved_frame:            usize,
+    pub stage:                  Stage,
     pub players:                Vec<Player>,
     pub debug_players:          Vec<DebugPlayer>,
     pub selected_controllers:   Vec<usize>,
-    pub selected_fighters:      Vec<String>,
     pub selected_stage:         String,
     pub edit:                   Edit,
     pub debug_output_this_step: bool,
@@ -48,28 +49,20 @@ pub struct Game {
 
 impl Game {
     pub fn new(package: Package, config: Config, setup: GameSetup) -> Game {
+        let stage = package.stages[setup.stage.as_ref()].clone();
+
         // generate players
         let mut players:       Vec<Player>      = vec!();
         let mut debug_players: Vec<DebugPlayer> = vec!();
         {
-            let spawn_points = &package.stages[setup.stage.as_ref()].spawn_points;
-            let respawn_points = &package.stages[setup.stage.as_ref()].respawn_points;
             for (i, _) in setup.controllers.iter().enumerate() {
-                // Stages can have less spawn points then players
-                let spawn = spawn_points[i % spawn_points.len()].clone();
-                let respawn = respawn_points[i % respawn_points.len()].clone();
-                players.push(Player::new(spawn, respawn, package.rules.stock_count));
+                // Stage can have less spawn points then players
+                let spawn = stage.spawn_points[i % stage.spawn_points.len()].clone();
+                let respawn = stage.respawn_points[i % stage.respawn_points.len()].clone();
+                // The CLI allows for selected_fighters to be shorter then players
+                let fighter = setup.fighters[i % setup.fighters.len()].clone();
+                players.push(Player::new(fighter, spawn, respawn, package.rules.stock_count));
                 debug_players.push(Default::default());
-            }
-        }
-
-        // The CLI allows for selected_fighters to be shorter then players
-        let mut filled_fighters = setup.fighters.clone();
-        let wrap = setup.fighters.len();
-        if players.len() > setup.fighters.len() {
-            let extra = players.len() - setup.fighters.len();
-            for i in 0..extra {
-                filled_fighters.push(setup.fighters[i % wrap].clone());
             }
         }
 
@@ -78,12 +71,13 @@ impl Game {
             config:                 config,
             state:                  setup.state,
             player_history:         setup.player_history,
+            stage_history:          setup.stage_history,
             current_frame:          0,
             saved_frame:            0,
             players:                players,
+            stage:                  stage,
             debug_players:          debug_players,
             selected_controllers:   setup.controllers,
-            selected_fighters:      filled_fighters,
             selected_stage:         setup.stage,
             edit:                   Edit::Stage,
             debug_output_this_step: false,
@@ -105,10 +99,7 @@ impl Game {
                 GameState::ToResults (_)   => { unreachable!(); }
                 GameState::ToCSS           => { unreachable!(); }
             }
-            {
-                let stage = &self.package.stages[self.selected_stage.as_ref()];
-                self.camera.update(os_input, &self.players, stage);
-            }
+            self.camera.update(os_input, &self.players, &self.package.fighters, &self.stage);
 
             if self.debug_output_this_step {
                 self.debug_output_this_step = false;
@@ -124,7 +115,7 @@ impl Game {
     fn set_context(&mut self) {
         match self.edit {
             Edit::Fighter (player) => {
-                let player_fighter = self.selected_fighters[player].as_ref();
+                let player_fighter = self.players[player].fighter.as_ref();
                 let player_action = self.players[player].action as usize;
                 let player_frame  = self.players[player].frame as usize;
                 let player_colboxes = self.selector.colboxes_vec();
@@ -270,7 +261,7 @@ impl Game {
 
         match self.edit {
             Edit::Fighter (player) => {
-                let fighter_string = self.selected_fighters[player].clone();
+                let fighter_string = self.players[player].fighter.clone();
                 let fighter = fighter_string.as_ref();
                 let action = self.players[player].action as usize;
                 let frame  = self.players[player].frame as usize;
@@ -315,8 +306,8 @@ impl Game {
                             // Correct any players that are now on a nonexistent frame due to the frame deletion.
                             // This is purely to stay on the same action for usability.
                             // The player itself must handle being on a frame that has been deleted in order for replays to work.
-                            for (i, any_player) in (&mut *self.players).iter_mut().enumerate() {
-                                if &self.selected_fighters[i] == fighter && any_player.action as usize == action
+                            for any_player in &mut self.players {
+                                if any_player.fighter == fighter && any_player.action as usize == action
                                     && any_player.frame as usize == self.package.fighters[fighter].actions[action].frames.len()
                                 {
                                     any_player.frame -= 1;
@@ -346,8 +337,7 @@ impl Game {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             let selected = {
                                 let player = &self.players[player];
-                                let p_x = player.bps_x;
-                                let p_y = player.bps_y;
+                                let (p_x, p_y) = player.bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
 
                                 let point = (player.relative_f(m_x - p_x), m_y - p_y);
                                 let new_colbox = CollisionBox::new(point);
@@ -391,8 +381,7 @@ impl Game {
                     // single click collisionbox selection
                     if os_input.mouse_pressed(0) {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
-                            let player_x = self.players[player].bps_x;
-                            let player_y = self.players[player].bps_y;
+                            let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
 
                             if !(os_input.held_shift() || os_input.held_alt()) {
                                 self.selector.colboxes = HashSet::new();
@@ -438,8 +427,7 @@ impl Game {
                                 if !(os_input.held_shift() || os_input.held_alt()) {
                                     self.selector.colboxes = HashSet::new();
                                 }
-                                let player_x = self.players[player].bps_x;
-                                let player_y = self.players[player].bps_y;
+                                let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
                                 let frame = &self.package.fighters[fighter].actions[action].frames[frame];
                                 let frame = self.players[player].relative_frame(frame);
 
@@ -601,21 +589,26 @@ impl Game {
 
     fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
         {
-            let stage = &self.package.stages[self.selected_stage.as_ref()];
-
             // step each player
-            for (i, player) in (&mut *self.players).iter_mut().enumerate() {
-                let fighter = &self.package.fighters[self.selected_fighters[i].as_ref()];
+            let mut new_players: Vec<Player> = vec!();
+            for (i, player) in self.players.iter().enumerate() {
+                let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.step(input, fighter, stage, self.current_frame, self.package.rules.goal.clone());
+                player.step(input, &self.players, &self.package.fighters, &self.stage, self.current_frame, self.package.rules.goal.clone());
+                new_players.push(player);
             }
+            self.players = new_players;
 
             // check collisions
-            let collision_results = collision_check(&self.players, &self.package.fighters, &self.selected_fighters);
-            for (i, player) in (&mut *self.players).iter_mut().enumerate() {
-                let fighter = &self.package.fighters[self.selected_fighters[i].as_ref()];
-                player.step_collision(fighter, &collision_results[i]);
+            let mut new_players: Vec<Player> = vec!();
+            let collision_results = collision_check(&self.players, &self.package.fighters, &self.stage.platforms);
+            for (i, player) in self.players.iter().enumerate() {
+                let mut player = player.clone();
+                player.step_collision(&self.players, &self.package.fighters, &self.stage.platforms, &collision_results[i]);
+                new_players.push(player);
             }
+            self.players = new_players;
+
 
             for player in &mut self.players {
                 player.step_action();
@@ -711,7 +704,7 @@ impl Game {
                 player_result.lcancel_success as f32 / player_result.lcancel_attempts as f32
             };
             game_results.push(GameResult {
-                fighter:         self.selected_fighters[i].clone(),
+                fighter:         player_result.ended_as_fighter.clone().unwrap(),
                 controller:      self.selected_controllers[i],
                 place:           places[i],
                 kills:           vec!(), // TODO
@@ -731,7 +724,7 @@ impl Game {
         println!("Frame: {}    state: {:?}", frame, self.state);
 
         for (i, player) in self.players.iter().enumerate() {
-            let fighter = &self.package.fighters[self.selected_fighters[i].as_ref()];
+            let fighter = &self.package.fighters[self.players[i].fighter.as_ref()];
             let player_input = &player_inputs[i];
             let debug_player = &self.debug_players[i];
             player.debug_print(fighter, player_input, debug_player, i);
@@ -748,8 +741,12 @@ impl Game {
 
     pub fn render(&self) -> RenderGame {
         let mut entities = vec!();
-        for (i, player) in self.players.iter().enumerate() {
 
+        // stage areas
+        entities.push(RenderEntity::Area(area_to_render(&self.stage.camera)));
+        entities.push(RenderEntity::Area(area_to_render(&self.stage.blast)));
+
+        for (i, player) in self.players.iter().enumerate() {
             let mut selected_colboxes = HashSet::new();
             let mut fighter_selected = false;
             let mut player_selected = false;
@@ -770,18 +767,14 @@ impl Game {
 
             let debug = self.debug_players[i].clone();
             if debug.cam_area {
-                let cam_area = &player.cam_area(&self.package.stages[self.selected_stage.as_ref()].camera);
+                let cam_area = &player.cam_area(&self.stage.camera, &self.players, &self.package.fighters, &self.stage.platforms);
                 entities.push(RenderEntity::Area(area_to_render(cam_area)));
             }
 
             let color = graphics::get_controller_color(self.selected_controllers[i]);
-            entities.push(RenderEntity::Player(player.render(color, self.selected_fighters[i].clone(), selected_colboxes, fighter_selected, player_selected, debug)));
+            let player_render = player.render(color, selected_colboxes, fighter_selected, player_selected, debug, &self.players, &self.package.fighters, &self.stage.platforms);
+            entities.push(RenderEntity::Player(player_render));
         }
-
-        // stage areas
-        let stage = &self.package.stages[self.selected_stage.as_ref()];
-        entities.push(RenderEntity::Area(area_to_render(&stage.camera)));
-        entities.push(RenderEntity::Area(area_to_render(&stage.blast)));
 
         // render selector box
         if let Some(point) = self.selector.point {
@@ -892,6 +885,7 @@ pub enum RenderEntity {
 pub struct GameSetup {
     pub input_history:  Vec<Vec<ControllerInput>>,
     pub player_history: Vec<Vec<Player>>,
+    pub stage_history:  Vec<Stage>,
     pub controllers:    Vec<usize>,
     pub fighters:       Vec<String>,
     pub stage:          String,

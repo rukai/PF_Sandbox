@@ -35,6 +35,7 @@ pub mod records;
 pub mod replays;
 pub mod rules;
 pub mod stage;
+pub mod math;
 
 #[cfg(feature = "vulkan")]
 #[macro_use]

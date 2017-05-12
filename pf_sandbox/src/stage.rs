@@ -101,24 +101,56 @@ pub struct Platform {
     pub pass_through: bool,
 }
 
+
+/// plat_x/plat_y/plat_p is offset from the centre of the platform
+/// world_x/world_y/world_p is world coordinates
 impl Platform {
     pub fn angle(&self) -> f32 {
         (self.y1-self.y2).atan2(self.x1-self.x2)
     }
 
-    /// In terms of values offset from the center of the platform
-    /// returns the y value at the x value
-    pub fn plat_x_to_plat_y(&self, x: f32) -> f32 {
-        0.0 // TODO
+    pub fn plat_x_in_bounds(&self, plat_x: f32) -> bool {
+        let world_x = self.plat_x_to_world_x(plat_x);
+        if self.x1 < self.x2 {
+            self.x1 < world_x && world_x < self.x2
+        } else {
+            self.x2 < world_x && world_x < self.x1
+        }
     }
 
-    pub fn world_to_plat_x(&self, x: f32) -> f32 {
-        (self.x1 + self.x2) / 2.0 - x
+    pub fn plat_x_to_world_y(&self, plat_x: f32) -> f32 {
+        // y - y1 = m(x - x1)
+        (self.y2 - self.y1) / (self.x2 - self.x1) * (plat_x - self.x1) + self.y1
     }
 
-    pub fn plat_x_to_world(&self, x: f32) -> (f32, f32) {
-        let world_x = (self.x1 + self.x2) / 2.0 + x;
-        (world_x, 0.0) // TODO
+    pub fn world_x_to_plat_x(&self, world_x: f32) -> f32 {
+        world_x - (self.x1 + self.x2) / 2.0
+    }
+
+    pub fn plat_x_to_world_x(&self, plat_x: f32) -> f32 {
+        (self.x1 + self.x2) / 2.0 + plat_x
+    }
+
+    pub fn plat_x_to_world_p(&self, plat_x: f32) -> (f32, f32) {
+        let world_x = self.plat_x_to_world_x(plat_x);
+        let world_y = self.plat_x_to_world_y(world_x);
+        (world_x, world_y)
+    }
+
+    pub fn ledge(&self, right: bool) -> (f32, f32) {
+        if right {
+            (self.x2, self.y2)
+        } else {
+            (self.x1, self.y1)
+        }
+    }
+
+    pub fn p1(&self) -> (f32, f32) {
+        (self.x1, self.y1)
+    }
+
+    pub fn p2(&self) -> (f32, f32) {
+        (self.x2, self.y2)
     }
 }
 
