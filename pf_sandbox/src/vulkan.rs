@@ -507,8 +507,8 @@ impl<'a> VulkanGraphics<'a> {
                 self.draw_game_selector(selection);
                 self.draw_package_banner(&render.package_verify);
             }
-            RenderMenuState::ReplaySelect (selection) => {
-                self.draw_replay_selector(&vec!(), selection);
+            RenderMenuState::ReplaySelect (replay_names, selection) => {
+                self.draw_replay_selector(&replay_names, selection);
                 self.draw_package_banner(&render.package_verify);
             }
             RenderMenuState::CharacterSelect (selections, back_counter, back_counter_max) => {
@@ -577,9 +577,6 @@ impl<'a> VulkanGraphics<'a> {
             }
             RenderMenuState::CreateFighter => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "create fighter");
-            }
-            RenderMenuState::StartGame => {
-                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Start game");
             }
         }
 
@@ -826,7 +823,6 @@ impl<'a> VulkanGraphics<'a> {
             self.os_input_tx.send(ev).unwrap();
         }
     }
-
 }
 
 enum MenuEntity {

@@ -103,9 +103,14 @@ impl<'a> Input<'a> {
         self.current_inputs = inputs;
     }
 
-    /// Reset the game input history
-    pub fn reset_history(&mut self) {
-        self.game_inputs = vec!();
+    /// Set the game input history
+    pub fn set_history(&mut self, history: Vec<Vec<ControllerInput>>) {
+        self.game_inputs = history;
+    }
+    
+    /// Get the game input history
+    pub fn get_history(&self) -> Vec<Vec<ControllerInput>> {
+        self.game_inputs.clone()
     }
 
     /// Call this once from the game update logic only 

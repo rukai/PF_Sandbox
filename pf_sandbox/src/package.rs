@@ -117,6 +117,10 @@ impl Package {
         package
     }
 
+    pub fn file_name(&self) -> String {
+        self.path.file_name().unwrap().to_str().unwrap().to_string()
+    }
+
     fn generate_base(name: &str) -> Package {
         let mut path = get_packages_path();
         path.push(name);

@@ -9,6 +9,7 @@ use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
 use ::records::{GameResult, PlayerResult};
+use ::replays;
 use ::rules::Goal;
 use ::stage::Area;
 
@@ -46,14 +47,14 @@ pub struct Game {
 /// All previous frame state is used to calculate the next frame then the current_frame is incremented
 
 impl Game {
-    pub fn new(package: Package, config: Config, selected_fighters: Vec<String>, selected_stage: String, netplay: bool, selected_controllers: Vec<usize>) -> Game {
+    pub fn new(package: Package, config: Config, setup: GameSetup) -> Game {
         // generate players
         let mut players:       Vec<Player>      = vec!();
         let mut debug_players: Vec<DebugPlayer> = vec!();
         {
-            let spawn_points = &package.stages[selected_stage.as_ref()].spawn_points;
-            let respawn_points = &package.stages[selected_stage.as_ref()].respawn_points;
-            for (i, _) in selected_controllers.iter().enumerate() {
+            let spawn_points = &package.stages[setup.stage.as_ref()].spawn_points;
+            let respawn_points = &package.stages[setup.stage.as_ref()].respawn_points;
+            for (i, _) in setup.controllers.iter().enumerate() {
                 // Stages can have less spawn points then players
                 let spawn = spawn_points[i % spawn_points.len()].clone();
                 let respawn = respawn_points[i % respawn_points.len()].clone();
@@ -63,27 +64,27 @@ impl Game {
         }
 
         // The CLI allows for selected_fighters to be shorter then players
-        let mut filled_fighters = selected_fighters.clone();
-        let wrap = selected_fighters.len();
-        if players.len() > selected_fighters.len() {
-            let extra = players.len() - selected_fighters.len();
+        let mut filled_fighters = setup.fighters.clone();
+        let wrap = setup.fighters.len();
+        if players.len() > setup.fighters.len() {
+            let extra = players.len() - setup.fighters.len();
             for i in 0..extra {
-                filled_fighters.push(selected_fighters[i % wrap].clone());
+                filled_fighters.push(setup.fighters[i % wrap].clone());
             }
         }
 
         Game {
             package:                package,
             config:                 config,
-            state:                  if netplay { GameState::Netplay } else { GameState::Local },
-            player_history:         vec!(),
+            state:                  setup.state,
+            player_history:         setup.player_history,
             current_frame:          0,
             saved_frame:            0,
             players:                players,
             debug_players:          debug_players,
-            selected_controllers:   selected_controllers,
+            selected_controllers:   setup.controllers,
             selected_fighters:      filled_fighters,
-            selected_stage:         selected_stage,
+            selected_stage:         setup.stage,
             edit:                   Edit::Stage,
             debug_output_this_step: false,
             selector:               Default::default(),
@@ -227,6 +228,9 @@ impl Game {
         }
 
         // modify package
+        if os_input.key_pressed(VirtualKeyCode::W) {
+            replays::save_replay(self, input, &self.package);
+        }
         if os_input.key_pressed(VirtualKeyCode::E) {
             self.package.save();
         }
@@ -882,4 +886,14 @@ pub enum RenderEntity {
     Player    (RenderPlayer),
     Selector  (RenderRect),
     Area      (RenderRect),
+}
+
+#[derive(Clone)]
+pub struct GameSetup {
+    pub input_history:  Vec<Vec<ControllerInput>>,
+    pub player_history: Vec<Vec<Player>>,
+    pub controllers:    Vec<usize>,
+    pub fighters:       Vec<String>,
+    pub stage:          String,
+    pub state:          GameState,
 }

@@ -21,7 +21,26 @@ pub fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
     File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
 }
 
+// TODO: Actually use compression
+pub fn save_struct_compressed<T: Serialize>(filename: PathBuf, object: &T) {
+    DirBuilder::new().recursive(true).create(filename.parent().unwrap()).unwrap();
+
+    let json = serde_json::to_string_pretty(object).unwrap();
+    File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
+}
+
 pub fn load_struct<T: DeserializeOwned>(filename: PathBuf) -> Option<T> {
+    if let Ok(mut file) = File::open(filename) {
+        let mut json = String::new();
+        if file.read_to_string(&mut json).is_ok() {
+            return serde_json::from_str(&json).ok();
+        }
+    }
+    None
+}
+
+// TODO: Actually use compression
+pub fn load_struct_compressed<T: DeserializeOwned>(filename: PathBuf) -> Option<T> {
     if let Ok(mut file) = File::open(filename) {
         let mut json = String::new();
         if file.read_to_string(&mut json).is_ok() {

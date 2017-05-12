@@ -1,9 +1,10 @@
 #![feature(drop_types_in_const)]
+extern crate chrono;
 extern crate crypto;
-extern crate reqwest;
 extern crate getopts;
 extern crate libusb;
 extern crate num;
+extern crate reqwest;
 extern crate serde;
 extern crate treeflection;
 extern crate winit;
@@ -31,6 +32,7 @@ pub mod os_input;
 pub mod package;
 pub mod player;
 pub mod records;
+pub mod replays;
 pub mod rules;
 pub mod stage;
 

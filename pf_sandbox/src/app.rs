@@ -8,10 +8,11 @@ use ::cli::GraphicsBackendChoice;
 use ::graphics::GraphicsMessage;
 #[cfg(any(feature = "vulkan", feature = "opengl"))]
 use std::sync::mpsc::Sender;
+use std;
 
 use ::cli::{CLIResults, ContinueFrom};
 use ::config::Config;
-use ::game::{Game, GameState};
+use ::game::{Game, GameState, GameSetup};
 use ::input::Input;
 use ::menu::{Menu, MenuState};
 use ::network::Network;
@@ -38,7 +39,6 @@ pub fn run(mut cli_results: CLIResults) {
     // CLI options
     let (mut state, mut os_input) = {
         // default values
-        let netplay = false;
         let mut controllers: Vec<usize> = vec!();
         input.game_update(0); // TODO: is this needed? What can I do to remove it?
         for (i, _) in input.players(0).iter().enumerate() {
@@ -139,7 +139,15 @@ pub fn run(mut cli_results: CLIResults) {
                     cli_results.stage_name = package.stages.index_to_key(0);
                 }
 
-                AppState::Game(Game::new(package, config, cli_results.fighter_names, cli_results.stage_name.unwrap(), netplay, controllers))
+                let setup = GameSetup {
+                    input_history:  vec!(),
+                    player_history: vec!(),
+                    controllers:    controllers,
+                    fighters:       cli_results.fighter_names,
+                    stage:          cli_results.stage_name.unwrap(),
+                    state:          GameState::Local,
+                };
+                AppState::Game(Game::new(package, config, setup))
             }
             _ => unreachable!()
         };
@@ -186,13 +194,13 @@ pub fn run(mut cli_results: CLIResults) {
         };
 
         match next_state {
-            NextAppState::Game (setup) => {
+            NextAppState::Game (mut setup) => {
                 let (package, config) = match state {
                     AppState::Menu (menu) => { menu.reclaim() }
                     AppState::Game (_)    => { unreachable!() }
                 };
-                input.reset_history();
-                state = AppState::Game(Game::new(package, config, setup.fighters, setup.stage, setup.netplay, setup.controllers));
+                input.set_history(std::mem::replace(&mut setup.input_history, vec!()));
+                state = AppState::Game(Game::new(package, config, setup));
             }
             NextAppState::Menu (menu_state) => {
                 let (package, config) = match state {
@@ -226,12 +234,4 @@ enum NextAppState {
     Game (GameSetup), // retrieve package from the menu
     Menu (MenuState),
     None
-}
-
-#[derive(Clone)]
-pub struct GameSetup {
-    pub controllers: Vec<usize>,
-    pub fighters:    Vec<String>,
-    pub stage:       String,
-    pub netplay:     bool,
 }
