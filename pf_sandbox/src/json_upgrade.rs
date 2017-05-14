@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use serde_json::{Value, Number};
 
-pub fn engine_version() -> u64 { 3 }
+pub fn engine_version() -> u64 { 4 }
 
 pub fn engine_version_json() -> Value {
-    Value::Number(Number::from_f64(engine_version() as f64).unwrap())
+    Value::Number(Number::from(engine_version()))
 }
 
 fn get_meta_engine_version(meta: &Option<Value>) -> u64 {
@@ -38,6 +38,7 @@ pub fn upgrade_to_latest(meta: &mut Option<Value>, rules: &mut Option<Value>, fi
     else if meta_engine_version < engine_version() {
         for upgrade_from in meta_engine_version..engine_version() {
             match upgrade_from {
+                3 => { upgrade3(fighters) }
                 2 => { upgrade2(fighters) }
                 1 => { upgrade1(fighters) }
                 0 => { upgrade0(fighters) }
@@ -57,6 +58,23 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
         }
     }
     return None;
+}
+
+/// add pass_through to ActionFrame
+fn upgrade3(fighters: &mut HashMap<String, Value>) {
+    for fighter in fighters.values_mut() {
+        if let Some (actions) = get_vec(fighter, "actions") {
+            for action in actions {
+                if let Some (frames) = get_vec(action, "frames") {
+                    for frame in frames {
+                        if let &mut Value::Object (ref mut frame) = frame {
+                            frame.insert(String::from("pass_through"), Value::Bool(true));
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// add force_hitlist_reset to ActionFrame

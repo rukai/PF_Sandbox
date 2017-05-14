@@ -159,6 +159,7 @@ impl Player {
 
     pub fn set_airbourne(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let (x, y) = self.bps_xy(players, fighters, platforms);
+        self.fastfalled = false;
         self.location = Location::Airbourne { x, y };
     }
 
@@ -329,17 +330,17 @@ impl Player {
                 Action::Dsmash    | Action::Fsmash |
                 Action::Usmash    | Action::Idle |
                 Action::Grab      | Action::DashGrab |
-                Action::CrouchEnd | Action::CrouchStart |
                 Action::FairLand  | Action::BairLand |
                 Action::UairLand  | Action::DairLand |
-                Action::Land      | Action::SpecialLand
+                Action::Land      | Action::SpecialLand |
+                Action::CrouchEnd
                 => { self.ground_idle_action(input, fighter) }
-
                 Action::DamageFly   => { self.damagefly_action(fighter) }
                 Action::Damage      => { self.damage_action(fighter) }
                 Action::AerialDodge => { self.aerialdodge_action(input, fighter) }
                 Action::SpecialFall => { self.specialfall_action(input, fighter) }
                 Action::Dtilt       => { self.dtilt_action(input, fighter) }
+                Action::CrouchStart => { self.crouch_start_action(input, players, fighters, platforms) }
                 Action::Crouch      => { self.crouch_action(input, fighter) }
                 Action::Walk        => { self.walk_action(input, fighter) }
                 Action::Dash        => { self.dash_action(input, fighter) }
@@ -448,12 +449,25 @@ impl Player {
         }
     }
 
-    fn crouch_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        self.apply_friction(fighter);
-        if input.stick_y.value > -0.3 {
-            self.set_action(Action::CrouchEnd);
-        }
+    fn crouch_start_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let fighter = &fighters[self.fighter.as_ref()];
         if self.interruptible(fighter) {
+            if self.check_pass_platform(input, players, fighters, platforms) { }
+            else if self.check_jump(input) { }
+            else if self.check_special(input) { } // TODO: no neutral/side special
+            else if self.check_smash(input) { }
+            else if self.check_attacks(input) { }
+            else if self.check_dash(input, fighter) { }
+            else if self.check_turn(input) { }
+            else if self.check_walk(input, fighter) { }
+            else if self.check_taunt(input) { }
+        }
+        self.apply_friction(fighter);
+    }
+
+    fn crouch_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if self.interruptible(fighter) {
+            if input.stick_y.value > -0.61 { self.set_action(Action::CrouchEnd); }
             if self.check_jump(input) { }
             else if self.check_special(input) { } // TODO: no neutral/side special
             else if self.check_smash(input) { }
@@ -637,6 +651,21 @@ impl Player {
         else {
             false
         }
+    }
+
+    fn check_pass_platform(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> bool {
+        let fighter = &fighters[self.fighter.as_ref()];
+        if let Location::Platform { platform_i, .. } = self.location {
+            if let Some(platform) = platforms.get(platform_i) {
+                let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
+                if platform.pass_through && self.frame == action_frames && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
+                    self.set_action(Action::PassPlatform);
+                    self.set_airbourne(players, fighters, platforms);
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn check_walk(&mut self, input: &PlayerInput, fighter: &Fighter) -> bool {
@@ -1056,7 +1085,7 @@ impl Player {
             Location::Airbourne { x, y } => {
                 let new_x = x + self.x_vel + self.kb_x_vel;
                 let new_y = y + self.y_vel + self.kb_y_vel;
-                if let Some(platform_i) = self.land_stage_collision(stage, (x, y), (new_x, new_y), input) {
+                if let Some(platform_i) = self.land_stage_collision(fighter, stage, (x, y), (new_x, new_y), input) {
                     let x = stage.platforms[platform_i].world_x_to_plat_x(new_x);
                     self.land(fighter, platform_i, x);
                 } else {
@@ -1070,7 +1099,6 @@ impl Player {
                 } else {
                     self.set_airbourne(players, fighters, &stage.platforms);
                     self.set_action(Action::Fall);
-                    self.fastfalled = false;
                 }
             }
             _ => { }
@@ -1100,23 +1128,23 @@ impl Player {
     }
 
     /// returns the index platform that the player will land on
-    fn land_stage_collision(&mut self, stage: &Stage, old_p: (f32, f32), new_p: (f32, f32), input: &PlayerInput) -> Option<usize> {
+    fn land_stage_collision(&mut self, fighter: &Fighter, stage: &Stage, old_p: (f32, f32), new_p: (f32, f32), input: &PlayerInput) -> Option<usize> {
         if new_p.1 > old_p.1 {
             return None;
         }
 
         for (platform_i, platform) in stage.platforms.iter().enumerate() {
-            if platform.pass_through && input[0].stick_y <= -0.56 {
-                continue;
-            }
-
-            if math::segments_intersect(old_p, new_p, platform.p1(), platform.p2()) {
-                println!("intersect! {:?}, {:?}, {:?}, {:?}", old_p, new_p, platform.p1(), platform.p2());
-                self.set_action(Action::PassPlatform);
+            if !self.pass_through_platform(fighter, platform, input) &&
+              math::segments_intersect(old_p, new_p, platform.p1(), platform.p2()) {
                 return Some(platform_i)
             }
         }
         None
+    }
+
+    pub fn pass_through_platform(&self, fighter: &Fighter, platform: &Platform, input: &PlayerInput) -> bool {
+        let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
+        platform.pass_through && fighter_frame.pass_through && input[0].stick_y <= -0.56
     }
 
     /// Returns the area sorounding the player that the camera must include

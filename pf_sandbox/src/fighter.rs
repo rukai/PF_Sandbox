@@ -1,4 +1,5 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
+use num::FromPrimitive;
 
 impl Default for Fighter {
     fn default() -> Fighter {
@@ -7,10 +8,19 @@ impl Default for Fighter {
             iasa:   0,
         };
         let mut actions: ContextVec<ActionDef> = ContextVec::new();
-        for _ in 0..((Action::Eliminated as usize)+1) { // TODO: Super gross but what is a man to do?
-            actions.push(action_def.clone());
+        for action_i in 0..((Action::Eliminated as usize)+1) {
+            let mut action = action_def.clone();
+            action.frames[0].pass_through = match Action::from_u64(action_i as u64).unwrap() {
+                Action::Damage     | Action::DamageFly |
+                Action::DamageFall | Action::AerialDodge |
+                Action::Uair       | Action::Dair |
+                Action::Fair       | Action::Bair |
+                Action::Nair => { false }
+                _ => { true }
+            };
+            actions.push(action);
         }
-        
+
         Fighter {
             // css render
             name:       "Base Fighter".to_string(),
@@ -136,6 +146,7 @@ pub struct ActionFrame {
     pub item_hold_y:  f32,
     pub grab_hold_x:  f32,
     pub grab_hold_y:  f32,
+    pub pass_through: bool, // only used on aerial actions
     pub force_hitlist_reset: bool,
 }
 
@@ -151,6 +162,7 @@ impl Default for ActionFrame {
             item_hold_y:  11.0,
             grab_hold_x:  4.0,
             grab_hold_y:  11.0,
+            pass_through: true,
             force_hitlist_reset: false,
         }
     }
