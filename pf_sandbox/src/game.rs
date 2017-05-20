@@ -589,30 +589,42 @@ impl Game {
 
     fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
         {
-            // step each player
-            let mut new_players: Vec<Player> = vec!();
+            // To synchronize player stepping, we step through player logic in stages (action logic, physics logic, collision logic)
+            // Modified players are copied from the previous stage so that every player perceives themselves as being stepped first, within that stage.
+
+            // step each player action
+            let mut action_players: Vec<Player> = vec!();
             for (i, player) in self.players.iter().enumerate() {
                 let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.step(input, &self.players, &self.package.fighters, &self.stage, self.current_frame, self.package.rules.goal.clone());
-                new_players.push(player);
+                player.action_step(input, &self.players, &self.package.fighters, &self.stage.platforms);
+                action_players.push(player);
             }
-            self.players = new_players;
 
-            // check collisions
-            let mut new_players: Vec<Player> = vec!();
-            let collision_results = collision_check(&self.players, &self.package.fighters, &self.stage.platforms);
-            for (i, player) in self.players.iter().enumerate() {
+            // step each player physics
+            let mut physics_players: Vec<Player> = vec!();
+            for (i, player) in action_players.iter().enumerate() {
                 let mut player = player.clone();
-                player.step_collision(&self.players, &self.package.fighters, &self.stage.platforms, &collision_results[i]);
-                new_players.push(player);
+                let input = &player_input[self.selected_controllers[i]];
+                player.physics_step(input, &action_players, &self.package.fighters, &self.stage, self.current_frame, self.package.rules.goal.clone());
+                physics_players.push(player);
             }
-            self.players = new_players;
 
-
-            for player in &mut self.players {
-                player.step_action();
+            // check for hits and run hit logic
+            let mut collision_players: Vec<Player> = vec!();
+            let collision_results = collision_check(&physics_players, &self.package.fighters, &self.stage.platforms);
+            for (i, player) in physics_players.iter().enumerate() {
+                let mut player = player.clone();
+                player.step_collision(&physics_players, &self.package.fighters, &self.stage.platforms, &collision_results[i]);
+                collision_players.push(player);
             }
+
+            // step counter
+            for player in &mut collision_players {
+                player.step_counter();
+            }
+
+            self.players = collision_players;
         }
 
         match self.package.rules.goal {

@@ -14,8 +14,7 @@ use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Player {
     pub fighter:          String,
-    pub action:           u64,
-    action_new:           u64,
+    pub action:           u64, // always change through self.set_action
     action_set:           bool,
     pub frame:            u64,
     pub stocks:           u64,
@@ -61,7 +60,6 @@ impl Player {
         Player {
             fighter:          fighter,
             action:           Action::Spawn as u64,
-            action_new:       Action::Spawn as u64,
             action_set:       false,
             frame:            0,
             stocks:           stocks,
@@ -165,9 +163,10 @@ impl Player {
 
     // always change self.action through this method
     fn set_action(&mut self, action: Action) {
-        self.action_new = action as u64;
+        self.action = action as u64;
         self.action_set = true;
         self.hitlist.clear();
+        self.frame = 0;
     }
 
     fn interruptible(&self, fighter: &Fighter) -> bool {
@@ -263,10 +262,8 @@ impl Player {
         }
     }
 
-    pub fn step_action(&mut self) {
+    pub fn step_counter(&mut self) {
         if self.action_set {
-            self.frame = 0;
-            self.action = self.action_new;
             self.action_set = false;
         }
         else {
@@ -274,16 +271,11 @@ impl Player {
         }
     }
 
-    pub fn step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
-        self.input_step(input, players, fighters, &stage.platforms);
-        self.physics_step(input, players, fighters, stage, game_frame, goal);
-    }
-
     /*
-     *  Begin input section
+     *  Begin action section
      */
 
-    fn input_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    pub fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
@@ -1053,7 +1045,7 @@ impl Player {
      *  Begin physics section
      */
 
-    fn physics_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
+    pub fn physics_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
         let fighter = &fighters[self.fighter.as_ref()];
 
         if self.kb_x_vel.abs() > 0.0 {
