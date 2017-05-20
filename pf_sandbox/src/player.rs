@@ -15,7 +15,6 @@ use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 pub struct Player {
     pub fighter:          String,
     pub action:           u64, // always change through self.set_action
-    action_set:           bool,
     pub frame:            u64,
     pub stocks:           u64,
     pub damage:           f32,
@@ -59,8 +58,7 @@ impl Player {
     pub fn new(fighter: String, spawn: SpawnPoint, respawn: SpawnPoint, stocks: u64) -> Player {
         Player {
             fighter:          fighter,
-            action:           Action::Spawn as u64,
-            action_set:       false,
+            action:           Action::DummyFramePreStart as u64,
             frame:            0,
             stocks:           stocks,
             damage:           0.0,
@@ -164,7 +162,6 @@ impl Player {
     // always change self.action through this method
     fn set_action(&mut self, action: Action) {
         self.action = action as u64;
-        self.action_set = true;
         self.hitlist.clear();
         self.frame = 0;
     }
@@ -262,15 +259,6 @@ impl Player {
         }
     }
 
-    pub fn step_counter(&mut self) {
-        if self.action_set {
-            self.action_set = false;
-        }
-        else {
-            self.frame += 1;
-        }
-    }
-
     /*
      *  Begin action section
      */
@@ -279,12 +267,8 @@ impl Player {
         let fighter = &fighters[self.fighter.as_ref()];
         let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
-        // handles a frame index that no longer exists by jumping to the last existing frame
-        if self.frame >= action_frames - 1 {
-            self.frame = action_frames - 1;
-        }
-
-        if self.frame == action_frames - 1 {
+        self.frame += 1; // The Action DummyFramePreStart is used so that this doesnt skip a real frame when the game starts
+        if self.frame >= action_frames {
             self.action_expired(input, players, fighters, platforms);
         }
 
@@ -972,7 +956,8 @@ impl Player {
             Some(Action::TauntLeft)  => { self.set_action(Action::Idle); },
             Some(Action::TauntRight) => { self.set_action(Action::Idle); },
 
-            Some(Action::Eliminated) => { },
+            Some(Action::Eliminated)         => { },
+            Some(Action::DummyFramePreStart) => { self.set_action(Action::Spawn); },
         };
     }
 

@@ -472,6 +472,7 @@ pub enum Action {
     CrouchEnd,
 
     Eliminated,
+    DummyFramePreStart,
 }
 }
 

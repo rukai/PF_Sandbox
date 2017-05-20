@@ -619,11 +619,6 @@ impl Game {
                 collision_players.push(player);
             }
 
-            // step counter
-            for player in &mut collision_players {
-                player.step_counter();
-            }
-
             self.players = collision_players;
         }
 
