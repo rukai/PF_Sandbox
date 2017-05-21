@@ -33,7 +33,7 @@ pub struct Player {
     pub turn_dash_buffer: bool,
     pub ecb:              ECB,
     pub hitlist:          Vec<usize>,
-    pub hitlag:           f32,
+    pub hitlag:           Hitlag,
     pub hitstun:          f32,
     pub hit_by:           Option<usize>,
     pub result:           PlayerResult,
@@ -51,6 +51,47 @@ pub enum Location {
 impl Default for Location {
     fn default() -> Location {
         Location::Airbourne { x: 0.0, y: 0.0 }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
+pub enum Hitlag {
+    Atk (u64),
+    Def { counter: u64, kb_vel: f32, angle: f32, wobble_x: f32 },
+    None
+}
+
+impl Default for Hitlag {
+    fn default() -> Hitlag {
+        Hitlag::None
+    }
+}
+
+impl Hitlag {
+    pub fn decrement(&mut self) -> bool {
+        let end = match self {
+            &mut Hitlag::Atk (ref mut counter) => {
+                *counter -= 1;
+                *counter <= 1
+            }
+            &mut Hitlag::Def { ref mut counter, .. } => {
+                *counter -= 1;
+                *counter <= 1
+            }
+            &mut Hitlag::None => {
+                false
+            }
+        };
+        if end {
+            *self = Hitlag::None
+        }
+        end
+    }
+
+    fn wobble(&mut self) {
+        if let &mut Hitlag::Def { ref mut wobble_x, .. } = self {
+            *wobble_x += 0.5; // TODO: implement deterministic random and use here
+        }
     }
 }
 
@@ -77,7 +118,7 @@ impl Player {
             turn_dash_buffer: false,
             ecb:              ECB::default(),
             hitlist:          vec!(),
-            hitlag:           0.0,
+            hitlag:           Hitlag::None,
             hitstun:          0.0,
             hit_by:           None,
             result:           PlayerResult::default(),
@@ -85,7 +126,7 @@ impl Player {
     }
 
     pub fn bps_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
-        match self.location {
+        let bps_xy = match self.location {
             Location::Platform { platform_i, x } => {
                 if let Some(platform) = platforms.get(platform_i) {
                     platform.plat_x_to_world_p(x)
@@ -111,6 +152,15 @@ impl Player {
             }
             Location::Airbourne { x, y } => {
                 (x, y)
+            }
+        };
+
+        match &self.hitlag {
+            &Hitlag::Def { wobble_x, .. } => {
+                (bps_xy.0 + wobble_x, bps_xy.1)
+            }
+            _ => {
+                bps_xy
             }
         }
     }
@@ -171,13 +221,14 @@ impl Player {
     }
 
     pub fn step_collision(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], col_results: &[CollisionResult]) {
-        let fighter = &fighters[self.fighter.as_ref()];
         for col_result in col_results {
             match col_result {
-                &CollisionResult::HitAtk { player_def_i, .. } => {
+                &CollisionResult::HitAtk { player_def_i, ref hitbox } => {
                     self.hitlist.push(player_def_i);
+                    self.hitlag = Hitlag::Atk ((hitbox.damage / 3.0 + 3.0) as u64);
                 }
                 &CollisionResult::HitDef { ref hitbox, ref hurtbox, player_atk_i } => {
+                    let fighter = &fighters[self.fighter.as_ref()];
                     let damage_done = hitbox.damage * hurtbox.damage_mult; // TODO: apply staling
                     self.damage += damage_done;
 
@@ -194,6 +245,23 @@ impl Player {
                                 kb_vel *= 0.67;
                             }
                             _ => { }
+                        }
+                    }
+
+                    let not_grabbed = true;
+                    if not_grabbed || kb_vel > 50.0 {
+                        self.hitstun = match hitbox.hitstun {
+                            HitStun::FramesTimesKnockback (frames) => { frames * kb_vel }
+                            HitStun::Frames               (frames) => { frames as f32 }
+                        };
+
+                        self.set_airbourne(players, fighters, platforms);
+
+                        if kb_vel > 80.0 {
+                            self.set_action(Action::DamageFly);
+                        }
+                        else {
+                            self.set_action(Action::Damage);
                         }
                     }
 
@@ -215,43 +283,8 @@ impl Player {
                         hitbox.angle
                     };
                     let angle = angle_deg * f32::consts::PI / 180.0;
-                    let (sin, cos) = angle.sin_cos();
-                    self.kb_x_vel = cos * kb_vel * 0.03;
-                    self.kb_y_vel = sin * kb_vel * 0.03;
-                    self.kb_x_dec = cos * 0.051;
-                    self.kb_y_dec = sin * 0.051;
 
-                    if self.kb_y_vel == 0.0 {
-                        if kb_vel >= 80.0 {
-                            self.set_airbourne(players, fighters, platforms);
-                            if let &mut Location::Airbourne { ref mut y, .. } = &mut self.location {
-                                *y += 0.0001;
-                            }
-                        }
-                    }
-                    else if self.kb_y_vel > 0.0 {
-                        self.set_airbourne(players, fighters, platforms);
-                    }
-
-                    let not_grabbed = true;
-                    if not_grabbed || kb_vel > 50.0 {
-                        // TODO: escape grab
-                        self.hitstun = match hitbox.hitstun {
-                            HitStun::FramesTimesKnockback (frames) => { frames * kb_vel }
-                            HitStun::Frames               (frames) => { frames as f32 }
-                        };
-
-                        self.set_airbourne(players, fighters, platforms);
-
-                        if kb_vel > 80.0 {
-                            self.set_action(Action::DamageFly);
-                        }
-                        else {
-                            self.set_action(Action::Damage);
-                        }
-                    }
-
-                    self.hitlag = hitbox.damage / 3.0 + 3.0;
+                    self.hitlag = Hitlag::Def { counter: (hitbox.damage / 3.0 + 3.0) as u64, kb_vel, angle, wobble_x: 0.0 };
                     self.hit_by = Some(player_atk_i);
                 }
                 _ => { }
@@ -263,7 +296,49 @@ impl Player {
      *  Begin action section
      */
 
-    pub fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    pub fn action_hitlag_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        match self.hitlag.clone() {
+            Hitlag::Atk (_) => {
+                self.hitlag.decrement();
+            }
+            Hitlag::Def { kb_vel, angle, .. } => {
+                self.hitlag.wobble();
+
+                if self.hitlag.decrement() {
+                    self.hitlag_def_end(players, fighters, platforms, kb_vel, angle);
+                }
+            }
+            Hitlag::None => {
+                self.action_step(input, players, fighters, platforms);
+            }
+        }
+    }
+
+    fn hitlag_def_end(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], kb_vel: f32, angle: f32) {
+        // TODO: DI
+
+        let (sin, cos) = angle.sin_cos();
+        self.x_vel = 0.0;
+        self.y_vel = 0.0;
+        self.kb_x_vel = cos * kb_vel * 0.03;
+        self.kb_y_vel = sin * kb_vel * 0.03;
+        self.kb_x_dec = cos * 0.051;
+        self.kb_y_dec = sin * 0.051;
+
+        if self.kb_y_vel == 0.0 {
+            if kb_vel >= 80.0 {
+                self.set_airbourne(players, fighters, platforms);
+                if let &mut Location::Airbourne { ref mut y, .. } = &mut self.location {
+                    *y += 0.0001;
+                }
+            }
+        }
+        else if self.kb_y_vel > 0.0 {
+            self.set_airbourne(players, fighters, platforms);
+        }
+    }
+
+    fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
@@ -1031,61 +1106,63 @@ impl Player {
      */
 
     pub fn physics_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
-        let fighter = &fighters[self.fighter.as_ref()];
+        if let Hitlag::None = self.hitlag {
+            let fighter = &fighters[self.fighter.as_ref()];
 
-        if self.kb_x_vel.abs() > 0.0 {
-            let vel_dir = self.kb_x_vel.signum();
-            if self.is_airbourne() {
-                self.kb_x_vel -= self.kb_x_dec;
-            } else {
-                self.kb_x_vel -= vel_dir * fighter.friction;
+            if self.kb_x_vel.abs() > 0.0 {
+                let vel_dir = self.kb_x_vel.signum();
+                if self.is_airbourne() {
+                    self.kb_x_vel -= self.kb_x_dec;
+                } else {
+                    self.kb_x_vel -= vel_dir * fighter.friction;
+                }
+                if vel_dir != self.kb_x_vel.signum() {
+                    self.kb_x_vel = 0.0;
+                }
             }
-            if vel_dir != self.kb_x_vel.signum() {
-                self.kb_x_vel = 0.0;
-            }
-        }
 
-        if self.kb_y_vel.abs() > 0.0 {
-            if self.is_airbourne() {
-                let vel_dir = self.kb_y_vel.signum();
-                self.kb_y_vel -= self.kb_y_dec;
-                if vel_dir != self.kb_y_vel.signum() {
+            if self.kb_y_vel.abs() > 0.0 {
+                if self.is_airbourne() {
+                    let vel_dir = self.kb_y_vel.signum();
+                    self.kb_y_vel -= self.kb_y_dec;
+                    if vel_dir != self.kb_y_vel.signum() {
+                        self.kb_y_vel = 0.0;
+                    }
+                }
+                else {
                     self.kb_y_vel = 0.0;
                 }
             }
-            else {
-                self.kb_y_vel = 0.0;
-            }
-        }
 
-        match self.location.clone() {
-            Location::Airbourne { x, y } => {
-                let new_x = x + self.x_vel + self.kb_x_vel;
-                let new_y = y + self.y_vel + self.kb_y_vel;
-                if let Some(platform_i) = self.land_stage_collision(fighter, stage, (x, y), (new_x, new_y), input) {
-                    let x = stage.platforms[platform_i].world_x_to_plat_x(new_x);
-                    self.land(fighter, platform_i, x);
-                } else {
-                    self.location = Location::Airbourne { x: new_x, y: new_y };
+            match self.location.clone() {
+                Location::Airbourne { x, y } => {
+                    let new_x = x + self.x_vel + self.kb_x_vel;
+                    let new_y = y + self.y_vel + self.kb_y_vel;
+                    if let Some(platform_i) = self.land_stage_collision(fighter, stage, (x, y), (new_x, new_y), input) {
+                        let x = stage.platforms[platform_i].world_x_to_plat_x(new_x);
+                        self.land(fighter, platform_i, x);
+                    } else {
+                        self.location = Location::Airbourne { x: new_x, y: new_y };
+                    }
                 }
-            }
-            Location::Platform { platform_i, mut x } => {
-                x += self.x_vel + self.kb_x_vel;
-                if stage.platforms.get(platform_i).map_or(false, |plat| plat.plat_x_in_bounds(x)) {
-                    self.location = Location::Platform { platform_i, x };
-                } else {
-                    self.set_airbourne(players, fighters, &stage.platforms);
-                    self.set_action(Action::Fall);
+                Location::Platform { platform_i, mut x } => {
+                    x += self.x_vel + self.kb_x_vel;
+                    if stage.platforms.get(platform_i).map_or(false, |plat| plat.plat_x_in_bounds(x)) {
+                        self.location = Location::Platform { platform_i, x };
+                    } else {
+                        self.set_airbourne(players, fighters, &stage.platforms);
+                        self.set_action(Action::Fall);
+                    }
                 }
+                _ => { }
             }
-            _ => { }
-        }
 
-        // death
-        let blast = &stage.blast;
-        let (x, y) = self.bps_xy(players, fighters, &stage.platforms);
-        if x < blast.left || x > blast.right || y < blast.bot || y > blast.top {
-            self.die(fighter, game_frame, goal);
+            // death
+            let blast = &stage.blast;
+            let (x, y) = self.bps_xy(players, fighters, &stage.platforms);
+            if x < blast.left || x > blast.right || y < blast.bot || y > blast.top {
+                self.die(fighter, game_frame, goal);
+            }
         }
     }
 
@@ -1226,11 +1303,10 @@ impl Player {
         self.y_vel = 0.0;
         self.kb_x_vel = 0.0;
         self.kb_y_vel = 0.0;
-        self.hitstun = 0.0;
         self.air_jumps_left = fighter.air_jumps;
         self.fastfalled = false;
         self.hitstun = 0.0;
-        self.hitlag = 0.0;
+        self.hitlag = Hitlag::None;
 
         self.result.deaths.push(DeathRecord {
             player: self.hit_by,

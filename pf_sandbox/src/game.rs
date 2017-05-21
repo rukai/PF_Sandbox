@@ -597,7 +597,7 @@ impl Game {
             for (i, player) in self.players.iter().enumerate() {
                 let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.action_step(input, &self.players, &self.package.fighters, &self.stage.platforms);
+                player.action_hitlag_step(input, &self.players, &self.package.fighters, &self.stage.platforms);
                 action_players.push(player);
             }
 
