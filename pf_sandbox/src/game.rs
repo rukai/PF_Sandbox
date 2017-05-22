@@ -12,10 +12,12 @@ use ::records::{GameResult, PlayerResult};
 use ::replays;
 use ::rules::Goal;
 use ::stage::{Area, Stage};
+use ::rand::{StdRng, SeedableRng};
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::iter;
+use chrono::offset::local::Local;
 
 use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};
@@ -24,6 +26,7 @@ use treeflection::{Node, NodeRunner, NodeToken};
 pub struct Game {
     pub package:                Package,
     pub config:                 Config,
+    pub init_seed:              Vec<usize>,
     pub state:                  GameState,
     pub player_history:         Vec<Vec<Player>>,
     pub stage_history:          Vec<Stage>,
@@ -69,6 +72,7 @@ impl Game {
         Game {
             package:                package,
             config:                 config,
+            init_seed:              setup.init_seed,
             state:                  setup.state,
             player_history:         setup.player_history,
             stage_history:          setup.stage_history,
@@ -587,8 +591,16 @@ impl Game {
         }
     }
 
+    fn get_seed(&self) -> Vec<usize> {
+        let mut seed = self.init_seed.clone();
+        seed.push(self.current_frame);
+        seed
+    }
+
     fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
         {
+            let mut rng = StdRng::from_seed(&self.get_seed());
+
             // To synchronize player stepping, we step through player logic in stages (action logic, physics logic, collision logic)
             // Modified players are copied from the previous stage so that every player perceives themselves as being stepped first, within that stage.
 
@@ -597,7 +609,7 @@ impl Game {
             for (i, player) in self.players.iter().enumerate() {
                 let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.action_hitlag_step(input, &self.players, &self.package.fighters, &self.stage.platforms);
+                player.action_hitlag_step(input, &self.players, &self.package.fighters, &self.stage.platforms, &mut rng);
                 action_players.push(player);
             }
 
@@ -890,6 +902,7 @@ pub enum RenderEntity {
 
 #[derive(Clone)]
 pub struct GameSetup {
+    pub init_seed:      Vec<usize>,
     pub input_history:  Vec<Vec<ControllerInput>>,
     pub player_history: Vec<Vec<Player>>,
     pub stage_history:  Vec<Stage>,
@@ -897,4 +910,10 @@ pub struct GameSetup {
     pub fighters:       Vec<String>,
     pub stage:          String,
     pub state:          GameState,
+}
+
+impl GameSetup {
+    pub fn gen_seed() -> Vec<usize> {
+        vec!(Local::now().timestamp() as usize)
+    }
 }

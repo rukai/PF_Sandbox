@@ -10,6 +10,8 @@ use std::f32;
 use num::FromPrimitive;
 use std::collections::HashSet;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
+use rand::StdRng;
+use rand::Rng;
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Player {
@@ -88,9 +90,9 @@ impl Hitlag {
         end
     }
 
-    fn wobble(&mut self) {
+    fn wobble(&mut self, rng: &mut StdRng) {
         if let &mut Hitlag::Def { ref mut wobble_x, .. } = self {
-            *wobble_x += 0.5; // TODO: implement deterministic random and use here
+            *wobble_x = (rng.next_f32() - 0.5) * 3.0;
         }
     }
 }
@@ -296,13 +298,13 @@ impl Player {
      *  Begin action section
      */
 
-    pub fn action_hitlag_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    pub fn action_hitlag_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], rng: &mut StdRng) {
         match self.hitlag.clone() {
             Hitlag::Atk (_) => {
                 self.hitlag.decrement();
             }
             Hitlag::Def { kb_vel, angle, .. } => {
-                self.hitlag.wobble();
+                self.hitlag.wobble(rng);
 
                 if self.hitlag.decrement() {
                     self.hitlag_def_end(players, fighters, platforms, kb_vel, angle);

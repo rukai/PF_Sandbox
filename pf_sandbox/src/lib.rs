@@ -4,6 +4,7 @@ extern crate crypto;
 extern crate getopts;
 extern crate libusb;
 extern crate num;
+extern crate rand;
 extern crate reqwest;
 extern crate serde;
 extern crate treeflection;

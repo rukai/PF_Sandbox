@@ -70,6 +70,7 @@ pub fn save_replay(game: &Game, input: &Input, package: &Package) {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Replay {
+    pub init_seed:            Vec<usize>,
     pub timestamp:            DateTime<Local>,
     pub input_history:        Vec<Vec<ControllerInput>>,
     pub player_history:       Vec<Vec<Player>>,
@@ -82,6 +83,7 @@ pub struct Replay {
 impl Replay {
     pub fn new(game: &Game, input: &Input) -> Replay {
         Replay {
+            init_seed:            game.init_seed.clone(),
             timestamp:            Local::now(),
             input_history:        input.get_history(),
             player_history:       game.player_history.clone(),

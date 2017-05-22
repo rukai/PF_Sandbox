@@ -107,6 +107,7 @@ impl Menu {
                 let name = &replays[ticker.cursor];
                 if let Some(replay) = replays::load_replay(name, self.package.get()) {
                     self.game_setup = Some(GameSetup {
+                        init_seed:      replay.init_seed,
                         input_history:  replay.input_history,
                         player_history: replay.player_history,
                         stage_history:  replay.stage_history,
@@ -246,6 +247,7 @@ impl Menu {
         let stage = self.package.get().stages.index_to_key(self.stage_ticker.as_ref().unwrap().cursor).unwrap();
 
         self.game_setup = Some(GameSetup {
+            init_seed:      GameSetup::gen_seed(),
             input_history:  vec!(),
             player_history: vec!(),
             stage_history:  vec!(),

@@ -140,6 +140,7 @@ pub fn run(mut cli_results: CLIResults) {
                 }
 
                 let setup = GameSetup {
+                    init_seed:      GameSetup::gen_seed(),
                     input_history:  vec!(),
                     player_history: vec!(),
                     stage_history:  vec!(),
