@@ -642,13 +642,30 @@ impl Node for Package {
 Package Help
 
 Commands:
-*   help - display this help
+*   help   - display this help
+*   save   - save changes to disc
+*   reload - reload from disc, all changes are lost
 
 Accessors:
 *   .fighters - KeyedContextVec
-*   .stages - KeyedContextVec
-*   .meta - PackageMeta
-*   .rules - Rules"#)
+*   .stages   - KeyedContextVec
+*   .meta     - PackageMeta
+*   .rules    - Rules"#)
+            }
+            NodeToken::Custom (action, _) => {
+                match action.as_ref() {
+                    "save" => {
+                        self.save();
+                        String::new()
+                    }
+                    "reload" => {
+                        self.load();
+                        String::new()
+                    }
+                    _ => {
+                        format!("Package cannot '{}'", action)
+                    }
+                }
             }
             action => { format!("Package cannot '{:?}'", action) }
         };
