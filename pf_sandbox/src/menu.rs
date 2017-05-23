@@ -8,18 +8,18 @@ use ::records::GameResult;
 use ::replays;
 
 pub struct Menu {
+    pub package:        PackageHolder,
     config:             Config,
     state:              MenuState,
     fighter_selections: Vec<CharacterSelect>,
     game_ticker:        MenuTicker,
     stage_ticker:       Option<MenuTicker>, // Uses an option because we dont know how many stages there are at Menu creation, but we want to remember which stage was selected
     current_frame:      usize,
-    package:            PackageHolder,
     back_counter_max:   usize,
     game_setup:         Option<GameSetup>,
 }
 
-enum PackageHolder {
+pub enum PackageHolder {
     Package (Package, Verify),
     None,
 }
@@ -210,6 +210,10 @@ impl Menu {
     }
 
     fn step_stage_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+        if let None = self.stage_ticker {
+            self.stage_ticker = Some(MenuTicker::new(self.package.get().stages.len()));
+        }
+
         {
             let ticker = self.stage_ticker.as_mut().unwrap();
 
@@ -307,6 +311,12 @@ impl Menu {
     }
 
     pub fn step(&mut self, input: &mut Input) -> Option<GameSetup> {
+        if let &PackageHolder::Package (ref package, _) = &self.package {
+            if package.has_updates() {
+                self.fighter_selections = vec!();
+                self.stage_ticker = None;
+            }
+        }
         input.game_update(self.current_frame);
         let player_inputs = input.players(self.current_frame);
 

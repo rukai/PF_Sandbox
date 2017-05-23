@@ -1,6 +1,7 @@
 use std::collections::{HashSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
+use std::mem;
 use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
@@ -90,6 +91,10 @@ impl Default for Package {
 }
 
 impl Package {
+    pub fn has_updates(&self) -> bool {
+        !self.package_updates.is_empty()
+    }
+
     // TODO: Actually handle failures to load package
     pub fn open(name: &str) -> Package {
         let mut path = get_packages_path();
@@ -615,11 +620,8 @@ impl Package {
         self.package_updates.push(package_update);
     }
 
-    // TODO: Swaparino
     pub fn updates(&mut self) -> Vec<PackageUpdate> {
-        let package_updates = self.package_updates.clone();
-        self.package_updates = vec!();
-        return package_updates;
+        mem::replace(&mut self.package_updates, vec!())
     }
 }
 

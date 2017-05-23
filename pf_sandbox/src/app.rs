@@ -14,7 +14,7 @@ use ::cli::{CLIResults, ContinueFrom};
 use ::config::Config;
 use ::game::{Game, GameState, GameSetup};
 use ::input::Input;
-use ::menu::{Menu, MenuState};
+use ::menu::{Menu, MenuState, PackageHolder};
 use ::network::Network;
 use ::os_input::OsInput;
 use ::package::Package;
@@ -173,6 +173,9 @@ pub fn run(mut cli_results: CLIResults) {
                         tx.send(menu.graphics_message()).unwrap();
                     }
                 }
+                if let &mut PackageHolder::Package (ref mut package, _) = &mut menu.package {
+                    network.update(package);
+                }
             }
             &mut AppState::Game (ref mut game) => {
                 input.update(&game.tas);
@@ -185,13 +188,13 @@ pub fn run(mut cli_results: CLIResults) {
                     }
                     _ => { }
                 }
-                network.update(game);
                 #[cfg(any(feature = "vulkan", feature = "opengl"))]
                 {
                     if let Some(ref tx) = graphics_tx {
                         tx.send(game.graphics_message()).unwrap();
                     }
                 }
+                network.update(game);
             }
         };
 
