@@ -1,5 +1,5 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
-use num::FromPrimitive;
+use enum_traits::{Index, Iterable};
 
 impl Default for Fighter {
     fn default() -> Fighter {
@@ -8,9 +8,9 @@ impl Default for Fighter {
             iasa:   0,
         };
         let mut actions: ContextVec<ActionDef> = ContextVec::new();
-        for action_i in 0..((Action::Eliminated as usize)+1) {
-            let mut action = action_def.clone();
-            action.frames[0].pass_through = match Action::from_u64(action_i as u64).unwrap() {
+        for action in Action::variants() {
+            let mut action_def_new = action_def.clone();
+            action_def_new.frames[0].pass_through = match action {
                 Action::Damage     | Action::DamageFly |
                 Action::DamageFall | Action::AerialDodge |
                 Action::Uair       | Action::Dair |
@@ -18,7 +18,7 @@ impl Default for Fighter {
                 Action::Nair => { false }
                 _ => { true }
             };
-            actions.push(action);
+            actions.push(action_def_new);
         }
 
         Fighter {
@@ -391,8 +391,8 @@ impl Default for LinkType {
     }
 }
 
-enum_from_primitive! {
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, Node)]
+#[repr(u64)]
+#[derive(Clone, PartialEq, Debug, EnumIndex, EnumFromIndex, EnumToIndex, EnumIter, Serialize, Deserialize, Node)]
 pub enum Action {
     // Idle
     Spawn,
@@ -473,7 +473,6 @@ pub enum Action {
 
     Eliminated,
     DummyFramePreStart,
-}
 }
 
 impl Default for Action {

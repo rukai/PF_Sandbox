@@ -7,11 +7,11 @@ use ::rules::Goal;
 use ::math;
 
 use std::f32;
-use num::FromPrimitive;
 use std::collections::HashSet;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use rand::StdRng;
 use rand::Rng;
+use enum_traits::{FromIndex, ToIndex};
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Player {
@@ -101,7 +101,7 @@ impl Player {
     pub fn new(fighter: String, spawn: SpawnPoint, respawn: SpawnPoint, stocks: u64) -> Player {
         Player {
             fighter:          fighter,
-            action:           Action::DummyFramePreStart as u64,
+            action:           Action::DummyFramePreStart.index(),
             frame:            0,
             stocks:           stocks,
             damage:           0.0,
@@ -241,7 +241,7 @@ impl Player {
 
                     let mut kb_vel = (bkb + kbg * (damage_launch * weight * 1.4 + 18.0)).min(2500.0); // 96
 
-                    if let Some(action) = Action::from_u64(self.action) {
+                    if let Some(action) = Action::from_index(self.action) {
                         match action {
                             Action::Crouch => {
                                 kb_vel *= 0.67;
@@ -350,7 +350,7 @@ impl Player {
         }
 
         let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
-        let action = Action::from_u64(self.action);
+        let action = Action::from_index(self.action);
 
         // update ecb
         let prev_bot_y = self.ecb.bot_y;
@@ -690,7 +690,7 @@ impl Player {
 
     fn check_crouch(&mut self, input: &PlayerInput) -> bool {
         if input[0].stick_y < -0.69 {
-            if let Some(action) = Action::from_u64(self.action) {
+            if let Some(action) = Action::from_index(self.action) {
                 match action {
                     Action::CrouchStart | Action::Crouch | Action::CrouchEnd => {
                     }
@@ -922,7 +922,7 @@ impl Player {
 
     fn action_expired(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
-        match Action::from_u64(self.action) {
+        match Action::from_index(self.action) {
             None => { panic!("Custom defined action expirations have not been implemented"); },
 
             // Idle
@@ -1251,7 +1251,7 @@ impl Player {
     }
 
     fn land(&mut self, fighter: &Fighter, platform_i: usize, x: f32) {
-        match Action::from_u64(self.action) {
+        match Action::from_index(self.action) {
             Some(Action::Uair)      => { self.set_action(Action::UairLand) },
             Some(Action::Dair)      => { self.set_action(Action::DairLand) },
             Some(Action::Fair)      => { self.set_action(Action::FairLand) },
@@ -1363,7 +1363,7 @@ impl Player {
         }
 
         if debug.action {
-            let action = Action::from_u64(self.action).unwrap();
+            let action = Action::from_index(self.action).unwrap();
             let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
             let iasa = fighter.actions[self.action as usize].iasa;
 

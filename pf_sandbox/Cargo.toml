@@ -11,7 +11,8 @@ keywords = ["pf", "sandbox", "platform", "fighter"]
 [dependencies]
 rand = "0.3"
 chrono = { version = "0.3", features = ["serde"] }
-enum_primitive = "0.1.0"
+enum_traits = "0.3"
+enum_traits_macros = "2.0"
 getopts = "0.2"
 libusb = "0.3"
 matches = "0.1.4"

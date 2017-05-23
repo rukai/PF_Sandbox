@@ -1,6 +1,7 @@
 #![feature(drop_types_in_const)]
 extern crate chrono;
 extern crate crypto;
+extern crate enum_traits;
 extern crate getopts;
 extern crate libusb;
 extern crate num;
@@ -10,7 +11,7 @@ extern crate serde;
 extern crate treeflection;
 extern crate winit;
 extern crate zip;
-#[macro_use] extern crate enum_primitive;
+#[macro_use] extern crate enum_traits_macros;
 #[macro_use] extern crate matches;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
