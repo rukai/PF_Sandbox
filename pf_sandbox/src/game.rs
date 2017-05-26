@@ -196,6 +196,7 @@ impl Game {
             else {
                 self.edit = Edit::Fighter (0);
             }
+            self.update_frame();
         }
         else if os_input.key_pressed(VirtualKeyCode::Key2) && players_len >= 2 {
             if os_input.held_shift() {
@@ -204,6 +205,7 @@ impl Game {
             else {
                 self.edit = Edit::Fighter (1);
             }
+            self.update_frame();
         }
         else if os_input.key_pressed(VirtualKeyCode::Key3) && players_len >= 3 {
             if os_input.held_shift() {
@@ -212,6 +214,7 @@ impl Game {
             else {
                 self.edit = Edit::Fighter (2);
             }
+            self.update_frame();
         }
         else if os_input.key_pressed(VirtualKeyCode::Key4) && players_len >= 4 {
             if os_input.held_shift() {
@@ -220,6 +223,7 @@ impl Game {
             else {
                 self.edit = Edit::Fighter (3);
             }
+            self.update_frame();
         }
 
         // modify package
