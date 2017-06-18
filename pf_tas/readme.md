@@ -1,5 +1,7 @@
 # PF TAS
 
+!!! Warning: Still uses vulkano 0.3.0 which will crash linux with a nvidia card, when resizing the window !!!
+
 A keyboard driven GUI tool for sending TAS inputs to PF Sandbox.
 
 ## Keyboard mapping

@@ -33,8 +33,6 @@ In my case this was `C:\msys64\mingw64\bin`
 
 ## Setup on Ubuntu
 
-!!! Warning: Do not resize window on linux will bring your OS to a halt. !!!
-
 Install rust via https://www.rustup.rs/
 Do a custom install and select nightly all other settings default.
 
@@ -54,6 +52,14 @@ Section "Device"
    Option      "DRI" "3"
 EndSection
 ```
+
+## Setup on Arch
+deps: gcc, libusb, cmake
+
+need vulkan drivers: vulkan-icd-loader
+*   Intel: vulkan-intel
+*   Nvida: No extra drivers required
+*   AMD:   vulkan-radeon
 
 ## Compile and run
 

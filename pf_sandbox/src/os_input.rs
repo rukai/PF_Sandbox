@@ -1,7 +1,7 @@
 use camera::Camera;
 
 use winit::ElementState::{Pressed, Released};
-use winit::{Event, MouseScrollDelta, VirtualKeyCode, MouseButton};
+use winit::{WindowEvent, MouseScrollDelta, VirtualKeyCode, MouseButton};
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 struct CurrentInput {
@@ -36,36 +36,36 @@ impl CurrentInput {
         self.mouse_point_prev = self.mouse_point;
     }
 
-    pub fn handle_event(&mut self, event: Event) {
+    pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
-            Event::KeyboardInput (Pressed, _, Some(key_code)) => {
+            WindowEvent::KeyboardInput (Pressed, _, Some(key_code), _) => {
                 self.key_held[key_code as usize] = true;
                 self.key_actions.push(KeyAction::Pressed(key_code));
             },
-            Event::KeyboardInput (Released, _, Some(key_code)) => {
+            WindowEvent::KeyboardInput (Released, _, Some(key_code), _) => {
                 self.key_held[key_code as usize] = false;
                 self.key_actions.push(KeyAction::Released(key_code));
             },
-            Event::MouseMoved (x, y) => {
+            WindowEvent::MouseMoved (x, y) => {
                 self.mouse_point = Some((x, y));
             },
-            Event::MouseInput (Pressed, button) => {
+            WindowEvent::MouseInput (Pressed, button) => {
                 let button = mouse_button_to_int(button);
                 self.mouse_held[button] = true;
                 self.mouse_actions.push(MouseAction::Pressed(button));
             },
-            Event::MouseInput (Released, button) => {
+            WindowEvent::MouseInput (Released, button) => {
                 let button = mouse_button_to_int(button);
                 self.mouse_held[button] = false;
                 self.mouse_actions.push(MouseAction::Released(button));
             },
-            Event::MouseWheel (sub_event, _) => {
+            WindowEvent::MouseWheel (sub_event, _) => {
                 match sub_event {
                     MouseScrollDelta::LineDelta  (_, y) => { self.scroll_diff += y; },
                     MouseScrollDelta::PixelDelta (_, _) => { panic!("Ooer, I dont know how to handle PixelDelta...") }, // TODO
                 }
             },
-            Event::Resized (x, y) => {
+            WindowEvent::Resized (x, y) => {
                 self.resolution = (x, y);
             }
             _ => {},
@@ -92,11 +92,11 @@ impl CurrentInput {
 pub struct OsInput {
     current: Option<CurrentInput>,
     quit:    bool,
-    rx:      Receiver<Event>,
+    rx:      Receiver<WindowEvent>,
 }
 
 impl OsInput {
-    pub fn new() -> (OsInput, Sender<Event>) {
+    pub fn new() -> (OsInput, Sender<WindowEvent>) {
         let (tx, rx) = channel();
         let os_input = OsInput {
             current: Some(CurrentInput::new()),
@@ -114,9 +114,9 @@ impl OsInput {
 
         while let Ok(event) = self.rx.try_recv() {
             match event {
-                Event::Closed         => { self.quit = true; },
-                Event::Focused(false) => { self.current = None; },
-                Event::Focused(true)  => { self.current = Some(CurrentInput::new()); },
+                WindowEvent::Closed         => { self.quit = true; },
+                WindowEvent::Focused(false) => { self.current = None; },
+                WindowEvent::Focused(true)  => { self.current = Some(CurrentInput::new()); },
                 _ => { },
             }
             if let Some(ref mut current) = self.current {

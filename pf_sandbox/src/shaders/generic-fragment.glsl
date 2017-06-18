@@ -1,8 +1,5 @@
 #version 450
 
-#extension GL_ARB_separate_shader_objects : enable
-#extension GL_ARB_shading_language_450pack : enable
-
 layout(location = 0) in float v_edge;
 layout(location = 1) in float v_render_id;
 layout(location = 0) out vec4 f_color;

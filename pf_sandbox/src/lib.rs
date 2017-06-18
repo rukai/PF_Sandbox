@@ -43,13 +43,15 @@ pub mod math;
 #[macro_use]
 extern crate vulkano;
 #[cfg(feature = "vulkan")]
+#[macro_use]
+extern crate vulkano_shader_derive;
+#[cfg(feature = "vulkan")]
 extern crate vulkano_win;
 #[cfg(feature = "vulkan")]
 extern crate vulkano_text;
+
 #[cfg(feature = "vulkan")]
 pub mod vulkan;
-#[cfg(feature = "vulkan")]
-pub mod vulkan_buffers;
 
 #[cfg(feature = "opengl")]
 #[macro_use]

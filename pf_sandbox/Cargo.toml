@@ -2,7 +2,6 @@
 name = "pf_sandbox"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
-build = "build.rs"
 description = "A platform fighter sandbox featuring a character editor tightly integrated with gameplay."
 license = "GPL-3.0"
 repository = "https://github.com/rukai/pf_sandbox"
@@ -25,17 +24,15 @@ treeflection_derive = "0.1"
 rust-crypto = "0.2"
 zip = "0.2"
 reqwest = "0.5"
-winit = "0.5" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+winit = "0.6" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 
-vulkano = { version = "0.3", optional = true }
-vulkano-win = { version = "0.3", optional = true }
+vulkano = { version = "0.4", optional = true }
+vulkano-win = { version = "0.4", optional = true }
+vulkano-shader-derive = { version = "0.4", optional = true }
+vulkano_text = {version = "0.2", optional = true }
 glium = { version = "0.16", optional = true }
-vulkano_text = { version = "0.1", optional = true }
-
-[build-dependencies]
-vulkano-shaders = { version = "0.3", optional = true }
 
 [features]
-default = ["vulkan", "opengl"]
-vulkan = ["vulkano", "vulkano-win", "vulkano-shaders", "vulkano_text"]
-opengl = ["glium"]
+default = ["vulkan"]
+vulkan = ["vulkano", "vulkano-win", "vulkano-shader-derive", "vulkano_text"]
+opengl = ["glium"] # opengl is now broken, need to port it over to winit instead of glutin
