@@ -17,7 +17,7 @@ use ::rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::iter;
-use chrono::offset::local::Local;
+use chrono::Local;
 
 use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};

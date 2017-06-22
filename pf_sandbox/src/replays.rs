@@ -3,8 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::cmp::Ordering;
 
-use chrono::datetime::DateTime;
-use chrono::offset::local::Local;
+use chrono::{Local, DateTime};
 
 use player::Player;
 use game::Game;

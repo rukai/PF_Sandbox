@@ -9,7 +9,7 @@ keywords = ["pf", "sandbox", "platform", "fighter"]
 
 [dependencies]
 rand = "0.3"
-chrono = { version = "0.3", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 enum_traits = "0.3"
 enum_traits_macros = "2.0"
 getopts = "0.2"
