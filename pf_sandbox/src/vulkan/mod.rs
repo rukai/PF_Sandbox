@@ -260,7 +260,8 @@ impl<'a> VulkanGraphics<'a> {
         if self.frame_durations.len() == 60 {
             let total: Duration = self.frame_durations.iter().sum();
             let total = total.as_secs() as f64 + total.subsec_nanos() as f64 / 1_000_000_000.0;
-            self.fps = format!("{:.0}", total * 60.0);
+            let average = total / 60.0;
+            self.fps = format!("{:.0}", 1.0 / average);
             self.frame_durations.clear();
         }
 
