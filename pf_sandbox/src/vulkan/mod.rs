@@ -37,7 +37,7 @@ use std::mem;
 use std::sync::Arc;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::collections::HashSet;
 
 mod vs {
@@ -76,6 +76,8 @@ pub struct VulkanGraphics<'a> {
     draw_text:       DrawText<'a>,
     os_input_tx:     Sender<WindowEvent>,
     render_rx:       Receiver<GraphicsMessage>,
+    frame_durations: Vec<Duration>,
+    fps:             String,
     width:           u32,
     height:          u32,
 }
@@ -152,6 +154,8 @@ impl<'a> VulkanGraphics<'a> {
             draw_text:        draw_text,
             os_input_tx:      os_input_tx,
             render_rx:        render_rx,
+            frame_durations:  vec!(),
+            fps:              String::new(),
             width:            0,
             height:           0,
         }
@@ -241,6 +245,9 @@ impl<'a> VulkanGraphics<'a> {
     fn run(&mut self) {
         loop {
             {
+                let frame_start = Instant::now();
+                self.render_fps();
+
                 // get the most recent render
                 let mut render = if let Ok(message) = self.render_rx.recv() {
                     self.read_message(message)
@@ -256,9 +263,21 @@ impl<'a> VulkanGraphics<'a> {
                     self.window_resize(new_width, new_height);
                 }
                 self.render(render);
+                self.frame_durations.push(frame_start.elapsed());
             }
             self.handle_events();
         }
+    }
+
+    fn render_fps(&mut self) {
+        if self.frame_durations.len() == 60 {
+            let total: Duration = self.frame_durations.iter().sum();
+            let total = total.as_secs() as f64 + total.subsec_nanos() as f64 / 1_000_000_000.0;
+            self.fps = format!("{:.0}", total * 60.0);
+            self.frame_durations.clear();
+        }
+
+        self.draw_text.queue_text(self.width as f32 - 30.0, 20.0, 20.0, [1.0, 1.0, 1.0, 1.0], &self.fps);
     }
 
     fn read_message(&mut self, message: GraphicsMessage) -> Render {
@@ -438,7 +457,7 @@ impl<'a> VulkanGraphics<'a> {
                                 }
                             }
                             else {
-                                 //TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
+                                 // TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
                             }
                         }
                         RenderFighter::None => { }
