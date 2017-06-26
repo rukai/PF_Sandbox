@@ -21,7 +21,7 @@ dependencies = [
  "vulkano 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "vulkano-shader-derive 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "vulkano-win 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "vulkano_text 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vulkano_text 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "winit 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "zip 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1318,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "vulkano_text"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rusttype 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1674,7 +1674,7 @@ dependencies = [
 "checksum vulkano-shader-derive 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "d78f0d2f696f971d2531b5c6ccf56beb31203a50b8d514e0b26fc2f5132dac7f"
 "checksum vulkano-shaders 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "15b747822a859ede8e5c327e12daff1c015a84b6df20cd56f2ff9dc577f4bf0f"
 "checksum vulkano-win 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "98be7b3dc1c0184a5432a8b3459a14250ad0a357f994b730b435600815d9fd39"
-"checksum vulkano_text 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "97e96f797ea244643bd9e55b38325f54536b71383bcf267bdf6bc91b23a0445c"
+"checksum vulkano_text 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b56fe3e8ed083d66504f17963cc23a794c78a312928b68ddf42330da2900a9da"
 "checksum wayland-client 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)" = "a4b2b9876c6c97ece4f1ac699b5172550df443f36942fdcdcc27768c8f1437b4"
 "checksum wayland-client 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)" = "88b06e2fe73033b5396173ce6d186bf8be1298130320c3c8d94a3ce1a41a7745"
 "checksum wayland-kbd 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2b4b69d43d6cce82d95a2c5e81605abd1fa4783bf49d09cd85aa092f16081ef1"

@@ -16,18 +16,14 @@ use vulkano;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder, CommandBufferBuilder};
 use vulkano::descriptor::descriptor_set::{SimpleDescriptorSet, SimpleDescriptorSetBuf};
-use vulkano::descriptor::pipeline_layout::{PipelineLayout, PipelineLayoutDescUnion};
+use vulkano::descriptor::pipeline_layout::PipelineLayoutAbstract;
 use vulkano::device::{Device, Queue};
 use vulkano::framebuffer::{Framebuffer, Subpass, RenderPass, RenderPassDesc};
 use vulkano::image::SwapchainImage;
 use vulkano::instance::{Instance, PhysicalDevice};
-use vulkano::pipeline::blend::Blend;
-use vulkano::pipeline::depth_stencil::DepthStencil;
-use vulkano::pipeline::input_assembly::InputAssembly;
-use vulkano::pipeline::multisample::Multisample;
 use vulkano::pipeline::vertex::SingleBufferDefinition;
-use vulkano::pipeline::viewport::{ViewportsState, Viewport, Scissor};
-use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineParams};
+use vulkano::pipeline::viewport::Viewport;
+use vulkano::pipeline::GraphicsPipeline;
 use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentMode};
 use vulkano::sync::{GpuFuture, FlushError};
 use vulkano_text::{DrawText, DrawTextTrait, UpdateTextCache};
@@ -39,6 +35,7 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread;
 use std::time::{Duration, Instant};
 use std::collections::HashSet;
+use std::iter;
 
 mod vs {
     #[derive(VulkanoShader)]
@@ -69,7 +66,7 @@ pub struct VulkanGraphics<'a> {
     future:          Box<GpuFuture>,
     swapchain:       Arc<Swapchain>,
     queue:           Arc<Queue>,
-    pipeline:        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, PipelineLayout<PipelineLayoutDescUnion<vs::Layout, fs::Layout>>, Arc<RenderPass<render_pass_desc::Desc>>>>,
+    pipeline:        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPass<render_pass_desc::Desc>>>>,
     render_pass:     Arc<RenderPass<render_pass_desc::Desc>>,
     framebuffers:    Vec<Arc<Framebuffer<Arc<RenderPass<render_pass_desc::Desc>>, ((), Arc<SwapchainImage>)>>>,
     uniforms:        Vec<Uniform>,
@@ -168,39 +165,29 @@ impl<'a> VulkanGraphics<'a> {
         render_pass: Arc<RenderPass<render_pass_desc::Desc>>
     ) -> (
         Vec<Uniform>,
-        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, PipelineLayout<PipelineLayoutDescUnion<vs::Layout, fs::Layout>>, Arc<RenderPass<render_pass_desc::Desc>>>>,
+        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPass<render_pass_desc::Desc>>>>
     ) {
         let vs = vs::Shader::load(&device).unwrap();
         let fs = fs::Shader::load(&device).unwrap();
 
-        let pipeline = Arc::new(GraphicsPipeline::new(device.clone(),
-            GraphicsPipelineParams {
-                vertex_input:    SingleBufferDefinition::new(),
-                vertex_shader:   vs.main_entry_point(),
-                input_assembly:  InputAssembly::triangle_list(),
-                tessellation:    None,
-                geometry_shader: None,
-                viewport:        ViewportsState::Fixed {
-                    data: vec![(
-                        Viewport {
-                            origin:      [0.0, 0.0],
-                            depth_range: 0.0..1.0,
-                            dimensions:  [
-                                images[0].dimensions()[0] as f32,
-                                images[0].dimensions()[1] as f32
-                            ],
-                        },
-                        Scissor::irrelevant()
-                    )],
-                },
-                raster:          Default::default(),
-                multisample:     Multisample::disabled(),
-                fragment_shader: fs.main_entry_point(),
-                depth_stencil:   DepthStencil::disabled(),
-                blend:           Blend::alpha_blending(),
-                render_pass:     Subpass::from(render_pass, 0).unwrap(),
-            }
-        ).unwrap());
+        let pipeline = Arc::new(GraphicsPipeline::start()
+            .vertex_input_single_buffer()
+            .vertex_shader(vs.main_entry_point(), ())
+            .triangle_list()
+            .viewports(iter::once(Viewport {
+                origin:      [0.0, 0.0],
+                depth_range: 0.0..1.0,
+                dimensions:  [
+                    images[0].dimensions()[0] as f32,
+                    images[0].dimensions()[1] as f32
+                ],
+            }))
+            .fragment_shader(fs.main_entry_point(), ())
+            .blend_alpha_blending()
+            .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
+            .build(device.clone())
+            .unwrap()
+        );
 
         let mut uniforms: Vec<Uniform> = vec!();
         for _ in 0..1000 {
