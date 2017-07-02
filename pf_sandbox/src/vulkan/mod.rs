@@ -1,5 +1,4 @@
 mod buffers;
-mod render_pass_desc;
 
 use self::buffers::{Vertex, Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
@@ -18,7 +17,7 @@ use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder, CommandBuf
 use vulkano::descriptor::descriptor_set::{SimpleDescriptorSet, SimpleDescriptorSetBuf};
 use vulkano::descriptor::pipeline_layout::PipelineLayoutAbstract;
 use vulkano::device::{Device, Queue};
-use vulkano::framebuffer::{Framebuffer, Subpass, RenderPass, RenderPassDesc};
+use vulkano::framebuffer::{Framebuffer, FramebufferAbstract, Subpass, RenderPassAbstract};
 use vulkano::image::SwapchainImage;
 use vulkano::instance::{Instance, PhysicalDevice};
 use vulkano::pipeline::vertex::SingleBufferDefinition;
@@ -66,9 +65,9 @@ pub struct VulkanGraphics<'a> {
     future:          Box<GpuFuture>,
     swapchain:       Arc<Swapchain>,
     queue:           Arc<Queue>,
-    pipeline:        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPass<render_pass_desc::Desc>>>>,
-    render_pass:     Arc<RenderPass<render_pass_desc::Desc>>,
-    framebuffers:    Vec<Arc<Framebuffer<Arc<RenderPass<render_pass_desc::Desc>>, ((), Arc<SwapchainImage>)>>>,
+    pipeline:        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+    render_pass:     Arc<RenderPassAbstract + Send + Sync>,
+    framebuffers:    Vec<Arc<FramebufferAbstract + Send + Sync>>,
     uniforms:        Vec<Uniform>,
     draw_text:       DrawText<'a>,
     os_input_tx:     Sender<WindowEvent>,
@@ -127,14 +126,10 @@ impl<'a> VulkanGraphics<'a> {
             ).unwrap()
         };
 
-        let render_pass = Arc::new(render_pass_desc::Desc {
-            color: (swapchain.format(), 1)
-        }.build_render_pass(device.clone()).unwrap());
+
+        let (uniforms, render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(device.clone(), queue.clone(), swapchain.clone(), &images);
 
         let draw_text = DrawText::new(device.clone(), queue.clone(), swapchain.clone(), &images);
-
-        let framebuffers = VulkanGraphics::gen_framebuffers(&images, render_pass.clone());
-        let (uniforms, pipeline) = VulkanGraphics::pipeline(device.clone(), queue.clone(), &images, render_pass.clone());
 
         VulkanGraphics {
             package_buffers:  PackageBuffers::new(),
@@ -161,12 +156,37 @@ impl<'a> VulkanGraphics<'a> {
     fn pipeline(
         device: Arc<Device>,
         queue: Arc<Queue>,
-        images: &[Arc<SwapchainImage>],
-        render_pass: Arc<RenderPass<render_pass_desc::Desc>>
+        swapchain: Arc<Swapchain>,
+        images: &[Arc<SwapchainImage>]
     ) -> (
         Vec<Uniform>,
-        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPass<render_pass_desc::Desc>>>>
+        Arc<RenderPassAbstract + Send + Sync>,
+        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+        Vec<Arc<FramebufferAbstract + Send + Sync>>
     ) {
+        let render_pass = Arc::new(single_pass_renderpass!(device.clone(),
+            attachments: {
+                color: {
+                    load:    Clear,
+                    store:   Store,
+                    format:  swapchain.format(),
+                    samples: 1,
+                }
+            },
+            pass: {
+                color: [color],
+                depth_stencil: {}
+            }
+        ).unwrap()) as Arc<RenderPassAbstract + Send + Sync>;
+
+        let framebuffers = images.iter().map(|image| {
+            Arc::new(
+                Framebuffer::start(render_pass.clone())
+                .add(image.clone()).unwrap()
+                .build().unwrap()
+            ) as Arc<FramebufferAbstract + Send + Sync>
+        }).collect::<Vec<_>>();
+
         let vs = vs::Shader::load(&device).unwrap();
         let fs = fs::Shader::load(&device).unwrap();
 
@@ -216,17 +236,7 @@ impl<'a> VulkanGraphics<'a> {
             });
         }
 
-        (uniforms, pipeline)
-    }
-
-    fn gen_framebuffers(images: &[Arc<SwapchainImage>], render_pass: Arc<RenderPass<render_pass_desc::Desc>>) -> Vec<Arc<Framebuffer<Arc<RenderPass<render_pass_desc::Desc>>, ((), Arc<SwapchainImage>)>>> {
-        images.iter().map(|image| {
-            Arc::new(
-                Framebuffer::start(render_pass.clone())
-                .add(image.clone()).unwrap()
-                .build().unwrap()
-            )
-        }).collect::<Vec<_>>()
+        (uniforms, render_pass, pipeline, framebuffers)
     }
 
     fn run(&mut self) {
@@ -280,18 +290,15 @@ impl<'a> VulkanGraphics<'a> {
     fn window_resize(&mut self, width: u32, height: u32) {
         self.width = width;
         self.height = height;
+
         let (new_swapchain, new_images) = self.swapchain.recreate_with_dimension([width, height]).unwrap();
-        self.swapchain = new_swapchain;
+        self.swapchain = new_swapchain.clone();
 
-        self.render_pass = Arc::new(render_pass_desc::Desc {
-            color: (self.swapchain.format(), 1)
-        }.build_render_pass(self.device.clone()).unwrap());
-
-        self.framebuffers = VulkanGraphics::gen_framebuffers(&new_images, self.render_pass.clone());
-
-        let (uniforms, pipeline) = VulkanGraphics::pipeline(self.device.clone(), self.queue.clone(), &new_images, self.render_pass.clone());
-        self.pipeline = pipeline;
+        let (uniforms, render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(self.device.clone(), self.queue.clone(), new_swapchain, &new_images);
         self.uniforms = uniforms;
+        self.render_pass = render_pass;
+        self.pipeline = pipeline;
+        self.framebuffers = framebuffers;
 
         self.draw_text = DrawText::new(self.device.clone(), self.queue.clone(), self.swapchain.clone(), &new_images);
     }
