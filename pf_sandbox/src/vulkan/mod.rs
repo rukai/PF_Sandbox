@@ -13,7 +13,7 @@ use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
 use vulkano;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder, CommandBufferBuilder};
+use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder};
 use vulkano::descriptor::descriptor_set::{SimpleDescriptorSet, SimpleDescriptorSetBuf};
 use vulkano::descriptor::pipeline_layout::PipelineLayoutAbstract;
 use vulkano::device::{Device, Queue};
@@ -109,7 +109,7 @@ impl<'a> VulkanGraphics<'a> {
                 khr_swapchain: true,
                 .. vulkano::device::DeviceExtensions::none()
             };
-            Device::new(&physical, physical.supported_features(), &device_ext, [(queue, 0.5)].iter().cloned()).unwrap()
+            Device::new(physical, physical.supported_features(), &device_ext, [(queue, 0.5)].iter().cloned()).unwrap()
         };
 
         let future = Box::new(vulkano::sync::now(device.clone())) as Box<GpuFuture>;
@@ -187,8 +187,8 @@ impl<'a> VulkanGraphics<'a> {
             ) as Arc<FramebufferAbstract + Send + Sync>
         }).collect::<Vec<_>>();
 
-        let vs = vs::Shader::load(&device).unwrap();
-        let fs = fs::Shader::load(&device).unwrap();
+        let vs = vs::Shader::load(device.clone()).unwrap();
+        let fs = fs::Shader::load(device.clone()).unwrap();
 
         let pipeline = Arc::new(GraphicsPipeline::start()
             .vertex_input_single_buffer()
@@ -305,7 +305,7 @@ impl<'a> VulkanGraphics<'a> {
 
     fn render(&mut self, render: Render) {
         self.future.cleanup_finished();
-        let (image_num, new_future) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), Duration::new(1, 0)) {
+        let (image_num, new_future) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
             Ok(result) => { result }
             Err(AcquireError::OutOfDate) => {
                 // Just abort this render, the user wont care about losing some frames while resizing. Internal rendering size will be fixed by next frame.
@@ -363,7 +363,7 @@ impl<'a> VulkanGraphics<'a> {
         let aspect_ratio = self.aspect_ratio();
 
         let mut command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
-        .update_text_cache(&mut self.draw_text)
+        .update_text_cache(&mut self.draw_text, self.queue.clone())
         .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into()]).unwrap();
 
         match render.state {
@@ -596,7 +596,7 @@ impl<'a> VulkanGraphics<'a> {
         }
 
         let mut command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
-        .update_text_cache(&mut self.draw_text)
+        .update_text_cache(&mut self.draw_text, self.queue.clone())
         .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into()]).unwrap();
 
         for (i, entity) in entities.iter().enumerate() {
@@ -834,9 +834,11 @@ impl<'a> VulkanGraphics<'a> {
         let res = window.get_inner_size_points().unwrap();
         self.os_input_tx.send(WindowEvent::Resized(res.0, res.1)).unwrap();
 
+        let os_input_tx = self.os_input_tx.clone();
         self.events_loop.poll_events(|event| {
-            let Event::WindowEvent {event, ..} = event;
-            self.os_input_tx.send(event).unwrap();
+            if let Event::WindowEvent { event, .. } = event {
+                os_input_tx.send(event).unwrap();
+            };
         });
     }
 }

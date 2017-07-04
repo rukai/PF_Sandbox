@@ -9,8 +9,8 @@ struct CurrentInput {
     pub key_actions:      Vec<KeyAction>,
     pub key_held:         [bool; 255],
     pub mouse_held:       [bool; 255],
-    pub mouse_point:      Option<(i32, i32)>,
-    pub mouse_point_prev: Option<(i32, i32)>,
+    pub mouse_point:      Option<(f32, f32)>,
+    pub mouse_point_prev: Option<(f32, f32)>,
     pub scroll_diff:      f32,
     pub resolution:       (u32, u32),
 }
@@ -38,29 +38,35 @@ impl CurrentInput {
 
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
-            WindowEvent::KeyboardInput (Pressed, _, Some(key_code), _) => {
-                self.key_held[key_code as usize] = true;
-                self.key_actions.push(KeyAction::Pressed(key_code));
+            WindowEvent::KeyboardInput { input, .. } => {
+                if let Some(keycode) = input.virtual_keycode {
+                    match input.state {
+                        Pressed => {
+                            self.key_held[keycode as usize] = true;
+                            self.key_actions.push(KeyAction::Pressed(keycode));
+                        }
+                        Released => {
+                            self.key_held[keycode as usize] = false;
+                            self.key_actions.push(KeyAction::Released(keycode));
+                        },
+                    }
+                }
+            }
+            WindowEvent::MouseMoved { position, .. } => {
+                self.mouse_point = Some((position.0 as f32, position.1 as f32));
             },
-            WindowEvent::KeyboardInput (Released, _, Some(key_code), _) => {
-                self.key_held[key_code as usize] = false;
-                self.key_actions.push(KeyAction::Released(key_code));
-            },
-            WindowEvent::MouseMoved (x, y) => {
-                self.mouse_point = Some((x, y));
-            },
-            WindowEvent::MouseInput (Pressed, button) => {
+            WindowEvent::MouseInput { state: Pressed, button, .. } => {
                 let button = mouse_button_to_int(button);
                 self.mouse_held[button] = true;
                 self.mouse_actions.push(MouseAction::Pressed(button));
             },
-            WindowEvent::MouseInput (Released, button) => {
+            WindowEvent::MouseInput { state: Released, button, .. } => {
                 let button = mouse_button_to_int(button);
                 self.mouse_held[button] = false;
                 self.mouse_actions.push(MouseAction::Released(button));
             },
-            WindowEvent::MouseWheel (sub_event, _) => {
-                match sub_event {
+            WindowEvent::MouseWheel { delta, .. } => {
+                match delta {
                     MouseScrollDelta::LineDelta  (_, y) => { self.scroll_diff += y; },
                     MouseScrollDelta::PixelDelta (_, _) => { panic!("Ooer, I dont know how to handle PixelDelta...") }, // TODO
                 }
@@ -73,9 +79,8 @@ impl CurrentInput {
     }
 
     /// Convert a mouse point to the corresponding in game point
-    pub fn mouse_to_game(&self, mouse_point: (i32, i32), camera: &Camera) -> (f32, f32) {
+    pub fn mouse_to_game(&self, mouse_point: (f32, f32), camera: &Camera) -> (f32, f32) {
         let (m_x, m_y) = mouse_point;
-        let (m_x, m_y) = (m_x as f32, m_y as f32);
         let (w_w, w_h) = self.resolution;
         let (w_w, w_h) = (w_w as f32, w_h as f32);
         let aspect_ratio = w_w / w_h;
@@ -216,7 +221,7 @@ impl OsInput {
         }
     }
 
-    pub fn mouse(&self) -> Option<(i32, i32)> {
+    pub fn mouse(&self) -> Option<(f32, f32)> {
         match self.current {
             Some(ref current) => { current.mouse_point },
             None              => { None },
@@ -232,7 +237,7 @@ impl OsInput {
         None
     }
 
-    pub fn mouse_diff(&self) -> (i32, i32) {
+    pub fn mouse_diff(&self) -> (f32, f32) {
         if let Some(ref current_input) = self.current {
             if let Some(cur) = current_input.mouse_point {
                 if let Some(prev) = current_input.mouse_point_prev {
@@ -240,7 +245,7 @@ impl OsInput {
                 }
             }
         }
-        (0, 0)
+        (0.0, 0.0)
     }
 
     pub fn game_mouse_diff(&self, camera: &Camera) -> (f32, f32) {

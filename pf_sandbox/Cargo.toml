@@ -1,6 +1,6 @@
 [package]
 name = "pf_sandbox"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Rukai <rubickent@gmail.com>"]
 description = "A platform fighter sandbox featuring a character editor tightly integrated with gameplay."
 license = "GPL-3.0"
@@ -24,12 +24,12 @@ treeflection_derive = "0.1"
 rust-crypto = "0.2"
 zip = "0.2"
 reqwest = "0.5"
-winit = "0.6" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+winit = "0.7" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 
-vulkano = { version = "0.4", optional = true }
-vulkano-win = { version = "0.4", optional = true }
-vulkano-shader-derive = { version = "0.4", optional = true }
-vulkano_text = {version = "0.2", optional = true }
+vulkano = { version = "0.5", optional = true }
+vulkano-win = { version = "0.5", optional = true }
+vulkano-shader-derive = { version = "0.5", optional = true }
+vulkano_text = {version = "0.3", optional = true }
 glium = { version = "0.16", optional = true }
 
 [features]
