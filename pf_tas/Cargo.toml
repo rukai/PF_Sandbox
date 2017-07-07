@@ -1,6 +1,6 @@
 [package]
 name = "pf_tas"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Rukai <rubickent@gmail.com>"]
 description = "TAS tool for PF sandbox"
 license = "GPL-3.0"
@@ -8,10 +8,11 @@ repository = "https://github.com/rukai/pf_sandbox"
 keywords = ["pf", "sandbox", "TAS"]
 
 [dependencies]
-winit = "0.5"
-vulkano = "0.3"
-vulkano-win = "0.3"
-vulkano_text = "0.1"
+winit = "0.7"
+vulkano = "0.5"
+vulkano-shader-derive = "0.5"
+vulkano-win = "0.5"
+vulkano_text = "0.3"
 serde_json = "0.9"
 serde_derive = "0.9"
 serde = "0.9"
