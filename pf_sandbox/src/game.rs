@@ -1,18 +1,19 @@
 use ::camera::Camera;
 use ::collision::collision_check;
+use ::command_line::CommandLine;
 use ::config::Config;
 use ::fighter::{ActionFrame, CollisionBox, LinkType};
-use ::graphics::{GraphicsMessage, Render, RenderRect};
+use ::graphics::{GraphicsMessage, Render, RenderType, RenderRect};
 use ::graphics;
 use ::input::{Input, PlayerInput, ControllerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
+use ::rand::{StdRng, SeedableRng};
 use ::records::{GameResult, PlayerResult};
 use ::replays;
 use ::rules::Goal;
 use ::stage::{Area, Stage};
-use ::rand::{StdRng, SeedableRng};
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -42,7 +43,7 @@ pub struct Game {
     pub selector:               Selector,
     copied_frame:               Option<ActionFrame>,
     pub camera:                 Camera,
-    pub tas:                    Vec<ControllerInput>
+    pub tas:                    Vec<ControllerInput>,
 }
 
 /// Frame 0 refers to the initial state of the game.
@@ -88,20 +89,33 @@ impl Game {
             selector:               Default::default(),
             copied_frame:           None,
             camera:                 Camera::new(),
-            tas:                    vec!()
+            tas:                    vec!(),
         }
     }
 
-    pub fn step(&mut self, input: &mut Input, os_input: &OsInput) -> GameState {
+    pub fn step(&mut self, input: &mut Input, os_input: &OsInput, os_input_blocked: bool) -> GameState {
         {
-            match self.state.clone() {
-                GameState::Local           => { self.step_local(input, os_input); }
+            let state = self.state.clone();
+            match state {
+                GameState::Local           => { self.step_local(input); }
                 GameState::Netplay         => { self.step_netplay(input); }
-                GameState::ReplayForwards  => { self.step_replay_forwards(input, os_input); }
-                GameState::ReplayBackwards => { self.step_replay_backwards(input, os_input); }
-                GameState::Paused          => { self.step_pause(input, os_input); }
+                GameState::ReplayForwards  => { self.step_replay_forwards(input); }
+                GameState::ReplayBackwards => { self.step_replay_backwards(input); }
+                GameState::Paused          => { self.step_pause(input); }
                 GameState::ToResults (_)   => { unreachable!(); }
                 GameState::ToCSS           => { unreachable!(); }
+            }
+
+            if !os_input_blocked {
+                match state {
+                    GameState::Local           => { self.step_local_os_input(os_input); }
+                    GameState::Netplay         => { }
+                    GameState::ReplayForwards  => { self.step_replay_forwards_os_input(os_input); }
+                    GameState::ReplayBackwards => { self.step_replay_backwards_os_input(os_input); }
+                    GameState::Paused          => { self.step_pause_os_input(input, os_input); }
+                    GameState::ToResults (_)   => { unreachable!(); }
+                    GameState::ToCSS           => { unreachable!(); }
+                }
             }
             self.camera.update(os_input, &self.players, &self.package.fighters, &self.stage);
 
@@ -112,7 +126,6 @@ impl Game {
         }
 
         self.set_context();
-
         self.state.clone()
     }
 
@@ -153,7 +166,7 @@ impl Game {
         self.package.stages.set_context(index);
     }
 
-    fn step_local(&mut self, input: &mut Input, os_input: &OsInput) {
+    fn step_local(&mut self, input: &mut Input) {
         self.player_history.push(self.players.clone());
         self.current_frame += 1;
 
@@ -168,7 +181,13 @@ impl Game {
         self.step_game(player_inputs);
 
         // pause game
-        if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
+        if input.start_pressed() {
+            self.state = GameState::Paused;
+        }
+    }
+
+    fn step_local_os_input(&mut self, os_input: &OsInput) {
+        if os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
             self.state = GameState::Paused;
         }
     }
@@ -182,7 +201,16 @@ impl Game {
         self.step_game(player_inputs);
     }
 
-    fn step_pause(&mut self, input: &mut Input, os_input: &OsInput) {
+    fn step_pause(&mut self, input: &mut Input) {
+        if input.game_quit_held() {
+            self.state = GameState::ToCSS;
+        }
+        else if input.start_pressed() {
+            self.state = GameState::Local;
+        }
+    }
+
+    fn step_pause_os_input(&mut self, input: &mut Input, os_input: &OsInput) {
         let players_len = self.players.len();
 
         // set current edit state
@@ -227,22 +255,16 @@ impl Game {
         }
 
         // modify package
-        if os_input.key_pressed(VirtualKeyCode::W) {
+        if os_input.key_pressed(VirtualKeyCode::W) { // TODO: turn this into treeflection command and delete
             replays::save_replay(self, input, &self.package);
-        }
-        if os_input.key_pressed(VirtualKeyCode::E) {
-            self.package.save();
-        }
-        if os_input.key_pressed(VirtualKeyCode::R) {
-            //self.package.load(); // Currently disabled to easy to bump, need some sort of UI confirmation
         }
 
         // game flow control
         if os_input.key_pressed(VirtualKeyCode::J) {
-            self.step_replay_backwards(input, os_input);
+            self.step_replay_backwards(input);
         }
         else if os_input.key_pressed(VirtualKeyCode::K) {
-            self.step_replay_forwards(input, os_input);
+            self.step_replay_forwards(input);
         }
         else if os_input.key_pressed(VirtualKeyCode::H) {
             self.state = GameState::ReplayBackwards;
@@ -251,7 +273,7 @@ impl Game {
             self.state = GameState::ReplayForwards;
         }
         else if os_input.key_pressed(VirtualKeyCode::Space) {
-            self.step_local(input, os_input);
+            self.step_local(input);
         }
         else if os_input.key_pressed(VirtualKeyCode::U) {
             // TODO: Invalidate saved_frame when the frame it refers to is deleted.
@@ -260,10 +282,7 @@ impl Game {
         else if os_input.key_pressed(VirtualKeyCode::I) {
             self.jump_frame();
         }
-        else if input.game_quit_held() {
-            self.state = GameState::ToCSS;
-        }
-        else if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Return) {
+        else if os_input.key_pressed(VirtualKeyCode::Return) {
             self.state = GameState::Local;
         }
 
@@ -306,7 +325,7 @@ impl Game {
                         self.package.new_fighter_frame(fighter, action, frame);
                         // We want to step just the players current frame to simplify the animation work flow
                         // However we need to do a proper full step so that the history doesn't get mucked up.
-                        self.step_local(input, os_input);
+                        self.step_local(input);
                     }
                     // delete frame
                     if os_input.key_pressed(VirtualKeyCode::N) {
@@ -542,28 +561,34 @@ impl Game {
 
     /// next frame is advanced by using the input history on the current frame
     // TODO: Allow choice between using input history and game history
-    fn step_replay_forwards(&mut self, input: &mut Input, os_input: &OsInput) {
+    fn step_replay_forwards(&mut self, input: &mut Input) {
         if self.current_frame < input.last_frame() {
             let player_inputs = &input.players(self.current_frame);
             self.step_game(player_inputs);
 
-            // flow controls
-            if os_input.key_pressed(VirtualKeyCode::H) {
-                self.state = GameState::ReplayBackwards;
-            }
-            if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
-                self.state = GameState::Paused;
-            }
             self.current_frame += 1;
             self.update_frame();
         }
         else {
             self.state = GameState::Paused;
         }
+
+        if input.start_pressed() {
+            self.state = GameState::Paused;
+        }
+    }
+
+    fn step_replay_forwards_os_input(&mut self, os_input: &OsInput) {
+        if os_input.key_pressed(VirtualKeyCode::H) {
+            self.state = GameState::ReplayBackwards;
+        }
+        if os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
+            self.state = GameState::Paused;
+        }
     }
 
     /// Immediately jumps to the previous frame in history
-    fn step_replay_backwards(&mut self, input: &mut Input, os_input: &OsInput) {
+    fn step_replay_backwards(&mut self, input: &mut Input) {
         if self.current_frame > 0 {
             let jump_to = self.current_frame - 1;
             self.players = self.player_history.get(jump_to).unwrap().clone();
@@ -574,11 +599,17 @@ impl Game {
             self.state = GameState::Paused;
         }
 
-        // flow controls
+        if input.start_pressed() {
+            self.state = GameState::Paused;
+            self.update_frame();
+        }
+    }
+
+    fn step_replay_backwards_os_input(&mut self, os_input: &OsInput) {
         if os_input.key_pressed(VirtualKeyCode::L) {
             self.state = GameState::ReplayForwards;
         }
-        else if input.start_pressed() || os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
+        else if os_input.key_pressed(VirtualKeyCode::Space) || os_input.key_pressed(VirtualKeyCode::Return) {
             self.state = GameState::Paused;
             self.update_frame();
         }
@@ -818,10 +849,15 @@ impl Game {
         }
     }
 
-    pub fn graphics_message(&mut self) -> GraphicsMessage {
+    pub fn graphics_message(&mut self, command_line: &CommandLine) -> GraphicsMessage {
+        let render = Render {
+            command_output: command_line.output(),
+            render_type:    RenderType::Game(self.render()),
+        };
+
         GraphicsMessage {
             package_updates: self.package.updates(),
-            render: Render::Game (self.render())
+            render:          render,
         }
     }
 

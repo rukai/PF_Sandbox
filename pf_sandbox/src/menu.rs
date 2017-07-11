@@ -1,9 +1,10 @@
+use ::command_line::CommandLine;
+use ::config::Config;
+use ::game::{GameSetup, GameState};
+use ::graphics::{GraphicsMessage, Render, RenderType};
 use ::input::{Input, PlayerInput};
 use ::package::{Package, PackageMeta, Verify};
 use ::package;
-use ::graphics::{GraphicsMessage, Render};
-use ::game::{GameSetup, GameState};
-use ::config::Config;
 use ::records::GameResult;
 use ::replays;
 
@@ -355,7 +356,7 @@ impl Menu {
         }
     }
 
-    pub fn graphics_message(&mut self) -> GraphicsMessage {
+    pub fn graphics_message(&mut self, command_line: &CommandLine) -> GraphicsMessage {
         let updates = match &mut self.package {
             &mut PackageHolder::Package (ref mut package, _) => {
                 package.updates()
@@ -365,9 +366,14 @@ impl Menu {
             }
         };
 
+        let render = Render {
+            command_output:  command_line.output(),
+            render_type:     RenderType::Menu (self.render()),
+        };
+
         GraphicsMessage {
             package_updates: updates,
-            render: Render::Menu (self.render())
+            render:          render,
         }
     }
 

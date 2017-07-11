@@ -9,7 +9,12 @@ pub struct GraphicsMessage {
     pub package_updates: Vec<PackageUpdate>,
 }
 
-pub enum Render {
+pub struct Render {
+    pub command_output: Vec<String>,
+    pub render_type:    RenderType,
+}
+
+pub enum RenderType {
     Game (RenderGame),
     Menu (RenderMenu),
 }

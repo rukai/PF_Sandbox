@@ -21,6 +21,7 @@ pub mod app;
 pub mod camera;
 pub mod cli;
 pub mod collision;
+pub mod command_line;
 pub mod config;
 pub mod fighter;
 pub mod files;
@@ -28,6 +29,7 @@ pub mod game;
 pub mod graphics;
 pub mod input;
 pub mod json_upgrade;
+pub mod math;
 pub mod menu;
 pub mod network;
 pub mod os_input;
@@ -37,7 +39,6 @@ pub mod records;
 pub mod replays;
 pub mod rules;
 pub mod stage;
-pub mod math;
 
 #[cfg(feature = "vulkan")]
 #[macro_use]

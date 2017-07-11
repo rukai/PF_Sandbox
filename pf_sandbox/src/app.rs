@@ -11,6 +11,7 @@ use std::sync::mpsc::Sender;
 use std;
 
 use ::cli::{CLIResults, ContinueFrom};
+use ::command_line::CommandLine;
 use ::config::Config;
 use ::game::{Game, GameState, GameSetup};
 use ::input::Input;
@@ -156,6 +157,8 @@ pub fn run(mut cli_results: CLIResults) {
         (state, os_input)
     };
 
+    let mut command_line = CommandLine::new();
+
     loop {
         let frame_start = Instant::now();
 
@@ -170,16 +173,17 @@ pub fn run(mut cli_results: CLIResults) {
                 #[cfg(any(feature = "vulkan", feature = "opengl"))]
                 {
                     if let Some(ref tx) = graphics_tx {
-                        tx.send(menu.graphics_message()).unwrap();
+                        tx.send(menu.graphics_message(&command_line)).unwrap();
                     }
                 }
                 if let &mut PackageHolder::Package (ref mut package, _) = &mut menu.package {
                     network.update(package);
+                    command_line.step(&os_input, package);
                 }
             }
             &mut AppState::Game (ref mut game) => {
                 input.update(&game.tas);
-                match game.step(&mut input, &os_input) {
+                match game.step(&mut input, &os_input, command_line.block()) {
                     GameState::ToResults (results) => {
                         next_state = NextAppState::Menu (MenuState::GameResults (results));
                     }
@@ -191,10 +195,11 @@ pub fn run(mut cli_results: CLIResults) {
                 #[cfg(any(feature = "vulkan", feature = "opengl"))]
                 {
                     if let Some(ref tx) = graphics_tx {
-                        tx.send(game.graphics_message()).unwrap();
+                        tx.send(game.graphics_message(&command_line)).unwrap();
                     }
                 }
                 network.update(game);
+                command_line.step(&os_input, game);
             }
         };
 

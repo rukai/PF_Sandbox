@@ -3,7 +3,7 @@ mod buffers;
 use self::buffers::{Vertex, Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
 use ::menu::{RenderMenu, RenderMenuState, CharacterSelect};
-use ::graphics::{self, GraphicsMessage, Render, RenderRect};
+use ::graphics::{self, GraphicsMessage, Render, RenderType, RenderRect};
 use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB};
 use ::records::GameResult;
@@ -314,9 +314,9 @@ impl<'a> VulkanGraphics<'a> {
             Err(err) => { panic!("{:?}", err) }
         };
 
-        let final_command_buffer = match render {
-            Render::Game(game) => { self.game_render(game, image_num) },
-            Render::Menu(menu) => { self.menu_render(menu, image_num) },
+        let final_command_buffer = match render.render_type {
+            RenderType::Game(game) => { self.game_render(game, image_num, &render.command_output) },
+            RenderType::Menu(menu) => { self.menu_render(menu, image_num, &render.command_output) },
         }.build().unwrap();
 
         let mut old_future = Box::new(vulkano::sync::now(self.device.clone())) as Box<GpuFuture>; // TODO: Can I avoid making this dummy future?
@@ -337,6 +337,13 @@ impl<'a> VulkanGraphics<'a> {
         };
     }
 
+    fn command_render(&mut self, lines: &[String]) {
+        // TODO: Render white text, with black background
+        for (i, line) in lines.iter().enumerate() {
+            self.draw_text.queue_text(0.05, self.height as f32 - 15.0 - 20.0 * i as f32, 20.0, [1.0, 1.0, 0.0, 1.0], format!(":{}", line).as_ref());
+        }
+    }
+
     fn game_hud_render(&mut self, entities: &[RenderEntity]) {
         let mut players = 0;
         for entity in entities {
@@ -355,8 +362,13 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
-    fn game_render(&mut self, render: RenderGame, image_num: usize) -> AutoCommandBufferBuilder {
-        self.game_hud_render(&render.entities);
+    fn game_render(&mut self, render: RenderGame, image_num: usize, command_output: &[String]) -> AutoCommandBufferBuilder {
+        if command_output.len() == 0 {
+            self.game_hud_render(&render.entities);
+        }
+        else {
+            self.command_render(command_output);
+        }
 
         let zoom = render.camera.zoom.recip();
         let pan  = render.camera.pan;
@@ -515,16 +527,16 @@ impl<'a> VulkanGraphics<'a> {
         .end_render_pass().unwrap()
     }
 
-    fn menu_render(&mut self, render: RenderMenu, image_num: usize) -> AutoCommandBufferBuilder {
+    fn menu_render(&mut self, render: RenderMenu, image_num: usize, command_output: &[String]) -> AutoCommandBufferBuilder {
         let mut entities: Vec<MenuEntity> = vec!();
         match render.state {
             RenderMenuState::GameSelect (selection) => {
                 self.draw_game_selector(selection);
-                self.draw_package_banner(&render.package_verify);
+                self.draw_package_banner(&render.package_verify, command_output);
             }
             RenderMenuState::ReplaySelect (replay_names, selection) => {
                 self.draw_replay_selector(&replay_names, selection);
-                self.draw_package_banner(&render.package_verify);
+                self.draw_package_banner(&render.package_verify, command_output);
             }
             RenderMenuState::CharacterSelect (selections, back_counter, back_counter_max) => {
                 let mut plugged_in_controller_indexes: Vec<usize>            = vec!();
@@ -564,11 +576,11 @@ impl<'a> VulkanGraphics<'a> {
                     }
                 }
                 self.draw_back_counter(&mut entities, back_counter, back_counter_max);
-                self.draw_package_banner(&render.package_verify);
+                self.draw_package_banner(&render.package_verify, command_output);
             }
             RenderMenuState::StageSelect (selection) => {
                 self.draw_stage_selector(&mut entities, selection);
-                self.draw_package_banner(&render.package_verify);
+                self.draw_package_banner(&render.package_verify, command_output);
             }
             RenderMenuState::GameResults (results) => {
                 let max = results.len() as f32;
@@ -648,33 +660,38 @@ impl<'a> VulkanGraphics<'a> {
         }));
     }
 
-    fn draw_package_banner(&mut self, verify: &Verify) {
-        let package = &self.package_buffers.package.as_ref().unwrap();
-        let color: [f32; 4] = if let &Verify::Ok = verify {
-            [0.0, 1.0, 0.0, 1.0]
-        } else {
-            [1.0, 0.0, 0.0, 1.0]
-        };
+    fn draw_package_banner(&mut self, verify: &Verify, command_output: &[String]) {
+        if command_output.len() == 0 {
+            let package = &self.package_buffers.package.as_ref().unwrap();
+            let color: [f32; 4] = if let &Verify::Ok = verify {
+                [0.0, 1.0, 0.0, 1.0]
+            } else {
+                [1.0, 0.0, 0.0, 1.0]
+            };
 
-        let message = match verify {
-            &Verify::Ok => {
-                format!("{} - {}", package.meta.title, package.meta.source)
-            }
-            &Verify::IncorrectHash => {
-                format!("{} - {} - The computed hash did not match the hash given by the host", package.meta.title, package.meta.source)
-            }
-            &Verify::UpdateAvailable => {
-                format!("{} - {} - There is an update available from the host", package.meta.title, package.meta.source)
-            }
-            &Verify::CannotConnect => {
-                format!("{} - {} - Cannot connect to package host", package.meta.title, package.meta.source)
-            }
-            &Verify::None => {
-                unreachable!();
-            }
-        };
+            let message = match verify {
+                &Verify::Ok => {
+                    format!("{} - {}", package.meta.title, package.meta.source)
+                }
+                &Verify::IncorrectHash => {
+                    format!("{} - {} - The computed hash did not match the hash given by the host", package.meta.title, package.meta.source)
+                }
+                &Verify::UpdateAvailable => {
+                    format!("{} - {} - There is an update available from the host", package.meta.title, package.meta.source)
+                }
+                &Verify::CannotConnect => {
+                    format!("{} - {} - Cannot connect to package host", package.meta.title, package.meta.source)
+                }
+                &Verify::None => {
+                    unreachable!();
+                }
+            };
 
-        self.draw_text.queue_text(30.0, self.height as f32 - 30.0, 30.0, color, message.as_str());
+            self.draw_text.queue_text(30.0, self.height as f32 - 30.0, 30.0, color, message.as_str());
+        }
+        else {
+            self.command_render(command_output);
+        }
     }
 
     fn draw_player_result(&mut self, result: &GameResult, start_x: f32) {

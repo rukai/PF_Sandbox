@@ -504,7 +504,7 @@ impl CollisionBox {
     pub fn new(point: (f32, f32)) -> CollisionBox {
         CollisionBox {
             point:  point,
-            radius: 3.0,
+            radius: 1.0,
             role:   CollisionBoxRole::default()
         }
     }
