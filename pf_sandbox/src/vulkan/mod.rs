@@ -340,7 +340,7 @@ impl<'a> VulkanGraphics<'a> {
     fn command_render(&mut self, lines: &[String]) {
         // TODO: Render white text, with black background
         for (i, line) in lines.iter().enumerate() {
-            self.draw_text.queue_text(0.05, self.height as f32 - 15.0 - 20.0 * i as f32, 20.0, [1.0, 1.0, 0.0, 1.0], format!(":{}", line).as_ref());
+            self.draw_text.queue_text(0.05, self.height as f32 - 15.0 - 20.0 * i as f32, 20.0, [1.0, 1.0, 0.0, 1.0], line);
         }
     }
 

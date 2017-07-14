@@ -1,7 +1,7 @@
 use camera::Camera;
 
 use winit::ElementState::{Pressed, Released};
-use winit::{WindowEvent, MouseScrollDelta, MouseButton, KeyboardInput, VirtualKeyCode};
+use winit::{WindowEvent, MouseScrollDelta, MouseButton, VirtualKeyCode};
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 struct CurrentInput {
@@ -16,6 +16,10 @@ struct CurrentInput {
     pub text:             Vec<TextChar>,
 }
 
+// TODO: Either:
+//  *   remove this struct and just use backspace character instead
+//  *   move keypresses like Home, End, Left, Right, Up, Down, Return to this enum
+//  (advantage of using this struct is it retains sub-frame keypress ordering)
 #[derive(Clone)]
 pub enum TextChar {
     Char (char),
@@ -53,13 +57,20 @@ impl CurrentInput {
                         Pressed => {
                             self.key_held[keycode as usize] = true;
                             self.key_actions.push(KeyAction::Pressed(keycode));
-                            self.push_text(input);
+                            if let VirtualKeyCode::Back = keycode {
+                                self.text.push(TextChar::Back);
+                            }
                         }
                         Released => {
                             self.key_held[keycode as usize] = false;
                             self.key_actions.push(KeyAction::Released(keycode));
                         },
                     }
+                }
+            }
+            WindowEvent::ReceivedCharacter (c) => {
+                if c != '\x08' && c != '\r' && c != '\n' {
+                    self.text.push(TextChar::Char(c));
                 }
             }
             WindowEvent::MouseMoved { position, .. } => {
@@ -85,116 +96,6 @@ impl CurrentInput {
                 self.resolution = (x, y);
             }
             _ => {},
-        }
-    }
-
-    fn push_text(&mut self, input: KeyboardInput) {
-        if input.modifiers.shift {
-            match input.virtual_keycode {
-                Some(VirtualKeyCode::A) => self.text.push(TextChar::Char('A')),
-                Some(VirtualKeyCode::B) => self.text.push(TextChar::Char('B')),
-                Some(VirtualKeyCode::C) => self.text.push(TextChar::Char('C')),
-                Some(VirtualKeyCode::D) => self.text.push(TextChar::Char('D')),
-                Some(VirtualKeyCode::E) => self.text.push(TextChar::Char('E')),
-                Some(VirtualKeyCode::F) => self.text.push(TextChar::Char('F')),
-                Some(VirtualKeyCode::G) => self.text.push(TextChar::Char('G')),
-                Some(VirtualKeyCode::H) => self.text.push(TextChar::Char('H')),
-                Some(VirtualKeyCode::I) => self.text.push(TextChar::Char('I')),
-                Some(VirtualKeyCode::J) => self.text.push(TextChar::Char('J')),
-                Some(VirtualKeyCode::K) => self.text.push(TextChar::Char('K')),
-                Some(VirtualKeyCode::L) => self.text.push(TextChar::Char('L')),
-                Some(VirtualKeyCode::M) => self.text.push(TextChar::Char('M')),
-                Some(VirtualKeyCode::N) => self.text.push(TextChar::Char('N')),
-                Some(VirtualKeyCode::O) => self.text.push(TextChar::Char('O')),
-                Some(VirtualKeyCode::P) => self.text.push(TextChar::Char('P')),
-                Some(VirtualKeyCode::Q) => self.text.push(TextChar::Char('Q')),
-                Some(VirtualKeyCode::R) => self.text.push(TextChar::Char('R')),
-                Some(VirtualKeyCode::S) => self.text.push(TextChar::Char('S')),
-                Some(VirtualKeyCode::T) => self.text.push(TextChar::Char('T')),
-                Some(VirtualKeyCode::U) => self.text.push(TextChar::Char('U')),
-                Some(VirtualKeyCode::V) => self.text.push(TextChar::Char('V')),
-                Some(VirtualKeyCode::W) => self.text.push(TextChar::Char('W')),
-                Some(VirtualKeyCode::X) => self.text.push(TextChar::Char('X')),
-                Some(VirtualKeyCode::Y) => self.text.push(TextChar::Char('Y')),
-                Some(VirtualKeyCode::Z) => self.text.push(TextChar::Char('Z')),
-                Some(VirtualKeyCode::Key1)       => self.text.push(TextChar::Char('!')),
-                Some(VirtualKeyCode::Key2)       => self.text.push(TextChar::Char('@')),
-                Some(VirtualKeyCode::Key3)       => self.text.push(TextChar::Char('#')),
-                Some(VirtualKeyCode::Key4)       => self.text.push(TextChar::Char('$')),
-                Some(VirtualKeyCode::Key5)       => self.text.push(TextChar::Char('%')),
-                Some(VirtualKeyCode::Key6)       => self.text.push(TextChar::Char('^')),
-                Some(VirtualKeyCode::Key7)       => self.text.push(TextChar::Char('&')),
-                Some(VirtualKeyCode::Key8)       => self.text.push(TextChar::Char('*')),
-                Some(VirtualKeyCode::Key9)       => self.text.push(TextChar::Char('(')),
-                Some(VirtualKeyCode::Key0)       => self.text.push(TextChar::Char(')')),
-                Some(VirtualKeyCode::Period)     => self.text.push(TextChar::Char('<')),
-                Some(VirtualKeyCode::Comma)      => self.text.push(TextChar::Char('>')),
-                Some(VirtualKeyCode::Semicolon)  => self.text.push(TextChar::Char(':')),
-                Some(VirtualKeyCode::LBracket)   => self.text.push(TextChar::Char('{')),
-                Some(VirtualKeyCode::RBracket)   => self.text.push(TextChar::Char('}')),
-                Some(VirtualKeyCode::Apostrophe) => self.text.push(TextChar::Char('"')),
-                Some(VirtualKeyCode::Subtract)   => self.text.push(TextChar::Char('_')),
-                Some(VirtualKeyCode::Equals)     => self.text.push(TextChar::Char('+')),
-                Some(VirtualKeyCode::Slash)      => self.text.push(TextChar::Char('?')),
-                Some(VirtualKeyCode::Backslash)  => self.text.push(TextChar::Char('|')),
-                Some(VirtualKeyCode::Grave)      => self.text.push(TextChar::Char('~')),
-                Some(VirtualKeyCode::Space)      => self.text.push(TextChar::Char(' ')),
-                Some(VirtualKeyCode::Back)       => self.text.push(TextChar::Back),
-                _ => { }
-            }
-        } else {
-            match input.virtual_keycode {
-                Some(VirtualKeyCode::A) => self.text.push(TextChar::Char('a')),
-                Some(VirtualKeyCode::B) => self.text.push(TextChar::Char('b')),
-                Some(VirtualKeyCode::C) => self.text.push(TextChar::Char('c')),
-                Some(VirtualKeyCode::D) => self.text.push(TextChar::Char('d')),
-                Some(VirtualKeyCode::E) => self.text.push(TextChar::Char('e')),
-                Some(VirtualKeyCode::F) => self.text.push(TextChar::Char('f')),
-                Some(VirtualKeyCode::G) => self.text.push(TextChar::Char('g')),
-                Some(VirtualKeyCode::H) => self.text.push(TextChar::Char('h')),
-                Some(VirtualKeyCode::I) => self.text.push(TextChar::Char('i')),
-                Some(VirtualKeyCode::J) => self.text.push(TextChar::Char('j')),
-                Some(VirtualKeyCode::K) => self.text.push(TextChar::Char('k')),
-                Some(VirtualKeyCode::L) => self.text.push(TextChar::Char('l')),
-                Some(VirtualKeyCode::M) => self.text.push(TextChar::Char('m')),
-                Some(VirtualKeyCode::N) => self.text.push(TextChar::Char('n')),
-                Some(VirtualKeyCode::O) => self.text.push(TextChar::Char('o')),
-                Some(VirtualKeyCode::P) => self.text.push(TextChar::Char('p')),
-                Some(VirtualKeyCode::Q) => self.text.push(TextChar::Char('q')),
-                Some(VirtualKeyCode::R) => self.text.push(TextChar::Char('r')),
-                Some(VirtualKeyCode::S) => self.text.push(TextChar::Char('s')),
-                Some(VirtualKeyCode::T) => self.text.push(TextChar::Char('t')),
-                Some(VirtualKeyCode::U) => self.text.push(TextChar::Char('u')),
-                Some(VirtualKeyCode::V) => self.text.push(TextChar::Char('v')),
-                Some(VirtualKeyCode::W) => self.text.push(TextChar::Char('w')),
-                Some(VirtualKeyCode::X) => self.text.push(TextChar::Char('x')),
-                Some(VirtualKeyCode::Y) => self.text.push(TextChar::Char('y')),
-                Some(VirtualKeyCode::Z) => self.text.push(TextChar::Char('z')),
-                Some(VirtualKeyCode::Key1)       => self.text.push(TextChar::Char('1')),
-                Some(VirtualKeyCode::Key2)       => self.text.push(TextChar::Char('2')),
-                Some(VirtualKeyCode::Key3)       => self.text.push(TextChar::Char('3')),
-                Some(VirtualKeyCode::Key4)       => self.text.push(TextChar::Char('4')),
-                Some(VirtualKeyCode::Key5)       => self.text.push(TextChar::Char('5')),
-                Some(VirtualKeyCode::Key6)       => self.text.push(TextChar::Char('6')),
-                Some(VirtualKeyCode::Key7)       => self.text.push(TextChar::Char('7')),
-                Some(VirtualKeyCode::Key8)       => self.text.push(TextChar::Char('8')),
-                Some(VirtualKeyCode::Key9)       => self.text.push(TextChar::Char('9')),
-                Some(VirtualKeyCode::Key0)       => self.text.push(TextChar::Char('0')),
-                Some(VirtualKeyCode::Period)     => self.text.push(TextChar::Char('.')),
-                Some(VirtualKeyCode::Comma)      => self.text.push(TextChar::Char(',')),
-                Some(VirtualKeyCode::Semicolon)  => self.text.push(TextChar::Char(';')),
-                Some(VirtualKeyCode::LBracket)   => self.text.push(TextChar::Char('[')),
-                Some(VirtualKeyCode::RBracket)   => self.text.push(TextChar::Char(']')),
-                Some(VirtualKeyCode::Apostrophe) => self.text.push(TextChar::Char('\'')),
-                Some(VirtualKeyCode::Subtract)   => self.text.push(TextChar::Char('-')),
-                Some(VirtualKeyCode::Equals)     => self.text.push(TextChar::Char('=')),
-                Some(VirtualKeyCode::Slash)      => self.text.push(TextChar::Char('/')),
-                Some(VirtualKeyCode::Backslash)  => self.text.push(TextChar::Char('\\')),
-                Some(VirtualKeyCode::Grave)      => self.text.push(TextChar::Char('`')),
-                Some(VirtualKeyCode::Space)      => self.text.push(TextChar::Char(' ')),
-                Some(VirtualKeyCode::Back)       => self.text.push(TextChar::Back),
-                _ => { }
-            }
         }
     }
 

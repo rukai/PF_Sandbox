@@ -214,7 +214,7 @@ impl Game {
         let players_len = self.players.len();
 
         // set current edit state
-        if os_input.key_pressed(VirtualKeyCode::Grave) {
+        if os_input.key_pressed(VirtualKeyCode::Key0) {
             self.edit = Edit::Stage;
         }
         else if os_input.key_pressed(VirtualKeyCode::Key1) && players_len >= 1 {
