@@ -77,7 +77,7 @@ impl ElementStick {
 }
 
 fn i8_to_u8(value: i8) -> u8 {
-    (127 + value) as u8
+    127i8.wrapping_add(value) as u8
 }
 
 impl ElementTrigger {

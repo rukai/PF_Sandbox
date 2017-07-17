@@ -26,11 +26,13 @@ impl Network {
         if let Ok((mut stream, _)) = self.listener.accept() {
             match stream.read(&mut buf) {
                 Ok(amt) => {
-                    if let Ok(string) = str::from_utf8(&buf[1..amt]) {
-                        if buf[0] == 0x43 { // 'C'
-                            let out = Network::run_command(&string, root_node);
-                            if let Err(e) = stream.write(out.as_bytes()) {
-                                println!("command send failed {}", e);
+                    if amt > 1 {
+                        if let Ok(string) = str::from_utf8(&buf[1..amt]) {
+                            if buf[0] == 0x43 { // 'C'
+                                let out = Network::run_command(&string, root_node);
+                                if let Err(e) = stream.write(out.as_bytes()) {
+                                    println!("command send failed {}", e);
+                                }
                             }
                         }
                     }

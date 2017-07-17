@@ -63,6 +63,7 @@ impl State {
         // controller select
         if input.key_pressed(VirtualKeyCode::F1) && self.controllers.len() > 0 {
             self.current_controller = 0;
+            println!("{}", self.number.pop_stick());
         }
         else if input.key_pressed(VirtualKeyCode::F2) && self.controllers.len() > 1 {
             self.current_controller = 1;
@@ -265,9 +266,10 @@ impl NumberInput {
 
     pub fn pop_stick(&mut self) -> i8 {
         let value_i8 = cmp::min(self.value, i8::max_value() as u64) as i8;
+        let value_i8 = (value_i8).saturating_mul(if self.negative { -1 } else { 1 });
         self.value = 0;
         self.negative = false;
-        (value_i8).saturating_mul(if self.negative { -1 } else { 1 })
+        value_i8
     }
 
     pub fn pop_trigger(&mut self) -> u8 {

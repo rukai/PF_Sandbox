@@ -14,11 +14,22 @@ pub fn send(state: &mut State) {
     
     let controllers: Vec<_> = state.controllers.iter_mut().map(|x| x.to_sandbox()).collect();
     let json = serde_json::to_string(&controllers).unwrap();
-    let out = format!("Ctas set {}", json);
+    let out = format!(r#"Ctas:set "{}""#, escape(json));
     stream.write(out.as_bytes()).unwrap();
 
     let mut result = String::new();
     if let Ok(_) = stream.read_to_string(&mut result) {
         println!("{}", result);
     }
+}
+
+fn escape(input: String) -> String {
+    let mut output = String::new();
+    for c in input.chars() {
+        if c == '"' {
+            output.push('\\');
+        }
+        output.push(c);
+    }
+    output
 }
