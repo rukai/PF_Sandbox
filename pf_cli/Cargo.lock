@@ -1,4 +1,4 @@
 [root]
-name = "pf_client"
+name = "pf_cli"
 version = "0.1.0"
 
