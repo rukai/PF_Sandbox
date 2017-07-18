@@ -7,15 +7,24 @@ use serde_json;
 use state::State;
 
 pub fn send(state: &mut State) {
+    if state.new_game_state.should_send() {
+        let controllers: Vec<_> = state.controllers.iter_mut().map(|x| x.to_sandbox()).collect();
+        let json = serde_json::to_string(&controllers).unwrap();
+        send_string(format!(r#"Ctas:set "{}""#, escape(json)));
+
+        let json = serde_json::to_string(&state.new_game_state).unwrap();
+        send_string(format!(r#"Cstate:set "{}""#, escape(json)));
+    }
+}
+
+fn send_string(string: String) {
+    println!("STRING: {}", string);
     let mut stream = match TcpStream::connect("127.0.0.1:1613") {
         Ok(stream)  => { stream }
         Err(e)      => { println!("Could not connect to PF Sandbox host: {}", e); return }
     };
-    
-    let controllers: Vec<_> = state.controllers.iter_mut().map(|x| x.to_sandbox()).collect();
-    let json = serde_json::to_string(&controllers).unwrap();
-    let out = format!(r#"Ctas:set "{}""#, escape(json));
-    stream.write(out.as_bytes()).unwrap();
+
+    stream.write(string.as_bytes()).unwrap();
 
     let mut result = String::new();
     if let Ok(_) = stream.read_to_string(&mut result) {

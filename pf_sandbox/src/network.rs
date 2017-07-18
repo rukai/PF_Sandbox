@@ -44,7 +44,7 @@ impl Network {
         }
     }
 
-    pub fn run_command<T>(command: &str, package: &mut T) -> String where T: Node{
+    pub fn run_command<T>(command: &str, package: &mut T) -> String where T: Node {
         match NodeRunner::new(command) {
             Ok(runner) => {
                 let result = package.node_step(runner);

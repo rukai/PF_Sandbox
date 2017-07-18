@@ -97,24 +97,29 @@ impl Game {
         {
             let state = self.state.clone();
             match state {
-                GameState::Local           => { self.step_local(input); }
-                GameState::Netplay         => { self.step_netplay(input); }
-                GameState::ReplayForwards  => { self.step_replay_forwards(input); }
-                GameState::ReplayBackwards => { self.step_replay_backwards(input); }
-                GameState::Paused          => { self.step_pause(input); }
-                GameState::ToResults (_)   => { unreachable!(); }
-                GameState::ToCSS           => { unreachable!(); }
+                GameState::Local                 => { self.step_local(input); }
+                GameState::Netplay               => { self.step_netplay(input); }
+                GameState::ReplayForwards        => { self.step_replay_forwards(input); }
+                GameState::ReplayBackwards       => { self.step_replay_backwards(input); }
+                GameState::StepThenPause         => { self.step_local(input); self.state = GameState::Paused; }
+                GameState::StepForwardThenPause  => { self.step_replay_forwards(input); self.state = GameState::Paused; }
+                GameState::StepBackwardThenPause => { self.step_replay_backwards(input); self.state = GameState::Paused; }
+                GameState::Paused                => { self.step_pause(input); }
+                GameState::ToResults (_)         => { unreachable!(); }
+                GameState::ToCSS                 => { unreachable!(); }
             }
 
             if !os_input_blocked {
                 match state {
                     GameState::Local           => { self.step_local_os_input(os_input); }
-                    GameState::Netplay         => { }
                     GameState::ReplayForwards  => { self.step_replay_forwards_os_input(os_input); }
                     GameState::ReplayBackwards => { self.step_replay_backwards_os_input(os_input); }
                     GameState::Paused          => { self.step_pause_os_input(input, os_input); }
                     GameState::ToResults (_)   => { unreachable!(); }
                     GameState::ToCSS           => { unreachable!(); }
+
+                    GameState::Netplay              | GameState::StepThenPause |
+                    GameState::StepForwardThenPause | GameState::StepBackwardThenPause => { }
                 }
             }
             self.camera.update(os_input, &self.players, &self.package.fighters, &self.stage);
@@ -882,6 +887,11 @@ pub enum GameState {
     Paused, // Only Local, ReplayForwards and ReplayBackwards can be paused
     ToResults (Vec<GameResult>), // Both Local and Netplay end at ToResults
     ToCSS,
+
+    // Used for TAS, in game these are run during pause state
+    StepThenPause,
+    StepForwardThenPause,
+    StepBackwardThenPause,
 }
 
 impl Default for GameState {

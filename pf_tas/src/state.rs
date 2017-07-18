@@ -4,14 +4,26 @@ use controller::{Controller, ElementButton, ElementStick, ElementTrigger};
 use input::Input;
 use std::cmp;
 
-pub enum Flow {
-    Stop,
-    Play,
-    Rewind,
-    Replay,
-    StepFrames   (u64),
-    RewindFrames (u64),
-    ReplayFrames (u64),
+#[derive(Serialize)]
+pub enum NewGameState {
+    None,
+    Local,
+    Paused,
+    ReplayForwards,
+    ReplayBackwards,
+    StepThenPause,
+    StepForwardThenPause,
+    StepBackwardThenPause,
+}
+
+impl NewGameState {
+    pub fn should_send(&self) -> bool {
+        if let &NewGameState::None = self {
+            false
+        } else {
+            true
+        }
+    }
 }
 
 pub struct State {
@@ -21,7 +33,7 @@ pub struct State {
     pub use_aspect_ratio:        bool,
     pub display_analog_as_float: bool,
     pub touchtype:               bool,
-    pub flow:                    Flow,
+    pub new_game_state:          NewGameState,
     number:                      NumberInput,
 }
 
@@ -34,7 +46,7 @@ impl State {
             use_aspect_ratio:        false,
             display_analog_as_float: false,
             touchtype:               true,
-            flow:                    Flow::Stop,
+            new_game_state:          NewGameState::None,
             number:                  NumberInput::new(),
         }
     }
@@ -177,25 +189,25 @@ impl State {
 
         // Game flow
         if input.key_pressed(VirtualKeyCode::Return) {
-            self.flow = match self.flow {
-                Flow::Play => { Flow::Stop }
-                _          => { Flow::Play }
-            };
+            self.new_game_state = NewGameState::Local;
         }
         else if input.key_pressed(VirtualKeyCode::Space) {
-            self.flow = Flow::StepFrames(self.number.pop_frames());
+            self.new_game_state = NewGameState::StepThenPause;
         }
         else if input.key_pressed(VirtualKeyCode::Z) {
-            self.flow = Flow::RewindFrames(self.number.pop_frames());
+            self.new_game_state = NewGameState::ReplayBackwards;
         }
         else if input.key_pressed(VirtualKeyCode::X) {
-            self.flow = Flow::ReplayFrames(self.number.pop_frames());
+            self.new_game_state = NewGameState::StepBackwardThenPause;
         }
         else if input.key_pressed(VirtualKeyCode::C) {
-            self.flow = Flow::Rewind;
+            self.new_game_state = NewGameState::StepForwardThenPause;
         }
         else if input.key_pressed(VirtualKeyCode::V) {
-            self.flow = Flow::Replay;
+            self.new_game_state = NewGameState::ReplayForwards;
+        }
+        else {
+            self.new_game_state = NewGameState::None;
         }
     }
 
@@ -277,15 +289,5 @@ impl NumberInput {
         self.value = 0;
         self.negative = false;
         value_u8
-    }
-
-    pub fn pop_frames(&mut self) -> u64 {
-        let result = self.value;
-        self.value = 0;
-        if result == 0 {
-            1
-        } else {
-            result
-        }
     }
 }
