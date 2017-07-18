@@ -4,49 +4,54 @@ A keyboard driven GUI tool for sending TAS inputs to PF Sandbox.
 
 ## Keyboard mapping
 
-### Inputs
+### Notes
 
-####  Modifiers
-*   Enter a number with 1234567890-+ before selecting an analog element (stick or trigger) to set the number as the value
-*   Hold shift to keep pressed until toggled off
+*   Advancing a frame with spacebar will toggle off all pressed buttons.
+*   However you can hold shift while pressing a button to keep the GC button held until manually toggled off.
+*   Enter a number with 1234567890-+ before selecting an analog element (stick or trigger) to set the number as the value.
 
-#### Keyboard -> GC
+### Keyboard -> GC
 
-*   a          -> a
-*   s          -> b
-*   d          -> x
-*   f          -> y
+*   a -> a
+*   s -> b
+*   d -> x
+*   f -> y
 
-*   g          -> start
-*   h          -> z
+*   y -> start
+*   h -> z
 
-*   j          -> left button
-*   k          -> left trigger
-*   l          -> right trigger
-*   ;          -> right button
+*   n -> left button
+*   m -> left trigger
+*   , -> right trigger
+*   . -> right button
 
-*   y          -> stick horizontal
-*   u          -> stick vertical
-*   i          -> c-stick horizontal
-*   o          -> c-stick vertical
+*   u -> stick horizontal
+*   i -> stick vertical
+*   o -> c-stick horizontal
+*   p -> c-stick vertical
 
 *   arrow keys -> DPAD
 
 ### Frame Advance
 
-Enter a number with 1234567890 before some of these keys to change the number of frames
+*   Enter -> Play
+*   Space -> Step
+*   Z     -> Replay Backwards
+*   X     -> Step Backwards
+*   C     -> Step Forwards
+*   V     -> Replay Forwards
 
-*   Enter - Play/Pause toggle
-*   Space - step number of frames
-*   Z     - rewind number of frames
-*   X     - replay number of frames
-*   C     - rewind
-*   V     - replay
+*   h  -> left button
+*   j  -> left trigger
+*   k  -> right trigger
+*   l  -> right button
 
 ### Config
 
 *   F1-F12 Select a controller
 *   }/{    Add/remove controller
+
+### TODO:
 
 *   Q - Toggle between display all controllers / display selected controller
 *   W - Toggle stretch display / force aspect ratio

@@ -175,17 +175,17 @@ impl State {
         State::map_button(input, VirtualKeyCode::F, &mut controller.y);
 
         State::map_button(input, VirtualKeyCode::G, &mut controller.start);
-        State::map_button(input, VirtualKeyCode::H, &mut controller.z);
+        State::map_button(input, VirtualKeyCode::Y, &mut controller.z);
 
-        State::map_button (input, VirtualKeyCode::J,     &mut controller.l);
-        State::map_trigger(input, VirtualKeyCode::K,     &mut controller.l_trigger, &mut self.number);
-        State::map_trigger(input, VirtualKeyCode::L,     &mut controller.r_trigger, &mut self.number);
-        State::map_button (input, VirtualKeyCode::Colon, &mut controller.r);
+        State::map_button (input, VirtualKeyCode::N,     &mut controller.l);
+        State::map_trigger(input, VirtualKeyCode::M,     &mut controller.l_trigger, &mut self.number);
+        State::map_trigger(input, VirtualKeyCode::Comma, &mut controller.r_trigger, &mut self.number);
+        State::map_button (input, VirtualKeyCode::Period, &mut controller.r);
 
-        State::map_stick(input, VirtualKeyCode::Y, &mut controller.stick_x,   &mut self.number);
-        State::map_stick(input, VirtualKeyCode::U, &mut controller.stick_y,   &mut self.number);
-        State::map_stick(input, VirtualKeyCode::I, &mut controller.c_stick_x, &mut self.number);
-        State::map_stick(input, VirtualKeyCode::O, &mut controller.c_stick_y, &mut self.number);
+        State::map_stick(input, VirtualKeyCode::U, &mut controller.stick_x,   &mut self.number);
+        State::map_stick(input, VirtualKeyCode::I, &mut controller.stick_y,   &mut self.number);
+        State::map_stick(input, VirtualKeyCode::O, &mut controller.c_stick_x, &mut self.number);
+        State::map_stick(input, VirtualKeyCode::P, &mut controller.c_stick_y, &mut self.number);
 
         // Game flow
         if input.key_pressed(VirtualKeyCode::Return) {
@@ -194,16 +194,16 @@ impl State {
         else if input.key_pressed(VirtualKeyCode::Space) {
             self.new_game_state = NewGameState::StepThenPause;
         }
-        else if input.key_pressed(VirtualKeyCode::Z) {
+        else if input.key_pressed(VirtualKeyCode::H) {
             self.new_game_state = NewGameState::ReplayBackwards;
         }
-        else if input.key_pressed(VirtualKeyCode::X) {
+        else if input.key_pressed(VirtualKeyCode::J) {
             self.new_game_state = NewGameState::StepBackwardThenPause;
         }
-        else if input.key_pressed(VirtualKeyCode::C) {
+        else if input.key_pressed(VirtualKeyCode::K) {
             self.new_game_state = NewGameState::StepForwardThenPause;
         }
-        else if input.key_pressed(VirtualKeyCode::V) {
+        else if input.key_pressed(VirtualKeyCode::L) {
             self.new_game_state = NewGameState::ReplayForwards;
         }
         else {
