@@ -1,5 +1,7 @@
 # PF Sandbox
 
+[![Build Status](https://travis-ci.org/rukai/PF_Sandbox.svg?branch=master)](https://travis-ci.org/rukai/PF_Sandbox)
+
 A platform fighter sandbox featuring a character editor tightly integrated with gameplay.
 
 Check out [this youtube video](https://www.youtube.com/watch?v=CTrwvg56VQs) demonstrating the project.  

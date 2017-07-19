@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "pf_sandbox",
+    "pf_tas",
+    "pf_cli"
+]
