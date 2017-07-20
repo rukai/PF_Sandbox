@@ -1,6 +1,4 @@
-# PF Sandbox
-
-[![Build Status](https://travis-ci.org/rukai/PF_Sandbox.svg?branch=master)](https://travis-ci.org/rukai/PF_Sandbox)
+# PF Sandbox [![Build Status](https://travis-ci.org/rukai/PF_Sandbox.svg?branch=master)](https://travis-ci.org/rukai/PF_Sandbox) [![Build status](https://ci.appveyor.com/api/projects/status/89drle66lde9pq35?svg=true)](https://ci.appveyor.com/project/rukai/pf-sandbox)
 
 A platform fighter sandbox featuring a character editor tightly integrated with gameplay.
 
@@ -104,3 +102,18 @@ However you can avoid fiddling with the system path by running `cargo run -- COM
 *   Advanced features need not be beginner Friendly (e.g. editor/frame advance/replays/TAS)
 *   Ability to recreate other platform fighters does not overrule other advantages (e.g. 2D hitboxes instead of 3D hitboxes)
 *   Restricting character graphics to only hitboxes reduces scope for development of the project and development of packages
+
+## CI Infrastructure
+
+Note: There are currently no tests implemented yet.
+
+We build and test on:
+
+*   Rust nightly - Linux 64 bit (Travis)
+*   Rust nightly gnu - Windows 64 bit (Appveyor)
+
+All incoming pull requests are built and tested.
+
+Every commit merged to master is built, tested and then an incrementing tag/release is created for it.
+
+TODO: If the commit is tagged with Netplay, it is also released as the netplay build which is pinned at the top of releases.

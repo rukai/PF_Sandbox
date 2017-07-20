@@ -1,0 +1,59 @@
+environment:
+  global:
+    RUST_VERSION: nightly
+  matrix:
+    - TARGET: x86_64-pc-windows-gnu
+
+image: Visual Studio 2015
+
+# Workaround delete tomorrow
+init:
+- ps: Disable-NetFirewallRule -DisplayName 'Core Networking - Group Policy (LSASS-Out)'
+
+install:
+    # setup rust
+  - curl -sSf -o rustup-init.exe https://win.rustup.rs/
+  - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - rustc -V
+  - cargo -V
+  # setup libusb
+  - set PATH=%PATH%;C:\msys64\mingw64\bin # access libusb
+  - set PATH=%PATH%;C:\msys64\usr\bin # access pacman
+  - echo %PATH%
+  - pacman --noconfirm -Syu
+  - pacman --noconfirm -Syu
+  - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc
+
+test_script:
+  - cargo test --release --all
+  - cargo build --release --all
+  - mkdir pf
+  - move target\release\pf_sandbox.exe pf
+  - move target\release\pf_tas.exe pf
+  - move target\release\pf_cli.exe pf
+  - copy C:\msys64\mingw64\bin\libusb-1.0.dll pf
+  - 7z a pf_sandbox-windows64.zip pf
+
+artifacts:
+  - path: pf_sandbox-windows64.zip
+    name: executables
+
+deploy:
+  tag: R$(appveyor_build_version)
+  release: Windows - R$(appveyor_build_version)
+  artifact: executables
+  provider: GitHub
+  force_update: true
+  auth_token:
+    secure: B3egtCu3I4VuEeAJkjWCLu02W49rdzAT2uwEoIms3chmk79cwJRJcs7vYEDIVCqC
+  on:
+    branch: master
+
+skip_tags: true
+
+cache:
+  - C:\Users\appveyor\.cargo\registry
+
+# Building is done in the test phase, so we disable Appveyor's build phase.
+build: false
