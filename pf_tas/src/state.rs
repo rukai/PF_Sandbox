@@ -124,34 +124,34 @@ impl State {
         }
 
         // number input
-        if input.key_pressed(VirtualKeyCode::Key0) {
+        if input.key_pressed(VirtualKeyCode::Key0) || input.key_pressed(VirtualKeyCode::Numpad0) {
             self.number.input(0);
         }
-        else if input.key_pressed(VirtualKeyCode::Key1) {
+        else if input.key_pressed(VirtualKeyCode::Key1) || input.key_pressed(VirtualKeyCode::Numpad1) {
             self.number.input(1);
         }
-        else if input.key_pressed(VirtualKeyCode::Key2) {
+        else if input.key_pressed(VirtualKeyCode::Key2) || input.key_pressed(VirtualKeyCode::Numpad2) {
             self.number.input(2);
         }
-        else if input.key_pressed(VirtualKeyCode::Key3) {
+        else if input.key_pressed(VirtualKeyCode::Key3) || input.key_pressed(VirtualKeyCode::Numpad3) {
             self.number.input(3);
         }
-        else if input.key_pressed(VirtualKeyCode::Key4) {
+        else if input.key_pressed(VirtualKeyCode::Key4) || input.key_pressed(VirtualKeyCode::Numpad4) {
             self.number.input(4);
         }
-        else if input.key_pressed(VirtualKeyCode::Key5) {
+        else if input.key_pressed(VirtualKeyCode::Key5) || input.key_pressed(VirtualKeyCode::Numpad5) {
             self.number.input(5);
         }
-        else if input.key_pressed(VirtualKeyCode::Key6) {
+        else if input.key_pressed(VirtualKeyCode::Key6) || input.key_pressed(VirtualKeyCode::Numpad6) {
             self.number.input(6);
         }
-        else if input.key_pressed(VirtualKeyCode::Key7) {
+        else if input.key_pressed(VirtualKeyCode::Key7) || input.key_pressed(VirtualKeyCode::Numpad7) {
             self.number.input(7);
         }
-        else if input.key_pressed(VirtualKeyCode::Key8) {
+        else if input.key_pressed(VirtualKeyCode::Key8) || input.key_pressed(VirtualKeyCode::Numpad8) {
             self.number.input(8);
         }
-        else if input.key_pressed(VirtualKeyCode::Key9) {
+        else if input.key_pressed(VirtualKeyCode::Key9) || input.key_pressed(VirtualKeyCode::Numpad9) {
             self.number.input(9);
         }
         else if input.key_pressed(VirtualKeyCode::Subtract) {
