@@ -40,6 +40,7 @@ pub struct Game {
     pub selected_stage:         String,
     pub edit:                   Edit,
     pub debug_output_this_step: bool,
+    pub debug_lines:            Vec<String>,
     pub selector:               Selector,
     copied_frame:               Option<ActionFrame>,
     pub camera:                 Camera,
@@ -86,6 +87,7 @@ impl Game {
             selected_stage:         setup.stage,
             edit:                   Edit::Stage,
             debug_output_this_step: false,
+            debug_lines:            vec!(),
             selector:               Default::default(),
             copied_frame:           None,
             camera:                 Camera::new(),
@@ -124,10 +126,7 @@ impl Game {
             }
             self.camera.update(os_input, &self.players, &self.package.fighters, &self.stage);
 
-            if self.debug_output_this_step {
-                self.debug_output_this_step = false;
-                self.debug_output(input);
-            }
+            self.generate_debug(input);
         }
 
         self.set_context();
@@ -775,18 +774,25 @@ impl Game {
         GameState::ToResults (game_results)
     }
 
-    fn debug_output(&mut self, input: &Input) {
+    fn generate_debug(&mut self, input: &Input) {
         let frame = self.current_frame;
         let player_inputs = &input.players(frame);
 
-        println!("\n-------------------------------------------");
-        println!("Frame: {}    state: {:?}", frame, self.state);
 
+        self.debug_lines = vec!(format!("Frame: {}    state: {:?}", frame, self.state));
         for (i, player) in self.players.iter().enumerate() {
             let fighter = &self.package.fighters[self.players[i].fighter.as_ref()];
             let player_input = &player_inputs[i];
             let debug_player = &self.debug_players[i];
-            player.debug_print(fighter, player_input, debug_player, i);
+            self.debug_lines.extend(player.debug_print(fighter, player_input, debug_player, i));
+        }
+
+        if self.debug_output_this_step {
+            self.debug_output_this_step = false;
+            println!("\n-------------------------------------------");
+            for line in self.debug_lines.iter() {
+                println!("{}", line);
+            }
         }
     }
 
@@ -847,10 +853,11 @@ impl Game {
         }
 
         RenderGame {
-            stage:    self.selected_stage.clone(),
-            entities: entities,
-            state:    self.state.clone(),
-            camera:   self.camera.clone(),
+            stage:       self.selected_stage.clone(),
+            entities:    entities,
+            state:       self.state.clone(),
+            camera:      self.camera.clone(),
+            debug_lines: self.debug_lines.clone(),
         }
     }
 
@@ -938,10 +945,11 @@ impl Selector {
 }
 
 pub struct RenderGame {
-    pub stage:    String,
-    pub entities: Vec<RenderEntity>,
-    pub state:    GameState,
-    pub camera:   Camera,
+    pub stage:       String,
+    pub entities:    Vec<RenderEntity>,
+    pub state:       GameState,
+    pub camera:      Camera,
+    pub debug_lines: Vec<String>,
 }
 
 pub enum RenderEntity {

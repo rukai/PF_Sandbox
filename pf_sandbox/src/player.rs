@@ -1332,10 +1332,11 @@ impl Player {
         }
     }
 
-    pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, debug: &DebugPlayer, index: usize) {
+    pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, debug: &DebugPlayer, index: usize) -> Vec<String> {
+        let mut lines: Vec<String> = vec!();
         if debug.physics {
-            println!("Player: {}    location: {:?}    x_vel: {:.5}    y_vel: {:.5}    kb_x_vel: {:.5}    kb_y_vel: {:.5} ",
-                index, self.location, self.x_vel, self.y_vel, self.kb_x_vel, self.kb_y_vel);
+            lines.push(format!("Player: {}    location: {:?}    x_vel: {:.5}    y_vel: {:.5}    kb_x_vel: {:.5}    kb_y_vel: {:.5} ",
+                index, self.location, self.x_vel, self.y_vel, self.kb_x_vel, self.kb_y_vel));
         }
 
         if debug.input {
@@ -1346,8 +1347,8 @@ impl Player {
             let l_trigger = player_input.l_trigger.value;
             let r_trigger = player_input.r_trigger.value;
 
-            println!("Player: {}    VALUE    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
-                index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
+            lines.push(format!("Player: {}    VALUE    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
+                index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger));
         }
 
         if debug.input_diff {
@@ -1358,8 +1359,8 @@ impl Player {
             let l_trigger = player_input.l_trigger.diff;
             let r_trigger = player_input.r_trigger.diff;
 
-            println!("Player: {}    DIFF    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
-                index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger);
+            lines.push(format!("Player: {}    DIFF    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
+                index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger));
         }
 
         if debug.action {
@@ -1367,8 +1368,8 @@ impl Player {
             let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
             let iasa = fighter.actions[self.action as usize].iasa;
 
-            println!("Player: {}    action: {:?}    frame: {}/{}    IASA: {}",
-                index, action, self.frame, action_frames, iasa);
+            lines.push(format!("Player: {}    action: {:?}    frame: {}/{}    IASA: {}",
+                index, action, self.frame, action_frames, iasa));
         }
 
         if debug.frame {
@@ -1377,13 +1378,14 @@ impl Player {
                 let frame = &frames[self.frame as usize];
                 let hitbox_count = frame.colboxes.len();
                 let effects_count = frame.effects.len();
-                println!("Player: {}    colboxes: {}    effects: {}",
-                    index, hitbox_count, effects_count);
+                lines.push(format!("Player: {}    colboxes: {}    effects: {}",
+                    index, hitbox_count, effects_count));
             }
             else {
-                println!("Player: {}    frame {} does not exist.", index, self.frame);
+                lines.push(format!("Player: {}    frame {} does not exist.", index, self.frame));
             }
         }
+        lines
     }
 
     pub fn render(&self, fighter_color: [f32; 4], selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> RenderPlayer {

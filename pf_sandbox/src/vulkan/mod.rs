@@ -362,9 +362,18 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
+    fn debug_lines_render(&mut self, lines: &[String]) {
+        if lines.len() > 1 {
+            for (i, line) in lines.iter().enumerate() {
+                self.draw_text.queue_text(0.05, 20.0 * (i+1) as f32, 20.0, [1.0, 1.0, 0.0, 1.0], line);
+            }
+        }
+    }
+
     fn game_render(&mut self, render: RenderGame, image_num: usize, command_output: &[String]) -> AutoCommandBufferBuilder {
         if command_output.len() == 0 {
             self.game_hud_render(&render.entities);
+            self.debug_lines_render(&render.debug_lines);
         }
         else {
             self.command_render(command_output);
