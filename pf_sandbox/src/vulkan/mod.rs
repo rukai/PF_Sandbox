@@ -678,22 +678,26 @@ impl<'a> VulkanGraphics<'a> {
                 [1.0, 0.0, 0.0, 1.0]
             };
 
-            let message = match verify {
-                &Verify::Ok => {
-                    format!("{} - {}", package.meta.title, package.meta.source)
+            let message = if let Some(ref source) = package.meta.source {
+                match verify {
+                    &Verify::Ok => {
+                        format!("{} - {}", package.meta.title, source)
+                    }
+                    &Verify::IncorrectHash => {
+                        format!("{} - {} - The computed hash did not match the hash given by the host", package.meta.title, source)
+                    }
+                    &Verify::UpdateAvailable => {
+                        format!("{} - {} - There is an update available from the host", package.meta.title, source)
+                    }
+                    &Verify::CannotConnect => {
+                        format!("{} - {} - Cannot connect to package host", package.meta.title, source)
+                    }
+                    &Verify::None => {
+                        unreachable!();
+                    }
                 }
-                &Verify::IncorrectHash => {
-                    format!("{} - {} - The computed hash did not match the hash given by the host", package.meta.title, package.meta.source)
-                }
-                &Verify::UpdateAvailable => {
-                    format!("{} - {} - There is an update available from the host", package.meta.title, package.meta.source)
-                }
-                &Verify::CannotConnect => {
-                    format!("{} - {} - Cannot connect to package host", package.meta.title, package.meta.source)
-                }
-                &Verify::None => {
-                    unreachable!();
-                }
+            } else {
+                package.meta.title.clone()
             };
 
             self.draw_text.queue_text(30.0, self.height as f32 - 30.0, 30.0, color, message.as_str());

@@ -105,8 +105,6 @@ However you can avoid fiddling with the system path by running `cargo run -- COM
 
 ## CI Infrastructure
 
-Note: There are currently no tests implemented yet.
-
 We build and test on:
 
 *   Rust nightly - Linux 64 bit (Travis)

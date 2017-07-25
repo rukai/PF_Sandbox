@@ -7,6 +7,7 @@ use std::io::Read;
 use std::io::Write;
 use std::io::Cursor;
 
+use reqwest::Url;
 use reqwest;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
@@ -61,26 +62,17 @@ pub fn load_json(filename: PathBuf) -> Option<Value> {
 }
 
 /// Load the json file at the passed URL directly into a struct
-pub fn load_struct_from_url<T: DeserializeOwned>(url: &str) -> Option<T> {
-    if let Some(json_bytes) = load_bin_from_url(url) {
-        if let Ok(json) = String::from_utf8(json_bytes) {
-            if let Ok(object) = serde_json::from_str(&json) {
-                return Some(object);
-            }
+pub fn load_struct_from_url<T: DeserializeOwned>(url: Url) -> Option<T> {
+    if let Ok(mut response) = reqwest::get(url) {
+        if response.status().is_success() {
+            return response.json().ok();
         }
     }
     None
-    // TODO: waiting on upgrade to serde 1.0 https://github.com/seanmonstar/reqwest/pull/79
-    //if let Ok(mut response) = reqwest::get(url) {
-    //    if response.status().is_success() {
-    //        return response.json().ok();
-    //    }
-    //}
-    //None
 }
 
 /// Returns the bytes of the file stored at the url
-pub fn load_bin_from_url(url: &str) -> Option<Vec<u8>> {
+pub fn load_bin_from_url(url: Url) -> Option<Vec<u8>> {
     if let Ok(mut response) = reqwest::get(url) {
         if response.status().is_success() {
             let mut buf: Vec<u8> = vec!();

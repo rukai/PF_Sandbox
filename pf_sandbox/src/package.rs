@@ -1,12 +1,15 @@
 use std::collections::{HashSet, HashMap};
 use std::fs;
-use std::path::PathBuf;
 use std::mem;
+use std::path::PathBuf;
+
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
+use reqwest::Url;
+use reqwest::UrlError;
 use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
 
 use ::files;
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType, RenderOrder};
@@ -32,7 +35,7 @@ pub fn generate_example_stub() {
             engine_version: engine_version(),
             save_version:   0,
             title:          "Example Package".to_string(),
-            source:         "http://lucaskent.me/example_package".to_string(),
+            source:         Some("lucaskent.me/example_package".to_string()),
             hash:           "".to_string(),
             fighter_keys:   vec!(),
             stage_keys:     vec!(),
@@ -100,18 +103,8 @@ impl Package {
         let mut path = get_packages_path();
         path.push(name);
 
-        let meta = PackageMeta {
-            engine_version: engine_version(),
-            save_version:   0,
-            title:          "".to_string(),
-            source:         "".to_string(),
-            hash:           "".to_string(),
-            fighter_keys:   vec!(),
-            stage_keys:     vec!(),
-        };
-
         let mut package = Package {
-            meta:            meta,
+            meta:            PackageMeta::new(),
             path:            path,
             rules:           Rules::base(),
             stages:          KeyedContextVec::new(),
@@ -134,7 +127,7 @@ impl Package {
             engine_version: engine_version(),
             save_version:   0,
             title:          "New Package".to_string(),
-            source:         "DELET THIS".to_string(), // TODO: include option to disable source functionality and use it here
+            source:         None,
             hash:           "".to_string(),
             fighter_keys:   vec!(),
             stage_keys:     vec!(),
@@ -267,7 +260,11 @@ impl Package {
     }
 
     pub fn download_latest_meta(&self) -> Option<PackageMeta> {
-        files::load_struct_from_url(format!("{}/package_meta.json", self.meta.source).as_str())
+        if let Some(url) = self.meta.url("package_meta.json") {
+            files::load_struct_from_url(url)
+        } else {
+            None
+        }
     }
 
     pub fn compute_hash(&self) -> String {
@@ -308,10 +305,12 @@ impl Package {
     pub fn update(&mut self) {
         if let Some(latest_meta) = self.download_latest_meta() {
             if self.meta.save_version < latest_meta.save_version {
-                let zip = files::load_bin_from_url(format!("{}/package{}.zip", self.meta.source, latest_meta.save_version).as_str());
-                if let Some(zip) = zip {
-                    files::extract_zip(&zip, &self.path);
-                    self.load();
+                let path = format!("package{}.zip", latest_meta.save_version);
+                if let Some(url) = self.meta.url(path.as_str()) {
+                    if let Some(zip) = files::load_bin_from_url(url) {
+                        files::extract_zip(&zip, &self.path);
+                        self.load();
+                    }
                 }
             }
         }
@@ -699,8 +698,53 @@ pub struct PackageMeta {
     pub engine_version: u64, // compared with a value incremented by pf engine when there are breaking changes to data structures
     pub save_version:   u64, // incremented every time the package is saved
     pub title:          String,
-    pub source:         String,
-    pub hash:           String,
     pub fighter_keys:   Vec<String>,
+    pub source:         Option<String>,
+    pub hash:           String,
     pub stage_keys:     Vec<String>,
+}
+
+impl PackageMeta {
+    pub fn new() -> PackageMeta {
+        PackageMeta {
+            engine_version: engine_version(),
+            save_version:   0,
+            title:          "".to_string(),
+            source:         None,
+            hash:           "".to_string(),
+            fighter_keys:   vec!(),
+            stage_keys:     vec!(),
+        }
+    }
+
+    pub fn url(&self, path: &str) -> Option<Url> {
+        if let Some(ref source) = self.source {
+            let mut url = match Url::parse(source) {
+                Ok(mut url) => {
+                    if let Err(_) = url.set_scheme("https") {
+                        return None;
+                    }
+                    url
+                }
+                Err(UrlError::RelativeUrlWithoutBase) => { // occurs when scheme is missing
+                    if let Ok(url) = Url::parse(format!("https://{}", source).as_str()) {
+                        url
+                    } else {
+                        return None;
+                    }
+                }
+                _ => { return None; }
+            };
+
+            // cant use source.join(path) because it relies on a trailing '/'
+            if let Ok(mut segments) = url.path_segments_mut() {
+                segments.push(path);
+            }
+            else {
+                return None;
+            }
+            return Some(url);
+        }
+        None
+    }
 }
