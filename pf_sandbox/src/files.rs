@@ -1,11 +1,8 @@
-use std::path::{PathBuf, Path};
 use std::env;
+use std::fs::{DirBuilder, File};
 use std::fs;
-use std::fs::File;
-use std::fs::DirBuilder;
-use std::io::Read;
-use std::io::Write;
-use std::io::Cursor;
+use std::io::{Cursor, Read, Write};
+use std::path::{PathBuf, Path};
 
 use reqwest::Url;
 use reqwest;
@@ -30,35 +27,33 @@ pub fn save_struct_compressed<T: Serialize>(filename: PathBuf, object: &T) {
     File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
 }
 
-pub fn load_struct<T: DeserializeOwned>(filename: PathBuf) -> Option<T> {
-    if let Ok(mut file) = File::open(filename) {
-        let mut json = String::new();
-        if file.read_to_string(&mut json).is_ok() {
-            return serde_json::from_str(&json).ok();
-        }
-    }
-    None
+pub fn load_struct<T: DeserializeOwned>(filename: PathBuf) -> Result<T, String> {
+    let json = load_file(filename)?;
+    serde_json::from_str(&json).map_err(|x| format!("{:?}", x))
 }
 
 // TODO: Actually use compression
-pub fn load_struct_compressed<T: DeserializeOwned>(filename: PathBuf) -> Option<T> {
-    if let Ok(mut file) = File::open(filename) {
-        let mut json = String::new();
-        if file.read_to_string(&mut json).is_ok() {
-            return serde_json::from_str(&json).ok();
-        }
-    }
-    None
+pub fn load_struct_compressed<T: DeserializeOwned>(filename: PathBuf) -> Result<T, String> {
+    let json = load_file(filename)?;
+    serde_json::from_str(&json).map_err(|x| format!("{:?}", x))
 }
 
-pub fn load_json(filename: PathBuf) -> Option<Value> {
-    if let Ok(mut file) = File::open(filename) {
-        let mut json = String::new();
-        if let Ok(_) = file.read_to_string(&mut json) {
-            return Some(serde_json::from_str(&json).unwrap());
-        }
-    }
-    None
+pub fn load_json(filename: PathBuf) -> Result<Value, String> {
+    let json = load_file(filename)?;
+    serde_json::from_str(&json).map_err(|x| format!("{:?}", x))
+}
+
+pub fn load_file(filename: PathBuf) -> Result<String, String> {
+    let mut file = match File::open(&filename) {
+        Ok(file) => file,
+        Err(err) => return Err(format!("Failed to open file: {} because: {}", filename.to_str().unwrap(), err))
+    };
+
+    let mut contents = String::new();
+    if let Err(err) = file.read_to_string(&mut contents) {
+        return Err(format!("Failed to read file {} because: {}", filename.to_str().unwrap(), err))
+    };
+    Ok(contents)
 }
 
 /// Load the json file at the passed URL directly into a struct

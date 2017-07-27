@@ -32,6 +32,7 @@ pub fn generate_example_stub() {
         path.push("package_meta.json");
 
         let meta = PackageMeta {
+            path:           path.clone(),
             engine_version: engine_version(),
             save_version:   0,
             title:          "Example Package".to_string(),
@@ -54,13 +55,17 @@ pub fn get_package_metas() -> Vec<(String, PackageMeta)> {
     let mut result: Vec<(String, PackageMeta)> = vec!();
 
     for file in fs::read_dir(get_packages_path()).unwrap() {
-        if let Ok(file) = file {
+        if let Ok (file) = file {
             let key = file.file_name().into_string().unwrap();
             let mut meta_path = file.path();
             meta_path.push("package_meta.json");
 
-            if let Some(meta) = files::load_struct(meta_path) {
-                result.push((key, meta));
+            match files::load_struct::<PackageMeta>(meta_path) {
+                Ok (mut meta) => {
+                    meta.path = file.path();
+                    result.push((key, meta))
+                }
+                Err (err) => println!("Failed to load package_meta.json: {}", err)
             }
         }
     }
@@ -77,9 +82,10 @@ pub fn exists(name: &str) -> bool {
     false
 }
 
+/// Stores data that makes up a single game
+/// Is also responsible for loading and saving itself
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Package {
-        path:               PathBuf,
     pub meta:               PackageMeta,
     pub rules:              Rules,
     pub stages:             KeyedContextVec<Stage>,
@@ -98,25 +104,36 @@ impl Package {
         !self.package_updates.is_empty()
     }
 
-    // TODO: Actually handle failures to load package
-    pub fn open(name: &str) -> Package {
+    pub fn blank() -> Package {
+        Package {
+            meta:            PackageMeta::new(),
+            rules:           Rules::base(),
+            stages:          KeyedContextVec::new(),
+            fighters:        KeyedContextVec::new(),
+            package_updates: vec!(),
+        }
+    }
+
+    pub fn open(name: &str) -> Option<Package> {
         let mut path = get_packages_path();
         path.push(name);
 
         let mut package = Package {
-            meta:            PackageMeta::new(),
-            path:            path,
+            meta:            PackageMeta { path, .. PackageMeta::new() },
             rules:           Rules::base(),
             stages:          KeyedContextVec::new(),
             fighters:        KeyedContextVec::new(),
             package_updates: vec!(),
         };
-        package.load();
-        package
+        if let Ok(_) = package.load() {
+            Some(package)
+        } else {
+            None
+        }
     }
 
     pub fn file_name(&self) -> String {
-        self.path.file_name().unwrap().to_str().unwrap().to_string()
+        self.meta.path.file_name().unwrap().to_str().unwrap().to_string()
     }
 
     fn generate_base(name: &str) -> Package {
@@ -124,9 +141,10 @@ impl Package {
         path.push(name);
 
         let meta = PackageMeta {
+            path:           path,
             engine_version: engine_version(),
             save_version:   0,
-            title:          "New Package".to_string(),
+            title:          name.to_string(),
             source:         None,
             hash:           "".to_string(),
             fighter_keys:   vec!(),
@@ -138,11 +156,10 @@ impl Package {
             rules:              Rules::base(),
             stages:             KeyedContextVec::from_vec(vec!((String::from("base_stage.json"), Stage::default()))),
             fighters:           KeyedContextVec::from_vec(vec!((String::from("base_fighter.json"), Fighter::default()))),
-            path:               path,
             package_updates:    vec!(),
         };
         package.save();
-        package.load();
+        package.load().unwrap();
         package
     }
 
@@ -154,7 +171,7 @@ impl Package {
 
         // if a package does not already exist create a new one
         match fs::metadata(package_path) {
-            Ok(_)  => Some(Package::open(package_name)), // TODO: Actually handle failures to load package
+            Ok(_)  => Package::open(package_name),
             Err(_) => Some(Package::generate_base(package_name)),
         }
     }
@@ -166,43 +183,44 @@ impl Package {
         self.meta.hash = self.compute_hash();
 
         // save all json files
-        files::save_struct(self.path.join("rules.json"), &self.rules);
-        files::save_struct(self.path.join("package_meta.json"), &self.meta);
+        files::save_struct(self.meta.path.join("rules.json"), &self.rules);
+        files::save_struct(self.meta.path.join("package_meta.json"), &self.meta);
 
         for (key, fighter) in self.fighters.key_value_iter() {
-            files::save_struct(self.path.join("Fighters").join(key), fighter);
+            files::save_struct(self.meta.path.join("Fighters").join(key), fighter);
         }
         
         for (key, stage) in self.stages.key_value_iter() {
-            files::save_struct(self.path.join("Stages").join(key), stage);
+            files::save_struct(self.meta.path.join("Stages").join(key), stage);
         }
     }
 
-    pub fn load(&mut self) {
-        let mut meta = files::load_json(self.path.join("package_meta.json"));
-        let mut rules = files::load_json(self.path.join("rules.json"));
+    pub fn load(&mut self) -> Result<(), String> {
+        let path = self.meta.path.clone();
+        let mut meta = match files::load_file(self.meta.path.join("package_meta.json")) {
+            Ok (string) => serde_json::from_str(&string).map_err(|x| format!("{:?}", x))?,
+            Err (_) => None
+        };
+        let mut rules = match files::load_file(self.meta.path.join("rules.json")) {
+            Ok (string) => serde_json::from_str(&string).map_err(|x| format!("{:?}", x))?,
+            Err (_) => None
+        };
 
         let mut fighters: HashMap<String, Value> = HashMap::new();
-        if let Ok (dir) = fs::read_dir(self.path.join("Fighters")) {
+        if let Ok (dir) = fs::read_dir(self.meta.path.join("Fighters")) {
             for path in dir {
                 let full_path = path.unwrap().path();
                 let key = full_path.file_name().unwrap().to_str().unwrap().to_string();
-
-                if let Some(fighter) = files::load_json(full_path) {
-                    fighters.insert(key, fighter);
-                }
+                fighters.insert(key, files::load_json(full_path)?);
             }
         }
 
         let mut stages: HashMap<String, Value> = HashMap::new();
-        if let Ok (dir) = fs::read_dir(self.path.join("Stages")) {
+        if let Ok (dir) = fs::read_dir(self.meta.path.join("Stages")) {
             for path in dir {
                 let full_path = path.unwrap().path();
                 let key = full_path.file_name().unwrap().to_str().unwrap().to_string();
-
-                if let Some(stage) = files::load_json(full_path) {
-                    stages.insert(key, stage);
-                }
+                stages.insert(key, files::load_json(full_path)?);
             }
         }
 
@@ -213,8 +231,10 @@ impl Package {
         // *    the user can choose to not save, if they find issues with the upgrade
         upgrade_to_latest(&mut meta, &mut rules, &mut fighters, &mut stages);
         self.json_into_structs(meta, rules, fighters, stages);
+        self.meta.path = path;
 
         self.force_update_entire_package();
+        Ok(())
     }
 
     pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, mut fighters: HashMap<String, Value>, mut stages: HashMap<String, Value>) {
@@ -259,14 +279,6 @@ impl Package {
         }
     }
 
-    pub fn download_latest_meta(&self) -> Option<PackageMeta> {
-        if let Some(url) = self.meta.url("package_meta.json") {
-            files::load_struct_from_url(url)
-        } else {
-            None
-        }
-    }
-
     pub fn compute_hash(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.input_str(serde_json::to_string(&self.rules).unwrap().as_str());
@@ -283,7 +295,7 @@ impl Package {
     }
 
     pub fn verify(&self) -> Verify {
-        if let Some(latest_meta) = self.download_latest_meta() {
+        if let Some(latest_meta) = self.meta.download_latest_meta() {
             let hash = self.compute_hash();
             if self.meta.save_version >= latest_meta.save_version {
                 if hash == latest_meta.hash {
@@ -299,20 +311,6 @@ impl Package {
         }
         else {
             Verify::CannotConnect
-        }
-    }
-
-    pub fn update(&mut self) {
-        if let Some(latest_meta) = self.download_latest_meta() {
-            if self.meta.save_version < latest_meta.save_version {
-                let path = format!("package{}.zip", latest_meta.save_version);
-                if let Some(url) = self.meta.url(path.as_str()) {
-                    if let Some(zip) = files::load_bin_from_url(url) {
-                        files::extract_zip(&zip, &self.path);
-                        self.load();
-                    }
-                }
-            }
         }
     }
 
@@ -658,8 +656,11 @@ Accessors:
                         String::new()
                     }
                     "reload" => {
-                        self.load();
-                        String::new()
+                        if let Err(err) = self.load() {
+                            err
+                        } else {
+                            String::new()
+                        }
                     }
                     _ => {
                         format!("Package cannot '{}'", action)
@@ -693,8 +694,13 @@ pub enum PackageUpdate {
     InsertStage { index: usize, key: String, stage: Stage },
 }
 
+/// Stores metadata for the package
+/// Also handles updating the Package
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PackageMeta {
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+        path:           PathBuf,
     pub engine_version: u64, // compared with a value incremented by pf engine when there are breaking changes to data structures
     pub save_version:   u64, // incremented every time the package is saved
     pub title:          String,
@@ -707,6 +713,7 @@ pub struct PackageMeta {
 impl PackageMeta {
     pub fn new() -> PackageMeta {
         PackageMeta {
+            path:           PathBuf::new(),
             engine_version: engine_version(),
             save_version:   0,
             title:          "".to_string(),
@@ -746,5 +753,41 @@ impl PackageMeta {
             return Some(url);
         }
         None
+    }
+
+    pub fn download_latest_meta(&self) -> Option<PackageMeta> {
+        if let Some(url) = self.url("package_meta.json") {
+            files::load_struct_from_url(url)
+        } else {
+            None
+        }
+    }
+
+    /// If downloading fails then just continue, we dont want to prevent playing due to network issues.
+    pub fn update(&self) {
+        if let Some(latest_meta) = self.download_latest_meta() {
+            if self.save_version < latest_meta.save_version {
+                let path = format!("package{}.zip", latest_meta.save_version);
+                if let Some(url) = self.url(path.as_str()) {
+                    if let Some(zip) = files::load_bin_from_url(url) {
+                        files::extract_zip(&zip, &self.path);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn folder_name(&self) -> String {
+        self.path.file_name().unwrap().to_str().unwrap().to_string()
+    }
+
+    /// consume self into a Package
+    pub fn load(self) -> Result<Package, String> {
+        let mut package = Package {
+            meta: self,
+            .. Package::blank()
+        };
+        package.load()?;
+        Ok(package)
     }
 }

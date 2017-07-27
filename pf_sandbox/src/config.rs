@@ -19,7 +19,7 @@ impl Config {
     }
 
     pub fn load() -> Config {
-        if let Some (json) = files::load_json(Config::get_path()) {
+        if let Ok (json) = files::load_json(Config::get_path()) {
             if let Ok (mut config) = serde_json::from_value::<Config>(json) {
                 // current_package may have been deleted since config was last saved
                 if let Some (ref current_package) = config.current_package.clone() {

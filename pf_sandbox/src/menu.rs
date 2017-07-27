@@ -8,6 +8,9 @@ use ::package;
 use ::records::GameResult;
 use ::replays;
 
+use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
+use std::thread;
+
 pub struct Menu {
     pub package:        PackageHolder,
     config:             Config,
@@ -106,7 +109,7 @@ impl Menu {
 
             if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && replays.len() > 0 {
                 let name = &replays[ticker.cursor];
-                if let Some(replay) = replays::load_replay(name, self.package.get()) {
+                if let Ok(replay) = replays::load_replay(name, self.package.get()) {
                     self.game_setup = Some(GameSetup {
                         init_seed:      replay.init_seed,
                         input_history:  replay.input_history,
@@ -264,45 +267,100 @@ impl Menu {
     }
 
     pub fn step_package_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
-        let selection = if let &mut MenuState::PackageSelect (ref package_metas, ref mut ticker) = &mut self.state {
-            if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
-                ticker.up();
-            }
-            else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
-                ticker.down();
+        let mut package = None;
+        if let &mut MenuState::PackageSelect (ref package_metas, ref mut ticker, ref mut load) = &mut self.state {
+            let update_selection = if let &mut Some((ref mut load_state, ref mut load_rx)) = load {
+                loop {
+                    match load_rx.try_recv() {
+                        Ok (new_state) => {
+                            if let PackageLoadState::Finished(new_package) = new_state {
+                                package = Some(new_package);
+                                break;
+                            }
+                            else {
+                                *load_state = new_state;
+                            }
+                        }
+                        Err (TryRecvError::Empty) => {
+                            break;
+                        }
+                        Err (TryRecvError::Disconnected) => {
+                            if let &mut PackageLoadState::Failed(_) = load_state { } else {
+                                *load_state = PackageLoadState::Failed(String::from("tx was destroyed"));
+                            }
+                            break;
+                        }
+                    }
+                }
+                if let &mut PackageLoadState::Failed(_) = load_state {
+                    true
+                } else {
+                    false
+                }
             }
             else {
-                ticker.reset();
-            }
+                true
+            };
 
-            if package_metas.len() > 0 {
-                if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
-                    let selection = package_metas[ticker.cursor].0.clone();
-                    let mut package = Package::open(selection.as_str());
-                    package.update();
-                    self.package = PackageHolder::new(Some(package));
-                    Some(selection)
-                } else if player_inputs.iter().any(|x| x.x.press || x.y.press) {
-                    let selection = package_metas[ticker.cursor].0.clone();
-                    self.package = PackageHolder::new(Some(Package::open(selection.as_str())));
-                    Some(selection)
-                } else {
-                    None
-                }
-            } else {
-                None
+            if update_selection {
+                Menu::step_package_select_inner(player_inputs, input, package_metas, ticker, load);
             }
-        } else {
-            unreachable!();
-        }; 
+        } else { unreachable!(); }
 
-        if let Some(selection) = selection {
+        if let Some(package) = package {
+            // setup for GameSelect
+            self.package = PackageHolder::new(Some(package));
+            self.state = MenuState::GameSelect;
             self.fighter_selections = vec!();
             self.stage_ticker = None;
-            self.config.current_package = Some(selection);
+
+            // remember selection
+            self.config.current_package = Some(self.package.get().meta.folder_name());
             self.config.save();
-            self.state = MenuState::GameSelect;
         }
+    }
+
+    fn step_package_select_inner(
+        player_inputs: &[PlayerInput],
+        input: &mut Input,
+        package_metas: &[(String, PackageMeta)],
+        ticker: &mut MenuTicker,
+        load: &mut Option<(PackageLoadState, Receiver<PackageLoadState>)>
+    ) {
+        if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
+            ticker.up();
+        }
+        else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
+            ticker.down();
+        }
+        else {
+            ticker.reset();
+        }
+
+        if package_metas.len() > 0 {
+            if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
+                let meta = package_metas[ticker.cursor].1.clone();
+
+                let (tx, rx) = channel();
+                thread::spawn(move || Menu::load_package(meta, tx));
+                *load = Some((PackageLoadState::Starting, rx));
+            }
+        }
+    }
+
+    // TODO: provide messages for:
+    // *   downloading package x%
+    // *   unzipping package
+    // *   writing package
+    fn load_package(meta: PackageMeta, tx: Sender<PackageLoadState>) {
+        tx.send(PackageLoadState::Downloading).unwrap();
+        meta.update();
+
+        tx.send(PackageLoadState::Loading).unwrap();
+        match meta.load() {
+            Ok (package) => tx.send(PackageLoadState::Finished(package)).unwrap(),
+            Err (err)    => tx.send(PackageLoadState::Failed(err)).unwrap()
+        };
     }
 
     fn step_results(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
@@ -322,16 +380,16 @@ impl Menu {
         let player_inputs = input.players(self.current_frame);
 
         match self.state {
-            MenuState::GameSelect           => { self.step_game_select   (&player_inputs, input) }
-            MenuState::ReplaySelect (_, _)  => { self.step_replay_select (&player_inputs, input) }
-            MenuState::PackageSelect (_, _) => { self.step_package_select(&player_inputs, input) }
-            MenuState::CharacterSelect (_)  => { self.step_fighter_select(&player_inputs, input) }
-            MenuState::StageSelect          => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::GameResults (_)      => { self.step_results       (&player_inputs, input) }
-            MenuState::SetRules             => { }
-            MenuState::BrowsePackages       => { }
-            MenuState::CreatePackage        => { }
-            MenuState::CreateFighter        => { }
+            MenuState::GameSelect             => { self.step_game_select   (&player_inputs, input) }
+            MenuState::ReplaySelect (_, _)    => { self.step_replay_select (&player_inputs, input) }
+            MenuState::PackageSelect (_, _,_) => { self.step_package_select(&player_inputs, input) }
+            MenuState::CharacterSelect (_)    => { self.step_fighter_select(&player_inputs, input) }
+            MenuState::StageSelect            => { self.step_stage_select  (&player_inputs, input) }
+            MenuState::GameResults (_)        => { self.step_results       (&player_inputs, input) }
+            MenuState::SetRules               => { }
+            MenuState::BrowsePackages         => { }
+            MenuState::CreatePackage          => { }
+            MenuState::CreateFighter          => { }
         };
 
         self.current_frame += 1;
@@ -341,7 +399,7 @@ impl Menu {
     pub fn render(&self) -> RenderMenu {
         RenderMenu {
             state: match self.state {
-                MenuState::PackageSelect (ref names, ref ticker)  => { RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor) }
+                MenuState::PackageSelect (ref names, ref ticker, ref load) => { RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor, load.as_ref().map(|x| x.0.message()).unwrap_or_default() ) }
                 MenuState::GameResults (ref results)              => { RenderMenuState::GameResults (results.clone()) }
                 MenuState::CharacterSelect (back_counter)         => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
                 MenuState::ReplaySelect (ref replays, ref ticker) => { RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor) }
@@ -385,7 +443,6 @@ impl Menu {
     }
 }
 
-#[derive(Clone)]
 pub enum MenuState {
     GameSelect,
     ReplaySelect (Vec<String>, MenuTicker),
@@ -393,17 +450,43 @@ pub enum MenuState {
     StageSelect,
     GameResults (Vec<GameResult>),
     SetRules,
-    PackageSelect (Vec<(String, PackageMeta)>, MenuTicker),
+    PackageSelect (Vec<(String, PackageMeta)>, MenuTicker, Option<(PackageLoadState, Receiver<PackageLoadState>)>),
     BrowsePackages,
     CreatePackage,
     CreateFighter,
+}
+
+pub enum PackageLoadState {
+    Starting,
+    Downloading,
+    Unzipping,
+    Updating,
+    Writing,
+    Loading,
+    Finished (Package),
+    Failed (String),
+}
+
+impl PackageLoadState {
+    pub fn message(&self) -> String {
+        match self {
+            &PackageLoadState::Starting     => format!(""),
+            &PackageLoadState::Downloading  => format!("Downloading package"),
+            &PackageLoadState::Unzipping    => format!("Unzipping package"),
+            &PackageLoadState::Updating     => format!("Updating package"),
+            &PackageLoadState::Writing      => format!("Writing package"),
+            &PackageLoadState::Loading      => format!("Loading package"),
+            &PackageLoadState::Finished (_) => format!("Package ready"),
+            &PackageLoadState::Failed (ref message) => message.clone()
+        }
+    }
 }
 
 impl MenuState {
     pub fn package_select() -> MenuState {
         let packages = package::get_package_metas();
         let ticker = MenuTicker::new(packages.len());
-        MenuState::PackageSelect(packages, ticker)
+        MenuState::PackageSelect(packages, ticker, None)
     }
 
     pub fn replay_select(package: &Package) -> MenuState {
@@ -424,7 +507,7 @@ pub enum RenderMenuState {
     StageSelect     (usize),
     GameResults     (Vec<GameResult>),
     SetRules,
-    PackageSelect   (Vec<String>, usize),
+    PackageSelect   (Vec<String>, usize, String),
     BrowsePackages,
     CreatePackage,
     CreateFighter,

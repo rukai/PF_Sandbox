@@ -602,8 +602,8 @@ impl<'a> VulkanGraphics<'a> {
             RenderMenuState::SetRules => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "set rules");
             }
-            RenderMenuState::PackageSelect (ref names, selection) => {
-                self.draw_package_selector(names, selection);
+            RenderMenuState::PackageSelect (ref names, selection, ref message) => {
+                self.draw_package_selector(names, selection, message);
             }
             RenderMenuState::BrowsePackages => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "browse package");
@@ -820,9 +820,9 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
-    fn draw_package_selector(&mut self, package_names: &[String], selection: usize) {
+    fn draw_package_selector(&mut self, package_names: &[String], selection: usize, message: &str) {
         self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Package");
-        //self.draw_text.queue_text(100.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], "A: Select package    X/Y: Select Package without updating");
+        self.draw_text.queue_text(100.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], message);
 
         for (package_i, name) in package_names.iter().enumerate() {
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos

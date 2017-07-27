@@ -54,7 +54,7 @@ pub fn get_replays_path(package: &Package) -> PathBuf {
     replays_path
 }
 
-pub fn load_replay(name: &str, package: &Package) -> Option<Replay> {
+pub fn load_replay(name: &str, package: &Package) -> Result<Replay, String> {
     let mut replay_path = get_replays_path(package);
     replay_path.push(name);
     files::load_struct_compressed(replay_path)
