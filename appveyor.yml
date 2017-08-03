@@ -32,6 +32,8 @@ test_script:
   - move target\release\pf_sandbox.exe pf
   - move target\release\pf_tas.exe pf
   - move target\release\pf_cli.exe pf
+  - move manual.md pf
+  - move editor-tutorial.md pf
   - copy C:\msys64\mingw64\bin\libusb-1.0.dll pf
   - 7z a pf_sandbox-windows64.zip pf
 

@@ -3,12 +3,23 @@
 Following this tutorial is a great way to get started with editing fighters in PF Sandbox.
 For a full reference of every operation check out the [documentation]().
 
-Start off by ensuring your controller is in port 1
-Then create a new package `cargo run -- new_package_name` (TODO: GUI menu method)
+## Create a new package
+
+It is important to create your own package to put your fighters in.
+If you instead modify the example package, when an update is released for it, your modifications will be lost!
+
+TODO:
+Add a way to create a new package via treeflection. https://github.com/rukai/PF_Sandbox/issues/32
+
+For Now:
+Create a new package by running from your command line `pf_sandbox new_package_name`
 After the game starts pause it. (spacebar)
+
+## Basics
 
 It will look like there is a stage with no fighters.
 However the fighters are there, they just have no collision boxes to make them visible.
+Start off by ensuring your controller is in port 1.
 Press `1` to select player 1.
 Now press F8 to toggle on ECB (Environment Collision Box) display
 Now we can see player 1's location as the newly appeared ECB.
@@ -80,13 +91,6 @@ Press B on your keyboard to paste the copied frame here.
 Repeat this process for all actions you can think of.
 Test out your fighter again, you can even disable the ECB (F3) if you want.
 
-## Save/Reload
-
-Press E to save the changes you have made.
-Close PF Sandbox and reopen it to verify that your changes are still there.
-
-Press R to discard any changes you have made and reload the package. (TODO: This is currently disabled because its too easy to bump we need some sort of UI confirmation)
-
 ## Multi-frame actions
 
 Return your player to the idle state, pause the game, and select your player.
@@ -119,16 +123,34 @@ To give control of the camera back to PF Sandbox press Backspace.
 
 ## Command Line
 
+Press '~' to open the command line in PF Sandbox.
+
 A command looks like this:
 
-`pf package:help`
+`package:help`
 
-You can enter this example into your systems command line and hit enter to run it.
 We use the help command to tell us what an object is capable of and what other objects it contains.
 By looking under the Accessors section, we can see that the package contains fighters, stages, meta, and rules.
 Lets further investigate fighters.
 
-`pf package.fighters:help`
+`package.fighters:help`
+
+## Menu/Game difference
+
+While in game commands are run on the game object. (which contains the package)
+While in menu commands are run on the package object.
+So commands that work in game wont necessarily work in the menu and vice versa.
+
+This is awkward to use so in the future a package holder object will be added so commands on the package succeed wherever they are run.
+
+## Save/Reload
+
+Run the command: `package:save`
+Wait for the 'Save completed successfully' message to appear.
+Close PF Sandbox and reopen it to verify that your changes are still there.
+
+Make a change to your fighter and then run: `package:reload`
+Verify that your fighter is the same as when you last ran `package:save`
 
 ## Keys & Context
 
@@ -136,18 +158,16 @@ This is a keyed context vector of fighters, that means it contains multiple figh
 
 We can access a specific fighter via its filename, assuming you have a fighter with filename base_fighter.json then we can run:
 
-`pf 'package.fighters["base_fighter.json"]:help'`
+`package.fighters["base_fighter.json"]:help`
 
 But thats generally not useful. (We dont want to have to check the filename of the fighter we are editing.)
 Instead we make use of the context system.
 By using `?` as our key, we tell PF Sandbox to automatically choose the fighter to access via in game context.
 In this case it uses the fighter used by the player we have selected with 1234.
 
-`pf package.fighters[?]:help`
+`package.fighters[?]:help`
 
 If this doesnt display the fighter help, ensure you are in a game, pf sandbox is paused (spacebar) and you have selected a player (1)
-
-Also note that we used single quotes earlier (pf '...') so that bash wouldnt eat our double quotes ("base_fighter.json").
 
 ## Fighter data
 
@@ -155,11 +175,11 @@ The fighter help text shows a lot of interesting fighter properties that I am su
 
 This will get the number of aerial jumps the fighter can do.
 
-`pf package.fighters[?].air_jumps:get`
+`package.fighters[?].air_jumps:get`
 
 Run this command and try out the changes.
 
-`pf package.fighters[?].air_jumps:set 99`
+`package.fighters[?].air_jumps:set 99`
 
 Try fiddling with this and other values you can find with the help command.
 
@@ -170,24 +190,24 @@ To find them we are going to do some exploration with the help command.
 We see that the fighter contains an `actions` property which is a context vec.
 (once again this object contains multiple actions, however they are only accessible by index and context.)
 
-`pf package.fighters[?].actions:help`
+`package.fighters[?].actions:help`
 
 We can use an index to access a numbered element of the vector
 
-`pf package.fighters[?].actions[0]:help`
+`package.fighters[?].actions[0]:help`
 
 However once again this is rarely useful so we stick to using context.
 This way we access the current action the selected player is in.
 
-`pf package.fighters[?].actions[?]:help`
+`package.fighters[?].actions[?]:help`
 
 We can see two properties: iasa and frames.
 
-`pf package.fighters[?].actions[?].frames[?]:help`
+`package.fighters[?].actions[?].frames[?]:help`
 
 We can see the colboxes property among numerous other properties.
 
-`pf package.fighters[?].actions[?].frames[?].colboxes:help`
+`package.fighters[?].actions[?].frames[?].colboxes:help`
 
 Nice, now we know how to access colboxes, and (hopefully) better understand how frame data is structured.
 
@@ -195,20 +215,20 @@ Nice, now we know how to access colboxes, and (hopefully) better understand how 
 
 Now select a hitbox by clicking on it in pf_sandbox and run this command:
 
-`pf package.fighters[?].actions[?].frames[?].colboxes[?].radius:set 10`
+`package.fighters[?].actions[?].frames[?].colboxes[?].radius:set 10`
 
 ## Variants & Hitboxes
 
 Select a colbox and run this command:
 
-`pf package.fighters[?].actions[?].frames[?].colboxes[?].role:variant Hit
+`package.fighters[?].actions[?].frames[?].colboxes[?].role:variant Hit
 
 This changes the role of the colbox to be a hitbox.
 Test it out in game.
 
 Now that we have set the role to hit, we have access to more properties on the role.
 
-`pf package.fighters[?].actions[?].frames[?].colboxes[?].role[0].bkb:set 9001`
+`package.fighters[?].actions[?].frames[?].colboxes[?].role[0].bkb:set 9001`
 
 We set the base knockback for the hitbox to 9001
 Test this out in game!

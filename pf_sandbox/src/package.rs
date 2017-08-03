@@ -653,13 +653,13 @@ Accessors:
                 match action.as_ref() {
                     "save" => {
                         self.save();
-                        String::new()
+                        String::from("Save completed successfully.")
                     }
                     "reload" => {
                         if let Err(err) = self.load() {
                             err
                         } else {
-                            String::new()
+                            String::from("Reload completed successfully.")
                         }
                     }
                     _ => {

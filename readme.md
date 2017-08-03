@@ -67,10 +67,8 @@ To run pf sandbox: run `cargo run` in the pf_sandbox directory.
 
 ## Setup CLI Tool
 
-The tutorial/manual assumes that you have setup the binary for the CLI tool in your system path as the command `pf`.
-To build the CLI tool run `cargo build` in the cli directory, the resulting binary is stored at `cli/target/debug/pf_client`.
-
-However you can avoid fiddling with the system path by running `cargo run -- COMMAND` in the cli directory instead of `pf COMMAND`.
+To build the CLI tool run `cargo build` in the cli directory, the resulting binary is stored at `cli/target/debug/pf_cli`.
+Copy `pf_cli` to somewhere in your PATH and rename it `pf`.
 
 ## Usage Documentation
 
@@ -97,7 +95,7 @@ However you can avoid fiddling with the system path by running `cargo run -- COM
 *   Netplay
 *   Minimalist but visually appealing graphics
 
-## Non-Goals/Restrictions
+## Restrictions/Non-Goals
 
 *   Advanced features need not be beginner Friendly (e.g. editor/frame advance/replays/TAS)
 *   Ability to recreate other platform fighters does not overrule other advantages (e.g. 2D hitboxes instead of 3D hitboxes)
@@ -110,8 +108,12 @@ We build and test on:
 *   Rust nightly - Linux 64 bit (Travis)
 *   Rust nightly gnu - Windows 64 bit (Appveyor)
 
-All incoming pull requests are built and tested.
+We build and test when:
 
-Every commit merged to master is built, tested and then an incrementing tag/release is created for it.
+*   All incoming pull requests are built and tested.
+*   Every commit merged to master is built, tested and then an incrementing tag/release is created for it.
 
-TODO: If the commit is tagged with Netplay, it is also released as the netplay build which is pinned at the top of releases.
+TODO:
+Github releases is fairly limited, a custom solution might be needed so that we can:
+*   combine linux and windows builds into a single release (tried and failed to achieve this with Github releases)
+*   Tag a commit as the current netplay build and then pin that build at the top. (no such functionality in Github releases)
