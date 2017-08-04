@@ -603,7 +603,7 @@ impl<'a> VulkanGraphics<'a> {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "set rules");
             }
             RenderMenuState::PackageSelect (ref names, selection, ref message) => {
-                self.draw_package_selector(names, selection, message);
+                self.draw_package_selector(names, selection, message, command_output);
             }
             RenderMenuState::BrowsePackages => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "browse package");
@@ -820,7 +820,7 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
-    fn draw_package_selector(&mut self, package_names: &[String], selection: usize, message: &str) {
+    fn draw_package_selector(&mut self, package_names: &[String], selection: usize, message: &str, command_output: &[String]) {
         self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Package");
         self.draw_text.queue_text(100.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], message);
 
@@ -831,6 +831,7 @@ impl<'a> VulkanGraphics<'a> {
             let y = self.height as f32 * 0.1 + package_i as f32 * 50.0;
             self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], name.as_ref());
         }
+        self.command_render(command_output);
     }
 
     fn draw_game_selector(&mut self, selection: usize) {

@@ -8,6 +8,8 @@ use ::package;
 use ::records::GameResult;
 use ::replays;
 
+use treeflection::{Node, NodeRunner, NodeToken};
+
 use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
 use std::thread;
 
@@ -308,16 +310,20 @@ impl Menu {
         } else { unreachable!(); }
 
         if let Some(package) = package {
-            // setup for GameSelect
-            self.package = PackageHolder::new(Some(package));
-            self.state = MenuState::GameSelect;
-            self.fighter_selections = vec!();
-            self.stage_ticker = None;
-
-            // remember selection
-            self.config.current_package = Some(self.package.get().meta.folder_name());
-            self.config.save();
+            self.set_package(package);
         }
+    }
+
+    fn set_package(&mut self, package: Package) {
+        // setup for GameSelect
+        self.package = PackageHolder::new(Some(package));
+        self.state = MenuState::GameSelect;
+        self.fighter_selections = vec!();
+        self.stage_ticker = None;
+
+        // remember selection
+        self.config.current_package = Some(self.package.get().meta.folder_name());
+        self.config.save();
     }
 
     fn step_package_select_inner(
@@ -440,6 +446,61 @@ impl Menu {
             PackageHolder::Package (package, _) => { (package, self.config) }
             PackageHolder::None                 => { panic!("Attempted to access the package while there was none") }
         }
+    }
+}
+
+impl Node for Menu {
+    fn node_step(&mut self, mut runner: NodeRunner) -> String {
+        let result = match runner.step() {
+            NodeToken::ChainProperty (property) => {
+                match property.as_str() {
+                    "package" => {
+                        if let &mut PackageHolder::Package (ref mut package, _) = &mut self.package {
+                            package.node_step(runner)
+                        } else {
+                            String::from("No package is loaded.")
+                        }
+                    }
+                    prop      => format!("Menu does not have a property '{}'", prop)
+                }
+            }
+            NodeToken::Help => {
+                String::from(r#"
+Menu Help
+
+Commands:
+*   help               - display this help
+*   open_package $name - loads the package with the given folder name, if it doesnt exist it is created.
+
+Accessors:
+*   .package - Package"#)
+            }
+            NodeToken::Custom (action, args) => {
+                match action.as_ref() {
+                    "open_package" => {
+                        if args.len() > 0 {
+                            let package_name = &args[0];
+                            match Package::open_or_generate(package_name) {
+                                Some (package) => {
+                                    self.set_package(package);
+                                    format!("Successfully opened or created package {}", package_name)
+                                }
+                                None => {
+                                    format!("Failed to open package: {}", package_name)
+                                }
+                            }
+                        } else {
+                            format!("Didn't specify a package")
+                        }
+                    }
+                    _ => {
+                        format!("Menu cannot '{}'", action)
+                    }
+                }
+            }
+            action => { format!("Menu cannot '{:?}'", action) }
+        };
+        result
     }
 }
 

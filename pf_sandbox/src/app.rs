@@ -15,7 +15,7 @@ use ::command_line::CommandLine;
 use ::config::Config;
 use ::game::{Game, GameState, GameSetup};
 use ::input::Input;
-use ::menu::{Menu, MenuState, PackageHolder};
+use ::menu::{Menu, MenuState};
 use ::network::Network;
 use ::os_input::OsInput;
 use ::package::Package;
@@ -176,10 +176,8 @@ pub fn run(mut cli_results: CLIResults) {
                         tx.send(menu.graphics_message(&command_line)).unwrap();
                     }
                 }
-                if let &mut PackageHolder::Package (ref mut package, _) = &mut menu.package {
-                    network.update(package);
-                    command_line.step(&os_input, package);
-                }
+                network.update(menu);
+                command_line.step(&os_input, menu);
             }
             &mut AppState::Game (ref mut game) => {
                 input.update(&game.tas);

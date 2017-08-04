@@ -31,6 +31,15 @@ A package contains:
 *   Game Rules
 *   A source URL to retrieve updates from
 
+You can manually download packages and place them in the packages folder:
+*   Linux: ~/.local/share/PF_Sandbox/packages
+*   Windows: C:\Users\Username\Appdata\Local\PF_Sandbox\packages
+
+You can safely copy fighter and stage files between packages.
+
+You can use the `:open_package $package_folder_name` command on the menu to open the package stored at the specified folder name.
+If the package does not exist at that folder a new package is created there.
+
 ## Game Editing
 
 Always backup any packages you are working on.

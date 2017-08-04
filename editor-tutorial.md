@@ -3,17 +3,23 @@
 Following this tutorial is a great way to get started with editing fighters in PF Sandbox.
 For a full reference of every operation check out the [documentation]().
 
-## Create a new package
+## Setup
 
 It is important to create your own package to put your fighters in.
 If you instead modify the example package, when an update is released for it, your modifications will be lost!
 
-TODO:
-Add a way to create a new package via treeflection. https://github.com/rukai/PF_Sandbox/issues/32
+### I have 2 GC controllers
 
-For Now:
-Create a new package by running from your command line `pf_sandbox new_package_name`
-After the game starts pause it. (spacebar)
+Press '~' to open the command line in PF Sandbox.
+run command `:open_package my_package`
+
+Insert a controller in ports 1 and 2.
+Then start a local game with the example fighter as player 1 and 2.
+
+### I only have 1 GC controller
+
+If you only have one GC controller you can force start a game with 2 fighters by launching PF Sandbox from your OS's command line: `pf_sandbox my_package -p2`
+You can then replug your controller between ports 1 and 2 to swap control of fighters.
 
 ## Basics
 
@@ -23,25 +29,21 @@ Start off by ensuring your controller is in port 1.
 Press `1` to select player 1.
 Now press F8 to toggle on ECB (Environment Collision Box) display
 Now we can see player 1's location as the newly appeared ECB.
+Now press F8 again to toggle it off.
 
-Repeat this for all players.
+Turn on the ECB display for all players.
 1.  Press 1
 2.  Press F8
 3.  Press 2
 4.  Press F8
-3.  Press 3
-4.  Press F8
-3.  Press 4
-4.  Press F8
 
-Unpause and move your fighter around
+Unpause and move your fighter around.
 
 ## Player states
 
 Pause the game, select your player (1) before continuing.
 Press F3, to enable player state debug information.
-Frame advance with spacebar.
-You can now see debug info in the terminal you launched PF Sandbox from. (TODO: in game display)
+You can now see debug info at the top of the screen.
 
 Hold X on your controller and press spacebar on your keyboard.
 Your action will go from Idle -> JumpSquat.
@@ -129,19 +131,11 @@ A command looks like this:
 
 `package:help`
 
-We use the help command to tell us what an object is capable of and what other objects it contains.
+We use the help command to learn what an object can do and what other objects it contains.
 By looking under the Accessors section, we can see that the package contains fighters, stages, meta, and rules.
 Lets further investigate fighters.
 
 `package.fighters:help`
-
-## Menu/Game difference
-
-While in game commands are run on the game object. (which contains the package)
-While in menu commands are run on the package object.
-So commands that work in game wont necessarily work in the menu and vice versa.
-
-This is awkward to use so in the future a package holder object will be added so commands on the package succeed wherever they are run.
 
 ## Save/Reload
 
@@ -232,3 +226,11 @@ Now that we have set the role to hit, we have access to more properties on the r
 
 We set the base knockback for the hitbox to 9001
 Test this out in game!
+
+## Menu/Game difference
+
+While in game commands are run on the game object.
+While in menu commands are run on the menu object.
+Both contain the current package so you can always access that, but the rest is different.
+So commands that work in game wont necessarily work in the menu and vice versa.
+Use :help while in game and in menu to see the differences.
