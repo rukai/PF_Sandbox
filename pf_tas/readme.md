@@ -1,6 +1,7 @@
 # PF TAS
 
 A keyboard driven GUI tool for sending TAS inputs to PF Sandbox.
+Only affects game inputs not menu inputs.
 
 ## Keyboard mapping
 
