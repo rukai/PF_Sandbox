@@ -112,9 +112,9 @@ impl Platform {
     pub fn plat_x_in_bounds(&self, plat_x: f32) -> bool {
         let world_x = self.plat_x_to_world_x(plat_x);
         if self.x1 < self.x2 {
-            self.x1 < world_x && world_x < self.x2
+            self.x1 <= world_x && world_x <= self.x2
         } else {
-            self.x2 < world_x && world_x < self.x1
+            self.x2 <= world_x && world_x <= self.x1
         }
     }
 
@@ -127,6 +127,18 @@ impl Platform {
         world_x - (self.x1 + self.x2) / 2.0
     }
 
+    /// Converts the world x value to be relative to the center of the platform
+    /// If it goes beyond the range of the platform, it is clamped to the edges
+    pub fn world_x_to_plat_x_clamp(&self, world_x: f32) -> f32 {
+        if world_x > self.x1 && world_x > self.x2 {
+            self.x1.max(self.x2)
+        } else if world_x < self.x1 && world_x < self.x2 {
+            self.x1.min(self.x2)
+        } else {
+            world_x - (self.x1 + self.x2) / 2.0
+        }
+    }
+
     pub fn plat_x_to_world_x(&self, plat_x: f32) -> f32 {
         (self.x1 + self.x2) / 2.0 + plat_x
     }
@@ -137,11 +149,35 @@ impl Platform {
         (world_x, world_y)
     }
 
-    pub fn ledge(&self, right: bool) -> (f32, f32) {
-        if right {
-            (self.x2, self.y2)
-        } else {
+    pub fn left_ledge(&self) -> (f32, f32) {
+        if self.x1 < self.x2 {
             (self.x1, self.y1)
+        } else {
+            (self.x2, self.y2)
+        }
+    }
+
+    pub fn left_grab(&self) -> bool {
+        if self.x1 < self.x2 {
+            self.grab1
+        } else {
+            self.grab2
+        }
+    }
+
+    pub fn right_ledge(&self) -> (f32, f32) {
+        if self.x1 > self.x2 {
+            (self.x1, self.y1)
+        } else {
+            (self.x2, self.y2)
+        }
+    }
+
+    pub fn right_grab(&self) -> bool {
+        if self.x1 > self.x2 {
+            self.grab1
+        } else {
+            self.grab2
         }
     }
 

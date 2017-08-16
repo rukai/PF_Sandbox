@@ -137,32 +137,34 @@ pub struct ActionDef {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct ActionFrame {
-    pub ecb:          ECB,
-    pub colboxes:     ContextVec<CollisionBox>,
-    pub colbox_links: Vec<CollisionBoxLink>,
-    pub render_order: Vec<RenderOrder>,
-    pub effects:      Vec<FrameEffect>,
-    pub item_hold_x:  f32,
-    pub item_hold_y:  f32,
-    pub grab_hold_x:  f32,
-    pub grab_hold_y:  f32,
-    pub pass_through: bool, // only used on aerial actions
+    pub ecb:            ECB,
+    pub colboxes:       ContextVec<CollisionBox>,
+    pub colbox_links:   Vec<CollisionBoxLink>,
+    pub render_order:   Vec<RenderOrder>,
+    pub effects:        Vec<FrameEffect>,
+    pub item_hold_x:    f32,
+    pub item_hold_y:    f32,
+    pub grab_hold_x:    f32,
+    pub grab_hold_y:    f32,
+    pub pass_through:   bool, // only used on aerial actions
+    pub ledge_grab_box: Option<LedgeGrabBox>,
     pub force_hitlist_reset: bool,
 }
 
 impl Default for ActionFrame {
     fn default() -> ActionFrame {
         ActionFrame {
-            colboxes:     ContextVec::new(),
-            colbox_links: vec!(),
-            render_order: vec!(),
-            effects:      vec!(),
-            ecb:          ECB::default(),
-            item_hold_x:  4.0,
-            item_hold_y:  11.0,
-            grab_hold_x:  4.0,
-            grab_hold_y:  11.0,
-            pass_through: true,
+            colboxes:       ContextVec::new(),
+            colbox_links:   vec!(),
+            render_order:   vec!(),
+            effects:        vec!(),
+            ecb:            ECB::default(),
+            item_hold_x:    4.0,
+            item_hold_y:    11.0,
+            grab_hold_x:    4.0,
+            grab_hold_y:    11.0,
+            pass_through:   true,
+            ledge_grab_box: None,
             force_hitlist_reset: false,
         }
     }
@@ -270,6 +272,25 @@ impl ActionFrame {
             }
         }
         result
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub struct LedgeGrabBox {
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
+}
+
+impl Default for LedgeGrabBox {
+    fn default() -> LedgeGrabBox {
+        LedgeGrabBox {
+            x1: 0.0,
+            y1: 12.0,
+            x2: 14.0,
+            y2: 22.0,
+        }
     }
 }
 
@@ -399,6 +420,7 @@ pub enum Action {
     SpawnIdle,
     Idle,
     Crouch,
+    LedgeIdle,
 
     // Movement
     Fall,
@@ -420,6 +442,11 @@ pub enum Action {
     Damage,
     DamageFly,
     DamageFall,
+    LedgeGrab,
+    LedgeJump,
+    LedgeJumpSlow,
+    LedgeGetup,
+    LedgeGetupSlow,
 
     // Defense
     ShieldOn,
@@ -434,6 +461,8 @@ pub enum Action {
     TechS,
     TechB,
     Rebound, // State after clang
+    LedgeRoll,
+    LedgeRollSlow,
 
     // Attacks
     Jab,
@@ -448,6 +477,8 @@ pub enum Action {
     Fsmash,
     Grab,
     DashGrab,
+    LedgeAttack,
+    LedgeAttackSlow,
 
     // Aerials
     Uair,

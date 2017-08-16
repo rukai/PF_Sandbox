@@ -45,7 +45,7 @@ pub struct Player {
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub enum Location {
     Platform { platform_i: usize, x: f32 },
-    GrabbedLedge (usize), // player.face_right determines which edge on the platform
+    GrabbedLedge { platform_i: usize, d_x: f32, d_y: f32, hogging: bool }, // player.face_right determines which edge on the platform
     GrabbedByPlayer (usize),
     Airbourne { x: f32, y: f32 },
 }
@@ -136,11 +136,14 @@ impl Player {
                     (0.0, 0.0)
                 }
             }
-            Location::GrabbedLedge (platform_i) => {
+            Location::GrabbedLedge { platform_i, d_x, d_y, .. } => {
                 if let Some(platform) = platforms.get(platform_i) {
-                    let (ledge_x, ledge_y) = platform.ledge(self.face_right);
-                    let (player_x, player_y) = (3.0, 12.0); // TODO: Get from fighter
-                    (ledge_x + self.relative_f(player_x), ledge_y + player_y)
+                    let (ledge_x, ledge_y) = if self.face_right {
+                        platform.left_ledge()
+                    } else {
+                        platform.right_ledge()
+                    };
+                    (ledge_x + self.relative_f(d_x), ledge_y + d_y)
                 } else {
                     (0.0, 0.0)
                 }
@@ -182,7 +185,7 @@ impl Player {
     }
 
     pub fn is_ledge(&self) -> bool {
-        if let &Location::GrabbedLedge (_) = &self.location {
+        if let &Location::GrabbedLedge { .. } = &self.location {
             true
         } else {
             false
@@ -356,7 +359,6 @@ impl Player {
         let prev_bot_y = self.ecb.bot_y;
         self.ecb = fighter_frame.ecb.clone();
         match action {
-            //TODO: Err does this if apply to all Some()?
             Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.frame < 10
                 => { self.ecb.bot_y = prev_bot_y }
             _   => { }
@@ -399,7 +401,59 @@ impl Player {
                 Action::Dash        => { self.dash_action(input, fighter) }
                 Action::Run         => { self.run_action(input, fighter) }
                 Action::Turn        => { self.turn_action(input, fighter) }
+                Action::LedgeIdle   => { self.ledge_idle_action(input, players, fighters, platforms) }
                 _ => { },
+            }
+        }
+    }
+
+    fn ledge_idle_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        if
+            (input[0].  stick_y < -0.2 && input[1].  stick_y >= -0.2) ||
+            (input[0].c_stick_y < -0.2 && input[1].c_stick_y >= -0.2) ||
+            (self.relative_f(input[0].  stick_x) < -0.2 && self.relative_f(input[1].  stick_x) >= -0.2) ||
+            (self.relative_f(input[0].c_stick_x) < -0.2 && self.relative_f(input[1].c_stick_x) >= -0.2)
+        {
+            self.set_airbourne(players, fighters, platforms);
+            self.set_action(Action::Fall);
+        }
+        else if input.x.press || input.y.press || (input[0].stick_y > 0.65 && input[1].stick_y <= 0.65) {
+            if self.damage < 100.0 {
+                self.set_action(Action::LedgeJump);
+            }
+            else {
+                self.set_action(Action::LedgeJumpSlow);
+            }
+        }
+        else if
+            (self.relative_f(input[0].stick_x) > 0.2 && self.relative_f(input[1].stick_x) <= 0.2) ||
+            (input[0].stick_y > 0.2 && input[1].stick_y <= 0.2)
+        {
+            if self.damage < 100.0 {
+                self.set_action(Action::LedgeGetup);
+            }
+            else {
+                self.set_action(Action::LedgeGetupSlow);
+            }
+        }
+        else if input.a.press || input.b.press || (input[0].c_stick_y > 0.65 && input[1].c_stick_x <= 0.65) {
+            if self.damage < 100.0 {
+                self.set_action(Action::LedgeAttack);
+            }
+            else {
+                self.set_action(Action::LedgeAttackSlow);
+            }
+        }
+        else if
+            input.l.press || input.r.press ||
+            (input[0].l_trigger > 0.3 && input[1].l_trigger <= 0.3) || (input[0].r_trigger > 0.3 && input[1].r_trigger <= 0.3) ||
+            (self.relative_f(input[0].c_stick_x) > 0.8 && self.relative_f(input[1].c_stick_x) <= 0.8)
+        {
+            if self.damage < 100.0 {
+                self.set_action(Action::LedgeRoll);
+            }
+            else {
+                self.set_action(Action::LedgeRollSlow);
             }
         }
     }
@@ -928,31 +982,37 @@ impl Player {
             // Idle
             Some(Action::Spawn)     => { self.set_action(Action::SpawnIdle); },
             Some(Action::SpawnIdle) => { self.set_action(Action::SpawnIdle); },
-            Some(Action::Idle)      => { self.set_action(Action::Idle);      },
+            Some(Action::Idle)      => { self.set_action(Action::Idle); },
+            Some(Action::LedgeIdle) => { self.set_action(Action::LedgeIdle); },
 
             // crouch
             Some(Action::CrouchStart) => { self.set_action(Action::Crouch); },
             Some(Action::Crouch)      => { self.set_action(Action::Crouch); },
-            Some(Action::CrouchEnd)   => { self.set_action(Action::Idle);   },
+            Some(Action::CrouchEnd)   => { self.set_action(Action::Idle); },
 
             // Movement
-            Some(Action::Fall)         => { self.set_action(Action::Fall);       },
-            Some(Action::AerialFall)   => { self.set_action(Action::AerialFall); },
-            Some(Action::Land)         => { self.set_action(Action::Idle);       },
-            Some(Action::JumpF)        => { self.set_action(Action::Fall);       },
-            Some(Action::JumpB)        => { self.set_action(Action::Fall);       },
-            Some(Action::JumpAerialF)  => { self.set_action(Action::AerialFall); },
-            Some(Action::JumpAerialB)  => { self.set_action(Action::AerialFall); },
-            Some(Action::TurnDash)     => { self.set_action(Action::Dash);       },
-            Some(Action::TurnRun)      => { self.set_action(Action::Idle);       },
-            Some(Action::Dash)         => { self.set_action(Action::Run);        },
-            Some(Action::Run)          => { self.set_action(Action::Run);        },
-            Some(Action::RunEnd)       => { self.set_action(Action::Idle);       },
-            Some(Action::Walk)         => { self.set_action(Action::Walk);       },
-            Some(Action::PassPlatform) => { self.set_action(Action::AerialFall); },
-            Some(Action::Damage)       => { self.set_action(Action::Damage);     },
-            Some(Action::DamageFly)    => { self.set_action(Action::DamageFly);  },
-            Some(Action::DamageFall)   => { self.set_action(Action::DamageFall); },
+            Some(Action::Fall)           => { self.set_action(Action::Fall); },
+            Some(Action::AerialFall)     => { self.set_action(Action::AerialFall); },
+            Some(Action::Land)           => { self.set_action(Action::Idle); },
+            Some(Action::JumpF)          => { self.set_action(Action::Fall); },
+            Some(Action::JumpB)          => { self.set_action(Action::Fall); },
+            Some(Action::JumpAerialF)    => { self.set_action(Action::AerialFall); },
+            Some(Action::JumpAerialB)    => { self.set_action(Action::AerialFall); },
+            Some(Action::TurnDash)       => { self.set_action(Action::Dash); },
+            Some(Action::TurnRun)        => { self.set_action(Action::Idle); },
+            Some(Action::Dash)           => { self.set_action(Action::Run); },
+            Some(Action::Run)            => { self.set_action(Action::Run); },
+            Some(Action::RunEnd)         => { self.set_action(Action::Idle); },
+            Some(Action::Walk)           => { self.set_action(Action::Walk); },
+            Some(Action::PassPlatform)   => { self.set_action(Action::AerialFall); },
+            Some(Action::Damage)         => { self.set_action(Action::Damage); },
+            Some(Action::DamageFly)      => { self.set_action(Action::DamageFly); },
+            Some(Action::DamageFall)     => { self.set_action(Action::DamageFall); },
+            Some(Action::LedgeGrab)      => { self.set_action(Action::LedgeIdle); },
+            Some(Action::LedgeGetup)     => { self.set_action_idle_from_ledge(players, fighters, platforms); },
+            Some(Action::LedgeGetupSlow) => { self.set_action_idle_from_ledge(players, fighters, platforms); },
+            Some(Action::LedgeJump)      => { self.set_action_fall_from_ledge_jump(players, fighters, platforms); },
+            Some(Action::LedgeJumpSlow)  => { self.set_action_fall_from_ledge_jump(players, fighters, platforms); },
             Some(Action::Turn) => {
                 let new_action = if self.relative_f(input[0].stick_x) > 0.79 && self.turn_dash_buffer {
                     Action::Dash
@@ -988,32 +1048,36 @@ impl Player {
             },
 
             // Defense
-            Some(Action::ShieldOn)    => { self.set_action(Action::Shield);      },
-            Some(Action::Shield)      => { self.set_action(Action::Shield);      },
-            Some(Action::ShieldOff)   => { self.set_action(Action::Idle);        },
-            Some(Action::RollF)       => { self.set_action(Action::Idle);        },
-            Some(Action::RollB)       => { self.set_action(Action::Idle);        },
-            Some(Action::AerialDodge) => { self.set_action(Action::SpecialFall); },
-            Some(Action::SpecialFall) => { self.set_action(Action::SpecialFall); },
-            Some(Action::SpecialLand) => { self.set_action(Action::Idle);        },
-            Some(Action::TechF)       => { self.set_action(Action::Idle);        },
-            Some(Action::TechS)       => { self.set_action(Action::Idle);        },
-            Some(Action::TechB)       => { self.set_action(Action::Idle);        },
-            Some(Action::Rebound)     => { self.set_action(Action::Idle);        },
+            Some(Action::ShieldOn)      => { self.set_action(Action::Shield); },
+            Some(Action::Shield)        => { self.set_action(Action::Shield); },
+            Some(Action::ShieldOff)     => { self.set_action(Action::Idle); },
+            Some(Action::RollF)         => { self.set_action(Action::Idle); },
+            Some(Action::RollB)         => { self.set_action(Action::Idle); },
+            Some(Action::AerialDodge)   => { self.set_action(Action::SpecialFall); },
+            Some(Action::SpecialFall)   => { self.set_action(Action::SpecialFall); },
+            Some(Action::SpecialLand)   => { self.set_action(Action::Idle); },
+            Some(Action::TechF)         => { self.set_action(Action::Idle); },
+            Some(Action::TechS)         => { self.set_action(Action::Idle); },
+            Some(Action::TechB)         => { self.set_action(Action::Idle); },
+            Some(Action::Rebound)       => { self.set_action(Action::Idle); },
+            Some(Action::LedgeRoll)     => { self.set_action_idle_from_ledge(players, fighters, platforms); },
+            Some(Action::LedgeRollSlow) => { self.set_action_idle_from_ledge(players, fighters, platforms); },
 
             // Attack
-            Some(Action::Jab)        => { self.set_action(Action::Idle); },
-            Some(Action::Jab2)       => { self.set_action(Action::Idle); },
-            Some(Action::Jab3)       => { self.set_action(Action::Idle); },
-            Some(Action::Utilt)      => { self.set_action(Action::Idle); },
-            Some(Action::Dtilt)      => { self.set_action(Action::Crouch); },
-            Some(Action::Ftilt)      => { self.set_action(Action::Idle); },
-            Some(Action::DashAttack) => { self.set_action(Action::Idle); },
-            Some(Action::Usmash)     => { self.set_action(Action::Idle); },
-            Some(Action::Dsmash)     => { self.set_action(Action::Idle); },
-            Some(Action::Fsmash)     => { self.set_action(Action::Idle); },
-            Some(Action::Grab)       => { self.set_action(Action::Idle); },
-            Some(Action::DashGrab)   => { self.set_action(Action::Idle); },
+            Some(Action::Jab)             => { self.set_action(Action::Idle); },
+            Some(Action::Jab2)            => { self.set_action(Action::Idle); },
+            Some(Action::Jab3)            => { self.set_action(Action::Idle); },
+            Some(Action::Utilt)           => { self.set_action(Action::Idle); },
+            Some(Action::Dtilt)           => { self.set_action(Action::Crouch); },
+            Some(Action::Ftilt)           => { self.set_action(Action::Idle); },
+            Some(Action::DashAttack)      => { self.set_action(Action::Idle); },
+            Some(Action::Usmash)          => { self.set_action(Action::Idle); },
+            Some(Action::Dsmash)          => { self.set_action(Action::Idle); },
+            Some(Action::Fsmash)          => { self.set_action(Action::Idle); },
+            Some(Action::Grab)            => { self.set_action(Action::Idle); },
+            Some(Action::DashGrab)        => { self.set_action(Action::Idle); },
+            Some(Action::LedgeAttack)     => { self.set_action_idle_from_ledge(players, fighters, platforms); },
+            Some(Action::LedgeAttackSlow) => { self.set_action_idle_from_ledge(players, fighters, platforms); },
 
             // Aerials
             Some(Action::Uair)     => { self.set_action(Action::Fall); },
@@ -1036,6 +1100,25 @@ impl Player {
             Some(Action::Eliminated)         => { },
             Some(Action::DummyFramePreStart) => { self.set_action(Action::Spawn); },
         };
+    }
+
+    pub fn set_action_idle_from_ledge(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        if let Location::GrabbedLedge { platform_i, .. } = self.location {
+            let platform = &platforms[platform_i];
+            let (world_x, _) = self.bps_xy(players, fighters, platforms);
+            let x = platform.world_x_to_plat_x_clamp(world_x);
+
+            self.location = Location::Platform { platform_i, x };
+            self.set_action(Action::Idle);
+        }
+        else {
+            panic!("Location must be on ledge to call this function.")
+        }
+    }
+
+    pub fn set_action_fall_from_ledge_jump(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        self.set_airbourne(players, fighters, platforms);
+        self.set_action(Action::Fall);
     }
 
     pub fn relative_f(&self, input: f32) -> f32 {
@@ -1164,6 +1247,13 @@ impl Player {
             let (x, y) = self.bps_xy(players, fighters, &stage.platforms);
             if x < blast.left || x > blast.right || y < blast.bot || y > blast.top {
                 self.die(fighter, game_frame, goal);
+            }
+
+            let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
+            if input.stick_y.value > -0.5 {
+                if let Some(ref ledge_grab_box) = fighter_frame.ledge_grab_box {
+                    self.check_ledge_grab(&fighter, &ledge_grab_box, &stage.platforms);
+                }
             }
         }
     }
@@ -1329,6 +1419,49 @@ impl Player {
             _ => {
                 self.set_action(Action::Spawn);
             }
+        }
+    }
+
+    fn check_ledge_grab(&mut self, fighter: &Fighter, ledge_grab_box: &LedgeGrabBox, platforms: &[Platform]) {
+        for (platform_i, platform) in platforms.iter().enumerate() {
+            let left_grab  = platform.left_grab()  && self.check_ledge_collision(ledge_grab_box, platform.left_ledge()); // TODO: Check not hogged
+            let right_grab = platform.right_grab() && self.check_ledge_collision(ledge_grab_box, platform.right_ledge()); // TODO: Check not hogged
+
+            // If both left and right ledges are in range then keep the same direction.
+            // This prevents always facing left or right on small platforms.
+            if left_grab && !right_grab {
+                self.face_right = true;
+            }
+            else if !left_grab && right_grab {
+                self.face_right = false;
+            }
+
+            if left_grab || right_grab {
+                self.x_vel = 0.0;
+                self.y_vel = 0.0;
+                self.fastfalled = false;
+                self.air_jumps_left = fighter.air_jumps;
+                self.hit_by = None;
+                self.location = Location::GrabbedLedge { platform_i, d_x: -3.0, d_y: -24.0, hogging: true };
+                self.set_action(Action::LedgeGrab);
+            }
+        }
+    }
+
+    fn check_ledge_collision(&self, ledge_grab_box: &LedgeGrabBox, ledge: (f32, f32)) -> bool {
+        if let Location::Airbourne { x: p_x, y: p_y } = self.location {
+            let b_x1 = self.relative_f(ledge_grab_box.x1).min(self.relative_f(ledge_grab_box.x2));
+            let b_y1 =                 ledge_grab_box.y1.min(ledge_grab_box.y2);
+
+            let b_x2 = self.relative_f(ledge_grab_box.x1).max(self.relative_f(ledge_grab_box.x2));
+            let b_y2 =                 ledge_grab_box.y1.max(ledge_grab_box.y2);
+
+            let (l_x, l_y) = ledge;
+
+            l_x > p_x + b_x1 && l_x < p_x + b_x2 &&
+            l_y > p_y + b_y1 && l_y < p_y + b_y2
+        } else {
+            false
         }
     }
 
