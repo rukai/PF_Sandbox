@@ -323,7 +323,7 @@ impl Package {
     }
 
     pub fn insert_fighter_frame(&mut self, fighter: &str, action: usize, frame: usize, action_frame: ActionFrame) {
-        let mut action_frames = &mut self.fighters[fighter].actions[action].frames;
+        let action_frames = &mut self.fighters[fighter].actions[action].frames;
 
         action_frames.insert(frame, action_frame.clone());
 
@@ -336,7 +336,7 @@ impl Package {
     }
 
     pub fn delete_fighter_frame(&mut self, fighter: &str, action: usize, frame: usize) -> bool {
-        let mut action_frames = &mut self.fighters[fighter].actions[action].frames;
+        let action_frames = &mut self.fighters[fighter].actions[action].frames;
 
         if action_frames.len() > 1 {
             action_frames.remove(frame);
@@ -359,7 +359,7 @@ impl Package {
         &mut self, fighter: &str, action: usize, frame: usize,
         new_colbox: CollisionBox, link_to: &HashSet<usize>, link_type: LinkType
     ) -> usize {
-        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
+        let fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         let new_colbox_index = fighter_frame.colboxes.len();
         fighter_frame.colboxes.push(new_colbox);
 
@@ -393,9 +393,9 @@ impl Package {
     }
 
     pub fn delete_fighter_colboxes(&mut self, fighter: &str, action: usize, frame: usize, colboxes_to_delete: &HashSet<usize>) {
-        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
+        let fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
-            let mut colboxes = &mut fighter_frame.colboxes;
+            let colboxes = &mut fighter_frame.colboxes;
 
             // ensure that collisionboxes are deleted in an order in which the indexes continue to refer to the same element.
             let mut colboxes_to_delete = colboxes_to_delete.iter().collect::<Vec<_>>();
@@ -472,9 +472,9 @@ impl Package {
     }
 
     pub fn move_fighter_colboxes(&mut self, fighter: &str, action: usize, frame: usize, moved_colboxes: &HashSet<usize>, distance: (f32, f32)) {
-        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
+        let fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
-            let mut colboxes = &mut fighter_frame.colboxes;
+            let colboxes = &mut fighter_frame.colboxes;
             let (d_x, d_y) = distance;
 
             for i in moved_colboxes {
@@ -497,12 +497,12 @@ impl Package {
     }
 
     pub fn resize_fighter_colboxes(&mut self, fighter: &str, action: usize, frame: usize, resized_colboxes: &HashSet<usize>, size_diff: f32) {
-        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
+        let fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
-            let mut colboxes = &mut fighter_frame.colboxes;
+            let colboxes = &mut fighter_frame.colboxes;
 
             for i in resized_colboxes {
-                let mut colbox = &mut colboxes[*i];
+                let colbox = &mut colboxes[*i];
                 colbox.radius += size_diff;
             }
         }
@@ -522,12 +522,12 @@ impl Package {
 
     /// All colboxes or links containing colboxes from reordered_colboxes are sent to the back
     pub fn fighter_colboxes_send_to_back(&mut self, fighter: &str, action: usize, frame: usize, reordered_colboxes: &HashSet<usize>) {
-        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
+        let fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             for reorder_colbox_i in reordered_colboxes {
                 let links = fighter_frame.get_links_containing_colbox(*reorder_colbox_i);
                 let colbox_links_clone = fighter_frame.colbox_links.clone();
-                let mut render_order = &mut fighter_frame.render_order;
+                let render_order = &mut fighter_frame.render_order;
 
                 // delete pre-existing value
                 render_order.retain(|x| -> bool {
@@ -568,11 +568,11 @@ impl Package {
 
     /// All colboxes or links containing colboxes from reordered_colboxes are sent to the front
     pub fn fighter_colboxes_send_to_front(&mut self, fighter: &str, action: usize, frame: usize, reordered_colboxes: &HashSet<usize>) {
-        let mut fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
+        let fighter_frame = &mut self.fighters[fighter].actions[action].frames[frame];
         {
             for reorder_i in reordered_colboxes {
                 let links = fighter_frame.get_links_containing_colbox(*reorder_i);
-                let mut render_order = &mut fighter_frame.render_order;
+                let render_order = &mut fighter_frame.render_order;
 
                 // delete pre-existing value
                 render_order.retain(|x| -> bool {

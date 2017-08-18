@@ -158,7 +158,7 @@ impl Menu {
             let fighters = &self.package.get().fighters;
             {
                 // update selections
-                let mut selections = &mut self.fighter_selections.iter_mut();
+                let selections = &mut self.fighter_selections.iter_mut();
                 for (ref mut selection, ref input) in selections.zip(player_inputs) {
                     selection.plugged_in = input.plugged_in;
 

@@ -1134,7 +1134,7 @@ impl Player {
         let mut frame = frame.clone();
 
         // fix hitboxes
-        for mut colbox in &mut frame.colboxes[..] {
+        for colbox in &mut frame.colboxes[..] {
             let (x, y) = colbox.point;
             colbox.point = (self.relative_f(x), y);
             if let &mut CollisionBoxRole::Hit (ref mut hitbox) = &mut colbox.role {
