@@ -12,17 +12,18 @@ use ::package::Verify;
 use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
 use vulkano;
-use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
+use vulkano::buffer::cpu_pool::CpuBufferPool;
+use vulkano::buffer::BufferUsage;
 use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder};
-use vulkano::descriptor::descriptor_set::{SimpleDescriptorSet, SimpleDescriptorSetBuf};
+use vulkano::descriptor::descriptor_set::{PersistentDescriptorSet, DescriptorSet};
 use vulkano::descriptor::pipeline_layout::PipelineLayoutAbstract;
 use vulkano::device::{Device, Queue};
 use vulkano::framebuffer::{Framebuffer, FramebufferAbstract, Subpass, RenderPassAbstract};
 use vulkano::image::SwapchainImage;
 use vulkano::instance::{Instance, PhysicalDevice};
+use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
-use vulkano::pipeline::GraphicsPipeline;
 use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentMode};
 use vulkano::sync::{GpuFuture, FlushError};
 use vulkano_text::{DrawText, DrawTextTrait, UpdateTextCache};
@@ -52,30 +53,25 @@ mod fs {
     struct Dummy;
 }
 
-pub struct Uniform {
-    uniform:  Arc<CpuAccessibleBuffer<vs::ty::Data>>,
-    set:      Arc<SimpleDescriptorSet<((), SimpleDescriptorSetBuf<Arc<CpuAccessibleBuffer<vs::ty::Data>>>)>>,
-}
-
 pub struct VulkanGraphics<'a> {
-    package_buffers: PackageBuffers,
-    window:          vulkano_win::Window,
-    events_loop:     EventsLoop,
-    device:          Arc<Device>,
-    future:          Box<GpuFuture>,
-    swapchain:       Arc<Swapchain>,
-    queue:           Arc<Queue>,
-    pipeline:        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
-    render_pass:     Arc<RenderPassAbstract + Send + Sync>,
-    framebuffers:    Vec<Arc<FramebufferAbstract + Send + Sync>>,
-    uniforms:        Vec<Uniform>,
-    draw_text:       DrawText<'a>,
-    os_input_tx:     Sender<WindowEvent>,
-    render_rx:       Receiver<GraphicsMessage>,
-    frame_durations: Vec<Duration>,
-    fps:             String,
-    width:           u32,
-    height:          u32,
+    package_buffers:     PackageBuffers,
+    window:              vulkano_win::Window,
+    events_loop:         EventsLoop,
+    device:              Arc<Device>,
+    future:              Box<GpuFuture>,
+    swapchain:           Arc<Swapchain>,
+    queue:               Arc<Queue>,
+    pipeline:            Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+    render_pass:         Arc<RenderPassAbstract + Send + Sync>,
+    framebuffers:        Vec<Arc<FramebufferAbstract + Send + Sync>>,
+    uniform_buffer_pool: CpuBufferPool<vs::ty::Data>,
+    draw_text:           DrawText<'a>,
+    os_input_tx:         Sender<WindowEvent>,
+    render_rx:           Receiver<GraphicsMessage>,
+    frame_durations:     Vec<Duration>,
+    fps:                 String,
+    width:               u32,
+    height:              u32,
 }
 
 impl<'a> VulkanGraphics<'a> {
@@ -127,39 +123,38 @@ impl<'a> VulkanGraphics<'a> {
         };
 
 
-        let (uniforms, render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(device.clone(), queue.clone(), swapchain.clone(), &images);
+        let (render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(device.clone(), swapchain.clone(), &images);
 
         let draw_text = DrawText::new(device.clone(), queue.clone(), swapchain.clone(), &images);
+        let uniform_buffer_pool = CpuBufferPool::<vs::ty::Data>::new(device.clone(), BufferUsage::all());
 
         VulkanGraphics {
-            package_buffers:  PackageBuffers::new(),
-            window:           window,
-            events_loop:      events_loop,
-            device:           device,
-            future:           future,
-            swapchain:        swapchain,
-            queue:            queue,
-            pipeline:         pipeline,
-            render_pass:      render_pass,
-            framebuffers:     framebuffers,
-            uniforms:         uniforms,
-            draw_text:        draw_text,
-            os_input_tx:      os_input_tx,
-            render_rx:        render_rx,
-            frame_durations:  vec!(),
-            fps:              String::new(),
-            width:            0,
-            height:           0,
+            package_buffers:     PackageBuffers::new(),
+            window:              window,
+            events_loop:         events_loop,
+            device:              device,
+            future:              future,
+            swapchain:           swapchain,
+            queue:               queue,
+            pipeline:            pipeline,
+            render_pass:         render_pass,
+            framebuffers:        framebuffers,
+            uniform_buffer_pool: uniform_buffer_pool,
+            draw_text:           draw_text,
+            os_input_tx:         os_input_tx,
+            render_rx:           render_rx,
+            frame_durations:     vec!(),
+            fps:                 String::new(),
+            width:               0,
+            height:              0,
         }
     }
 
     fn pipeline(
         device: Arc<Device>,
-        queue: Arc<Queue>,
         swapchain: Arc<Swapchain>,
         images: &[Arc<SwapchainImage>]
     ) -> (
-        Vec<Uniform>,
         Arc<RenderPassAbstract + Send + Sync>,
         Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
         Vec<Arc<FramebufferAbstract + Send + Sync>>
@@ -209,34 +204,16 @@ impl<'a> VulkanGraphics<'a> {
             .unwrap()
         );
 
-        let mut uniforms: Vec<Uniform> = vec!();
-        for _ in 0..1000 {
-            let uniform = CpuAccessibleBuffer::<vs::ty::Data>::from_data(
-                device.clone(),
-                BufferUsage::all(),
-                Some(queue.family()),
-                vs::ty::Data {
-                    position_offset: [0.0, 0.0],
-                    zoom:            1.0,
-                    aspect_ratio:    1.0,
-                    direction:       1.0,
-                    edge_color:      [1.0, 1.0, 1.0, 1.0],
-                    color:           [1.0, 1.0, 1.0, 1.0],
-                    _dummy0:         [0; 12],
-                }
-            ).unwrap();
+        (render_pass, pipeline, framebuffers)
+    }
 
-            let set = Arc::new(simple_descriptor_set!(pipeline.clone(), 0, {
-                uniforms: uniform.clone()
-            }));
-
-            uniforms.push(Uniform {
-                uniform: uniform,
-                set: set
-            });
-        }
-
-        (uniforms, render_pass, pipeline, framebuffers)
+    fn new_uniform_set(&self, uniform: vs::ty::Data) -> Arc<DescriptorSet + Send + Sync> {
+        let uniform_buffer = self.uniform_buffer_pool.next(uniform);
+        Arc::new(
+            PersistentDescriptorSet::start(self.pipeline.clone(), 0)
+            .add_buffer(uniform_buffer).unwrap()
+            .build().unwrap()
+        )
     }
 
     fn run(&mut self) {
@@ -279,7 +256,7 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn read_message(&mut self, message: GraphicsMessage) -> Render {
-        self.package_buffers.update(self.device.clone(), self.queue.clone(), message.package_updates);
+        self.package_buffers.update(self.device.clone(), message.package_updates);
         message.render
     }
 
@@ -294,8 +271,7 @@ impl<'a> VulkanGraphics<'a> {
         let (new_swapchain, new_images) = self.swapchain.recreate_with_dimension([width, height]).unwrap();
         self.swapchain = new_swapchain.clone();
 
-        let (uniforms, render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(self.device.clone(), self.queue.clone(), new_swapchain, &new_images);
-        self.uniforms = uniforms;
+        let (render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(self.device.clone(), new_swapchain, &new_images);
         self.render_pass = render_pass;
         self.pipeline = pipeline;
         self.framebuffers = framebuffers;
@@ -384,7 +360,7 @@ impl<'a> VulkanGraphics<'a> {
         let aspect_ratio = self.aspect_ratio();
 
         let mut command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
-        .update_text_cache(&mut self.draw_text, self.queue.clone())
+        .update_text_cache(&mut self.draw_text)
         .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into()]).unwrap();
 
         match render.state {
@@ -400,19 +376,18 @@ impl<'a> VulkanGraphics<'a> {
         }
 
         let stage: &str = render.stage.as_ref();
-        let mut uniforms = self.uniforms.iter();
-        let uniform = uniforms.next().unwrap();
-        {
-            let mut buffer_content = uniform.uniform.write().unwrap();
-            buffer_content.zoom            = zoom;
-            buffer_content.aspect_ratio    = aspect_ratio;
-            buffer_content.position_offset = [pan.0 as f32, pan.1 as f32];
-            buffer_content.direction       = 1.0;
-            buffer_content.edge_color      = [1.0, 1.0, 1.0, 1.0];
-            buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
-        }
         if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
-            command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform.set.clone(), ()).unwrap();
+            let uniform = vs::ty::Data {
+                zoom:            zoom,
+                aspect_ratio:    aspect_ratio,
+                position_offset: [pan.0 as f32, pan.1 as f32],
+                direction:       1.0,
+                edge_color:      [1.0, 1.0, 1.0, 1.0],
+                color:           [1.0, 1.0, 1.0, 1.0],
+                _dummy0:         [0; 12],
+            };
+            let set = self.new_uniform_set(uniform);
+            command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
         }
 
         for entity in render.entities {
@@ -422,54 +397,54 @@ impl<'a> VulkanGraphics<'a> {
                     let draw_pos = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
                     // draw player ecb
                     if player.debug.ecb {
-                        let buffers = Buffers::new_player(self.device.clone(), self.queue.clone(), &player);
-                        let uniform = uniforms.next().unwrap();
-                        {
-                            let mut buffer_content = uniform.uniform.write().unwrap();
-                            buffer_content.zoom            = zoom;
-                            buffer_content.aspect_ratio    = aspect_ratio;
-                            buffer_content.position_offset = draw_pos;
-                            buffer_content.direction       = dir;
-                            buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
-                            if player.fighter_selected {
-                                buffer_content.color = [0.0, 1.0, 0.0, 1.0];
-                            }
-                            else {
-                                buffer_content.color = [1.0, 1.0, 1.0, 1.0];
-                            }
-                        }
-                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform.set.clone(), ()).unwrap();
+                        let buffers = Buffers::new_player(self.device.clone(), &player);
+                        let color = if player.fighter_selected {
+                            [0.0, 1.0, 0.0, 1.0]
+                        } else {
+                            [1.0, 1.0, 1.0, 1.0]
+                        };
+                        let uniform = vs::ty::Data {
+                            zoom:            zoom,
+                            aspect_ratio:    aspect_ratio,
+                            position_offset: draw_pos,
+                            direction:       dir,
+                            edge_color:      [0.0, 1.0, 0.0, 1.0],
+                            color:           color,
+                            _dummy0:         [0; 12],
+                        };
+                        let set = self.new_uniform_set(uniform);
+                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                     }
 
                     // setup fighter uniform
                     match player.debug.fighter {
                         RenderFighter::Normal | RenderFighter::Debug => {
-                            let uniform = uniforms.next().unwrap();
-                            {
-                                let mut buffer_content = uniform.uniform.write().unwrap();
-                                buffer_content.zoom            = zoom;
-                                buffer_content.aspect_ratio    = aspect_ratio;
-                                buffer_content.position_offset = draw_pos;
-                                buffer_content.direction       = dir;
-                                if let RenderFighter::Debug = player.debug.fighter {
-                                    buffer_content.color = [0.0, 0.0, 0.0, 0.0];
-                                }
-                                else {
-                                    buffer_content.color = [1.0, 1.0, 1.0, 1.0];
-                                }
-                                if player.fighter_selected {
-                                    buffer_content.edge_color = [0.0, 1.0, 0.0, 1.0];
-                                }
-                                else {
-                                    buffer_content.edge_color = player.fighter_color;
-                                }
-                            }
+                            let color = if let RenderFighter::Debug = player.debug.fighter {
+                                [0.0, 0.0, 0.0, 0.0]
+                            } else {
+                                [1.0, 1.0, 1.0, 1.0]
+                            };
+                            let edge_color = if player.fighter_selected {
+                                [0.0, 1.0, 0.0, 1.0]
+                            } else {
+                                player.fighter_color
+                            };
+                            let uniform = vs::ty::Data {
+                                zoom:            zoom,
+                                aspect_ratio:    aspect_ratio,
+                                position_offset: draw_pos,
+                                direction:       dir,
+                                edge_color:      edge_color,
+                                color:           color,
+                                _dummy0:         [0; 12],
+                            };
+                            let set = self.new_uniform_set(uniform);
 
                             // draw fighter
                             let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
                             if player.frame < fighter_frames.len() {
                                 if let &Some(ref buffers) = &fighter_frames[player.frame] {
-                                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform.set.clone(), ()).unwrap();
+                                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                                 }
                             }
                             else {
@@ -483,18 +458,18 @@ impl<'a> VulkanGraphics<'a> {
                     if player.selected_colboxes.len() > 0 {
                         // I could store which element each vertex is part of and handle this in the shader but then I wouldn't be able to highlight overlapping elements.
                         // The extra vertex generation + draw should be fast enough (this only occurs on the pause screen)
-                        let uniform = uniforms.next().unwrap();
-                        {
-                            let mut buffer_content = uniform.uniform.write().unwrap();
-                            buffer_content.zoom            = zoom;
-                            buffer_content.aspect_ratio    = aspect_ratio;
-                            buffer_content.position_offset = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
-                            buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
-                            buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
-                            buffer_content.color           = [0.0, 1.0, 0.0, 1.0];
-                        }
-                        let buffers = self.package_buffers.fighter_frame_colboxes(self.device.clone(), self.queue.clone(), &player.fighter, player.action, player.frame, &player.selected_colboxes);
-                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform.set.clone(), ()).unwrap();
+                        let uniform = vs::ty::Data {
+                            zoom:            zoom,
+                            aspect_ratio:    aspect_ratio,
+                            position_offset: [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32],
+                            direction:       if player.face_right { 1.0 } else { -1.0 } as f32,
+                            edge_color:      [0.0, 1.0, 0.0, 1.0],
+                            color:           [0.0, 1.0, 0.0, 1.0],
+                            _dummy0:         [0; 12],
+                        };
+                        let set = self.new_uniform_set(uniform);
+                        let buffers = self.package_buffers.fighter_frame_colboxes(self.device.clone(), &player.fighter, player.action, player.frame, &player.selected_colboxes);
+                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                     }
 
                     // TODO: Edit::Player  - render selected player's BPS as green
@@ -502,42 +477,42 @@ impl<'a> VulkanGraphics<'a> {
                     // TODO: Edit::Stage   - render selected platforms as green
                 },
                 RenderEntity::Selector(rect) => {
-                    let uniform = uniforms.next().unwrap();
-                    {
-                        let mut buffer_content = uniform.uniform.write().unwrap();
-                        buffer_content.zoom            = zoom;
-                        buffer_content.aspect_ratio    = aspect_ratio;
-                        buffer_content.position_offset = [pan.0 as f32, pan.1 as f32];
-                        buffer_content.direction       = 1.0;
-                        buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
-                        buffer_content.color           = [0.0, 1.0, 0.0, 1.0];
-                    }
-                    let buffers = Buffers::rect_outline_buffers(self.device.clone(), self.queue.clone(), rect);
-                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform.set.clone(), ()).unwrap();
+                    let uniform = vs::ty::Data {
+                        zoom:            zoom,
+                        aspect_ratio:    aspect_ratio,
+                        position_offset: [pan.0 as f32, pan.1 as f32],
+                        direction:       1.0,
+                        edge_color:      [0.0, 1.0, 0.0, 1.0],
+                        color:           [0.0, 1.0, 0.0, 1.0],
+                        _dummy0:         [0; 12],
+                    };
+                    let set = self.new_uniform_set(uniform);
+                    let buffers = Buffers::rect_outline_buffers(self.device.clone(), rect);
+                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                 },
                 RenderEntity::Area(rect) => {
-                    let uniform = uniforms.next().unwrap();
-                    {
-                        let mut buffer_content = uniform.uniform.write().unwrap();
-                        buffer_content.zoom            = zoom;
-                        buffer_content.aspect_ratio    = aspect_ratio;
-                        buffer_content.position_offset = [pan.0 as f32, pan.1 as f32];
-                        buffer_content.direction       = 1.0;
-                        buffer_content.edge_color      = [0.0, 1.0, 0.0, 1.0];
-                        buffer_content.color           = [0.0, 1.0, 0.0, 1.0]; // HMMM maybe i can use only the edge to get the outline from a normal rect?
-                    }
-                    let buffers = Buffers::rect_outline_buffers(self.device.clone(), self.queue.clone(), rect);
-                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform.set.clone(), ()).unwrap();
+                    let uniform = vs::ty::Data {
+                        zoom:            zoom,
+                        aspect_ratio:    aspect_ratio,
+                        position_offset: [pan.0 as f32, pan.1 as f32],
+                        direction:       1.0,
+                        edge_color:      [0.0, 1.0, 0.0, 1.0],
+                        color:           [0.0, 1.0, 0.0, 1.0], // TODO: HMMM maybe i can use only the edge to get the outline from a normal rect?
+                        _dummy0:         [0; 12],
+                    };
+                    let set = self.new_uniform_set(uniform);
+                    let buffers = Buffers::rect_outline_buffers(self.device.clone(), rect);
+                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                 },
             }
         }
         command_buffer
-        .draw_text(&mut self.draw_text, self.queue.clone(), self.width, self.height)
+        .draw_text(&mut self.draw_text, self.width, self.height)
         .end_render_pass().unwrap()
     }
 
     fn menu_render(&mut self, render: RenderMenu, image_num: usize, command_output: &[String]) -> AutoCommandBufferBuilder {
-        let mut entities: Vec<MenuEntity> = vec!();
+        let mut entities: Vec<MenuEntityAndSet> = vec!();
         match render.state {
             RenderMenuState::GameSelect (selection) => {
                 self.draw_game_selector(selection);
@@ -558,6 +533,7 @@ impl<'a> VulkanGraphics<'a> {
                     }
                 }
 
+                self.draw_back_counter(&mut entities, back_counter, back_counter_max);
                 match plugged_in_selections.len() {
                     0 => {
                         self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "There are no controllers plugged in.");
@@ -584,7 +560,6 @@ impl<'a> VulkanGraphics<'a> {
                         self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Currently only supports up to 4 controllers. Please unplug some.");
                     }
                 }
-                self.draw_back_counter(&mut entities, back_counter, back_counter_max);
                 self.draw_package_banner(&render.package_verify, command_output);
             }
             RenderMenuState::StageSelect (selection) => {
@@ -617,56 +592,58 @@ impl<'a> VulkanGraphics<'a> {
         }
 
         let mut command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
-        .update_text_cache(&mut self.draw_text, self.queue.clone())
+        .update_text_cache(&mut self.draw_text)
         .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into()]).unwrap();
 
-        for (i, entity) in entities.iter().enumerate() {
-            let uniform = self.uniforms[i].set.clone();
-            match entity {
-                &MenuEntity::Fighter { ref fighter, action, frame } => {
+        for entity_and_set in entities {
+            let set = entity_and_set.set;
+            match entity_and_set.entity {
+                MenuEntity::Fighter { ref fighter, action, frame } => {
                     let fighter_frames = &self.package_buffers.fighters[fighter][action];
                     if frame < fighter_frames.len() {
                         if let &Some(ref buffers) = &fighter_frames[frame] {
-                            command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform, ()).unwrap();
+                            command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                         }
                     }
                 }
-                &MenuEntity::Stage (ref stage) => {
+                MenuEntity::Stage (ref stage) => {
                     let stage: &str = stage.as_ref();
                     if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
-                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform, ()).unwrap();
+                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
-                &MenuEntity::Rect (ref rect) => {
-                    let buffers = Buffers::rect_buffers(self.device.clone(), self.queue.clone(), rect.clone());
-                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), uniform, ()).unwrap();
+                MenuEntity::Rect (ref rect) => {
+                    let buffers = Buffers::rect_buffers(self.device.clone(), rect.clone());
+                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                 }
             }
         }
 
         command_buffer
-        .draw_text(&mut self.draw_text, self.queue.clone(), self.width, self.height)
+        .draw_text(&mut self.draw_text, self.width, self.height)
         .end_render_pass().unwrap()
     }
 
     // TODO: Rewrite text rendering to be part of scene instead of just plastered on top
     // TODO: Then this bar can be drawn on top of the package banner text
-    fn draw_back_counter(&mut self, entities: &mut Vec<MenuEntity>, back_counter: usize, back_counter_max: usize) {
-        let uniform = &self.uniforms[entities.len()];
-        {
-            let mut buffer_content = uniform.uniform.write().unwrap();
-            buffer_content.zoom            = 1.0;
-            buffer_content.aspect_ratio    = 1.0;
-            buffer_content.position_offset = [0.0, 0.0];
-            buffer_content.direction       = 1.0;
-            buffer_content.edge_color      = [1.0, 1.0, 1.0, 1.0];
-            buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
-        }
+    fn draw_back_counter(&mut self, entities: &mut Vec<MenuEntityAndSet>, back_counter: usize, back_counter_max: usize) {
+        let uniform = vs::ty::Data {
+            zoom:            1.0,
+            aspect_ratio:    1.0,
+            position_offset: [0.0, 0.0],
+            direction:       1.0,
+            edge_color:      [1.0, 1.0, 1.0, 1.0],
+            color:           [1.0, 1.0, 1.0, 1.0],
+            _dummy0:         [0; 12],
+        };
+        let set = self.new_uniform_set(uniform);
 
-        entities.push(MenuEntity::Rect (RenderRect {
+        let entity = MenuEntity::Rect (RenderRect {
             p1: ( -1.0, -0.85),
             p2: (back_counter as f32 / back_counter_max as f32 * 2.0 - 1.0, -1.0),
-        }));
+        });
+
+        entities.push(MenuEntityAndSet { set, entity });
     }
 
     fn draw_package_banner(&mut self, verify: &Verify, command_output: &[String]) {
@@ -723,7 +700,7 @@ impl<'a> VulkanGraphics<'a> {
         self.draw_text.queue_text(x, y, 30.0, color, format!("L-Cancel Success: {}%", result.lcancel_percent).as_str());
     }
 
-    fn draw_fighter_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, controller_i: usize, selection: &CharacterSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
+    fn draw_fighter_selector(&mut self, entities: &mut Vec<MenuEntityAndSet>, controller_i: usize, selection: &CharacterSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
         self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Fighters");
         let fighters = &self.package_buffers.package.as_ref().unwrap().fighters;
         for (fighter_i, fighter) in fighters.key_value_iter().enumerate() {
@@ -765,23 +742,26 @@ impl<'a> VulkanGraphics<'a> {
                         let fighter_y = end_y - 0.2; // HACK: dont know why the fighters are drawing so low, so just put them 0.2 higher
                         let fighter_x_scaled = fighter_x * zoom;
                         let fighter_y_scaled = fighter_y * zoom * -1.0 + player.bps.1;
-                        let uniform = &self.uniforms[menu_entities.len()];
-                        {
-                            let mut buffer_content = uniform.uniform.write().unwrap();
-                            buffer_content.zoom            = 1.0 / zoom;
-                            buffer_content.aspect_ratio    = self.aspect_ratio();
-                            buffer_content.position_offset = [fighter_x_scaled, fighter_y_scaled];
-                            buffer_content.direction       = if player.face_right { 1.0 } else { -1.0 } as f32;
-                            buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
-                            buffer_content.edge_color      = color;
-                        }
 
                         if let &Some(_) = &fighter_frames[player.frame] {
-                            menu_entities.push(MenuEntity::Fighter {
+                            let uniform = vs::ty::Data {
+                                zoom:            1.0 / zoom,
+                                aspect_ratio:    self.aspect_ratio(),
+                                position_offset: [fighter_x_scaled, fighter_y_scaled],
+                                direction:       if player.face_right { 1.0 } else { -1.0 } as f32,
+                                edge_color:      color,
+                                color:           [1.0, 1.0, 1.0, 1.0],
+                                _dummy0:         [0; 12],
+                            };
+                            let set = self.new_uniform_set(uniform);
+
+                            let entity = MenuEntity::Fighter {
                                 fighter: player.fighter,
                                 action:  player.action,
                                 frame:   player.frame
-                            });
+                            };
+
+                            entities.push(MenuEntityAndSet { set, entity });
                         }
                     }
                 }
@@ -790,7 +770,7 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
-    fn draw_stage_selector(&mut self, menu_entities: &mut Vec<MenuEntity>, selection: usize) {
+    fn draw_stage_selector(&mut self, entities: &mut Vec<MenuEntityAndSet>, selection: usize) {
         self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Stage");
         let stages = &self.package_buffers.package.as_ref().unwrap().stages;
         for (stage_i, stage) in stages.key_value_iter().enumerate() {
@@ -802,20 +782,22 @@ impl<'a> VulkanGraphics<'a> {
             self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], stage.name.as_ref());
 
             if stage_i == selection {
-                let uniform = &self.uniforms[menu_entities.len()];
-                {
-                    let zoom = 100.0;
-                    let y = -0.2 * zoom;
-                    let mut buffer_content = uniform.uniform.write().unwrap();
-                    buffer_content.zoom            = 1.0 / zoom;
-                    buffer_content.aspect_ratio    = self.aspect_ratio();
-                    buffer_content.position_offset = [0.0, y];
-                    buffer_content.direction       = 1.0;
-                    buffer_content.edge_color      = [1.0, 1.0, 1.0, 1.0];
-                    buffer_content.color           = [1.0, 1.0, 1.0, 1.0];
-                }
+                let zoom = 100.0;
+                let y = -0.2 * zoom;
 
-                menu_entities.push(MenuEntity::Stage(stage_key.clone()));
+                let uniform = vs::ty::Data {
+                    zoom:            1.0 / zoom,
+                    aspect_ratio:    self.aspect_ratio(),
+                    position_offset: [0.0, y],
+                    direction:       1.0,
+                    edge_color:      [1.0, 1.0, 1.0, 1.0],
+                    color:           [1.0, 1.0, 1.0, 1.0],
+                    _dummy0:         [0; 12],
+                };
+                let set = self.new_uniform_set(uniform);
+                let entity = MenuEntity::Stage(stage_key.clone());
+
+                entities.push(MenuEntityAndSet { set, entity });
             }
         }
     }
@@ -878,4 +860,9 @@ enum MenuEntity {
     Fighter { fighter: String, action: usize, frame: usize },
     Stage   (String),
     Rect    (RenderRect),
+}
+
+struct MenuEntityAndSet {
+    entity: MenuEntity,
+    set:    Arc<DescriptorSet + Send + Sync>,
 }

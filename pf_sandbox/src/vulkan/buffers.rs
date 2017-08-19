@@ -7,7 +7,7 @@ use ::stage::Stage;
 
 use std::collections::{HashSet, HashMap};
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
-use vulkano::device::{Device, Queue};
+use vulkano::device::Device;
 
 use std::f32::consts;
 use std::sync::Arc;
@@ -35,7 +35,7 @@ pub struct Buffers {
 }
 
 impl Buffers {
-    pub fn rect_buffers(device: Arc<Device>, queue: Arc<Queue>, rect: RenderRect) -> Buffers {
+    pub fn rect_buffers(device: Arc<Device>, rect: RenderRect) -> Buffers {
         let min_x = rect.p1.0.min(rect.p2.0);
         let min_y = rect.p1.1.min(rect.p2.1);
         let max_x = rect.p1.0.max(rect.p2.0);
@@ -54,12 +54,12 @@ impl Buffers {
         ];
 
         Buffers {
-            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
-            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
         }
     }
 
-    pub fn rect_outline_buffers(device: Arc<Device>, queue: Arc<Queue>, rect: RenderRect) -> Buffers {
+    pub fn rect_outline_buffers(device: Arc<Device>, rect: RenderRect) -> Buffers {
         let width = 0.5;
         let min_x = rect.p1.0.min(rect.p2.0);
         let min_y = rect.p1.1.min(rect.p2.1);
@@ -88,12 +88,12 @@ impl Buffers {
         ];
 
         Buffers {
-            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
-            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
         }
     }
 
-    fn new_stage(device: Arc<Device>, queue: Arc<Queue>, stage: &Stage) -> Option<Buffers> {
+    fn new_stage(device: Arc<Device>, stage: &Stage) -> Option<Buffers> {
         if stage.platforms.len() == 0 {
             return None;
         }
@@ -117,12 +117,12 @@ impl Buffers {
         }
 
         Some(Buffers {
-            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
-            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
         })
     }
 
-    fn new_fighter_frame(device: Arc<Device>, queue: Arc<Queue>, frame: &ActionFrame) -> Option<Buffers> {
+    fn new_fighter_frame(device: Arc<Device>, frame: &ActionFrame) -> Option<Buffers> {
         if frame.colboxes.len() == 0 {
             return None;
         }
@@ -150,8 +150,8 @@ impl Buffers {
         }
 
         Some(Buffers {
-            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
-            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
         })
     }
 
@@ -234,7 +234,7 @@ impl Buffers {
         }
     }
 
-    pub fn new_player(device: Arc<Device>, queue: Arc<Queue>, player: &RenderPlayer) -> Buffers {
+    pub fn new_player(device: Arc<Device>, player: &RenderPlayer) -> Buffers {
         // ecb
         let vertex0 = vertex(player.ecb.bot_x,   player.ecb.bot_y);
         let vertex1 = vertex(player.ecb.left_x,  player.ecb.left_y);
@@ -264,8 +264,8 @@ impl Buffers {
         ];
 
         Buffers {
-            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
-            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
         }
     }
 }
@@ -286,7 +286,7 @@ impl PackageBuffers {
     }
 
     /// Update internal copy of the package and buffers
-    pub fn update(&mut self, device: Arc<Device>, queue: Arc<Queue>, package_updates: Vec<PackageUpdate>) {
+    pub fn update(&mut self, device: Arc<Device>, package_updates: Vec<PackageUpdate>) {
         for update in package_updates {
             match update {
                 PackageUpdate::Package (package) => {
@@ -298,7 +298,7 @@ impl PackageBuffers {
                         for action in &fighter.actions[..] {
                             let mut frame_buffers: Vec<Option<Buffers>> = vec!();
                             for frame in &action.frames[..] {
-                                frame_buffers.push(Buffers::new_fighter_frame(device.clone(), queue.clone(), frame));
+                                frame_buffers.push(Buffers::new_fighter_frame(device.clone(), frame));
                             }
                             action_buffers.push(frame_buffers);
                         }
@@ -306,7 +306,7 @@ impl PackageBuffers {
                     }
 
                     for (key, stage) in package.stages.key_value_iter() {
-                        self.stages.insert(key.clone(), Buffers::new_stage(device.clone(), queue.clone(), &stage));
+                        self.stages.insert(key.clone(), Buffers::new_stage(device.clone(), &stage));
                     }
                     self.package = Some(package);
                 }
@@ -319,7 +319,7 @@ impl PackageBuffers {
                 }
                 PackageUpdate::InsertFighterFrame { fighter, action, frame_index, frame } => {
                     let fighter: &str = &fighter;
-                    let buffers = Buffers::new_fighter_frame(device.clone(), queue.clone(), &frame);
+                    let buffers = Buffers::new_fighter_frame(device.clone(), &frame);
                     self.fighters.get_mut(fighter).unwrap()[action].insert(frame_index, buffers);
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.fighters[fighter].actions[action].frames.insert(frame_index, frame);
@@ -332,7 +332,7 @@ impl PackageBuffers {
                     }
                 }
                 PackageUpdate::InsertStage { index, key, stage } => {
-                    self.stages.insert(key.clone(), Buffers::new_stage(device.clone(), queue.clone(), &stage));
+                    self.stages.insert(key.clone(), Buffers::new_stage(device.clone(), &stage));
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.stages.insert(index, key, stage);
                     }
@@ -341,7 +341,7 @@ impl PackageBuffers {
         }
     }
 
-    pub fn fighter_frame_colboxes(&self, device: Arc<Device>, queue: Arc<Queue>, fighter: &str, action: usize, frame: usize, selected: &HashSet<usize>) -> Buffers {
+    pub fn fighter_frame_colboxes(&self, device: Arc<Device>, fighter: &str, action: usize, frame: usize, selected: &HashSet<usize>) -> Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut index_count = 0;
@@ -356,8 +356,8 @@ impl PackageBuffers {
         }
 
         Buffers {
-            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), indices.iter().cloned()).unwrap(),
-            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), Some(queue.family()), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
         }
     }
 
