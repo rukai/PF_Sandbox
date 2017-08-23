@@ -20,10 +20,10 @@ install:
 script:
   - cargo test --all -j 2
   - cd pf_sandbox
-  - cargo build --no-default-features
-  - cargo build --no-default-features --features=vulkan
-  #- cargo build --no-default-features --features=opengl
-  #- cargo build --no-default-features --features=vulkan,opengl
+  - cargo check --no-default-features
+  - cargo check --no-default-features --features=vulkan
+  #- cargo check --no-default-features --features=opengl
+  #- cargo check --no-default-features --features=vulkan,opengl
 
 # For disabled deploy
 #  - cargo build --release --all -j 2
@@ -41,7 +41,7 @@ branches:
 # 1   There is no way to specify the tag to use from travis CI, it just generates one that looks like untagged-3222787eaa877e191892
 #     Because of this, it doesnt match up with the tag used by appveyor and a seperate release is created.
 #     This makes the github releases page confusing (Made worse by github's [Latest Release] label applied to only one release)
-# 2   As Linux users are generally not afraid of compiling from source and/or using their package manager.
+# 2   Linux users are generally not afraid of compiling from source and/or using their package manager.
 
 #deploy:
 #  name: Linux - R${TRAVIS_BUILD_NUMBER}
