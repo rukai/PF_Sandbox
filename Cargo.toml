@@ -4,3 +4,6 @@ members = [
     "pf_tas",
     "pf_cli"
 ]
+
+[profile.dev]
+opt-level = 2
