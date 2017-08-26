@@ -2,7 +2,7 @@ use ::camera::Camera;
 use ::collision::collision_check;
 use ::command_line::CommandLine;
 use ::config::Config;
-use ::fighter::{ActionFrame, CollisionBox, LinkType};
+use ::fighter::{ActionFrame, CollisionBox, LinkType, Action};
 use ::graphics::{GraphicsMessage, Render, RenderType, RenderRect};
 use ::graphics;
 use ::input::{Input, PlayerInput, ControllerInput};
@@ -17,8 +17,9 @@ use ::stage::{Area, Stage};
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::iter;
+use std::time::Duration;
 use chrono::Local;
+use enum_traits::ToIndex;
 
 use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};
@@ -673,31 +674,25 @@ impl Game {
             self.players = collision_players;
         }
 
-        match self.package.rules.goal {
-            Goal::Time => {
-                if (self.current_frame / 60) as u64 > self.package.rules.time_limit {
-                    self.state = self.generate_game_results();
-                }
-            }
-            Goal::Stock => {
-                if (self.current_frame / 60) as u64 > self.package.rules.time_limit
-                || self.players.iter().filter(|x| x.stocks > 0).count() == 1 {
-                    self.state = self.generate_game_results();
-                }
-            }
-            Goal::Training => { }
+        if self.time_out() || self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 1 {
+            self.state = self.generate_game_results();
         }
 
         self.update_frame();
     }
 
+    pub fn time_out(&self) -> bool {
+        if let Some(time_limit_frames) = self.package.rules.time_limit_frames() {
+            self.current_frame as u64 > time_limit_frames
+        } else {
+            false
+        }
+    }
+
     pub fn generate_game_results(&self) -> GameState {
         let player_results: Vec<PlayerResult> = self.players.iter().map(|x| x.result()).collect();
         let places: Vec<usize> = match self.package.rules.goal {
-            Goal::Training => {
-                iter::repeat(0).take(self.players.len()).collect()
-            }
-            Goal::Stock => {
+            Goal::LastManStanding => {
                 // most stocks remaining wins
                 // tie-breaker:
                 //  * if both eliminated: who lost their last stock last wins
@@ -731,7 +726,7 @@ impl Game {
                 );
                 player_results_i.iter().map(|x| x.0).collect()
             }
-            Goal::Time => {
+            Goal::KillDeathScore => {
                 // highest kills wins
                 // tie breaker: least deaths wins
                 let mut player_results_i: Vec<(usize, &PlayerResult)> = player_results.iter().enumerate().collect();
@@ -852,12 +847,21 @@ impl Game {
             }
         }
 
+        let timer = if let Some(time_limit_frames) = self.package.rules.time_limit_frames() {
+            let frames_remaining = time_limit_frames.saturating_sub(self.current_frame as u64);
+            let frame_duration = Duration::new(1, 0) / 60;
+            Some(frame_duration * frames_remaining as u32)
+        } else {
+            None
+        };
+
         RenderGame {
             stage:       self.selected_stage.clone(),
             entities:    entities,
             state:       self.state.clone(),
             camera:      self.camera.clone(),
             debug_lines: self.debug_lines.clone(),
+            timer:       timer,
         }
     }
 
@@ -950,6 +954,7 @@ pub struct RenderGame {
     pub state:       GameState,
     pub camera:      Camera,
     pub debug_lines: Vec<String>,
+    pub timer:       Option<Duration>,
 }
 
 pub enum RenderEntity {

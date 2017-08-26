@@ -320,6 +320,14 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
+    fn game_timer_render(&mut self, timer: &Option<Duration>) {
+        if let &Some(ref timer) = timer {
+            let minutes = timer.as_secs() / 60;
+            let seconds = timer.as_secs() % 60;
+            self.draw_text.queue_text((self.width / 2) as f32 - 50.0, 35.0, 40.0, [1.0, 1.0, 1.0, 1.0], format!("{:02}:{:02}", minutes, seconds).as_ref());
+        }
+    }
+
     fn game_hud_render(&mut self, entities: &[RenderEntity]) {
         let mut players = 0;
         for entity in entities {
@@ -349,6 +357,7 @@ impl<'a> VulkanGraphics<'a> {
     fn game_render(&mut self, render: RenderGame, image_num: usize, command_output: &[String]) -> AutoCommandBufferBuilder {
         if command_output.len() == 0 {
             self.game_hud_render(&render.entities);
+            self.game_timer_render(&render.timer);
             self.debug_lines_render(&render.debug_lines);
         }
         else {
@@ -720,7 +729,7 @@ impl<'a> VulkanGraphics<'a> {
                     let player = RenderPlayer {
                         debug:             DebugPlayer::default(),
                         damage:            0.0,
-                        stocks:            0,
+                        stocks:            None,
                         bps:               (0.0, 0.0),
                         ecb:               ECB::default(),
                         frame:             0,

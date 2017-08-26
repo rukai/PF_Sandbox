@@ -107,7 +107,7 @@ impl Package {
     pub fn blank() -> Package {
         Package {
             meta:            PackageMeta::new(),
-            rules:           Rules::base(),
+            rules:           Rules::default(),
             stages:          KeyedContextVec::new(),
             fighters:        KeyedContextVec::new(),
             package_updates: vec!(),
@@ -120,7 +120,7 @@ impl Package {
 
         let mut package = Package {
             meta:            PackageMeta { path, .. PackageMeta::new() },
-            rules:           Rules::base(),
+            rules:           Rules::default(),
             stages:          KeyedContextVec::new(),
             fighters:        KeyedContextVec::new(),
             package_updates: vec!(),
@@ -153,7 +153,7 @@ impl Package {
 
         let mut package = Package {
             meta:               meta,
-            rules:              Rules::base(),
+            rules:              Rules::default(),
             stages:             KeyedContextVec::from_vec(vec!((String::from("base_stage.json"), Stage::default()))),
             fighters:           KeyedContextVec::from_vec(vec!((String::from("base_fighter.json"), Fighter::default()))),
             package_updates:    vec!(),

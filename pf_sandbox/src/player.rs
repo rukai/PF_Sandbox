@@ -18,7 +18,7 @@ pub struct Player {
     pub fighter:          String,
     pub action:           u64, // always change through self.set_action
     pub frame:            u64,
-    pub stocks:           u64,
+    pub stocks:           Option<u64>,
     pub damage:           f32,
     pub location:         Location,
     pub respawn:          SpawnPoint,
@@ -98,7 +98,7 @@ impl Hitlag {
 }
 
 impl Player {
-    pub fn new(fighter: String, spawn: SpawnPoint, respawn: SpawnPoint, stocks: u64) -> Player {
+    pub fn new(fighter: String, spawn: SpawnPoint, respawn: SpawnPoint, stocks: Option<u64>) -> Player {
         Player {
             fighter:          fighter,
             action:           Action::DummyFramePreStart.index(),
@@ -1406,17 +1406,20 @@ impl Player {
         });
 
         match goal {
-            Goal::Stock => {
-                self.stocks -= 1;
+            Goal::LastManStanding => {
+                if let Some(mut stocks) = self.stocks {
+                    stocks -= 1;
+                    self.stocks = Some(stocks);
 
-                if self.stocks > 0 {
-                    self.set_action(Action::Spawn);
-                }
-                else {
-                    self.set_action(Action::Eliminated);
+                    if stocks == 0 {
+                        self.set_action(Action::Eliminated);
+                    }
+                    else {
+                        self.set_action(Action::Spawn);
+                    }
                 }
             }
-            _ => {
+            Goal::KillDeathScore => {
                 self.set_action(Action::Spawn);
             }
         }
@@ -1565,7 +1568,7 @@ impl JumpResult {
 pub struct RenderPlayer {
     pub debug:             DebugPlayer,
     pub damage:            f32,
-    pub stocks:            u64,
+    pub stocks:            Option<u64>,
     pub bps:               (f32, f32),
     pub ecb:               ECB,
     pub frame:             usize,

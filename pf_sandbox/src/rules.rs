@@ -1,59 +1,87 @@
 use treeflection::{Node, NodeRunner, NodeToken};
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Rules {
-    pub title:         String,
-    pub goal:          Goal,
-    pub stock_count:   u64,
-    pub time_limit:    u64,
-    pub best_of:       u64,
-    pub teams:         bool,
-    pub pause:         bool,
-    pub friendly_fire: bool,
-    pub ledge_grab:    LedgeGrab,
-    pub grab_clang:    bool,
+    pub title:              String,
+    pub goal:               Goal,
+    pub stock_count:        Option<u64>,
+    pub time_limit_seconds: Option<u64>,
+    pub best_of:            u64,
+    pub pause:              Pause,
+    pub teams:              Teams,
+    pub ledge_grab:         LedgeGrab,
+    pub grab_clang:         bool,
     //pub force_user_settings: User,
 }
 
-impl Rules {
-    pub fn base() -> Rules {
+impl Default for Rules {
+    fn default() -> Self {
         Rules {
-            title:         "Base Game Mode".to_string(),
-            goal:          Goal::Training,
-            stock_count:   4,
-            time_limit:    480,
-            best_of:       3,
-            pause:         true,
-            teams:         false,
-            friendly_fire: false,
-            ledge_grab:    LedgeGrab::Hog,
-            grab_clang:    false,
+            title:              "Base Game Mode".to_string(),
+            goal:               Goal::default(),
+            stock_count:        Some(4),
+            time_limit_seconds: Some(480),
+            best_of:            1,
+            pause:              Pause::default(),
+            teams:              Teams::default(),
+            ledge_grab:         LedgeGrab::default(),
+            grab_clang:         false,
         }
+    }
+}
+
+impl Rules {
+    pub fn time_limit_frames(&self) -> Option<u64> {
+        self.time_limit_seconds.map(|x| x * 60)
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub enum Goal {
-    Training,
-    Time,
-    Stock,
+    KillDeathScore,
+    LastManStanding,
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub enum LedgeGrab {
     Hog,
     Share,
-    Steal
+    Trump
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub enum Pause {
+    On,
+    Off,
+    Hold,
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub enum Teams {
+    On { friendly_fire: bool },
+    Off,
 }
 
 impl Default for Goal {
-    fn default() -> Goal {
-        Goal::Stock
+    fn default() -> Self {
+        Goal::LastManStanding
     }
 }
 
 impl Default for LedgeGrab {
-    fn default() -> LedgeGrab {
+    fn default() -> Self {
         LedgeGrab::Hog
+    }
+}
+
+impl Default for Pause {
+    fn default() -> Self {
+        Pause::On
+    }
+}
+
+impl Default for Teams {
+    fn default() -> Self {
+        Teams::Off
     }
 }
