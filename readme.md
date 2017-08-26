@@ -63,7 +63,7 @@ need vulkan drivers: vulkan-icd-loader
 
 ## Compile and run
 
-To run pf sandbox: run `cargo run` in the pf_sandbox directory.
+To run pf sandbox: run `CARGO_INCREMENTAL=1 cargo run --release` in the pf_sandbox directory.
 
 ## Setup CLI Tool
 

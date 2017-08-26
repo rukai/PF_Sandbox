@@ -18,7 +18,7 @@ install:
   - export CXX="g++-4.8"
 
 script:
-  - cargo test --all -j 2
+  - cargo test -v --all -j 2
   - cd pf_sandbox
   - cargo check --no-default-features
   - cargo check --no-default-features --features=vulkan
