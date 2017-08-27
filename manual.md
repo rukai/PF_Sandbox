@@ -234,3 +234,15 @@ Instead you can let PF engine use context to know what you want to modify.
 Select the hitboxes you want in game then run:
 
 `pf package.fighters[?].actions[?].frames[?].colboxes[?].radius:set 10`
+
+## How to Publish a Package
+
+1.  Add a source property to your package_meta
+2.  Run `package:publish`
+3.  Then grab the files at ~/.local/share/PF_Sandbox/publish/
+4.  Upload them to your webserver at the url you specified in the source property
+
+Note:
+If PF Sandbox encounters any errors while updating a package, it will "silently" fail and continue loading the package as normal.
+This is because we dont want to prevent users playing local games due to network issues.
+However to troubleshoot issues with your published package you can check the terminal output for errors.

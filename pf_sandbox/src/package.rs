@@ -32,14 +32,15 @@ pub fn generate_example_stub() {
         path.push("package_meta.json");
 
         let meta = PackageMeta {
-            path:           path.clone(),
-            engine_version: engine_version(),
-            save_version:   0,
-            title:          "Example Package".to_string(),
-            source:         Some("lucaskent.me/example_package".to_string()),
-            hash:           "".to_string(),
-            fighter_keys:   vec!(),
-            stage_keys:     vec!(),
+            path:              path.clone(),
+            engine_version:    engine_version(),
+            published_version: 0,
+            title:             "Example Package".to_string(),
+            source:            Some("lucaskent.me/example_package".to_string()),
+            published:         false,
+            hash:              "".to_string(),
+            fighter_keys:      vec!(),
+            stage_keys:        vec!(),
         };
         files::save_struct(path, &meta);
     }
@@ -141,14 +142,15 @@ impl Package {
         path.push(name);
 
         let meta = PackageMeta {
-            path:           path,
-            engine_version: engine_version(),
-            save_version:   0,
-            title:          name.to_string(),
-            source:         None,
-            hash:           "".to_string(),
-            fighter_keys:   vec!(),
-            stage_keys:     vec!(),
+            path:              path,
+            engine_version:    engine_version(),
+            published_version: 0,
+            title:             name.to_string(),
+            source:            None,
+            published:         false,
+            hash:              "".to_string(),
+            fighter_keys:      vec!(),
+            stage_keys:        vec!(),
         };
 
         let mut package = Package {
@@ -176,8 +178,11 @@ impl Package {
         }
     }
 
-    pub fn save(&mut self) {
-        self.meta.save_version += 1;
+    pub fn save(&mut self) -> String {
+        if self.meta.published {
+            return String::from("Save FAILED! The published property in package_meta is set.");
+        }
+
         self.meta.fighter_keys = self.fighters.keys();
         self.meta.stage_keys = self.stages.keys();
         self.meta.hash = self.compute_hash();
@@ -193,6 +198,7 @@ impl Package {
         for (key, stage) in self.stages.key_value_iter() {
             files::save_struct(self.meta.path.join("Stages").join(key), stage);
         }
+        String::from("Save completed successfully.")
     }
 
     pub fn load(&mut self) -> Result<(), String> {
@@ -297,7 +303,7 @@ impl Package {
     pub fn verify(&self) -> Verify {
         if let Some(latest_meta) = self.meta.download_latest_meta() {
             let hash = self.compute_hash();
-            if self.meta.save_version >= latest_meta.save_version {
+            if self.meta.published_version >= latest_meta.published_version {
                 if hash == latest_meta.hash {
                     Verify::Ok
                 }
@@ -652,8 +658,7 @@ Accessors:
             NodeToken::Custom (action, _) => {
                 match action.as_ref() {
                     "save" => {
-                        self.save();
-                        String::from("Save completed successfully.")
+                        self.save()
                     }
                     "reload" => {
                         if let Err(err) = self.load() {
@@ -700,27 +705,29 @@ pub enum PackageUpdate {
 pub struct PackageMeta {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-        path:           PathBuf,
-    pub engine_version: u64, // compared with a value incremented by pf engine when there are breaking changes to data structures
-    pub save_version:   u64, // incremented every time the package is saved
-    pub title:          String,
-    pub fighter_keys:   Vec<String>,
-    pub source:         Option<String>,
-    pub hash:           String,
-    pub stage_keys:     Vec<String>,
+        path:              PathBuf,
+    pub engine_version:    u64, // compared with a value incremented by pf engine when there are breaking changes to data structures
+    pub published_version: u64, // incremented every time the package is published
+    pub title:             String,
+    pub fighter_keys:      Vec<String>,
+    pub source:            Option<String>,
+    pub published:         bool,
+    pub hash:              String,
+    pub stage_keys:        Vec<String>,
 }
 
 impl PackageMeta {
     pub fn new() -> PackageMeta {
         PackageMeta {
-            path:           PathBuf::new(),
-            engine_version: engine_version(),
-            save_version:   0,
-            title:          "".to_string(),
-            source:         None,
-            hash:           "".to_string(),
-            fighter_keys:   vec!(),
-            stage_keys:     vec!(),
+            path:              PathBuf::new(),
+            engine_version:    engine_version(),
+            published_version: 0,
+            title:             "".to_string(),
+            source:            None,
+            published:         false,
+            hash:              "".to_string(),
+            fighter_keys:      vec!(),
+            stage_keys:        vec!(),
         }
     }
 
@@ -765,13 +772,21 @@ impl PackageMeta {
 
     /// If downloading fails then just continue, we dont want to prevent playing due to network issues.
     pub fn update(&self) {
-        if let Some(latest_meta) = self.download_latest_meta() {
-            if self.save_version < latest_meta.save_version {
-                let path = format!("package{}.zip", latest_meta.save_version);
-                if let Some(url) = self.url(path.as_str()) {
-                    if let Some(zip) = files::load_bin_from_url(url) {
-                        files::extract_zip(&zip, &self.path);
+        if self.published {
+            if let Some(url) = self.url("package_meta.json") {
+                if let Some(latest_meta) = files::load_struct_from_url::<PackageMeta>(url) {
+                    if self.published_version < latest_meta.published_version {
+                        let path = format!("package{}.zip", latest_meta.published_version);
+                        if let Some(url) = self.url(path.as_str()) {
+                            if let Some(zip) = files::load_bin_from_url(url) {
+                                files::extract_zip(&zip, &self.path);
+                            } else {
+                                println!("Failed to download package zip file");
+                            }
+                        }
                     }
+                } else {
+                    println!("Failed to download or deserialize package_meta.json");
                 }
             }
         }
