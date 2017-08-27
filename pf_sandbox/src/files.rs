@@ -1,7 +1,7 @@
 use std::env;
 use std::fs::{DirBuilder, File};
 use std::fs;
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Write, Seek};
 use std::path::{PathBuf, Path};
 
 use reqwest::Url;
@@ -10,7 +10,14 @@ use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use serde_json::Value;
 use serde_json;
-use zip::ZipArchive;
+use zip::{ZipArchive, ZipWriter};
+use zip::write::FileOptions;
+
+pub fn write_to_zip<TObject: Serialize, TWriter: Write + Seek>(zip: &mut ZipWriter<TWriter>, path: &str, object: &TObject) {
+    zip.start_file(path, FileOptions::default()).unwrap();
+    let json = serde_json::to_string_pretty(object).unwrap();
+    zip.write_all(json.as_bytes()).unwrap();
+}
 
 pub fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
     DirBuilder::new().recursive(true).create(filename.parent().unwrap()).unwrap();
@@ -79,12 +86,18 @@ pub fn load_bin_from_url(url: Url) -> Option<Vec<u8>> {
     None
 }
 
+
+/// deletes all files in the passed directory
+/// if the directory does not exist it is created
+pub fn nuke_dir(path: &Path) {
+    fs::remove_dir_all(path).ok();
+    fs::create_dir_all(path).unwrap();
+}
+
 /// Delete contents of destination directory
 /// Extract contents of zip into destination
 pub fn extract_zip(zip: &[u8], destination: &Path) {
-    // nuke destination
-    fs::remove_dir_all(destination).unwrap();
-    fs::create_dir_all(destination).unwrap();
+    nuke_dir(destination);
 
     let mut zip = ZipArchive::new(Cursor::new(zip)).unwrap();
     for i in 0..zip.len() {
@@ -102,6 +115,8 @@ pub fn extract_zip(zip: &[u8], destination: &Path) {
         }
     }
 }
+
+
 
 pub fn get_path() -> PathBuf {
     match env::home_dir() {

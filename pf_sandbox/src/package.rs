@@ -10,6 +10,8 @@ use reqwest::UrlError;
 use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
+use zip::ZipWriter;
+use zip::write::FileOptions;
 
 use ::files;
 use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType, RenderOrder};
@@ -166,7 +168,7 @@ impl Package {
     }
 
     /// Opens a package if it exists
-    /// Creates and opens it if it doesnt
+    /// Creates and opens it if it doesn't
     /// However if it does exist but is broken in some way it returns None
     pub fn open_or_generate(package_name: &str) -> Option<Package> {
         let package_path = get_packages_path().join(package_name);
@@ -176,6 +178,47 @@ impl Package {
             Ok(_)  => Package::open(package_name),
             Err(_) => Some(Package::generate_base(package_name)),
         }
+    }
+
+    /// Produces a zip of the package in the PF_Sandbox/publish directory
+    /// The actual package has its published_version incremented and is then saved
+    /// The exported package has its published flag set to true
+    pub fn publish(&mut self) -> String {
+        if self.meta.published {
+            return String::from("Publish FAILED! The published property in package_meta is already set.");
+        }
+
+        self.meta.published_version += 1;
+
+        self.save(); // If more failure cases are added to save they should be checked for in publish as well.
+        let new_meta = PackageMeta {
+            published: true,
+            .. self.meta.clone()
+        };
+
+        let mut path = files::get_path();
+        path.push("publish");
+        files::nuke_dir(&path);
+
+        let zip_file = fs::File::create(path.join(format!("package{}.zip", new_meta.published_version))).unwrap();
+        let mut zip = ZipWriter::new(zip_file);
+        files::write_to_zip(&mut zip, "package_meta.json", &new_meta);
+        files::write_to_zip(&mut zip, "rules.json", &self.rules);
+
+        zip.add_directory("stages/", FileOptions::default()).unwrap();
+        for (key, stage) in self.stages.key_value_iter() {
+            files::write_to_zip(&mut zip, format!("stages/{}", key).as_ref(), &stage);
+        }
+
+        zip.add_directory("fighters/", FileOptions::default()).unwrap();
+        for (key, fighter) in self.fighters.key_value_iter() {
+            files::write_to_zip(&mut zip, format!("fighters/{}", key).as_ref(), &fighter);
+        }
+        zip.finish().unwrap();
+
+        files::save_struct(path.join("package_meta.json"), &new_meta);
+
+        String::from("Publish completed succesfully.")
     }
 
     pub fn save(&mut self) -> String {
@@ -645,9 +688,10 @@ impl Node for Package {
 Package Help
 
 Commands:
-*   help   - display this help
-*   save   - save changes to disc
-*   reload - reload from disc, all changes are lost
+*   help    - display this help
+*   save    - save changes to disc
+*   reload  - reload from disc, all changes are lost
+*   publish - export the package to a zip file in the PF_Sandbox/publish directory
 
 Accessors:
 *   .fighters - KeyedContextVec
@@ -659,6 +703,9 @@ Accessors:
                 match action.as_ref() {
                     "save" => {
                         self.save()
+                    }
+                    "publish" => {
+                        self.publish()
                     }
                     "reload" => {
                         if let Err(err) = self.load() {

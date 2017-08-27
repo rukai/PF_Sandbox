@@ -5,7 +5,7 @@ A platform fighter sandbox featuring a character editor tightly integrated with 
 ## Quick links
 
 *   [Download for windows](https://github.com/rukai/PF_Sandbox/releases/latest)
-*   [Discord](https://discord.gg/k22pbk)
+*   [Discord](https://discord.gg/KyjBs4x)
 *   [Youtube introduction](https://www.youtube.com/watch?v=CTrwvg56VQs) to the project.
 
 [![Youtube Video](https://img.youtube.com/vi/CTrwvg56VQs/0.jpg)](https://www.youtube.com/watch?v=CTrwvg56VQs)
