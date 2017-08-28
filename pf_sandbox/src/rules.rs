@@ -9,7 +9,6 @@ pub struct Rules {
     pub best_of:            u64,
     pub pause:              Pause,
     pub teams:              Teams,
-    pub ledge_grab:         LedgeGrab,
     pub grab_clang:         bool,
     //pub force_user_settings: User,
 }
@@ -24,7 +23,6 @@ impl Default for Rules {
             best_of:            1,
             pause:              Pause::default(),
             teams:              Teams::default(),
-            ledge_grab:         LedgeGrab::default(),
             grab_clang:         false,
         }
     }
@@ -43,13 +41,6 @@ pub enum Goal {
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]
-pub enum LedgeGrab {
-    Hog,
-    Share,
-    Trump
-}
-
-#[derive(Clone, Serialize, Deserialize, Node)]
 pub enum Pause {
     On,
     Off,
@@ -65,12 +56,6 @@ pub enum Teams {
 impl Default for Goal {
     fn default() -> Self {
         Goal::LastManStanding
-    }
-}
-
-impl Default for LedgeGrab {
-    fn default() -> Self {
-        LedgeGrab::Hog
     }
 }
 

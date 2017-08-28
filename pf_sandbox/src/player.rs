@@ -41,11 +41,18 @@ pub struct Player {
     pub result:           PlayerResult,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Node)]
+pub enum LedgeLogic {
+    Hog,
+    Share,
+    Trump
+}
+
 // Describes the player location by offsets from other locations
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub enum Location {
     Platform { platform_i: usize, x: f32 },
-    GrabbedLedge { platform_i: usize, d_x: f32, d_y: f32, hogging: bool }, // player.face_right determines which edge on the platform
+    GrabbedLedge { platform_i: usize, d_x: f32, d_y: f32, logic: LedgeLogic }, // player.face_right determines which edge on the platform
     GrabbedByPlayer (usize),
     Airbourne { x: f32, y: f32 },
 }
@@ -53,6 +60,12 @@ pub enum Location {
 impl Default for Location {
     fn default() -> Location {
         Location::Airbourne { x: 0.0, y: 0.0 }
+    }
+}
+
+impl Default for LedgeLogic {
+    fn default() -> Self {
+        LedgeLogic::Hog
     }
 }
 
@@ -206,6 +219,15 @@ impl Player {
         } else {
             false
         }
+    }
+
+    pub fn is_hogging_ledge(&self, check_platform_i: usize, face_right: bool) -> bool {
+        if let &Location::GrabbedLedge { platform_i, ref logic, .. } = &self.location {
+            if let &LedgeLogic::Hog = logic {
+                return self.face_right == face_right && check_platform_i == platform_i;
+            }
+        }
+        false
     }
 
     pub fn set_airbourne(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
@@ -1252,7 +1274,7 @@ impl Player {
             let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
             if input.stick_y.value > -0.5 {
                 if let Some(ref ledge_grab_box) = fighter_frame.ledge_grab_box {
-                    self.check_ledge_grab(&fighter, &ledge_grab_box, &stage.platforms);
+                    self.check_ledge_grab(players, &fighter, &ledge_grab_box, &stage.platforms);
                 }
             }
         }
@@ -1425,10 +1447,10 @@ impl Player {
         }
     }
 
-    fn check_ledge_grab(&mut self, fighter: &Fighter, ledge_grab_box: &LedgeGrabBox, platforms: &[Platform]) {
+    fn check_ledge_grab(&mut self, players: &[Player], fighter: &Fighter, ledge_grab_box: &LedgeGrabBox, platforms: &[Platform]) {
         for (platform_i, platform) in platforms.iter().enumerate() {
-            let left_grab  = platform.left_grab()  && self.check_ledge_collision(ledge_grab_box, platform.left_ledge()); // TODO: Check not hogged
-            let right_grab = platform.right_grab() && self.check_ledge_collision(ledge_grab_box, platform.right_ledge()); // TODO: Check not hogged
+            let left_grab  = platform.left_grab()  && self.check_ledge_collision(ledge_grab_box, platform.left_ledge()) && players.iter().all(|x| !x.is_hogging_ledge(platform_i, true));
+            let right_grab = platform.right_grab() && self.check_ledge_collision(ledge_grab_box, platform.right_ledge()) && players.iter().all(|x| !x.is_hogging_ledge(platform_i, false));
 
             // If both left and right ledges are in range then keep the same direction.
             // This prevents always facing left or right on small platforms.
@@ -1445,7 +1467,7 @@ impl Player {
                 self.fastfalled = false;
                 self.air_jumps_left = fighter.air_jumps;
                 self.hit_by = None;
-                self.location = Location::GrabbedLedge { platform_i, d_x: -3.0, d_y: -24.0, hogging: true };
+                self.location = Location::GrabbedLedge { platform_i, d_x: -3.0, d_y: -24.0, logic: LedgeLogic::Hog };
                 self.set_action(Action::LedgeGrab);
             }
         }
