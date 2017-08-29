@@ -39,7 +39,7 @@ pub fn generate_example_stub() {
             published_version: 0,
             title:             "Example Package".to_string(),
             source:            Some("lucaskent.me/example_package".to_string()),
-            published:         false,
+            published:         true,
             hash:              "".to_string(),
             fighter_keys:      vec!(),
             stage_keys:        vec!(),
@@ -205,14 +205,14 @@ impl Package {
         files::write_to_zip(&mut zip, "package_meta.json", &new_meta);
         files::write_to_zip(&mut zip, "rules.json", &self.rules);
 
-        zip.add_directory("stages/", FileOptions::default()).unwrap();
+        zip.add_directory("Stages/", FileOptions::default()).unwrap();
         for (key, stage) in self.stages.key_value_iter() {
-            files::write_to_zip(&mut zip, format!("stages/{}", key).as_ref(), &stage);
+            files::write_to_zip(&mut zip, format!("Stages/{}", key).as_ref(), &stage);
         }
 
-        zip.add_directory("fighters/", FileOptions::default()).unwrap();
+        zip.add_directory("Fighters/", FileOptions::default()).unwrap();
         for (key, fighter) in self.fighters.key_value_iter() {
-            files::write_to_zip(&mut zip, format!("fighters/{}", key).as_ref(), &fighter);
+            files::write_to_zip(&mut zip, format!("Fighters/{}", key).as_ref(), &fighter);
         }
         zip.finish().unwrap();
 
