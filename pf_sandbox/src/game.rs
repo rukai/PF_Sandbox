@@ -933,12 +933,8 @@ pub struct Selector {
 }
 
 impl Selector {
-    fn colboxes_vec(&self) -> Vec<usize> { // TODO: LOL
-        let mut result:Vec<usize> = vec!();
-        for value in &self.colboxes {
-            result.push(*value);
-        }
-        result
+    fn colboxes_vec(&self) -> Vec<usize> {
+        self.colboxes.iter().cloned().collect()
     }
 
     pub fn start(&mut self, mouse: (f32, f32)) {
