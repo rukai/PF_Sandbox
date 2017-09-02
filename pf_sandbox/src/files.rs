@@ -20,18 +20,24 @@ pub fn write_to_zip<TObject: Serialize, TWriter: Write + Seek>(zip: &mut ZipWrit
 }
 
 pub fn save_struct<T: Serialize>(filename: PathBuf, object: &T) {
+    // ensure parent directories exists
     DirBuilder::new().recursive(true).create(filename.parent().unwrap()).unwrap();
 
+    // save
     let json = serde_json::to_string_pretty(object).unwrap();
     File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
 }
 
-// TODO: Actually use compression
 pub fn save_struct_compressed<T: Serialize>(filename: PathBuf, object: &T) {
+    // ensure parent directories exists
     DirBuilder::new().recursive(true).create(filename.parent().unwrap()).unwrap();
 
+    // save
     let json = serde_json::to_string_pretty(object).unwrap();
-    File::create(filename).unwrap().write_all(&json.as_bytes()).unwrap();
+    let mut zip = ZipWriter::new(File::create(filename).unwrap());
+    zip.start_file("data.json", FileOptions::default()).unwrap();
+    zip.write_all(&json.as_bytes()).unwrap();
+    zip.finish().unwrap();
 }
 
 pub fn load_struct<T: DeserializeOwned>(filename: PathBuf) -> Result<T, String> {
@@ -39,10 +45,10 @@ pub fn load_struct<T: DeserializeOwned>(filename: PathBuf) -> Result<T, String> 
     serde_json::from_str(&json).map_err(|x| format!("{:?}", x))
 }
 
-// TODO: Actually use compression
 pub fn load_struct_compressed<T: DeserializeOwned>(filename: PathBuf) -> Result<T, String> {
-    let json = load_file(filename)?;
-    serde_json::from_str(&json).map_err(|x| format!("{:?}", x))
+    let mut zip = ZipArchive::new(File::open(filename).unwrap()).map_err(|x| format!("{:?}", x))?;
+    let zip_file = zip.by_name("data.json").map_err(|x| format!("{:?}", x))?;
+    serde_json::from_reader(zip_file).map_err(|x| format!("{:?}", x))
 }
 
 pub fn load_json(filename: PathBuf) -> Result<Value, String> {
@@ -146,7 +152,7 @@ pub fn get_path() -> PathBuf {
             }
             #[cfg(macos)]
             {
-                panic!("macos is unimplemented");
+                compile_error!("macos is unimplemented");
             }
         }
         None => {
