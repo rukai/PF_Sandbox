@@ -8,7 +8,9 @@ use ::package;
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Config {
-    pub current_package: Option<String>,
+    pub current_package:       Option<String>,
+    pub auto_save_replay:      bool,
+    pub verify_package_hashes: bool,
 }
 
 impl Config {
@@ -41,7 +43,9 @@ impl Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            current_package: None
+            current_package:       None,
+            auto_save_replay:      false,
+            verify_package_hashes: true,
         }
     }
 }

@@ -183,7 +183,7 @@ pub fn run(mut cli_results: CLIResults) {
                 input.update(&game.tas);
                 match game.step(&mut input, &os_input, command_line.block()) {
                     GameState::ToResults (results) => {
-                        next_state = NextAppState::Menu (MenuState::GameResults (results));
+                        next_state = NextAppState::Menu (MenuState::game_results(results));
                     }
                     GameState::ToCSS => {
                         next_state = NextAppState::Menu (MenuState::character_select());

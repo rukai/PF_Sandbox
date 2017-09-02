@@ -2,7 +2,7 @@ use ::fighter::*;
 use ::input::{PlayerInput};
 use ::stage::{Stage, Platform, Area, SpawnPoint};
 use ::collision::CollisionResult;
-use ::records::{PlayerResult, DeathRecord};
+use ::results::{RawPlayerResult, DeathRecord};
 use ::rules::Goal;
 use ::math;
 
@@ -38,7 +38,7 @@ pub struct Player {
     pub hitlag:           Hitlag,
     pub hitstun:          f32,
     pub hit_by:           Option<usize>,
-    pub result:           PlayerResult,
+    pub result:           RawPlayerResult,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
@@ -136,7 +136,7 @@ impl Player {
             hitlag:           Hitlag::None,
             hitstun:          0.0,
             hit_by:           None,
-            result:           PlayerResult::default(),
+            result:           RawPlayerResult::default(),
         }
     }
 
@@ -1564,7 +1564,7 @@ impl Player {
         }
     }
 
-    pub fn result(&self) -> PlayerResult {
+    pub fn result(&self) -> RawPlayerResult {
         let mut result = self.result.clone();
         result.final_damage = Some(self.damage);
         result.ended_as_fighter = Some(self.fighter.clone());

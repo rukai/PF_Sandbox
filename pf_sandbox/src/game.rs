@@ -10,13 +10,15 @@ use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
 use ::rand::{StdRng, SeedableRng};
-use ::records::{GameResult, PlayerResult};
+use ::results::{GameResults, RawPlayerResult, PlayerResult};
+use ::replays::Replay;
 use ::replays;
 use ::rules::Goal;
 use ::stage::{Area, Stage};
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::fmt;
 use std::time::Duration;
 use chrono::Local;
 use enum_traits::ToIndex;
@@ -24,6 +26,9 @@ use enum_traits::ToIndex;
 use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};
 
+#[NodeActions(
+    NodeAction(function="save_replay", return_string),
+)]
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Game {
     pub package:                Package,
@@ -46,6 +51,7 @@ pub struct Game {
     copied_frame:               Option<ActionFrame>,
     pub camera:                 Camera,
     pub tas:                    Vec<ControllerInput>,
+    pub save_replay:            bool,
 }
 
 /// Frame 0 refers to the initial state of the game.
@@ -93,10 +99,16 @@ impl Game {
             copied_frame:           None,
             camera:                 Camera::new(),
             tas:                    vec!(),
+            save_replay:            false,
         }
     }
 
     pub fn step(&mut self, input: &mut Input, os_input: &OsInput, os_input_blocked: bool) -> GameState {
+        if self.save_replay {
+            replays::save_replay(&Replay::new(self, input), &self.package);
+            self.save_replay = false;
+        }
+
         {
             let state = self.state.clone();
             match state {
@@ -132,6 +144,11 @@ impl Game {
 
         self.set_context();
         self.state.clone()
+    }
+
+    fn save_replay(&mut self) -> String{
+        self.save_replay = true;
+        String::from("Save replay completed successfully")
     }
 
     fn set_context(&mut self) {
@@ -183,7 +200,7 @@ impl Game {
         // run game loop
         input.game_update(self.current_frame);
         let player_inputs = &input.players(self.current_frame);
-        self.step_game(player_inputs);
+        self.step_game(input, player_inputs);
 
         // pause game
         if input.start_pressed() {
@@ -203,7 +220,7 @@ impl Game {
 
         input.game_update(self.current_frame);
         let player_inputs = &input.players(self.current_frame);
-        self.step_game(player_inputs);
+        self.step_game(input, player_inputs);
     }
 
     fn step_pause(&mut self, input: &mut Input) {
@@ -257,11 +274,6 @@ impl Game {
                 self.edit = Edit::Fighter (3);
             }
             self.update_frame();
-        }
-
-        // modify package
-        if os_input.key_pressed(VirtualKeyCode::W) { // TODO: turn this into treeflection command and delete
-            replays::save_replay(self, input, &self.package);
         }
 
         // game flow control
@@ -569,7 +581,7 @@ impl Game {
         if self.current_frame <= input.last_frame() {
             self.current_frame += 1;
             let player_inputs = &input.players(self.current_frame);
-            self.step_game(player_inputs);
+            self.step_game(input, player_inputs);
 
             self.update_frame();
         }
@@ -635,7 +647,7 @@ impl Game {
         seed
     }
 
-    fn step_game(&mut self, player_input: &Vec<PlayerInput>) {
+    fn step_game(&mut self, input: &Input, player_input: &Vec<PlayerInput>) {
         {
             let mut rng = StdRng::from_seed(&self.get_seed());
 
@@ -673,7 +685,7 @@ impl Game {
         }
 
         if self.time_out() || self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 1 {
-            self.state = self.generate_game_results();
+            self.state = self.generate_game_results(input);
         }
 
         self.update_frame();
@@ -687,16 +699,16 @@ impl Game {
         }
     }
 
-    pub fn generate_game_results(&self) -> GameState {
-        let player_results: Vec<PlayerResult> = self.players.iter().map(|x| x.result()).collect();
+    pub fn generate_game_results(&self, input: &Input) -> GameState {
+        let raw_player_results: Vec<RawPlayerResult> = self.players.iter().map(|x| x.result()).collect();
         let places: Vec<usize> = match self.package.rules.goal {
             Goal::LastManStanding => {
                 // most stocks remaining wins
                 // tie-breaker:
                 //  * if both eliminated: who lost their last stock last wins
                 //  * if both alive:      lowest percentage wins
-                let mut player_results_i: Vec<(usize, &PlayerResult)> = player_results.iter().enumerate().collect();
-                player_results_i.sort_by(
+                let mut raw_player_results_i: Vec<(usize, &RawPlayerResult)> = raw_player_results.iter().enumerate().collect();
+                raw_player_results_i.sort_by(
                     |a_set, b_set| {
                         let a = a_set.1;
                         let b = b_set.1;
@@ -722,13 +734,13 @@ impl Game {
                         )
                     }
                 );
-                player_results_i.iter().map(|x| x.0).collect()
+                raw_player_results_i.iter().map(|x| x.0).collect()
             }
             Goal::KillDeathScore => {
                 // highest kills wins
                 // tie breaker: least deaths wins
-                let mut player_results_i: Vec<(usize, &PlayerResult)> = player_results.iter().enumerate().collect();
-                player_results_i.sort_by(
+                let mut raw_player_results_i: Vec<(usize, &RawPlayerResult)> = raw_player_results.iter().enumerate().collect();
+                raw_player_results_i.sort_by(
                     |a_set, b_set| {
                         // Repopulating kill lists every frame shouldnt be too bad
                         let a_kills: Vec<usize> = vec!(); // TODO: populate
@@ -742,29 +754,35 @@ impl Game {
                         b_kills.cmp(&a_kills).then(a_deaths.cmp(&b_deaths))
                     }
                 );
-                player_results_i.iter().map(|x| x.0).collect()
+                raw_player_results_i.iter().map(|x| x.0).collect()
             }
         };
 
-        let mut game_results: Vec<GameResult> = vec!();
-        for (i, player_result) in player_results.iter().enumerate() {
-            let lcancel_percent = if player_result.lcancel_attempts == 0 {
+        let mut player_results: Vec<PlayerResult> = vec!();
+        for (i, raw_player_result) in raw_player_results.iter().enumerate() {
+            let lcancel_percent = if raw_player_result.lcancel_attempts == 0 {
                 100.0
             }
             else {
-                player_result.lcancel_success as f32 / player_result.lcancel_attempts as f32
+                raw_player_result.lcancel_success as f32 / raw_player_result.lcancel_attempts as f32
             };
-            game_results.push(GameResult {
-                fighter:         player_result.ended_as_fighter.clone().unwrap(),
+            player_results.push(PlayerResult {
+                fighter:         raw_player_result.ended_as_fighter.clone().unwrap(),
                 controller:      self.selected_controllers[i],
                 place:           places[i],
                 kills:           vec!(), // TODO
-                deaths:          player_result.deaths.clone(),
+                deaths:          raw_player_result.deaths.clone(),
                 lcancel_percent: lcancel_percent,
             });
         }
-        game_results.sort_by_key(|x| x.place);
-        GameState::ToResults (game_results)
+        player_results.sort_by_key(|x| x.place);
+
+        let replay = Replay::new(self, input);
+
+        GameState::ToResults ( GameResults {
+            player_results,
+            replay,
+        })
     }
 
     fn generate_debug(&mut self, input: &Input) {
@@ -772,7 +790,7 @@ impl Game {
         let player_inputs = &input.players(frame);
 
 
-        self.debug_lines = vec!(format!("Frame: {}    state: {:?}", frame, self.state));
+        self.debug_lines = vec!(format!("Frame: {}    state: {}", frame, self.state));
         for (i, player) in self.players.iter().enumerate() {
             let fighter = &self.package.fighters[self.players[i].fighter.as_ref()];
             let player_input = &player_inputs[i];
@@ -887,20 +905,37 @@ fn area_to_render(area: &Area) -> RenderRect {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub enum GameState {
     Local,
     ReplayForwards,
     ReplayBackwards,
     Netplay,
     Paused, // Only Local, ReplayForwards and ReplayBackwards can be paused
-    ToResults (Vec<GameResult>), // Both Local and Netplay end at ToResults
+    ToResults (GameResults), // Both Local and Netplay end at ToResults
     ToCSS,
 
     // Used for TAS, in game these are run during pause state
     StepThenPause,
     StepForwardThenPause,
     StepBackwardThenPause,
+}
+
+impl fmt::Display for GameState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &GameState::Local                 => write!(f, "Local"),
+            &GameState::ReplayForwards        => write!(f, "ReplayForwards"),
+            &GameState::ReplayBackwards       => write!(f, "ReplayBackwards"),
+            &GameState::Netplay               => write!(f, "Netplay"),
+            &GameState::Paused                => write!(f, "Paused"),
+            &GameState::ToResults (_)         => write!(f, "ToResults"),
+            &GameState::ToCSS                 => write!(f, "ToCSS"),
+            &GameState::StepThenPause         => write!(f, "StepThenPause"),
+            &GameState::StepForwardThenPause  => write!(f, "StepForwardThenPause"),
+            &GameState::StepBackwardThenPause => write!(f, "StepBackwardThenPause)"),
+        }
+    }
 }
 
 impl Default for GameState {

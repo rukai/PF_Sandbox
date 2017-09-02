@@ -6,7 +6,7 @@ use ::menu::{RenderMenu, RenderMenuState, CharacterSelect};
 use ::graphics::{self, GraphicsMessage, Render, RenderType, RenderRect};
 use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB};
-use ::records::GameResult;
+use ::results::PlayerResult;
 use ::package::Verify;
 
 use vulkano_win;
@@ -575,12 +575,16 @@ impl<'a> VulkanGraphics<'a> {
                 self.draw_stage_selector(&mut entities, selection);
                 self.draw_package_banner(&render.package_verify, command_output);
             }
-            RenderMenuState::GameResults (results) => {
+            RenderMenuState::GameResults { results, replay_saved } => {
                 let max = results.len() as f32;
                 for (i, result) in results.iter().enumerate() {
                     let i = i as f32;
                     let start_x = i / max;
                     self.draw_player_result(result, start_x);
+                }
+
+                if replay_saved {
+                    self.draw_text.queue_text(30.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Replay saved!");
                 }
             }
             RenderMenuState::SetRules => {
@@ -693,7 +697,7 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
-    fn draw_player_result(&mut self, result: &GameResult, start_x: f32) {
+    fn draw_player_result(&mut self, result: &PlayerResult, start_x: f32) {
         let fighter_name = self.package_buffers.package.as_ref().unwrap().fighters[result.fighter.as_ref()].name.as_ref();
         let color = graphics::get_controller_color(result.controller);
         let x = (start_x + 0.05) * self.width as f32;

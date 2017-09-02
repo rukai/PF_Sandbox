@@ -71,8 +71,7 @@ pub fn load_replay(name: &str, package: &Package) -> Result<Replay, String> {
     files::load_struct_compressed(replay_path)
 }
 
-pub fn save_replay(game: &Game, input: &Input, package: &Package) {
-    let replay = Replay::new(game, input);
+pub fn save_replay(replay: &Replay, package: &Package) {
     let replay_path = get_replay_path(package, replay.timestamp.to_rfc2822().as_ref()); // TODO: could still collide under strange circumstances: check and handle
     files::save_struct_compressed(replay_path, &replay);
 }

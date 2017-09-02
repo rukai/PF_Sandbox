@@ -5,7 +5,7 @@ use ::graphics::{GraphicsMessage, Render, RenderType};
 use ::input::{Input, PlayerInput};
 use ::package::{Package, PackageMeta, Verify};
 use ::package;
-use ::records::GameResult;
+use ::results::{GameResults, PlayerResult};
 use ::replays;
 
 use treeflection::{Node, NodeRunner, NodeToken};
@@ -31,10 +31,14 @@ pub enum PackageHolder {
 }
 
 impl PackageHolder {
-    fn new(package: Option<Package>) -> PackageHolder {
+    fn new(package: Option<Package>, config: &Config) -> PackageHolder {
         if let Some(package) = package {
-            let verify = package.verify();
-            PackageHolder::Package(package, verify)
+            if config.verify_package_hashes {
+                let verify = package.verify();
+                PackageHolder::Package(package, verify)
+            } else {
+                PackageHolder::Package(package, Verify::CannotConnect)
+            }
         } else {
             PackageHolder::None
         }
@@ -58,13 +62,13 @@ impl PackageHolder {
 impl Menu {
     pub fn new(package: Option<Package>, config: Config, state: MenuState) -> Menu {
         Menu {
+            package:            PackageHolder::new(package, &config),
             config:             config,
             state:              state,
             fighter_selections: vec!(),
             stage_ticker:       None,
             game_ticker:        MenuTicker::new(4),
             current_frame:      0,
-            package:            PackageHolder::new(package),
             back_counter_max:   90,
             game_setup:         None,
         }
@@ -321,7 +325,7 @@ impl Menu {
 
     fn set_package(&mut self, package: Package) {
         // setup for GameSelect
-        self.package = PackageHolder::new(Some(package));
+        self.package = PackageHolder::new(Some(package), &self.config);
         self.state = MenuState::GameSelect;
         self.fighter_selections = vec!();
         self.stage_ticker = None;
@@ -378,6 +382,15 @@ impl Menu {
         if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
             self.state = MenuState::character_select();
         }
+
+        if let &mut MenuState::GameResults { ref results, ref mut replay_saved } = &mut self.state {
+            if !*replay_saved {
+                if self.config.auto_save_replay || player_inputs.iter().any(|x| x.l.press && x.r.press) {
+                    replays::save_replay(&results.replay, self.package.get());
+                    *replay_saved = true;
+                }
+            }
+        }
     }
 
     pub fn step(&mut self, input: &mut Input) -> Option<GameSetup> {
@@ -396,7 +409,7 @@ impl Menu {
             MenuState::PackageSelect (_, _,_) => { self.step_package_select(&player_inputs, input) }
             MenuState::CharacterSelect (_)    => { self.step_fighter_select(&player_inputs, input) }
             MenuState::StageSelect            => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::GameResults (_)        => { self.step_results       (&player_inputs, input) }
+            MenuState::GameResults {..}       => { self.step_results       (&player_inputs, input) }
             MenuState::SetRules               => { }
             MenuState::BrowsePackages         => { }
             MenuState::CreatePackage          => { }
@@ -411,9 +424,9 @@ impl Menu {
         RenderMenu {
             state: match self.state {
                 MenuState::PackageSelect (ref names, ref ticker, ref load) => { RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor, load.as_ref().map(|x| x.0.message()).unwrap_or_default() ) }
-                MenuState::GameResults (ref results)              => { RenderMenuState::GameResults (results.clone()) }
-                MenuState::CharacterSelect (back_counter)         => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
-                MenuState::ReplaySelect (ref replays, ref ticker) => { RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor) }
+                MenuState::GameResults {ref results, replay_saved} => { RenderMenuState::GameResults { results: results.player_results.clone(), replay_saved } }
+                MenuState::CharacterSelect (back_counter)          => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
+                MenuState::ReplaySelect (ref replays, ref ticker)  => { RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor) }
                 MenuState::GameSelect     => { RenderMenuState::GameSelect (self.game_ticker.cursor) }
                 MenuState::StageSelect    => { RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor) }
                 MenuState::SetRules       => { RenderMenuState::SetRules }
@@ -514,7 +527,7 @@ pub enum MenuState {
     ReplaySelect (Vec<String>, MenuTicker),
     CharacterSelect (usize), // TODO: name usize value as backcounter
     StageSelect,
-    GameResults (Vec<GameResult>),
+    GameResults { results: GameResults, replay_saved: bool },
     SetRules,
     PackageSelect (Vec<(String, PackageMeta)>, MenuTicker, Option<(PackageLoadState, Receiver<PackageLoadState>)>),
     BrowsePackages,
@@ -564,6 +577,10 @@ impl MenuState {
     pub fn character_select() -> MenuState {
         MenuState::CharacterSelect(0)
     }
+
+    pub fn game_results(results: GameResults) -> MenuState {
+        MenuState::GameResults { results, replay_saved: false }
+    }
 }
 
 pub enum RenderMenuState {
@@ -571,7 +588,7 @@ pub enum RenderMenuState {
     ReplaySelect    (Vec<String>, usize),
     CharacterSelect (Vec<CharacterSelect>, usize, usize),
     StageSelect     (usize),
-    GameResults     (Vec<GameResult>),
+    GameResults     { results: Vec<PlayerResult>, replay_saved: bool },
     SetRules,
     PackageSelect   (Vec<String>, usize, String),
     BrowsePackages,
