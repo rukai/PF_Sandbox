@@ -281,7 +281,6 @@ impl Game {
             self.step_local(input);
         }
         else if os_input.key_pressed(VirtualKeyCode::U) {
-            // TODO: Invalidate saved_frame when the frame it refers to is deleted.
             self.saved_frame = self.current_frame;
         }
         else if os_input.key_pressed(VirtualKeyCode::I) {
@@ -568,10 +567,10 @@ impl Game {
     // TODO: Allow choice between using input history and game history
     fn step_replay_forwards(&mut self, input: &mut Input) {
         if self.current_frame < input.last_frame() {
+            self.current_frame += 1;
             let player_inputs = &input.players(self.current_frame);
             self.step_game(player_inputs);
 
-            self.current_frame += 1;
             self.update_frame();
         }
         else {
@@ -595,9 +594,8 @@ impl Game {
     /// Immediately jumps to the previous frame in history
     fn step_replay_backwards(&mut self, input: &mut Input) {
         if self.current_frame > 0 {
-            let jump_to = self.current_frame - 1;
-            self.players = self.player_history.get(jump_to).unwrap().clone();
-            self.current_frame = jump_to;
+            self.current_frame -= 1;
+            self.players = self.player_history.get(self.current_frame).unwrap().clone();
             self.update_frame();
         }
         else {
