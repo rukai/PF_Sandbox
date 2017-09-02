@@ -566,7 +566,7 @@ impl Game {
     /// next frame is advanced by using the input history on the current frame
     // TODO: Allow choice between using input history and game history
     fn step_replay_forwards(&mut self, input: &mut Input) {
-        if self.current_frame < input.last_frame() {
+        if self.current_frame <= input.last_frame() {
             self.current_frame += 1;
             let player_inputs = &input.players(self.current_frame);
             self.step_game(player_inputs);
