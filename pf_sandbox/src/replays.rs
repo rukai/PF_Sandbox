@@ -34,7 +34,7 @@ pub fn get_replay_names(package: &Package) -> Vec<String> {
             } else {
                 if let Ok(a_dt) = a_dt {
                     if let Ok(b_dt) = b_dt {
-                        a_dt.cmp(&b_dt)
+                        a_dt.cmp(&b_dt).reverse()
                     } else {
                         Ordering::Less
                     }

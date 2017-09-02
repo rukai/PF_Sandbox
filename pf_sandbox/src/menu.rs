@@ -111,17 +111,22 @@ impl Menu {
 
             if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && replays.len() > 0 {
                 let name = &replays[ticker.cursor];
-                if let Ok(replay) = replays::load_replay(name, self.package.get()) {
-                    self.game_setup = Some(GameSetup {
-                        init_seed:      replay.init_seed,
-                        input_history:  replay.input_history,
-                        player_history: replay.player_history,
-                        stage_history:  replay.stage_history,
-                        controllers:    replay.selected_controllers,
-                        fighters:       replay.selected_fighters,
-                        stage:          replay.selected_stage,
-                        state:          GameState::ReplayForwards,
-                    });
+                match replays::load_replay(name, self.package.get()) {
+                    Ok(replay) => {
+                        self.game_setup = Some(GameSetup {
+                            init_seed:      replay.init_seed,
+                            input_history:  replay.input_history,
+                            player_history: replay.player_history,
+                            stage_history:  replay.stage_history,
+                            controllers:    replay.selected_controllers,
+                            fighters:       replay.selected_fighters,
+                            stage:          replay.selected_stage,
+                            state:          GameState::ReplayForwards,
+                        });
+                    }
+                    Err(error) => {
+                        println!("Failed to load replay: {}\n{}", name, error);
+                    }
                 }
                 false
             }
