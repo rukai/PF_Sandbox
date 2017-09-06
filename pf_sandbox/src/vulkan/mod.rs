@@ -593,9 +593,6 @@ impl<'a> VulkanGraphics<'a> {
             RenderMenuState::PackageSelect (ref names, selection, ref message) => {
                 self.draw_package_selector(names, selection, message, command_output);
             }
-            RenderMenuState::BrowsePackages => {
-                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "browse package");
-            }
             RenderMenuState::CreatePackage => {
                 self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "create package");
             }

@@ -103,6 +103,12 @@ impl<'a> Input<'a> {
         self.current_inputs = inputs;
     }
 
+    /// Reset the game input history
+    pub fn reset_history(&mut self) {
+        self.game_inputs.clear();
+        self.prev_start = false;
+    }
+
     /// Set the game input history
     pub fn set_history(&mut self, history: Vec<Vec<ControllerInput>>) {
         self.game_inputs = history;
@@ -198,8 +204,8 @@ impl<'a> Input<'a> {
     }
 
     /// button combination for quiting the game
-    pub fn game_quit_held(&self) -> bool {
-        self.current_inputs.iter().any(|x| x.a && x.l && x.r && x.start)
+    pub fn game_quit_held(&mut self) -> bool {
+        self.current_inputs.iter().any(|x| x.a && x.l && x.r && x.start) && self.start_pressed()
     }
 }
 

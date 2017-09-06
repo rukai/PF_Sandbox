@@ -15,7 +15,7 @@ use ::command_line::CommandLine;
 use ::config::Config;
 use ::game::{Game, GameState, GameSetup};
 use ::input::Input;
-use ::menu::{Menu, MenuState};
+use ::menu::{Menu, MenuState, ResumeMenu};
 use ::network::Network;
 use ::os_input::OsInput;
 use ::package::Package;
@@ -34,14 +34,12 @@ pub fn run(mut cli_results: CLIResults) {
     let mut input = Input::new(&mut context);
     #[cfg(any(feature = "vulkan", feature = "opengl"))]
     let mut graphics_tx: Option<Sender<GraphicsMessage>> = None;
-    let mut next_state = NextAppState::None;
     let mut network = Network::new();
 
     // CLI options
-    let (mut state, mut os_input) = {
+    let (mut menu, mut game, mut os_input) = {
         // default values
         let mut controllers: Vec<usize> = vec!();
-        input.game_update(0); // TODO: is this needed? What can I do to remove it?
         for (i, _) in input.players(0).iter().enumerate() {
             controllers.push(i);
         }
@@ -95,9 +93,13 @@ pub fn run(mut cli_results: CLIResults) {
             MenuState::package_select()
         };
 
-        let state = match cli_results.continue_from {
+        match cli_results.continue_from {
             ContinueFrom::Menu => {
-                AppState::Menu(Menu::new(package, config, menu_state))
+                (
+                    Menu::new(package, config, menu_state),
+                    None,
+                    os_input
+                )
             }
             ContinueFrom::Game => {
                 // handle no package
@@ -150,11 +152,14 @@ pub fn run(mut cli_results: CLIResults) {
                     stage:          cli_results.stage_name.unwrap(),
                     state:          GameState::Local,
                 };
-                AppState::Game(Game::new(package, config, setup))
+                (
+                    Menu::new(None, config.clone(), menu_state),
+                    Some(Game::new(package, config, setup)),
+                    os_input
+                )
             }
             _ => unreachable!()
-        };
-        (state, os_input)
+        }
     };
 
     let mut command_line = CommandLine::new();
@@ -164,62 +169,55 @@ pub fn run(mut cli_results: CLIResults) {
 
         os_input.update();
 
-        match &mut state {
-            &mut AppState::Menu (ref mut menu) => {
-                input.update(&[]);
-                if let Some(menu_game_setup) = menu.step(&mut input) {
-                    next_state = NextAppState::Game (menu_game_setup);
+        let mut resume_menu: Option<ResumeMenu> = None;
+        if let Some(ref mut game) = game {
+            input.update(&game.tas);
+            if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block()) {
+                resume_menu = Some(resume_menu_inner)
+            }
+            #[cfg(any(feature = "vulkan", feature = "opengl"))]
+            {
+                if let Some(ref tx) = graphics_tx {
+                    tx.send(game.graphics_message(&command_line)).unwrap();
                 }
+            }
+            network.update(game);
+            command_line.step(&os_input, game);
+        }
+        else {
+            input.update(&[]);
+            if let Some(mut menu_game_setup) = menu.step(&mut input) {
+                let (package, config) = menu.reclaim();
+                input.set_history(std::mem::replace(&mut menu_game_setup.input_history, vec!()));
+                game = Some(Game::new(package, config, menu_game_setup));
+            }
+            else {
                 #[cfg(any(feature = "vulkan", feature = "opengl"))]
                 {
                     if let Some(ref tx) = graphics_tx {
                         tx.send(menu.graphics_message(&command_line)).unwrap();
                     }
                 }
-                network.update(menu);
-                command_line.step(&os_input, menu);
             }
-            &mut AppState::Game (ref mut game) => {
-                input.update(&game.tas);
-                match game.step(&mut input, &os_input, command_line.block()) {
-                    GameState::ToResults (results) => {
-                        next_state = NextAppState::Menu (MenuState::game_results(results));
-                    }
-                    GameState::ToCSS => {
-                        next_state = NextAppState::Menu (MenuState::character_select());
-                    }
-                    _ => { }
-                }
-                #[cfg(any(feature = "vulkan", feature = "opengl"))]
-                {
-                    if let Some(ref tx) = graphics_tx {
-                        tx.send(game.graphics_message(&command_line)).unwrap();
-                    }
-                }
-                network.update(game);
-                command_line.step(&os_input, game);
-            }
-        };
-
-        match next_state {
-            NextAppState::Game (mut setup) => {
-                let (package, config) = match state {
-                    AppState::Menu (menu) => { menu.reclaim() }
-                    AppState::Game (_)    => { unreachable!() }
-                };
-                input.set_history(std::mem::replace(&mut setup.input_history, vec!()));
-                state = AppState::Game(Game::new(package, config, setup));
-            }
-            NextAppState::Menu (menu_state) => {
-                let (package, config) = match state {
-                    AppState::Menu (_)    => { unreachable!() }
-                    AppState::Game (game) => { game.reclaim() }
-                };
-                state = AppState::Menu(Menu::new(Some(package), config, menu_state));
-            }
-            NextAppState::None => { }
+            network.update(&mut menu);
+            command_line.step(&os_input, &mut menu);
         }
-        next_state = NextAppState::None;
+
+        if let Some(resume_menu) = resume_menu {
+            let (package, config) = match game {
+                Some (game) => game.reclaim(),
+                None        => unreachable!()
+            };
+            input.reset_history();
+            game = None;
+            menu.resume(package, config, resume_menu);
+
+            // Game -> Menu Transitions
+            // Game complete   -> display results -> CSS
+            // Game quit       -> CSS
+            // Replay complete -> display results -> replay screen
+            // Replay quit     -> replay screen
+        }
 
         if os_input.quit() {
             return;
@@ -231,15 +229,4 @@ pub fn run(mut cli_results: CLIResults) {
             thread::sleep(frame_duration - frame_start.elapsed());
         }
     }
-}
-
-pub enum AppState {
-    Game (Game),
-    Menu (Menu),
-}
-
-enum NextAppState {
-    Game (GameSetup), // retrieve package from the menu
-    Menu (MenuState),
-    None
 }

@@ -15,6 +15,7 @@ use ::replays::Replay;
 use ::replays;
 use ::rules::Goal;
 use ::stage::{Area, Stage};
+use ::menu::ResumeMenu;
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -120,8 +121,7 @@ impl Game {
                 GameState::StepForwardThenPause  => { self.step_replay_forwards(input); self.state = GameState::Paused; }
                 GameState::StepBackwardThenPause => { self.step_replay_backwards(input); self.state = GameState::Paused; }
                 GameState::Paused                => { self.step_pause(input); }
-                GameState::ToResults (_)         => { unreachable!(); }
-                GameState::ToCSS                 => { unreachable!(); }
+                GameState::Quit (_)              => { unreachable!(); }
             }
 
             if !os_input_blocked {
@@ -130,8 +130,7 @@ impl Game {
                     GameState::ReplayForwards  => { self.step_replay_forwards_os_input(os_input); }
                     GameState::ReplayBackwards => { self.step_replay_backwards_os_input(os_input); }
                     GameState::Paused          => { self.step_pause_os_input(input, os_input); }
-                    GameState::ToResults (_)   => { unreachable!(); }
-                    GameState::ToCSS           => { unreachable!(); }
+                    GameState::Quit (_)        => { unreachable!(); }
 
                     GameState::Netplay              | GameState::StepThenPause |
                     GameState::StepForwardThenPause | GameState::StepBackwardThenPause => { }
@@ -225,7 +224,7 @@ impl Game {
 
     fn step_pause(&mut self, input: &mut Input) {
         if input.game_quit_held() {
-            self.state = GameState::ToCSS;
+            self.state = GameState::Quit (ResumeMenu::Unchanged);
         }
         else if input.start_pressed() {
             self.state = GameState::Local;
@@ -684,7 +683,10 @@ impl Game {
             self.players = collision_players;
         }
 
-        if self.time_out() || (self.players.len() > 1 && self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 1) {
+        if self.time_out() ||
+           (self.players.len() == 1 && self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 0) ||
+           (self.players.len() >  1 && self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 1)
+        {
             self.state = self.generate_game_results(input);
         }
 
@@ -779,10 +781,14 @@ impl Game {
 
         let replay = Replay::new(self, input);
 
-        GameState::ToResults ( GameResults {
-            player_results,
-            replay,
-        })
+        GameState::Quit (
+            ResumeMenu::Results (
+                GameResults {
+                    player_results,
+                    replay,
+                }
+            )
+        )
     }
 
     fn generate_debug(&mut self, input: &Input) {
@@ -912,8 +918,7 @@ pub enum GameState {
     ReplayBackwards,
     Netplay,
     Paused, // Only Local, ReplayForwards and ReplayBackwards can be paused
-    ToResults (GameResults), // Both Local and Netplay end at ToResults
-    ToCSS,
+    Quit (ResumeMenu), // Both Local and Netplay end at Quit
 
     // Used for TAS, in game these are run during pause state
     StepThenPause,
@@ -929,8 +934,7 @@ impl fmt::Display for GameState {
             &GameState::ReplayBackwards       => write!(f, "ReplayBackwards"),
             &GameState::Netplay               => write!(f, "Netplay"),
             &GameState::Paused                => write!(f, "Paused"),
-            &GameState::ToResults (_)         => write!(f, "ToResults"),
-            &GameState::ToCSS                 => write!(f, "ToCSS"),
+            &GameState::Quit (_)              => write!(f, "Quit"),
             &GameState::StepThenPause         => write!(f, "StepThenPause"),
             &GameState::StepForwardThenPause  => write!(f, "StepForwardThenPause"),
             &GameState::StepBackwardThenPause => write!(f, "StepBackwardThenPause)"),

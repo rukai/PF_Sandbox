@@ -12,11 +12,19 @@ use treeflection::{Node, NodeRunner, NodeToken};
 
 use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
 use std::thread;
+use std::mem;
+
+/// For player convenience some data is kept when moving between menus.
+/// This data is stored in the Menu struct.
+///
+/// Because it should be refreshed (sourced from filesystem) or is no longer valid (e.g. back_counter) some data is thrown away when moving between menus.
+/// This data is is kept in the MenuState variants.
 
 pub struct Menu {
     pub package:        PackageHolder,
     config:             Config,
     state:              MenuState,
+    prev_state:         Option<MenuState>, // Only populated when the current state specifically needs to jump back to the previous state i.e we could arrive at the current state via multiple sources.
     fighter_selections: Vec<CharacterSelect>,
     game_ticker:        MenuTicker,
     stage_ticker:       Option<MenuTicker>, // Uses an option because we dont know how many stages there are at Menu creation, but we want to remember which stage was selected
@@ -65,12 +73,22 @@ impl Menu {
             package:            PackageHolder::new(package, &config),
             config:             config,
             state:              state,
+            prev_state:         None,
             fighter_selections: vec!(),
             stage_ticker:       None,
             game_ticker:        MenuTicker::new(4),
             current_frame:      0,
             back_counter_max:   90,
             game_setup:         None,
+        }
+    }
+
+    pub fn resume(&mut self, package: Package, config: Config, resume_menu: ResumeMenu) {
+        self.current_frame = 0;
+        self.package = PackageHolder::new(Some(package), &config);
+        self.config = config;
+        if let ResumeMenu::Results (results) = resume_menu {
+            self.prev_state = Some(mem::replace(&mut self.state, MenuState::game_results(results)));
         }
     }
 
@@ -380,10 +398,10 @@ impl Menu {
 
     fn step_results(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
         if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
-            self.state = MenuState::character_select();
+            self.state = self.prev_state.take().unwrap();
         }
 
-        if let &mut MenuState::GameResults { ref results, ref mut replay_saved } = &mut self.state {
+        if let &mut MenuState::GameResults { ref results, ref mut replay_saved, .. } = &mut self.state {
             if !*replay_saved {
                 if self.config.auto_save_replay || player_inputs.iter().any(|x| x.l.press && x.r.press) {
                     replays::save_replay(&results.replay, self.package.get());
@@ -400,37 +418,39 @@ impl Menu {
                 self.stage_ticker = None;
             }
         }
+
+        self.current_frame += 1;
         input.game_update(self.current_frame);
         let player_inputs = input.players(self.current_frame);
 
-        match self.state {
-            MenuState::GameSelect             => { self.step_game_select   (&player_inputs, input) }
-            MenuState::ReplaySelect (_, _)    => { self.step_replay_select (&player_inputs, input) }
-            MenuState::PackageSelect (_, _,_) => { self.step_package_select(&player_inputs, input) }
-            MenuState::CharacterSelect (_)    => { self.step_fighter_select(&player_inputs, input) }
-            MenuState::StageSelect            => { self.step_stage_select  (&player_inputs, input) }
-            MenuState::GameResults {..}       => { self.step_results       (&player_inputs, input) }
-            MenuState::SetRules               => { }
-            MenuState::BrowsePackages         => { }
-            MenuState::CreatePackage          => { }
-            MenuState::CreateFighter          => { }
-        };
+        // In order to avoid hitting buttons still held down from the game, dont do anything on the first frame.
+        if self.current_frame > 1 {
+            match self.state {
+                MenuState::GameSelect             => { self.step_game_select   (&player_inputs, input) }
+                MenuState::ReplaySelect (_, _)    => { self.step_replay_select (&player_inputs, input) }
+                MenuState::PackageSelect (_, _,_) => { self.step_package_select(&player_inputs, input) }
+                MenuState::CharacterSelect (_)    => { self.step_fighter_select(&player_inputs, input) }
+                MenuState::StageSelect            => { self.step_stage_select  (&player_inputs, input) }
+                MenuState::GameResults {..}       => { self.step_results       (&player_inputs, input) }
+                MenuState::SetRules               => { }
+                MenuState::CreatePackage          => { }
+                MenuState::CreateFighter          => { }
+            };
+        }
 
-        self.current_frame += 1;
-        self.game_setup.clone()
+        self.game_setup.take()
     }
 
     pub fn render(&self) -> RenderMenu {
         RenderMenu {
             state: match self.state {
                 MenuState::PackageSelect (ref names, ref ticker, ref load) => { RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor, load.as_ref().map(|x| x.0.message()).unwrap_or_default() ) }
-                MenuState::GameResults {ref results, replay_saved} => { RenderMenuState::GameResults { results: results.player_results.clone(), replay_saved } }
+                MenuState::GameResults {ref results, replay_saved, ..} => { RenderMenuState::GameResults { results: results.player_results.clone(), replay_saved } }
                 MenuState::CharacterSelect (back_counter)          => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
                 MenuState::ReplaySelect (ref replays, ref ticker)  => { RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor) }
                 MenuState::GameSelect     => { RenderMenuState::GameSelect (self.game_ticker.cursor) }
                 MenuState::StageSelect    => { RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor) }
                 MenuState::SetRules       => { RenderMenuState::SetRules }
-                MenuState::BrowsePackages => { RenderMenuState::BrowsePackages }
                 MenuState::CreatePackage  => { RenderMenuState::CreatePackage }
                 MenuState::CreateFighter  => { RenderMenuState::CreateFighter }
             },
@@ -459,9 +479,9 @@ impl Menu {
         }
     }
 
-    pub fn reclaim(self) -> (Package, Config) {
-        match self.package {
-            PackageHolder::Package (package, _) => { (package, self.config) }
+    pub fn reclaim(&mut self) -> (Package, Config) {
+        match mem::replace(&mut self.package, PackageHolder::None) {
+            PackageHolder::Package (package, _) => { (package, self.config.clone()) }
             PackageHolder::None                 => { panic!("Attempted to access the package while there was none") }
         }
     }
@@ -524,13 +544,12 @@ Accessors:
 
 pub enum MenuState {
     GameSelect,
-    ReplaySelect (Vec<String>, MenuTicker),
+    ReplaySelect (Vec<String>, MenuTicker), // MenuTicker must be tied with the Vec<String>, otherwise they may become out of sync
     CharacterSelect (usize), // TODO: name usize value as backcounter
     StageSelect,
     GameResults { results: GameResults, replay_saved: bool },
     SetRules,
     PackageSelect (Vec<(String, PackageMeta)>, MenuTicker, Option<(PackageLoadState, Receiver<PackageLoadState>)>),
-    BrowsePackages,
     CreatePackage,
     CreateFighter,
 }
@@ -591,7 +610,6 @@ pub enum RenderMenuState {
     GameResults     { results: Vec<PlayerResult>, replay_saved: bool },
     SetRules,
     PackageSelect   (Vec<String>, usize, String),
-    BrowsePackages,
     CreatePackage,
     CreateFighter,
 }
@@ -676,4 +694,22 @@ impl MenuTicker {
 pub struct RenderMenu {
     pub state:          RenderMenuState,
     pub package_verify: Verify,
+}
+
+/// # Game -> Menu Transitions
+/// Results:   Game complete   -> display results -> CSS
+/// Unchanged: Game quit       -> CSS
+/// Results:   Replay complete -> display results -> replay screen
+/// Unchanged: Replay quit     -> replay screen
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub enum ResumeMenu {
+    Results(GameResults),
+    Unchanged,
+}
+
+impl Default for ResumeMenu {
+    fn default() -> Self {
+        ResumeMenu::Unchanged
+    }
 }
