@@ -4,9 +4,11 @@ A platform fighter sandbox featuring a character editor tightly integrated with 
 
 ## Quick links
 
-*   [Download for windows](https://github.com/rukai/PF_Sandbox/releases/latest)
-*   [Discord](https://discord.gg/KyjBs4x)
+*   [Download for windows](https://github.com/rukai/PF_Sandbox/releases/latest) (Run pf_sandbox.exe)
 *   [Youtube introduction](https://www.youtube.com/watch?v=CTrwvg56VQs) to the project.
+*   [Full Manual](manual.md)
+*   [Editor Tutorial](editor-tutorial.md)
+*   [Discord](https://discord.gg/KyjBs4x)
 
 [![Youtube Video](https://img.youtube.com/vi/CTrwvg56VQs/0.jpg)](https://www.youtube.com/watch?v=CTrwvg56VQs)
 
@@ -74,11 +76,6 @@ To run pf sandbox: run `CARGO_INCREMENTAL=1 cargo run --release` in the pf_sandb
 
 To build the CLI tool run `cargo build` in the cli directory, the resulting binary is stored at `cli/target/debug/pf_cli`.
 Copy `pf_cli` to somewhere in your PATH and rename it `pf`.
-
-## Usage Documentation
-
-*   [Get Started Tutorial](editor-tutorial.md)
-*   [Full Reference Manual](manual.md)
 
 ## Goals/Features
 
