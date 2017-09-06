@@ -684,7 +684,7 @@ impl Game {
             self.players = collision_players;
         }
 
-        if self.time_out() || self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 1 {
+        if self.time_out() || (self.players.len() > 1 && self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 1) {
             self.state = self.generate_game_results(input);
         }
 
