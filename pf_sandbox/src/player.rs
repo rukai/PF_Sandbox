@@ -15,30 +15,32 @@ use enum_traits::{FromIndex, ToIndex};
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Player {
-    pub fighter:          String,
-    pub action:           u64, // always change through self.set_action
-    pub frame:            u64,
-    pub stocks:           Option<u64>,
-    pub damage:           f32,
-    pub location:         Location,
-    pub respawn:          SpawnPoint,
-    pub x_vel:            f32,
-    pub y_vel:            f32,
-    pub kb_x_vel:         f32,
-    pub kb_y_vel:         f32,
-    pub kb_x_dec:         f32,
-    pub kb_y_dec:         f32,
-    pub face_right:       bool,
-    pub fastfalled:       bool,
-    pub air_jumps_left:   u64,
-    pub jumpsquat_button: bool,
-    pub turn_dash_buffer: bool,
-    pub ecb:              ECB,
-    pub hitlist:          Vec<usize>,
-    pub hitlag:           Hitlag,
-    pub hitstun:          f32,
-    pub hit_by:           Option<usize>,
-    pub result:           RawPlayerResult,
+    pub fighter:            String,
+    pub action:             u64, // always change through self.set_action
+    pub frame:              u64,
+    pub stocks:             Option<u64>,
+    pub damage:             f32,
+    pub location:           Location,
+    pub respawn:            SpawnPoint,
+    pub x_vel:              f32,
+    pub y_vel:              f32,
+    pub kb_x_vel:           f32,
+    pub kb_y_vel:           f32,
+    pub kb_x_dec:           f32,
+    pub kb_y_dec:           f32,
+    pub face_right:         bool,
+    pub frames_since_ledge: u64,
+    pub ledge_idle_timer:   u64,
+    pub fastfalled:         bool,
+    pub air_jumps_left:     u64,
+    pub jumpsquat_button:   bool,
+    pub turn_dash_buffer:   bool,
+    pub ecb:                ECB,
+    pub hitlist:            Vec<usize>,
+    pub hitlag:             Hitlag,
+    pub hitstun:            f32,
+    pub hit_by:             Option<usize>,
+    pub result:             RawPlayerResult,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
@@ -113,30 +115,32 @@ impl Hitlag {
 impl Player {
     pub fn new(fighter: String, spawn: SpawnPoint, respawn: SpawnPoint, stocks: Option<u64>) -> Player {
         Player {
-            fighter:          fighter,
-            action:           Action::DummyFramePreStart.index(),
-            frame:            0,
-            stocks:           stocks,
-            damage:           0.0,
-            location:         Location::Airbourne { x: spawn.x, y: spawn.y },
-            respawn:          respawn,
-            x_vel:            0.0,
-            y_vel:            0.0,
-            kb_x_vel:         0.0,
-            kb_y_vel:         0.0,
-            kb_x_dec:         0.0,
-            kb_y_dec:         0.0,
-            face_right:       spawn.face_right,
-            fastfalled:       false,
-            air_jumps_left:   0,
-            jumpsquat_button: false,
-            turn_dash_buffer: false,
-            ecb:              ECB::default(),
-            hitlist:          vec!(),
-            hitlag:           Hitlag::None,
-            hitstun:          0.0,
-            hit_by:           None,
-            result:           RawPlayerResult::default(),
+            fighter:            fighter,
+            action:             Action::DummyFramePreStart.index(),
+            frame:              0,
+            stocks:             stocks,
+            damage:             0.0,
+            location:           Location::Airbourne { x: spawn.x, y: spawn.y },
+            respawn:            respawn,
+            x_vel:              0.0,
+            y_vel:              0.0,
+            kb_x_vel:           0.0,
+            kb_y_vel:           0.0,
+            kb_x_dec:           0.0,
+            kb_y_dec:           0.0,
+            face_right:         spawn.face_right,
+            frames_since_ledge: 0,
+            ledge_idle_timer:   0,
+            fastfalled:         false,
+            air_jumps_left:     0,
+            jumpsquat_button:   false,
+            turn_dash_buffer:   false,
+            ecb:                ECB::default(),
+            hitlist:            vec!(),
+            hitlag:             Hitlag::None,
+            hitstun:            0.0,
+            hit_by:             None,
+            result:             RawPlayerResult::default(),
         }
     }
 
@@ -438,6 +442,7 @@ impl Player {
         {
             self.set_airbourne(players, fighters, platforms);
             self.set_action(Action::Fall);
+            self.frames_since_ledge = 0;
         }
         else if input.x.press || input.y.press || (input[0].stick_y > 0.65 && input[1].stick_y <= 0.65) {
             if self.damage < 100.0 {
@@ -478,6 +483,12 @@ impl Player {
                 self.set_action(Action::LedgeRollSlow);
             }
         }
+        else if self.ledge_idle_timer > 600 {
+            self.set_airbourne(players, fighters, platforms);
+            self.set_action(Action::DamageFall);
+            self.frames_since_ledge = 0;
+        }
+        self.ledge_idle_timer += 1;
     }
 
     fn damage_action(&mut self, fighter: &Fighter) {
@@ -1030,7 +1041,7 @@ impl Player {
             Some(Action::Damage)         => { self.set_action(Action::Damage); },
             Some(Action::DamageFly)      => { self.set_action(Action::DamageFly); },
             Some(Action::DamageFall)     => { self.set_action(Action::DamageFall); },
-            Some(Action::LedgeGrab)      => { self.set_action(Action::LedgeIdle); },
+            Some(Action::LedgeGrab)      => { self.set_action(Action::LedgeIdle); self.ledge_idle_timer = 0; },
             Some(Action::LedgeGetup)     => { self.set_action_idle_from_ledge(players, fighters, platforms); },
             Some(Action::LedgeGetupSlow) => { self.set_action_idle_from_ledge(players, fighters, platforms); },
             Some(Action::LedgeJump)      => { self.set_action_fall_from_ledge_jump(players, fighters, platforms); },
@@ -1132,6 +1143,7 @@ impl Player {
 
             self.location = Location::Platform { platform_i, x };
             self.set_action(Action::Idle);
+            self.frames_since_ledge = 0;
         }
         else {
             panic!("Location must be on ledge to call this function.")
@@ -1141,6 +1153,7 @@ impl Player {
     pub fn set_action_fall_from_ledge_jump(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         self.set_airbourne(players, fighters, platforms);
         self.set_action(Action::Fall);
+        self.frames_since_ledge = 0;
     }
 
     pub fn relative_f(&self, input: f32) -> f32 {
@@ -1271,8 +1284,10 @@ impl Player {
                 self.die(fighter, game_frame, goal);
             }
 
+            // ledge grabs
             let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
-            if input.stick_y.value > -0.5 {
+            self.frames_since_ledge += 1;
+            if self.frames_since_ledge >= 30 && self.y_vel < 0.0 && input.stick_y.value > -0.5 {
                 if let Some(ref ledge_grab_box) = fighter_frame.ledge_grab_box {
                     self.check_ledge_grab(players, &fighter, &ledge_grab_box, &stage.platforms);
                 }
