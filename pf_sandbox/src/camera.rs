@@ -41,6 +41,11 @@ impl Camera {
             self.aspect_ratio = width as f32 / height as f32;
         }
 
+        // enable manual camera control
+        if os_input.mouse_pressed(2) || os_input.scroll_diff() != 0.0 {
+            self.state = CameraState::Manual;
+        }
+
         match self.state {
             CameraState::Manual => {
                 // pan camera
@@ -136,11 +141,6 @@ impl Camera {
                 self.pan.0 += diff_pan_x / 10.0;
                 self.pan.1 += diff_pan_y / 10.0;
                 self.zoom += diff_zoom / 10.0;
-
-                // enable manual camera control
-                if os_input.mouse_pressed(2) || os_input.scroll_diff() != 0.0 {
-                    self.state = CameraState::Manual;
-                }
             },
         }
     }
