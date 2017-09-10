@@ -1301,6 +1301,20 @@ impl Player {
     }
 
     fn apply_friction(&mut self, fighter: &Fighter) {
+        match Action::from_index(self.action) {
+            Some(Action::Idle) |
+            Some(Action::Dash) |
+            Some(Action::Shield) |
+            Some(Action::ShieldOn) |
+            Some(Action::ShieldOff) |
+            Some(Action::Damage)
+              => { self.apply_friction_weak(fighter) }
+            _ => { self.apply_friction_strong(fighter) }
+        }
+    }
+
+    // TODO: These functions are split up as weak/strong so that one day they may be called individually by player scripts
+    fn apply_friction_weak(&mut self, fighter: &Fighter) {
         if self.x_vel > 0.0 {
             self.x_vel -= fighter.friction;
             if self.x_vel < 0.0 {
@@ -1309,6 +1323,21 @@ impl Player {
         }
         else {
             self.x_vel += fighter.friction;
+            if self.x_vel > 0.0 {
+                self.x_vel = 0.0;
+            }
+        }
+    }
+
+    fn apply_friction_strong(&mut self, fighter: &Fighter) {
+        if self.x_vel > 0.0 {
+            self.x_vel -= fighter.friction * if self.x_vel > fighter.walk_max_vel { 2.0 } else { 1.0 };
+            if self.x_vel < 0.0 {
+                self.x_vel = 0.0;
+            }
+        }
+        else {
+            self.x_vel += fighter.friction * if self.x_vel < -fighter.walk_max_vel { 2.0 } else { 1.0 };
             if self.x_vel > 0.0 {
                 self.x_vel = 0.0;
             }
