@@ -135,6 +135,7 @@ impl Game {
                     GameState::Netplay              | GameState::StepThenPause |
                     GameState::StepForwardThenPause | GameState::StepBackwardThenPause => { }
                 }
+                self.camera.update_os_input(os_input);
             }
             self.camera.update(os_input, &self.players, &self.package.fighters, &self.stage);
 
