@@ -527,11 +527,11 @@ impl Player {
             }
             else if self.jump_input(input).jump() && self.air_jumps_left > 0 {
                 self.air_jumps_left -= 1;
-                self.y_vel = fighter.jump_y_init_vel;
-                self.x_vel = fighter.jump_x_init_vel * input[0].stick_x;
+                self.y_vel = fighter.air_jump_y_vel;
+                self.x_vel = fighter.air_jump_x_vel * input[0].stick_x;
                 self.fastfalled = false;
 
-                if self.relative_f(input.stick_x.value) < -0.1 { // TODO: refine
+                if self.relative_f(input.stick_x.value) < -0.3 {
                     self.set_action(Action::JumpAerialB);
                 }
                 else {
@@ -1070,6 +1070,11 @@ impl Player {
                 }
                 else {
                     self.y_vel = fighter.jump_y_init_vel;
+                }
+
+                self.x_vel = self.x_vel * fighter.jump_x_vel_ground_mult + input[0].stick_x * fighter.jump_x_init_vel;
+                if self.x_vel.abs() > fighter.jump_x_term_vel {
+                    self.x_vel = fighter.jump_x_term_vel * self.x_vel.signum();
                 }
 
                 if self.relative_f(input[2].stick_x) >= -0.3 {
