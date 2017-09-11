@@ -139,6 +139,15 @@ impl Platform {
         }
     }
 
+    pub fn plat_x_clamp(&self, plat_x: f32) -> f32 {
+        let h_w = (self.x1 - self.x2).abs() / 2.0;
+        if plat_x > 0.0 {
+            plat_x.min(h_w)
+        } else {
+            plat_x.max(-h_w)
+        }
+    }
+
     pub fn plat_x_to_world_x(&self, plat_x: f32) -> f32 {
         (self.x1 + self.x2) / 2.0 + plat_x
     }

@@ -416,18 +416,21 @@ impl Player {
                 Action::Land      | Action::SpecialLand |
                 Action::CrouchEnd
                 => { self.ground_idle_action(input, fighter) }
-                Action::DamageFly   => { self.damagefly_action(fighter) }
-                Action::Damage      => { self.damage_action(fighter) }
-                Action::AerialDodge => { self.aerialdodge_action(input, fighter) }
-                Action::SpecialFall => { self.specialfall_action(input, fighter) }
-                Action::Dtilt       => { self.dtilt_action(input, fighter) }
-                Action::CrouchStart => { self.crouch_start_action(input, players, fighters, platforms) }
-                Action::Crouch      => { self.crouch_action(input, fighter) }
-                Action::Walk        => { self.walk_action(input, fighter) }
-                Action::Dash        => { self.dash_action(input, fighter) }
-                Action::Run         => { self.run_action(input, fighter) }
-                Action::Turn        => { self.turn_action(input, fighter) }
-                Action::LedgeIdle   => { self.ledge_idle_action(input, players, fighters, platforms) }
+
+                Action::Teeter |
+                Action::TeeterIdle  => self.teeter_action(input, fighter),
+                Action::DamageFly   => self.damagefly_action(fighter),
+                Action::Damage      => self.damage_action(fighter),
+                Action::AerialDodge => self.aerialdodge_action(input, fighter),
+                Action::SpecialFall => self.specialfall_action(input, fighter),
+                Action::Dtilt       => self.dtilt_action(input, fighter),
+                Action::CrouchStart => self.crouch_start_action(input, players, fighters, platforms),
+                Action::Crouch      => self.crouch_action(input, fighter),
+                Action::Walk        => self.walk_action(input, fighter),
+                Action::Dash        => self.dash_action(input, fighter),
+                Action::Run         => self.run_action(input, fighter),
+                Action::Turn        => self.turn_action(input, fighter),
+                Action::LedgeIdle   => self.ledge_idle_action(input, players, fighters, platforms),
                 _ => { },
             }
         }
@@ -641,11 +644,26 @@ impl Player {
             else if self.check_special(input) { }
             else if self.check_smash(input) { }
             else if self.check_attacks(input) { }
+            else if self.check_taunt(input) { }
             else if self.check_crouch(input) { }
             else if self.check_dash(input, fighter) { }
             else if self.check_turn(input) { }
             else if self.check_walk(input, fighter) { }
+        }
+    }
+
+    fn teeter_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        self.apply_friction(fighter);
+        if self.interruptible(fighter) {
+            if self.check_jump(input) { }
+            else if self.check_special(input) { }
+            else if self.check_smash(input) { }
+            else if self.check_attacks(input) { }
             else if self.check_taunt(input) { }
+            else if self.check_crouch(input) { }
+            else if self.check_dash(input, fighter) { }
+            else if self.check_turn(input) { }
+            else if self.check_walk_teeter(input, fighter) { }
         }
     }
 
@@ -810,6 +828,16 @@ impl Player {
 
     fn check_walk(&mut self, input: &PlayerInput, fighter: &Fighter) -> bool {
         if input[0].stick_x.abs() > 0.3 {
+            self.walk(fighter);
+            true
+        }
+        else {
+            false
+        }
+    }
+
+    fn check_walk_teeter(&mut self, input: &PlayerInput, fighter: &Fighter) -> bool {
+        if input[0].stick_x.abs() > 0.6 {
             self.walk(fighter);
             true
         }
@@ -1013,10 +1041,12 @@ impl Player {
             None => { panic!("Custom defined action expirations have not been implemented"); },
 
             // Idle
-            Some(Action::Spawn)     => { self.set_action(Action::SpawnIdle); },
-            Some(Action::SpawnIdle) => { self.set_action(Action::SpawnIdle); },
-            Some(Action::Idle)      => { self.set_action(Action::Idle); },
-            Some(Action::LedgeIdle) => { self.set_action(Action::LedgeIdle); },
+            Some(Action::Spawn)      => { self.set_action(Action::SpawnIdle); },
+            Some(Action::SpawnIdle)  => { self.set_action(Action::SpawnIdle); },
+            Some(Action::Idle)       => { self.set_action(Action::Idle); },
+            Some(Action::LedgeIdle)  => { self.set_action(Action::LedgeIdle); },
+            Some(Action::Teeter)     => { self.set_action(Action::TeeterIdle); },
+            Some(Action::TeeterIdle) => { self.set_action(Action::TeeterIdle); },
 
             // crouch
             Some(Action::CrouchStart) => { self.set_action(Action::Crouch); },
@@ -1091,6 +1121,7 @@ impl Player {
             Some(Action::ShieldOff)     => { self.set_action(Action::Idle); },
             Some(Action::RollF)         => { self.set_action(Action::Idle); },
             Some(Action::RollB)         => { self.set_action(Action::Idle); },
+            Some(Action::SpotDodge)     => { self.set_action(Action::Idle); },
             Some(Action::AerialDodge)   => { self.set_action(Action::SpecialFall); },
             Some(Action::SpecialFall)   => { self.set_action(Action::SpecialFall); },
             Some(Action::SpecialLand)   => { self.set_action(Action::Idle); },
@@ -1271,12 +1302,24 @@ impl Player {
                     }
                 }
                 Location::Platform { platform_i, mut x } => {
+                    let platform = &stage.platforms[platform_i];
                     x += self.x_vel + self.kb_x_vel;
                     if stage.platforms.get(platform_i).map_or(false, |plat| plat.plat_x_in_bounds(x)) {
                         self.location = Location::Platform { platform_i, x };
-                    } else {
+                    }
+                    else if !fighter.actions[self.action as usize].frames[self.frame as usize].ledge_cancel {
+                        self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
+                    }
+                    else if self.face_right && x < 0.0 || !self.face_right && x >= 0.0 || // facing away from the ledge
+                      self.relative_f(input.stick_x.value) > 0.6
+                    {
                         self.set_airbourne(players, fighters, &stage.platforms);
                         self.set_action(Action::Fall);
+                    }
+                    else {
+                        self.x_vel = 0.0;
+                        self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
+                        self.set_action(Action::Teeter);
                     }
                 }
                 _ => { }

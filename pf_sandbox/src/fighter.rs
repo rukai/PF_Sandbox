@@ -15,8 +15,16 @@ impl Default for Fighter {
                 Action::DamageFall | Action::AerialDodge |
                 Action::Uair       | Action::Dair |
                 Action::Fair       | Action::Bair |
-                Action::Nair => { false }
-                _ => { true }
+                Action::Nair => false,
+                _ => true
+            };
+            action_def_new.frames[0].ledge_cancel = match action {
+                Action::Teeter | Action::TeeterIdle |
+                Action::TechB  | Action::TechF |
+                Action::RollB  | Action::RollF |
+                Action::SpotDodge
+                  => false,
+                _ => true
             };
             actions.push(action_def_new);
         }
@@ -155,6 +163,7 @@ pub struct ActionFrame {
     pub grab_hold_x:    f32,
     pub grab_hold_y:    f32,
     pub pass_through:   bool, // only used on aerial actions
+    pub ledge_cancel:   bool, // only used on ground actions
     pub ledge_grab_box: Option<LedgeGrabBox>,
     pub force_hitlist_reset: bool,
 }
@@ -172,6 +181,7 @@ impl Default for ActionFrame {
             grab_hold_x:    4.0,
             grab_hold_y:    11.0,
             pass_through:   true,
+            ledge_cancel:   true,
             ledge_grab_box: None,
             force_hitlist_reset: false,
         }
@@ -429,6 +439,8 @@ pub enum Action {
     Idle,
     Crouch,
     LedgeIdle,
+    Teeter,
+    TeeterIdle,
 
     // Movement
     Fall,
@@ -462,6 +474,7 @@ pub enum Action {
     ShieldOff,
     RollF,
     RollB,
+    SpotDodge,
     AerialDodge,
     SpecialFall,
     SpecialLand,

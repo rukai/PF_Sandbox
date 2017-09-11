@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde_json::{Value, Number};
 
-pub fn engine_version() -> u64 { 5 }
+pub fn engine_version() -> u64 { 6 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
@@ -38,6 +38,7 @@ pub fn upgrade_to_latest(meta: &mut Option<Value>, rules: &mut Option<Value>, fi
     else if meta_engine_version < engine_version() {
         for upgrade_from in meta_engine_version..engine_version() {
             match upgrade_from {
+                5 => { upgrade5(fighters) }
                 4 => { upgrade4(fighters) }
                 3 => { upgrade3(fighters) }
                 2 => { upgrade2(fighters) }
@@ -63,6 +64,64 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
+
+/// teeter + ledge cancel
+fn upgrade5(fighters: &mut HashMap<String, Value>) {
+    //ledge_cancel to ActionFrame
+    for fighter in fighters.values_mut() {
+        if let Some (actions) = get_vec(fighter, "actions") {
+            for action in actions {
+                if let Some (frames) = get_vec(action, "frames") {
+                    for frame in frames {
+                        if let &mut Value::Object (ref mut frame) = frame {
+                            frame.insert(String::from("ledge_cancel"), Value::Bool(true));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // add teeter and spotdoge actions
+    let action_indexes: Vec<usize> = vec!(5, 6, 36);
+    let action = json!({
+      "frames": [
+        {
+          "ecb": {
+            "top_x": 0.0,
+            "top_y": 16.0,
+            "left_x": -4.0,
+            "left_y": 11.0,
+            "right_x": 4.0,
+            "right_y": 11.0,
+            "bot_x": 0.0,
+            "bot_y": 0.0
+          },
+          "colboxes": [],
+          "colbox_links": [],
+          "render_order": [],
+          "effects": [],
+          "item_hold_x": 4.0,
+          "item_hold_y": 11.0,
+          "grab_hold_x": 4.0,
+          "grab_hold_y": 11.0,
+          "pass_through": true,
+          "ledge_cancel": false,
+          "ledge_grab_box": null,
+          "force_hitlist_reset": false
+        }
+      ],
+      "iasa": 0
+    });
+
+    for fighter in fighters.values_mut() {
+        if let Some (actions) = get_vec(fighter, "actions") {
+            for action_index in &action_indexes {
+                actions.insert(*action_index, action.clone());
+            }
+        }
+    }
+}
 
 /// add ledge actions
 fn upgrade4(fighters: &mut HashMap<String, Value>) {
