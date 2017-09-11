@@ -671,7 +671,7 @@ impl Player {
                 let acc = (vel_max - self.x_vel) * (2.0/fighter.walk_max_vel) * (fighter.walk_init_vel + fighter.walk_acc);
                 self.x_vel += acc;
                 if self.relative_f(self.x_vel) > self.relative_f(vel_max) {
-                    self.x_vel = acc;
+                    self.x_vel = vel_max;
                 }
             }
         }
