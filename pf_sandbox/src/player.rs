@@ -596,14 +596,11 @@ impl Player {
         let fighter = &fighters[self.fighter.as_ref()];
         if self.interruptible(fighter) {
             if self.check_pass_platform(input, players, fighters, platforms) { }
-            else if self.check_jump(input) { }
             else if self.check_special(input) { } // TODO: no neutral/side special
             else if self.check_smash(input) { }
             else if self.check_attacks(input) { }
-            else if self.check_dash(input, fighter) { }
-            else if self.check_turn(input) { }
-            else if self.check_walk(input, fighter) { }
             else if self.check_taunt(input) { }
+            else if self.check_jump(input) { }
         }
         self.apply_friction(fighter);
     }
@@ -615,10 +612,9 @@ impl Player {
             else if self.check_special(input) { } // TODO: no neutral/side special
             else if self.check_smash(input) { }
             else if self.check_attacks(input) { }
+            else if self.check_taunt(input) { }
             else if self.check_dash(input, fighter) { }
             else if self.check_turn(input) { }
-            else if self.check_walk(input, fighter) { }
-            else if self.check_taunt(input) { }
         }
         self.apply_friction(fighter);
     }
