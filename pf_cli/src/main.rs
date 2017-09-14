@@ -2,7 +2,6 @@ use std::env;
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
-use std::str;
 
 fn main() {
     let mut args = env::args();

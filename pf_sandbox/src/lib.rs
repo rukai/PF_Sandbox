@@ -1,4 +1,3 @@
-#![feature(drop_types_in_const)]
 extern crate chrono;
 extern crate crypto;
 extern crate enum_traits;
