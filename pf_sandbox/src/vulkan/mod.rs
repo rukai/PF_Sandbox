@@ -233,9 +233,7 @@ impl<'a> VulkanGraphics<'a> {
 
                 // MS Windows removes the window immediately on close before the process ends
                 if let Some((new_width, new_height)) = self.window.window().get_inner_size_pixels() {
-                    if self.width != new_width || self.height != new_height {
-                        self.window_resize(new_width, new_height);
-                    }
+                    self.window_resize(new_width, new_height);
                 }
                 else {
                     return;
@@ -260,6 +258,18 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn window_resize(&mut self, width: u32, height: u32) {
+        if self.width == width && self.height == height
+        {
+            return;
+        }
+
+        // Prevents a host OoM when vk.CreateSwapchainKHR is called in recreate_with_dimension. Only occurs on my laptop in windows when minimizing. Seems like a driver issue so should be safe to remove this if it stops happening.
+        if width == 0 || height == 0 {
+            self.width = width; // force recreate swapchain when we return to sensible values
+            self.height = height;
+            return
+        }
+
         match self.swapchain.recreate_with_dimension([width, height]) {
             Ok((new_swapchain, new_images)) => {
                 self.width = width;
@@ -274,7 +284,7 @@ impl<'a> VulkanGraphics<'a> {
                 self.draw_text = DrawText::new(self.device.clone(), self.queue.clone(), self.swapchain.clone(), &new_images);
             }
             Err(SwapchainCreationError::UnsupportedDimensions) => { } // Occurs when minimized on MS Windows as dimensions are (0, 0)
-            Err(err) => { panic!("resize error: {:?}", err) }
+            Err(err) => { panic!("resize error: width={}, height={}, err={:?}", width, height, err) }
         }
     }
 
