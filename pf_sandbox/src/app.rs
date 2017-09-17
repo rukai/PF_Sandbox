@@ -22,7 +22,6 @@ use ::package::Package;
 use ::package;
 
 use libusb::Context;
-use std::thread;
 use std::time::{Duration, Instant};
 
 pub fn run(mut cli_results: CLIResults) {
@@ -228,9 +227,6 @@ pub fn run(mut cli_results: CLIResults) {
         }
 
         let frame_duration = Duration::from_secs(1) / 60;
-        let frame_duration_actual = frame_start.elapsed();
-        if frame_duration_actual < frame_duration {
-            thread::sleep(frame_duration - frame_start.elapsed());
-        }
+        while frame_start.elapsed() < frame_duration { }
     }
 }
