@@ -178,7 +178,9 @@ pub fn run(mut cli_results: CLIResults) {
             #[cfg(any(feature = "vulkan", feature = "opengl"))]
             {
                 if let Some(ref tx) = graphics_tx {
-                    tx.send(game.graphics_message(&command_line)).unwrap();
+                    if let Err(_) = tx.send(game.graphics_message(&command_line)) {
+                        return;
+                    }
                 }
             }
             network.update(game);
@@ -195,7 +197,9 @@ pub fn run(mut cli_results: CLIResults) {
                 #[cfg(any(feature = "vulkan", feature = "opengl"))]
                 {
                     if let Some(ref tx) = graphics_tx {
-                        tx.send(menu.graphics_message(&command_line)).unwrap();
+                        if let Err(_) = tx.send(menu.graphics_message(&command_line)) {
+                            return;
+                        }
                     }
                 }
             }

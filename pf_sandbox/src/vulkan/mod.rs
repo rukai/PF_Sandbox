@@ -231,15 +231,22 @@ impl<'a> VulkanGraphics<'a> {
                     render = self.read_message(message);
                 }
 
-                let (new_width, new_height) = self.window.window().get_inner_size_points().unwrap();
-                if self.width != new_width || self.height != new_height {
-                    self.window_resize(new_width, new_height);
+                // MS Windows removes the window immediately on close before the process ends
+                if let Some((new_width, new_height)) = self.window.window().get_inner_size_pixels() {
+                    if self.width != new_width || self.height != new_height {
+                        self.window_resize(new_width, new_height);
+                    }
+                }
+                else {
+                    return;
                 }
 
                 self.render(render);
                 self.frame_durations.push(frame_start.elapsed());
             }
-            self.handle_events();
+            if !self.handle_events() {
+                return;
+            }
         }
     }
 
@@ -857,11 +864,17 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
-    fn handle_events(&mut self) {
+    /// returns true iff succeeds
+    fn handle_events(&mut self) -> bool {
         // force send the current resolution
         let window = self.window.window();
-        let res = window.get_inner_size_points().unwrap();
-        self.os_input_tx.send(WindowEvent::Resized(res.0, res.1)).unwrap();
+
+        // MS Windows removes the window immediately on close before the process ends
+        if let Some((res_x, res_y)) = window.get_inner_size_pixels() {
+            self.os_input_tx.send(WindowEvent::Resized(res_x, res_y)).unwrap();
+        } else {
+            return false;
+        }
 
         let os_input_tx = self.os_input_tx.clone();
         self.events_loop.poll_events(|event| {
@@ -869,6 +882,7 @@ impl<'a> VulkanGraphics<'a> {
                 os_input_tx.send(event).unwrap();
             };
         });
+        true
     }
 }
 
