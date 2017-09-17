@@ -24,7 +24,7 @@ use vulkano::instance::{Instance, PhysicalDevice};
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
-use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentMode};
+use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
 use vulkano_text::{DrawText, DrawTextTrait, UpdateTextCache};
 use winit::{Event, WindowEvent, WindowBuilder, EventsLoop};
@@ -220,7 +220,6 @@ impl<'a> VulkanGraphics<'a> {
         loop {
             {
                 let frame_start = Instant::now();
-                self.render_fps();
 
                 // get the most recent render
                 let mut render = if let Ok(message) = self.render_rx.recv() {
@@ -236,23 +235,12 @@ impl<'a> VulkanGraphics<'a> {
                 if self.width != new_width || self.height != new_height {
                     self.window_resize(new_width, new_height);
                 }
+
                 self.render(render);
                 self.frame_durations.push(frame_start.elapsed());
             }
             self.handle_events();
         }
-    }
-
-    fn render_fps(&mut self) {
-        if self.frame_durations.len() == 60 {
-            let total: Duration = self.frame_durations.iter().sum();
-            let total = total.as_secs() as f64 + total.subsec_nanos() as f64 / 1_000_000_000.0;
-            let average = total / 60.0;
-            self.fps = format!("{:.0}", 1.0 / average);
-            self.frame_durations.clear();
-        }
-
-        self.draw_text.queue_text(self.width as f32 - 30.0, 20.0, 20.0, [1.0, 1.0, 1.0, 1.0], &self.fps);
     }
 
     fn read_message(&mut self, message: GraphicsMessage) -> Render {
@@ -265,18 +253,22 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn window_resize(&mut self, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
+        match self.swapchain.recreate_with_dimension([width, height]) {
+            Ok((new_swapchain, new_images)) => {
+                self.width = width;
+                self.height = height;
+                self.swapchain = new_swapchain.clone();
 
-        let (new_swapchain, new_images) = self.swapchain.recreate_with_dimension([width, height]).unwrap();
-        self.swapchain = new_swapchain.clone();
+                let (render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(self.device.clone(), new_swapchain, &new_images);
+                self.render_pass = render_pass;
+                self.pipeline = pipeline;
+                self.framebuffers = framebuffers;
 
-        let (render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(self.device.clone(), new_swapchain, &new_images);
-        self.render_pass = render_pass;
-        self.pipeline = pipeline;
-        self.framebuffers = framebuffers;
-
-        self.draw_text = DrawText::new(self.device.clone(), self.queue.clone(), self.swapchain.clone(), &new_images);
+                self.draw_text = DrawText::new(self.device.clone(), self.queue.clone(), self.swapchain.clone(), &new_images);
+            }
+            Err(SwapchainCreationError::UnsupportedDimensions) => { } // Occurs when minimized on MS Windows as dimensions are (0, 0)
+            Err(err) => { panic!("resize error: {:?}", err) }
+        }
     }
 
     fn render(&mut self, render: Render) {
@@ -346,6 +338,18 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
+    fn fps_render(&mut self) {
+        if self.frame_durations.len() == 60 {
+            let total: Duration = self.frame_durations.iter().sum();
+            let total = total.as_secs() as f64 + total.subsec_nanos() as f64 / 1_000_000_000.0;
+            let average = total / 60.0;
+            self.fps = format!("{:.0}", 1.0 / average);
+            self.frame_durations.clear();
+        }
+
+        self.draw_text.queue_text(self.width as f32 - 30.0, 20.0, 20.0, [1.0, 1.0, 1.0, 1.0], &self.fps);
+    }
+
     fn debug_lines_render(&mut self, lines: &[String]) {
         if lines.len() > 1 {
             for (i, line) in lines.iter().enumerate() {
@@ -359,6 +363,7 @@ impl<'a> VulkanGraphics<'a> {
             self.game_hud_render(&render.entities);
             self.game_timer_render(&render.timer);
             self.debug_lines_render(&render.debug_lines);
+            self.fps_render();
         }
         else {
             self.command_render(command_output);
@@ -521,6 +526,7 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn menu_render(&mut self, render: RenderMenu, image_num: usize, command_output: &[String]) -> AutoCommandBufferBuilder {
+        self.fps_render();
         let mut entities: Vec<MenuEntityAndSet> = vec!();
         match render.state {
             RenderMenuState::GameSelect (selection) => {

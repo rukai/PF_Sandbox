@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 extern crate pf_sandbox;
 
 use pf_sandbox::app::{run};

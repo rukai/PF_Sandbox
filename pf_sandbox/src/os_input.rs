@@ -138,6 +138,7 @@ impl OsInput {
             current.update();
         }
 
+        // receive all waiting events from the graphics thread (does not block)
         while let Ok(event) = self.rx.try_recv() {
             match event {
                 WindowEvent::Closed         => { self.quit = true; },
