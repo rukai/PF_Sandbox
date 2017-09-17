@@ -1,17 +1,12 @@
 # PF TAS
 
-A keyboard driven GUI tool for sending TAS inputs to PF Sandbox.
-Only affects game inputs not menu inputs.
-
-## Keyboard mapping
-
-### Notes
-
-*   Advancing a frame with spacebar will toggle off all pressed buttons.
+*   PF TAS is a keyboard driven GUI tool for sending TAS inputs to PF Sandbox.
+*   Only affects game inputs not menu inputs.
+*   Pressing spacebar in PF TAS will tell PF Sandbox to advance the frame using your TAS inputs instead of the controllers and will toggle off all pressed buttons.
 *   However you can hold shift while pressing a button to keep the GC button held until manually toggled off.
 *   Enter a number with 1234567890-+ before selecting an analog element (stick or trigger) to set the number as the value.
 
-### Keyboard -> GC
+## Keyboard -> GC
 
 *   a -> a
 *   s -> b
@@ -33,7 +28,7 @@ Only affects game inputs not menu inputs.
 
 *   arrow keys -> DPAD
 
-### Frame Advance
+## Frame Advance
 
 *   Enter -> Play
 *   Space -> Step
@@ -47,12 +42,12 @@ Only affects game inputs not menu inputs.
 *   k  -> right trigger
 *   l  -> right button
 
-### Config
+## Config
 
 *   F1-F12 Select a controller
 *   }/{    Add/remove controller
 
-### TODO:
+## TODO:
 
 *   Q - Toggle between display all controllers / display selected controller
 *   W - Toggle stretch display / force aspect ratio

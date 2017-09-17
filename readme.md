@@ -4,10 +4,12 @@ A platform fighter sandbox featuring a character editor tightly integrated with 
 
 ## Quick links
 
-*   [Download for windows](https://github.com/rukai/PF_Sandbox/releases/latest) (Run pf_sandbox.exe)
+*   [Download for Windows](https://github.com/rukai/PF_Sandbox/releases/latest) (Run pf_sandbox.exe)
+*   [Compile from source (Windows & Linux)](documentation/compiling.md)
 *   [Youtube introduction](https://www.youtube.com/watch?v=CTrwvg56VQs) to the project.
-*   [Full Manual](manual.md)
-*   [Editor Tutorial](editor-tutorial.md)
+*   [Editor Tutorial](documentation/editor_tutorial.md)
+*   [PF Sandbox Manual](documentation/manual.md)
+*   [TAS Manual](documentation/pf_tas.md)
 *   [Discord](https://discord.gg/KyjBs4x)
 
 [![Youtube Video](https://img.youtube.com/vi/CTrwvg56VQs/0.jpg)](https://www.youtube.com/watch?v=CTrwvg56VQs)
@@ -16,66 +18,6 @@ A platform fighter sandbox featuring a character editor tightly integrated with 
 
 Controller support is currently hardcoded to the GC adapter for Wii U (Nintendo or Mayflash in Wii U mode)
 Follow the steps for your OS, found under Installation at this [Dolphin Wiki page](https://wiki.dolphin-emu.org/index.php?title=How_to_use_the_Official_GameCube_Controller_Adapter_for_Wii_U_in_Dolphin)
-
-## Setup on Windows
-
-Install rust via https://www.rustup.rs/
-Do a custom install and select nightly and GNU compatible rust version. (instead of MSVC)
-
-Install [msys2](http://www.msys2.org/), following ALL of the instructions.
-
-Then in the msys2 terminal run:
-`pacman -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc`
-
-Add the msys2 mingw64 binary path to the PATH environment variable.
-In my case this was `C:\msys64\mingw64\bin`
-
-### Breakdown of crates -> msys2 package dependencies
-#### Libusb:
-*   mingw64/mingw-w64-x86_64-pkg-config
-*   mingw64/mingw-w64-x86_64-libusb
-
-#### zip->(flate->miniz-sys & bzip2) & rust-crypto
-*   mingw-w64-x86_64-gcc
-
-## Setup on Ubuntu
-
-Install rust via https://www.rustup.rs/
-Do a custom install and select nightly all other settings default.
-
-sudo apt-get install libssl-dev libusb-1.0-0-dev cmake libvulkan-dev vulkan-utils
-
-You will also need vulkan drivers:
-*   Intel: sudo apt-get install mesa-vulkan-drivers
-*   Nvida: No extra drivers required
-*   AMD:   TODO
-
-If it fails to launch, you may need to enable DRI3,
-Create a file /etc/X11/xorg.conf.d/20-intel.conf containing:
-```
-Section "Device"
-   Identifier  "Intel Graphics"
-   Driver      "intel"
-   Option      "DRI" "3"
-EndSection
-```
-
-## Setup on Arch
-deps: gcc, libusb, cmake
-
-need vulkan drivers: vulkan-icd-loader
-*   Intel: vulkan-intel
-*   Nvida: No extra drivers required
-*   AMD:   vulkan-radeon
-
-## Compile and run
-
-To run pf sandbox: run `CARGO_INCREMENTAL=1 cargo run --release` in the pf_sandbox directory.
-
-## Setup CLI Tool
-
-To build the CLI tool run `cargo build` in the cli directory, the resulting binary is stored at `cli/target/debug/pf_cli`.
-Copy `pf_cli` to somewhere in your PATH and rename it `pf`.
 
 ## Goals/Features
 

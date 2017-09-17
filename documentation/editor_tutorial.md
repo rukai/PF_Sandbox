@@ -1,7 +1,7 @@
 # Editor Tutorial
 
 Following this tutorial is a great way to get started with editing fighters in PF Sandbox.
-For a full reference of every operation check out the [documentation]().
+For a full reference of every operation check out the [Manual](manual.md).
 
 ## Setup
 

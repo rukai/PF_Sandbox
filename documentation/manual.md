@@ -45,7 +45,7 @@ If the package does not exist at that folder a new package is created there.
 Always backup any packages you are working on.
 Due to the nature of the interface it is super easy to accidentally destroy work without realising.
 
-To work through some examples check out the [editor-tutorial](editor-tutorial.md).
+To work through some examples check out the [editor-tutorial](editor_tutorial.md).
 
 The pause screen is where all the editing action occurs.
 Make sure you are on the pause screen to make use of the following tools.
