@@ -20,7 +20,7 @@ use vulkano::descriptor::pipeline_layout::PipelineLayoutAbstract;
 use vulkano::device::{Device, Queue};
 use vulkano::framebuffer::{Framebuffer, FramebufferAbstract, Subpass, RenderPassAbstract};
 use vulkano::image::SwapchainImage;
-use vulkano::instance::{Instance, PhysicalDevice};
+use vulkano::instance::{Instance, PhysicalDevice, PhysicalDeviceType};
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
@@ -85,13 +85,28 @@ impl<'a> VulkanGraphics<'a> {
         render_tx
     }
 
+    fn rank_physical_device(physical: &PhysicalDevice) -> u32 {
+        match physical.ty() {
+            PhysicalDeviceType::DiscreteGpu => 0,
+            PhysicalDeviceType::IntegratedGpu => 1,
+            PhysicalDeviceType::VirtualGpu => 2,
+            PhysicalDeviceType::Cpu => 3,
+            PhysicalDeviceType::Other => 4,
+        }
+    }
+
     fn new(os_input_tx: Sender<WindowEvent>, render_rx: Receiver<GraphicsMessage>) -> VulkanGraphics<'a> {
         let instance = {
             let extensions = vulkano_win::required_extensions();
             Instance::new(None, &extensions, None).expect("failed to create Vulkan instance")
         };
 
-        let physical = PhysicalDevice::enumerate(&instance).next().expect("no device available");
+        let mut physical_devices: Vec<PhysicalDevice> = PhysicalDevice::enumerate(&instance).collect();
+        physical_devices.sort_by_key(VulkanGraphics::rank_physical_device);
+        assert_ne!(physical_devices.len(), 0, "there are no physical devices");
+        let physical = physical_devices.remove(0);
+        println!("GPU: {} (type: {:?})", physical.name(), physical.ty());
+
         let events_loop = EventsLoop::new();
         let window = WindowBuilder::new().build_vk_surface(&events_loop, instance.clone()).unwrap();
         window.window().set_title("PF Sandbox");
