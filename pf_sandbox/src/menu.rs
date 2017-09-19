@@ -25,7 +25,7 @@ pub struct Menu {
     config:             Config,
     state:              MenuState,
     prev_state:         Option<MenuState>, // Only populated when the current state specifically needs to jump back to the previous state i.e we could arrive at the current state via multiple sources.
-    fighter_selections: Vec<CharacterSelect>,
+    fighter_selections: Vec<PlayerSelect>,
     game_ticker:        MenuTicker,
     stage_ticker:       Option<MenuTicker>, // Uses an option because we dont know how many stages there are at Menu creation, but we want to remember which stage was selected
     current_frame:      usize,
@@ -142,6 +142,7 @@ impl Menu {
                             stage_history:  replay.stage_history,
                             controllers:    replay.selected_controllers,
                             fighters:       replay.selected_fighters,
+                            ais:            replay.selected_ais,
                             stage:          replay.selected_stage,
                             state:          GameState::ReplayForwards,
                         });
@@ -163,53 +164,171 @@ impl Menu {
     }
 
     fn add_remove_fighter_selections(&mut self, player_inputs: &[PlayerInput]) {
-        // HACK to populate fighter_selections, if not done so yet
-        let cursor_max = self.fighter_select_cursor_max();
         if self.fighter_selections.len() == 0 {
-            for input in player_inputs {
-                self.fighter_selections.push(CharacterSelect {
-                    plugged_in: input.plugged_in,
-                    selection:  None,
-                    ticker:     MenuTicker::new(cursor_max),
+            for (i, input) in player_inputs.iter().enumerate() {
+                let ui = if input.plugged_in {
+                    PlayerSelectUi::human_fighter(self.package.get())
+                } else {
+                    PlayerSelectUi::HumanUnplugged
+                };
+                self.fighter_selections.push(PlayerSelect {
+                    controller: Some((i, MenuTicker::new(1))),
+                    fighter:    None,
+                    cpu_ai:     None,
+                    ui:         ui,
                 });
             }
         }
 
-        // TODO: add/remove fighter_selections on input add/remove
+        // TODO: if extra inputs are added/removed then add/remove corresponding human fighter_selections (before any CPU players)
     }
 
     fn step_fighter_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
         self.add_remove_fighter_selections(&player_inputs);
         let mut new_state: Option<MenuState> = None;
-        if let &mut MenuState::CharacterSelect (ref mut back_counter) = &mut self.state {
+        if let &mut MenuState::CharacterSelect { ref mut back_counter } = &mut self.state {
             let fighters = &self.package.get().fighters;
-            {
-                // update selections
-                let selections = &mut self.fighter_selections.iter_mut();
-                for (ref mut selection, ref input) in selections.zip(player_inputs) {
-                    selection.plugged_in = input.plugged_in;
+            for (controller_i, ref input) in player_inputs.iter().enumerate() {
+                if !input.plugged_in {
+                    continue;
+                }
+
+                // get current selection
+                let mut selection_i = 0;
+                for (check_selection_i, selection) in self.fighter_selections.iter().enumerate() {
+                    if let Some((check_controller_i, _)) = selection.controller {
+                        if check_controller_i == controller_i {
+                            selection_i = check_selection_i;
+                        }
+                    }
+                }
+
+                // move left/right
+                if input[0].stick_x < -0.7 || input[0].left {
+                    if self.fighter_selections[selection_i].controller.as_mut().unwrap().1.tick() {
+                        // find prev selection to move to
+                        let mut new_selection_i: Option<usize> = None;
+                        for (check_selection_i, selection) in self.fighter_selections.iter().enumerate() {
+                            if check_selection_i > selection_i && (selection.is_free() || check_selection_i == controller_i) {
+                                new_selection_i = Some(check_selection_i);
+                            }
+                        }
+                        for (check_selection_i, selection) in self.fighter_selections.iter().enumerate() {
+                            if check_selection_i < selection_i && (selection.is_free() || check_selection_i == controller_i) {
+                                new_selection_i = Some(check_selection_i);
+                            }
+                        }
+
+                        // move selection
+                        if let Some(new_selection_i) = new_selection_i {
+                            self.fighter_selections[new_selection_i].controller = self.fighter_selections[selection_i].controller.clone();
+                            self.fighter_selections[selection_i].controller = None;
+                            self.fighter_selections[selection_i].ui.ticker_full_reset();
+                        }
+                    }
+                }
+                else if input[0].stick_x > 0.7 || input[0].right {
+                    if self.fighter_selections[selection_i].controller.as_mut().unwrap().1.tick() {
+                        // find next selection to move to
+                        let mut new_selection_i: Option<usize> = None;
+                        for (check_selection_i, selection) in self.fighter_selections.iter().enumerate().rev() {
+                            if check_selection_i < selection_i && (selection.is_free() || check_selection_i == controller_i) {
+                                new_selection_i = Some(check_selection_i);
+                            }
+                        }
+                        for (check_selection_i, selection) in self.fighter_selections.iter().enumerate().rev() {
+                            if check_selection_i > selection_i && (selection.is_free() || check_selection_i == controller_i) {
+                                new_selection_i = Some(check_selection_i);
+                            }
+                        }
+
+                        // move selection
+                        if let Some(new_selection_i) = new_selection_i {
+                            self.fighter_selections[new_selection_i].controller = self.fighter_selections[selection_i].controller.clone();
+                            self.fighter_selections[selection_i].controller = None;
+                            self.fighter_selections[selection_i].ui.ticker_full_reset();
+                        }
+                    }
+                }
+                else {
+                    self.fighter_selections[selection_i].controller.as_mut().unwrap().1.reset();
+                }
+            }
+
+            // update selections
+            let mut add_cpu = false;
+            let mut remove_cpu: Option<usize> = None;
+            for (selection_i, ref mut selection) in self.fighter_selections.iter_mut().enumerate() {
+                if let Some((controller, _)) = selection.controller {
+                    let input = &player_inputs[controller];
+                    selection.update_plugged_in(input.plugged_in, self.package.get());
 
                     if input.b.press {
-                        selection.selection = None;
+                        selection.fighter = None;
                     }
                     else if input.a.press {
-                        if selection.ticker.cursor < fighters.len() {
-                            selection.selection = Some(selection.ticker.cursor);
-                        }
-                        else {
-                            // TODO: run extra options
+                        match selection.ui.clone() {
+                            PlayerSelectUi::HumanFighter (ticker) => {
+                                if ticker.cursor < fighters.len() {
+                                    selection.fighter = Some(ticker.cursor);
+                                }
+                                else {
+                                    match ticker.cursor - fighters.len() {
+                                        0 => { add_cpu = true; }
+                                        _ => { unreachable!() }
+                                    }
+                                }
+                            }
+                            PlayerSelectUi::CpuFighter (ticker) => {
+                                if ticker.cursor < fighters.len() {
+                                    selection.fighter = Some(ticker.cursor);
+                                }
+                                else {
+                                    match ticker.cursor - fighters.len() {
+                                        0 => { /* TODO: selection.ui = PlayerSelectUi::cpu_ai()*/ }
+                                        1 => { remove_cpu = Some(selection_i); }
+                                        _ => { unreachable!() }
+                                    }
+                                }
+                            }
+                            PlayerSelectUi::CpuAi (_) => { }
+                            PlayerSelectUi::HumanUnplugged => { }
                         }
                     }
 
-                    if input[0].stick_y > 0.4 || input[0].up {
-                        selection.ticker.up();
+                    match selection.ui {
+                        PlayerSelectUi::HumanFighter (ref mut ticker) |
+                        PlayerSelectUi::CpuFighter   (ref mut ticker) |
+                        PlayerSelectUi::CpuAi        (ref mut ticker) => {
+                            if input[0].stick_y > 0.4 || input[0].up {
+                                ticker.up();
+                            }
+                            else if input[0].stick_y < -0.4 || input[0].down {
+                                ticker.down();
+                            }
+                            else {
+                                ticker.reset();
+                            }
+                        }
+                        PlayerSelectUi::HumanUnplugged => { }
                     }
-                    else if input[0].stick_y < -0.4 || input[0].down {
-                        selection.ticker.down();
-                    }
-                    else {
-                        selection.ticker.reset();
-                    }
+                }
+            }
+
+            // run selection modifications that were previously immutably borrowed
+            if let Some(selection_i) = remove_cpu {
+                let home_selection_i = self.fighter_selections[selection_i].controller.clone().unwrap().0;
+                self.fighter_selections[home_selection_i].controller = self.fighter_selections[selection_i].controller.clone();
+                self.fighter_selections.remove(selection_i);
+            }
+            if add_cpu {
+                if self.fighter_selections.iter().filter(|x| x.ui.is_visible()).count() < 4 {
+                    self.fighter_selections.push(PlayerSelect {
+                        controller: None,
+                        fighter:    None,
+                        cpu_ai:     None,
+                        ui:         PlayerSelectUi::cpu_fighter(self.package.get()),
+                    });
                 }
             }
 
@@ -237,11 +356,6 @@ impl Menu {
         }
     }
 
-    fn fighter_select_cursor_max(&self) -> usize {
-        self.package.get().fighters.len() // last index of fighters
-        + 0                               // number of extra options
-    }
-
     fn step_stage_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
         if let None = self.stage_ticker {
             self.stage_ticker = Some(MenuTicker::new(self.package.get().stages.len()));
@@ -262,21 +376,38 @@ impl Menu {
         }
 
         if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && self.package.get().stages.len() > 0 {
-            self.game_setup(player_inputs);
+            self.game_setup();
         }
         else if player_inputs.iter().any(|x| x.b.press) {
             self.state = MenuState::character_select();
         }
     }
 
-    pub fn game_setup(&mut self, player_inputs: &[PlayerInput]) {
+    pub fn game_setup(&mut self) {
         let mut selected_fighters: Vec<String> = vec!();
         let mut controllers: Vec<usize> = vec!();
+        let mut ais: Vec<usize> = vec!();
+        let mut ais_skipped = 0;
         for (i, selection) in (&self.fighter_selections).iter().enumerate() {
-            if let Some(selection) = selection.selection {
-                selected_fighters.push(self.package.get().fighters.index_to_key(selection).unwrap());
-                if player_inputs[i].plugged_in {
+            // add human players
+            if let PlayerSelectUi::HumanFighter (_) = selection.ui {
+                if let Some(fighter) = selection.fighter {
+                    selected_fighters.push(self.package.get().fighters.index_to_key(fighter).unwrap());
                     controllers.push(i);
+                }
+            }
+
+            // add CPU players
+            if selection.ui.is_cpu() {
+                if selection.fighter.is_some() /* && selection.cpu.is_some() TODO */ {
+                    let fighter = selection.fighter.unwrap();
+                    selected_fighters.push(self.package.get().fighters.index_to_key(fighter).unwrap());
+                    controllers.push(i - ais_skipped);
+                    ais.push(0); // TODO: delete this
+                    // ais.push(selection.cpu_ai.unwrap()); TODO: add this
+                }
+                else {
+                    ais_skipped += 1;
                 }
             }
         }
@@ -289,6 +420,7 @@ impl Menu {
             player_history: vec!(),
             stage_history:  vec!(),
             controllers:    controllers,
+            ais:            ais,
             fighters:       selected_fighters,
             stage:          stage,
             state:          GameState::Local,
@@ -429,7 +561,7 @@ impl Menu {
                 MenuState::GameSelect             => { self.step_game_select   (&player_inputs, input) }
                 MenuState::ReplaySelect (_, _)    => { self.step_replay_select (&player_inputs, input) }
                 MenuState::PackageSelect (_, _,_) => { self.step_package_select(&player_inputs, input) }
-                MenuState::CharacterSelect (_)    => { self.step_fighter_select(&player_inputs, input) }
+                MenuState::CharacterSelect {..}   => { self.step_fighter_select(&player_inputs, input) }
                 MenuState::StageSelect            => { self.step_stage_select  (&player_inputs, input) }
                 MenuState::GameResults {..}       => { self.step_results       (&player_inputs, input) }
                 MenuState::SetRules               => { }
@@ -445,9 +577,9 @@ impl Menu {
         RenderMenu {
             state: match self.state {
                 MenuState::PackageSelect (ref names, ref ticker, ref load) => { RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor, load.as_ref().map(|x| x.0.message()).unwrap_or_default() ) }
-                MenuState::GameResults {ref results, replay_saved, ..} => { RenderMenuState::GameResults { results: results.player_results.clone(), replay_saved } }
-                MenuState::CharacterSelect (back_counter)          => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
-                MenuState::ReplaySelect (ref replays, ref ticker)  => { RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor) }
+                MenuState::GameResults {ref results, replay_saved, ..}     => { RenderMenuState::GameResults { results: results.player_results.clone(), replay_saved } }
+                MenuState::CharacterSelect { back_counter }                => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
+                MenuState::ReplaySelect (ref replays, ref ticker)          => { RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor) }
                 MenuState::GameSelect     => { RenderMenuState::GameSelect (self.game_ticker.cursor) }
                 MenuState::StageSelect    => { RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor) }
                 MenuState::SetRules       => { RenderMenuState::SetRules }
@@ -545,7 +677,7 @@ Accessors:
 pub enum MenuState {
     GameSelect,
     ReplaySelect (Vec<String>, MenuTicker), // MenuTicker must be tied with the Vec<String>, otherwise they may become out of sync
-    CharacterSelect (usize), // TODO: name usize value as backcounter
+    CharacterSelect { back_counter: usize },
     StageSelect,
     GameResults { results: GameResults, replay_saved: bool },
     SetRules,
@@ -594,7 +726,7 @@ impl MenuState {
     }
 
     pub fn character_select() -> MenuState {
-        MenuState::CharacterSelect(0)
+        MenuState::CharacterSelect { back_counter: 0 }
     }
 
     pub fn game_results(results: GameResults) -> MenuState {
@@ -605,7 +737,7 @@ impl MenuState {
 pub enum RenderMenuState {
     GameSelect      (usize),
     ReplaySelect    (Vec<String>, usize),
-    CharacterSelect (Vec<CharacterSelect>, usize, usize),
+    CharacterSelect (Vec<PlayerSelect>, usize, usize),
     StageSelect     (usize),
     GameResults     { results: Vec<PlayerResult>, replay_saved: bool },
     SetRules,
@@ -615,10 +747,91 @@ pub enum RenderMenuState {
 }
 
 #[derive(Clone)]
-pub struct CharacterSelect {
-    pub plugged_in: bool,
-    pub selection:  Option<usize>,
-    pub ticker:     MenuTicker,
+pub struct PlayerSelect {
+    pub controller: Option<(usize, MenuTicker)>, // the cursor of the ticker is ignored
+    pub fighter:    Option<usize>,
+    pub cpu_ai:     Option<usize>,
+    pub ui:         PlayerSelectUi,
+}
+
+impl PlayerSelect {
+    pub fn update_plugged_in(&mut self, plugged_in: bool, package: &Package) {
+        if plugged_in {
+            if let PlayerSelectUi::HumanUnplugged = self.ui {
+                self.ui = PlayerSelectUi::human_fighter(package);
+            }
+        }
+        else {
+            if let PlayerSelectUi::HumanFighter (_) = self.ui {
+                self.ui = PlayerSelectUi::HumanUnplugged;
+            }
+        }
+    }
+
+    /// Returns true iff a controller can move to this selection
+    pub fn is_free(&self) -> bool {
+        self.ui.is_cpu() && self.controller.is_none()
+    }
+}
+
+#[derive(Clone)]
+pub enum PlayerSelectUi {
+    CpuAi (MenuTicker),
+    CpuFighter (MenuTicker),
+    HumanFighter (MenuTicker),
+    HumanUnplugged,
+}
+
+impl PlayerSelectUi {
+    pub fn cpu_ai() -> Self {
+        PlayerSelectUi::CpuAi (MenuTicker::new(/* TODO: number_of_ai + */ 1))
+    }
+
+    pub fn cpu_fighter(package: &Package) -> Self {
+        PlayerSelectUi::CpuFighter (MenuTicker::new(package.fighters.len() + 2))
+    }
+
+    pub fn human_fighter(package: &Package) -> Self {
+        PlayerSelectUi::HumanFighter (MenuTicker::new(package.fighters.len() + 1))
+    }
+
+    pub fn is_visible(&self) -> bool {
+        match self {
+            &PlayerSelectUi::HumanUnplugged => false,
+            _                               => true
+        }
+    }
+
+    pub fn is_cpu(&self) -> bool {
+        match self {
+            &PlayerSelectUi::CpuAi (_) |
+            &PlayerSelectUi::CpuFighter (_) => true,
+            _                               => false
+        }
+    }
+
+    pub fn ticker_unwrap(&self) -> &MenuTicker {
+        match self {
+            &PlayerSelectUi::HumanFighter (ref ticker) |
+            &PlayerSelectUi::CpuFighter   (ref ticker) |
+            &PlayerSelectUi::CpuAi        (ref ticker) => { ticker }
+            &PlayerSelectUi::HumanUnplugged => {
+                panic!("Tried to unwrap the PlayerSelectUi ticker but was HumanUnplugged")
+            }
+        }
+    }
+
+    pub fn ticker_full_reset(&mut self) {
+        match self {
+            &mut PlayerSelectUi::HumanFighter (ref mut ticker) |
+            &mut PlayerSelectUi::CpuFighter   (ref mut ticker) |
+            &mut PlayerSelectUi::CpuAi        (ref mut ticker) => {
+                ticker.reset();
+                ticker.cursor = 0;
+            }
+            &mut PlayerSelectUi::HumanUnplugged => { }
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -641,7 +854,8 @@ impl MenuTicker {
         }
     }
 
-    fn tick(&mut self) -> bool {
+    /// increments internal state and returns true if a tick occurs
+    pub fn tick(&mut self) -> bool {
         let tick_durations = [20, 12, 10, 8, 6, 5];
         if self.reset {
             self.ticks_remaining = tick_durations[0];
@@ -699,8 +913,8 @@ pub struct RenderMenu {
 /// # Game -> Menu Transitions
 /// Results:   Game complete   -> display results -> CSS
 /// Unchanged: Game quit       -> CSS
-/// Results:   Replay complete -> display results -> replay screen
-/// Unchanged: Replay quit     -> replay screen
+/// Results:   Replay complete -> display results -> replay ui
+/// Unchanged: Replay quit     -> replay ui
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub enum ResumeMenu {

@@ -1162,7 +1162,7 @@ impl Player {
             Some(Action::TauntLeft)  => { self.set_action(Action::Idle); },
             Some(Action::TauntRight) => { self.set_action(Action::Idle); },
 
-            Some(Action::Eliminated)         => { },
+            Some(Action::Eliminated)         => { self.set_action(Action::Eliminated) },
             Some(Action::DummyFramePreStart) => { self.set_action(Action::Spawn); },
         };
     }

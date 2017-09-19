@@ -75,7 +75,6 @@ impl State {
         // controller select
         if input.key_pressed(VirtualKeyCode::F1) && self.controllers.len() > 0 {
             self.current_controller = 0;
-            println!("{}", self.number.pop_stick());
         }
         else if input.key_pressed(VirtualKeyCode::F2) && self.controllers.len() > 1 {
             self.current_controller = 1;

@@ -2,7 +2,7 @@ mod buffers;
 
 use self::buffers::{Vertex, Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
-use ::menu::{RenderMenu, RenderMenuState, CharacterSelect};
+use ::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
 use ::graphics::{self, GraphicsMessage, Render, RenderType, RenderRect};
 use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB};
@@ -570,20 +570,21 @@ impl<'a> VulkanGraphics<'a> {
                 self.draw_package_banner(&render.package_verify, command_output);
             }
             RenderMenuState::CharacterSelect (selections, back_counter, back_counter_max) => {
-                let mut plugged_in_controller_indexes: Vec<usize>            = vec!();
-                let mut plugged_in_selections:         Vec<&CharacterSelect> = vec!();
+                let mut plugged_in_controller_indexes: Vec<usize>         = vec!();
+                let mut plugged_in_selections:         Vec<&PlayerSelect> = vec!();
 
                 for (i, selection) in selections.iter().enumerate() {
-                    if selection.plugged_in {
+                    if selection.ui.is_visible() {
                         plugged_in_selections.push(selection);
                         plugged_in_controller_indexes.push(i);
                     }
                 }
 
                 self.draw_back_counter(&mut entities, back_counter, back_counter_max);
+                self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Fighters");
                 match plugged_in_selections.len() {
                     0 => {
-                        self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "There are no controllers plugged in.");
+                        self.draw_text.queue_text(100.0, 100.0, 30.0, [1.0, 1.0, 1.0, 1.0], "There are no controllers plugged in.");
                     }
                     1 => {
                         self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[0], plugged_in_selections[0], -0.9, -0.8, 0.9, 0.9);
@@ -604,7 +605,7 @@ impl<'a> VulkanGraphics<'a> {
                         self.draw_fighter_selector(&mut entities, plugged_in_controller_indexes[3], plugged_in_selections[3],  0.0,  0.0, 0.9, 0.9);
                     }
                     _ => {
-                        self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Currently only supports up to 4 controllers. Please unplug some.");
+                        self.draw_text.queue_text(100.0, 100.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Currently only supports up to 4 controllers. Please unplug some.");
                     }
                 }
                 self.draw_package_banner(&render.package_verify, command_output);
@@ -748,21 +749,56 @@ impl<'a> VulkanGraphics<'a> {
         self.draw_text.queue_text(x, y, 30.0, color, format!("L-Cancel Success: {}%", result.lcancel_percent).as_str());
     }
 
-    fn draw_fighter_selector(&mut self, entities: &mut Vec<MenuEntityAndSet>, controller_i: usize, selection: &CharacterSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
-        self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Fighters");
+    fn draw_fighter_selector(&mut self, entities: &mut Vec<MenuEntityAndSet>, controller_i: usize, selection: &PlayerSelect, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
         let fighters = &self.package_buffers.package.as_ref().unwrap().fighters;
-        for (fighter_i, fighter) in fighters.key_value_iter().enumerate() {
-            let (fighter_key, fighter) = fighter;
-            let x_offset = if fighter_i == selection.ticker.cursor { 0.1 } else { 0.0 };
+
+        // render player name
+        {
+            let x = ((start_x+1.0) / 2.0) * self.width  as f32;
+            let y = ((start_y+1.0) / 2.0) * self.height as f32;
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let color = if let Some((controller, _)) = selection.controller {
+                graphics::get_controller_color(controller)
+            } else {
+                [0.5, 0.5, 0.5, 1.0]
+            };
+            let name = match selection.ui {
+                PlayerSelectUi::CpuAi        (_) => format!("CPU AI"),
+                PlayerSelectUi::CpuFighter   (_) => format!("CPU Fighter"),
+                PlayerSelectUi::HumanFighter (_) => format!("Port #{}", controller_i+1),
+                PlayerSelectUi::HumanUnplugged   => unreachable!()
+            };
+            self.draw_text.queue_text(x, y, size, color, name.as_ref());
+        }
+
+        // render UI
+        let options = fighters.iter().map(|x| x.name.clone())
+        .chain(match selection.ui {
+            PlayerSelectUi::HumanFighter (_) => vec!(String::from("Add CPU")),
+            PlayerSelectUi::CpuFighter   (_) => vec!(String::from("Change AI"), String::from("Remove CPU")),
+            PlayerSelectUi::CpuAi        (_) => vec!(),
+            PlayerSelectUi::HumanUnplugged   => unreachable!()
+        });
+        for (fighter_i, fighter_name) in options.enumerate() {
+            let x_offset = if fighter_i == selection.ui.ticker_unwrap().cursor { 0.1 } else { 0.0 };
             let x = ((start_x+1.0 + x_offset) / 2.0) * self.width  as f32;
-            let y = ((start_y+1.0           ) / 2.0) * self.height as f32 + fighter_i as f32 * 50.0;
+            let y = ((start_y+1.0           ) / 2.0) * self.height as f32 + (fighter_i+1) as f32 * 50.0;
 
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos
-
             let mut color = [1.0, 1.0, 1.0, 1.0];
-            if let Some(selection_i) = selection.selection {
-                if fighter_i == selection_i {
+            if let Some(selected_fighter_i) = selection.fighter {
+                if selected_fighter_i == fighter_i {
                     color = graphics::get_controller_color(controller_i);
+                }
+            }
+            self.draw_text.queue_text(x, y, size, color, fighter_name.as_ref());
+        }
+
+        // render fighter
+        for (fighter_i, fighter_key) in fighters.key_iter().enumerate() {
+            if let Some(selection_i) = selection.fighter {
+                if fighter_i == selection_i {
+                    let color = graphics::get_controller_color(controller_i);
 
                     // fudge player data (One day I would like to have the menu selection fighters (mostly) playable)
                     let player = RenderPlayer {
@@ -814,7 +850,6 @@ impl<'a> VulkanGraphics<'a> {
                     }
                 }
             }
-            self.draw_text.queue_text(x, y, size, color, fighter.name.as_ref());
         }
     }
 

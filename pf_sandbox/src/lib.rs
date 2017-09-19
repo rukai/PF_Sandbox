@@ -1,3 +1,5 @@
+#![feature(ord_max_min)]
+
 extern crate chrono;
 extern crate crypto;
 extern crate enum_traits;
@@ -15,6 +17,7 @@ extern crate zip;
 #[macro_use] extern crate serde_json;
 #[macro_use] extern crate treeflection_derive;
 
+pub mod ai;
 pub mod app;
 pub mod camera;
 pub mod cli;

@@ -44,6 +44,7 @@ pub struct Game {
     pub players:                Vec<Player>,
     pub debug_players:          Vec<DebugPlayer>,
     pub selected_controllers:   Vec<usize>,
+    pub selected_ais:           Vec<usize>,
     pub selected_stage:         String,
     pub edit:                   Edit,
     pub debug_output_this_step: bool,
@@ -68,13 +69,11 @@ impl Game {
         let mut players:       Vec<Player>      = vec!();
         let mut debug_players: Vec<DebugPlayer> = vec!();
         {
-            for (i, _) in setup.controllers.iter().enumerate() {
+            for (i, fighter) in setup.fighters.iter().enumerate() {
                 // Stage can have less spawn points then players
                 let spawn = stage.spawn_points[i % stage.spawn_points.len()].clone();
                 let respawn = stage.respawn_points[i % stage.respawn_points.len()].clone();
-                // The CLI allows for selected_fighters to be shorter then players
-                let fighter = setup.fighters[i % setup.fighters.len()].clone();
-                players.push(Player::new(fighter, spawn, respawn, package.rules.stock_count));
+                players.push(Player::new(fighter.clone(), spawn, respawn, package.rules.stock_count));
                 debug_players.push(Default::default());
             }
         }
@@ -92,6 +91,7 @@ impl Game {
             stage:                  stage,
             debug_players:          debug_players,
             selected_controllers:   setup.controllers,
+            selected_ais:           setup.ais,
             selected_stage:         setup.stage,
             edit:                   Edit::Stage,
             debug_output_this_step: false,
@@ -1005,6 +1005,7 @@ pub struct GameSetup {
     pub stage_history:  Vec<Stage>,
     pub controllers:    Vec<usize>,
     pub fighters:       Vec<String>,
+    pub ais:            Vec<usize>,
     pub stage:          String,
     pub state:          GameState,
 }

@@ -87,17 +87,21 @@ impl<'a> Input<'a> {
     }
 
     /// Call this once every frame
-    pub fn update(&mut self, tas_inputs: &[ControllerInput]) {
+    pub fn update(&mut self, tas_inputs: &[ControllerInput], ai_inputs: &[ControllerInput]) {
+        // read input from controllers
         let mut inputs: Vec<ControllerInput> = Vec::new();
-
-        for input in tas_inputs.iter().rev() {
-            inputs.insert(0, input.clone());
-        }
-
         for handle in &mut self.adapter_handles {
             read_gc_adapter(handle, &mut inputs);
         }
         read_usb_controllers(&mut inputs);
+
+        // append AI inputs
+        inputs.extend_from_slice(ai_inputs);
+
+        // replace tas inputs
+        for i in 0..tas_inputs.len().min(inputs.len()) {
+            inputs[i] = tas_inputs[i].clone();
+        }
 
         self.prev_start     = self.current_inputs.iter().any(|x| x.start);
         self.current_inputs = inputs;
@@ -133,7 +137,7 @@ impl<'a> Input<'a> {
     pub fn players(&self, frame: usize) -> Vec<PlayerInput> {
         let mut result_inputs: Vec<PlayerInput> = vec!();
 
-        for i in 0..4 { // TODO: retrieve number of controllers from frame history
+        for (i, _) in self.current_inputs.iter().enumerate() {
             let inputs = self.get_player_inputs(i, frame as i64);
             if inputs[0].plugged_in {
                 result_inputs.push(PlayerInput {

@@ -85,6 +85,7 @@ pub struct Replay {
     pub stage_history:        Vec<Stage>,
     pub selected_controllers: Vec<usize>,
     pub selected_fighters:    Vec<String>,
+    pub selected_ais:         Vec<usize>,
     pub selected_stage:       String,
 }
 
@@ -98,6 +99,7 @@ impl Replay {
             stage_history:        game.stage_history.clone(),
             selected_controllers: game.selected_controllers.clone(),
             selected_fighters:    game.players.iter().map(|x| x.fighter.clone()).collect(),
+            selected_ais:         game.selected_ais.clone(),
             selected_stage:       game.selected_stage.clone(),
         }
     }

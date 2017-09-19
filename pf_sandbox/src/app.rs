@@ -10,6 +10,7 @@ use ::graphics::GraphicsMessage;
 use std::sync::mpsc::Sender;
 use std;
 
+use ::ai;
 use ::cli::{CLIResults, ContinueFrom};
 use ::command_line::CommandLine;
 use ::config::Config;
@@ -37,24 +38,12 @@ pub fn run(mut cli_results: CLIResults) {
 
     // CLI options
     let (mut menu, mut game, mut os_input) = {
-        // default values
-        let mut controllers: Vec<usize> = vec!();
-        for (i, _) in input.players(0).iter().enumerate() {
-            controllers.push(i);
-        }
-
         #[allow(unused_variables)] // Needed for headless build
         let (os_input, os_input_tx) = OsInput::new();
 
         package::generate_example_stub();
         let config = Config::load();
         let package_string = cli_results.package.or(config.current_package.clone());
-
-        if let Some(total_players) = cli_results.total_players {
-            while controllers.len() > total_players {
-                controllers.pop();
-            }
-        }
 
         #[cfg(any(feature = "vulkan", feature = "opengl"))]
         {
@@ -122,9 +111,6 @@ pub fn run(mut cli_results: CLIResults) {
                 }
 
                 // handle missing and invalid cli input
-                if cli_results.fighter_names.len() == 0 {
-                    cli_results.fighter_names.push(package.fighters.index_to_key(0).unwrap());
-                }
                 for name in &cli_results.fighter_names {
                     if !package.fighters.contains_key(name) {
                         println!("Package does not contain selected fighter '{}'", name);
@@ -137,6 +123,29 @@ pub fn run(mut cli_results: CLIResults) {
                         return;
                     }
                 }
+
+                // handle missing and invalid cli input
+                if cli_results.fighter_names.len() == 0 {
+                    cli_results.fighter_names.push(package.fighters.index_to_key(0).unwrap());
+                }
+
+                // fill fighters/controllers
+                let mut controllers: Vec<usize> = vec!();
+                let mut fighters: Vec<String> = vec!();
+                input.update(&[], &[]); // run the first input step so that we can check for the number of controllers.
+                for (i, _) in input.players(0).iter().enumerate() {
+                    controllers.push(i);
+                    fighters.push(cli_results.fighter_names[i % cli_results.fighter_names.len()].clone());
+                }
+
+                // remove extra fighters/controllers
+                if let Some(total_players) = cli_results.total_players {
+                    while controllers.len() > total_players {
+                        controllers.pop();
+                        fighters.pop();
+                    }
+                }
+
                 if cli_results.stage_name.is_none() {
                     cli_results.stage_name = package.stages.index_to_key(0);
                 }
@@ -147,7 +156,8 @@ pub fn run(mut cli_results: CLIResults) {
                     player_history: vec!(),
                     stage_history:  vec!(),
                     controllers:    controllers,
-                    fighters:       cli_results.fighter_names,
+                    fighters:       fighters,
+                    ais:            vec!(),
                     stage:          cli_results.stage_name.unwrap(),
                     state:          GameState::Local,
                 };
@@ -170,7 +180,8 @@ pub fn run(mut cli_results: CLIResults) {
 
         let mut resume_menu: Option<ResumeMenu> = None;
         if let Some(ref mut game) = game {
-            input.update(&game.tas);
+            let ai_inputs = ai::gen_inputs(&game);
+            input.update(&game.tas, &ai_inputs);
             if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block()) {
                 resume_menu = Some(resume_menu_inner)
             }
@@ -186,7 +197,7 @@ pub fn run(mut cli_results: CLIResults) {
             command_line.step(&os_input, game);
         }
         else {
-            input.update(&[]);
+            input.update(&[], &[]);
             if let Some(mut menu_game_setup) = menu.step(&mut input) {
                 let (package, config) = menu.reclaim();
                 input.set_history(std::mem::replace(&mut menu_game_setup.input_history, vec!()));
