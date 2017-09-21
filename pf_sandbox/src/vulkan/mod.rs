@@ -223,7 +223,7 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn new_uniform_set(&self, uniform: vs::ty::Data) -> Arc<DescriptorSet + Send + Sync> {
-        let uniform_buffer = self.uniform_buffer_pool.next(uniform);
+        let uniform_buffer = self.uniform_buffer_pool.next(uniform).unwrap();
         Arc::new(
             PersistentDescriptorSet::start(self.pipeline.clone(), 0)
             .add_buffer(uniform_buffer).unwrap()
@@ -859,7 +859,7 @@ impl<'a> VulkanGraphics<'a> {
         for (stage_i, stage) in stages.key_value_iter().enumerate() {
             let (stage_key, stage) = stage;
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos
-            let x_offset = if stage_i == selection { 0.1 } else { 0.0 };
+            let x_offset = if stage_i == selection { 0.05 } else { 0.0 };
             let x = self.width as f32 * (0.1 + x_offset);
             let y = self.height as f32 * 0.1 + stage_i as f32 * 50.0;
             self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], stage.name.as_ref());

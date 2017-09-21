@@ -9,13 +9,13 @@ keywords = ["pf", "sandbox", "TAS"]
 
 [dependencies]
 winit = "0.7"
-vulkano = "0.6"
-vulkano-shader-derive = "0.6"
-vulkano-win = "0.6"
-vulkano_text = "0.4"
-serde_json = "0.9"
-serde_derive = "0.9"
-serde = "0.9"
+vulkano = "0.7"
+vulkano-shader-derive = "0.7"
+vulkano-win = "0.7"
+vulkano_text = "0.5"
+serde_json = "1.0"
+serde_derive = "1.0"
+serde = "1.0"
 
 [build-dependencies]
-vulkano-shaders = "0.6"
+vulkano-shaders = "0.7"
