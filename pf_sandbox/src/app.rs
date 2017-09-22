@@ -139,10 +139,21 @@ pub fn run(mut cli_results: CLIResults) {
                 }
 
                 // remove extra fighters/controllers
-                if let Some(total_players) = cli_results.total_players {
-                    while controllers.len() > total_players {
+                if let Some(max_players) = cli_results.max_human_players {
+                    while controllers.len() > max_players {
                         controllers.pop();
                         fighters.pop();
+                    }
+                }
+
+                // add cpu players
+                let mut ais: Vec<usize> = vec!();
+                let last_fighter_i = fighters.len();
+                if let Some(total_players) = cli_results.total_cpu_players {
+                    for i in 0..total_players {
+                        fighters.push(cli_results.fighter_names[(last_fighter_i + i) % cli_results.fighter_names.len()].clone());
+                        controllers.push(last_fighter_i + i);
+                        ais.push(0);
                     }
                 }
 
@@ -157,7 +168,7 @@ pub fn run(mut cli_results: CLIResults) {
                     stage_history:  vec!(),
                     controllers:    controllers,
                     fighters:       fighters,
-                    ais:            vec!(),
+                    ais:            ais,
                     stage:          cli_results.stage_name.unwrap(),
                     state:          GameState::Local,
                 };

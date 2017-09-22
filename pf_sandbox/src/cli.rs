@@ -12,11 +12,12 @@ pub fn cli() -> CLIResults {
     let program = args[0].clone();
 
     let mut opts = Options::new();
-    opts.optflag("l", "list", "List available packages and close");
-    opts.optopt("s", "stage",        "Use the stage specified", "NAME");
-    opts.optopt("f", "fighters",     "Use the fighters specified", "NAME1,NAME2,NAME3...");
-    opts.optopt("p", "players",      "Number of players in the game", "NUMPLAYERS");
-    opts.optopt("g", "graphics",     "Graphics backend to use",
+    opts.optflag("l", "list",         "List available packages and close");
+    opts.optopt("s",  "stage",        "Use the stage specified", "NAME");
+    opts.optopt("f",  "fighters",     "Use the fighters specified", "NAME1,NAME2,NAME3...");
+    opts.optopt("h",  "humanplayers", "Number of human players in the game", "NUM_HUMAN_PLAYERS");
+    opts.optopt("c",  "cpuplayers",   "Number of CPU players in the game", "NUM_CPU_PLAYERS");
+    opts.optopt("g",  "graphics",     "Graphics backend to use",
         if cfg!(features =  "vulkan") && cfg!(features = "opengl") {
             "[vulkan|opengl|none]"
         } else if cfg!(features =  "vulkan") {
@@ -55,10 +56,22 @@ pub fn cli() -> CLIResults {
         results.package = Some(matches.free[0].clone());
     }
 
-    if let Some(players) = matches.opt_str("p") {
+    if let Some(players) = matches.opt_str("h") {
         if let Ok(players) = players.parse::<usize>() {
             results.continue_from = ContinueFrom::Game;
-            results.total_players = Some(players);
+            results.max_human_players = Some(players);
+        }
+        else {
+            print_usage(&program, opts);
+            results.continue_from = ContinueFrom::Close;
+            return results;
+        }
+    }
+
+    if let Some(players) = matches.opt_str("c") {
+        if let Ok(players) = players.parse::<usize>() {
+            results.continue_from = ContinueFrom::Game;
+            results.total_cpu_players = Some(players);
         }
         else {
             print_usage(&program, opts);
@@ -98,23 +111,25 @@ pub fn cli() -> CLIResults {
 }
 
 pub struct CLIResults {
-    pub graphics_backend: GraphicsBackendChoice,
-    pub package:          Option<String>,
-    pub total_players:    Option<usize>,
-    pub fighter_names:    Vec<String>,
-    pub stage_name:       Option<String>,
-    pub continue_from:    ContinueFrom,
+    pub graphics_backend:  GraphicsBackendChoice,
+    pub package:           Option<String>,
+    pub max_human_players: Option<usize>,
+    pub total_cpu_players: Option<usize>,
+    pub fighter_names:     Vec<String>,
+    pub stage_name:        Option<String>,
+    pub continue_from:     ContinueFrom,
 }
 
 impl CLIResults {
     pub fn new() -> CLIResults {
         CLIResults {
-            graphics_backend: GraphicsBackendChoice::Default,
-            package:          None,
-            total_players:    None,
-            fighter_names:    vec!(),
-            stage_name:       None,
-            continue_from:    ContinueFrom::Menu,
+            graphics_backend:  GraphicsBackendChoice::Default,
+            package:           None,
+            max_human_players: None,
+            total_cpu_players: None,
+            fighter_names:     vec!(),
+            stage_name:        None,
+            continue_from:     ContinueFrom::Menu,
         }
     }
 }
