@@ -268,7 +268,7 @@ impl Player {
                     let kbg = hitbox.kbg + hurtbox.kbg_add;
                     let bkb = hitbox.bkb + hurtbox.bkb_add;
 
-                    let mut kb_vel = (bkb + kbg * (damage_launch * weight * 1.4 + 18.0)).min(2500.0); // 96
+                    let mut kb_vel = (bkb + kbg * (damage_launch * weight * 1.4 + 18.0)).min(2500.0);
 
                     if let Some(action) = Action::from_index(self.action) {
                         match action {
@@ -317,6 +317,7 @@ impl Player {
 
                     self.hitlag = Hitlag::Def { counter: (hitbox.damage / 3.0 + 3.0) as u64, kb_vel, angle, wobble_x: 0.0 };
                     self.hit_by = Some(player_atk_i);
+                    self.face_right = self.bps_xy(players, fighters, platforms).0 < players[player_atk_i].bps_xy(players, fighters, platforms).0;
                 }
                 _ => { }
             }
@@ -373,7 +374,7 @@ impl Player {
         let fighter = &fighters[self.fighter.as_ref()];
         let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
-        self.frame += 1; // The Action DummyFramePreStart is used so that this doesnt skip a real frame when the game starts
+        self.frame += 1; // Action::DummyFramePreStart is used so that this doesnt skip a real frame when the game starts
         if self.frame >= action_frames {
             self.action_expired(input, players, fighters, platforms);
         }
@@ -1309,8 +1310,14 @@ impl Player {
                     else if self.face_right && x < 0.0 || !self.face_right && x >= 0.0 || // facing away from the ledge
                       self.relative_f(input.stick_x.value) > 0.6
                     {
-                        self.set_airbourne(players, fighters, &stage.platforms);
+                        // fall
                         self.set_action(Action::Fall);
+                        self.set_airbourne(players, fighters, &stage.platforms);
+
+                        // force set past platform
+                        let x_offset = if x > 0.0 { 0.000001 } else { -0.000001 }; // just being cautious, probably dont need this
+                        let (air_x, air_y) = platform.plat_x_to_world_p(x + x_offset);
+                        self.location = Location::Airbourne { x: air_x, y: air_y };
                     }
                     else {
                         self.x_vel = 0.0;
