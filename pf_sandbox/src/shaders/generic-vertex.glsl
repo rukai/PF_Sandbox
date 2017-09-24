@@ -5,20 +5,16 @@ layout(location = 1) in float edge;
 layout(location = 2) in float render_id;
 layout(location = 0) out float v_edge;
 layout(location = 1) out float v_render_id;
+
 layout(set = 0, binding = 0) uniform Data {
-    vec2  position_offset;
-    float zoom;
-    float aspect_ratio;
-    float direction;
     vec4  edge_color;
     vec4  color;
+    mat4  transformation;
 } uniforms;
 
 void main() {
-    vec2 pos_flipped = vec2(position[0] * uniforms.direction, position[1]);
-    vec2 pos_camera = (pos_flipped + uniforms.position_offset) * uniforms.zoom;
-    vec2 pos_aspect = vec2(pos_camera[0], pos_camera[1] * uniforms.aspect_ratio * -1);
-    gl_Position = vec4(pos_aspect, 0.0, 1.0);
+    vec4 result = uniforms.transformation * vec4(position, 0.0, 1.0);
+    gl_Position = vec4(result[0], result[1] * -1.0, result[2], result[3]); // positive is up
 
     v_edge = edge;
     v_render_id = render_id;

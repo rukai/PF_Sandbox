@@ -28,10 +28,11 @@ winit = "0.7" # Needed on all builds, game logic is dependent on VirtualKeyCode 
 vulkano = { version = "0.7", optional = true }
 vulkano-win = { version = "0.7", optional = true }
 vulkano-shader-derive = { version = "0.7", optional = true }
-vulkano_text = {version = "0.5", optional = true }
+vulkano_text = { version = "0.5", optional = true }
+cgmath = { version = "0.15.0", optional = true }
 glium = { version = "0.16", optional = true }
 
 [features]
 default = ["vulkan"]
-vulkan = ["vulkano", "vulkano-win", "vulkano-shader-derive", "vulkano_text"]
+vulkan = ["vulkano", "vulkano-win", "vulkano-shader-derive", "vulkano_text", "cgmath"]
 opengl = ["glium"] # opengl is now broken, need to port it over to winit instead of glutin

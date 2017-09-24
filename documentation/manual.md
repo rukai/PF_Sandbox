@@ -78,14 +78,14 @@ Before editing anything you must first select what you wish to edit:
 Debug output is displayed to the terminal every time a frame is changed or modified.
 Use the following keys to toggle debug displays:
 
-*   F1 - Player physics  (terminal only)
-*   F2 - Input (terminal only)
-*   F2 + Shift - Input difference (terminal only)
-*   F3 - Current action (terminal only)
+*   F1 - Player physics
+*   F2 - Input
+*   F2 + Shift - Input difference
+*   F3 - Current action
 *   F4 - Frame (terminal only)
-*   F5 - Main stick vector (TODO)
-*   F6 - CStick vector (TODO)
-*   F7 - DI vector (TODO)
+*   F5 - Main stick vector
+*   F6 - CStick vector
+*   F7 - DI vector
 *   F8 - Display ECB and BPS
 *   F9 - Dont display fighter
 *   F10 - Display player camera area

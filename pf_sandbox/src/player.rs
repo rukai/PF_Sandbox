@@ -41,6 +41,13 @@ pub struct Player {
     pub hitstun:            f32,
     pub hit_by:             Option<usize>,
     pub result:             RawPlayerResult,
+
+    // Only use for debug display
+    pub frames_since_hit:   u64,
+    pub hit_angle_pre_di:   Option<f32>,
+    pub hit_angle_post_di:  Option<f32>,
+    pub stick:              Option<(f32, f32)>,
+    pub c_stick:            Option<(f32, f32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
@@ -141,6 +148,13 @@ impl Player {
             hitstun:            0.0,
             hit_by:             None,
             result:             RawPlayerResult::default(),
+
+            // Only use for debug display
+            frames_since_hit:   0,
+            hit_angle_pre_di:   None,
+            hit_angle_post_di:  None,
+            stick:              None,
+            c_stick:            None,
         }
     }
 
@@ -315,6 +329,10 @@ impl Player {
                     };
                     let angle = angle_deg * f32::consts::PI / 180.0;
 
+                    // debug data
+                    self.hit_angle_pre_di = Some(angle);
+                    self.frames_since_hit = 0;
+
                     self.hitlag = Hitlag::Def { counter: (hitbox.damage / 3.0 + 3.0) as u64, kb_vel, angle, wobble_x: 0.0 };
                     self.hit_by = Some(player_atk_i);
                     self.face_right = self.bps_xy(players, fighters, platforms).0 < players[player_atk_i].bps_xy(players, fighters, platforms).0;
@@ -344,10 +362,31 @@ impl Player {
                 self.action_step(input, players, fighters, platforms);
             }
         }
+
+        self.frames_since_hit += 1;
+        if self.frames_since_hit > 60 {
+            self.hit_angle_pre_di = None;
+            self.hit_angle_post_di = None;
+        }
+
+        if input[0].stick_x == 0.0 && input[0].stick_y == 0.0 {
+            self.stick = None;
+        }
+        else {
+            self.stick = Some((input[0].stick_x, input[0].stick_y));
+        }
+
+        if input[0].c_stick_x == 0.0 && input[0].c_stick_y == 0.0 {
+            self.c_stick = None;
+        }
+        else {
+            self.c_stick = Some((input[0].c_stick_x, input[0].c_stick_y));
+        }
     }
 
     fn hitlag_def_end(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], kb_vel: f32, angle: f32) {
         // TODO: DI
+        self.hit_angle_post_di = Some(angle);
 
         let (sin, cos) = angle.sin_cos();
         self.x_vel = 0.0;
@@ -1642,6 +1681,41 @@ impl Player {
     }
 
     pub fn render(&self, fighter_color: [f32; 4], selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> RenderPlayer {
+        let mut vector_arrows = vec!();
+        if debug.stick_vector {
+            if let Some((x, y)) = self.stick {
+                vector_arrows.push(VectorArrow {
+                    x,
+                    y,
+                    color: [0.7, 0.7, 0.7, 1.0]
+                });
+            }
+        }
+        if debug.c_stick_vector {
+            if let Some((x, y)) = self.c_stick {
+                vector_arrows.push(VectorArrow {
+                    x,
+                    y,
+                    color: [1.0, 1.0, 0.0, 1.0]
+                });
+            }
+        }
+        if debug.di_vector {
+            if let Some(angle) = self.hit_angle_pre_di {
+                vector_arrows.push(VectorArrow {
+                    x: angle.cos(),
+                    y: angle.sin(),
+                    color: [1.0, 0.0, 0.0, 1.0]
+                });
+            }
+            if let Some(angle) = self.hit_angle_post_di {
+                vector_arrows.push(VectorArrow {
+                    x: angle.cos(),
+                    y: angle.sin(),
+                    color: [0.0, 1.0, 0.0, 1.0]
+                });
+            }
+        }
         RenderPlayer {
             debug:             debug,
             damage:            self.damage,
@@ -1656,6 +1730,7 @@ impl Player {
             fighter_selected:  fighter_selected,
             player_selected:   player_selected,
             selected_colboxes: selected_colboxes,
+            vector_arrows:     vector_arrows,
         }
     }
 
@@ -1696,6 +1771,13 @@ pub struct RenderPlayer {
     pub fighter_selected:  bool,
     pub player_selected:   bool,
     pub selected_colboxes: HashSet<usize>,
+    pub vector_arrows:     Vec<VectorArrow>,
+}
+
+pub struct VectorArrow {
+    pub x:     f32,
+    pub y:     f32,
+    pub color: [f32; 4]
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]

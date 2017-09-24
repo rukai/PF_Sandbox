@@ -9,6 +9,8 @@ use ::fighter::{Action, ECB};
 use ::results::PlayerResult;
 use ::package::Verify;
 
+use cgmath::{Matrix4, Vector3, Rad};
+use cgmath::prelude::*;
 use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
 use vulkano;
@@ -36,6 +38,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use std::collections::HashSet;
 use std::iter;
+use std::f32;
 
 mod vs {
     #[derive(VulkanoShader)]
@@ -390,6 +393,28 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
+    fn render_buffers(
+        &self,
+        command_buffer: AutoCommandBufferBuilder,
+        render:         &RenderGame,
+        buffers:        Buffers,
+        entity:         &Matrix4<f32>,
+        edge_color:     [f32; 4],
+        color:          [f32; 4]
+    ) -> AutoCommandBufferBuilder {
+        let zoom = render.camera.zoom.recip();
+        let aspect_ratio = self.aspect_ratio();
+        let camera = Matrix4::from_nonuniform_scale(zoom, zoom * aspect_ratio, 1.0);
+        let transformation = camera * entity;
+        let uniform = vs::ty::Data {
+            edge_color,
+            color,
+            transformation:  transformation.into(),
+        };
+        let set = self.new_uniform_set(uniform);
+        command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
+    }
+
     fn game_render(&mut self, render: RenderGame, image_num: usize, command_output: &[String]) -> AutoCommandBufferBuilder {
         if command_output.len() == 0 {
             self.game_hud_render(&render.entities);
@@ -401,10 +426,7 @@ impl<'a> VulkanGraphics<'a> {
             self.command_render(command_output);
         }
 
-        let zoom = render.camera.zoom.recip();
         let pan  = render.camera.pan;
-        let aspect_ratio = self.aspect_ratio();
-
         let mut command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
         .update_text_cache(&mut self.draw_text)
         .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into()]).unwrap();
@@ -423,43 +445,29 @@ impl<'a> VulkanGraphics<'a> {
 
         let stage: &str = render.stage.as_ref();
         if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
-            let uniform = vs::ty::Data {
-                zoom:            zoom,
-                aspect_ratio:    aspect_ratio,
-                position_offset: [pan.0 as f32, pan.1 as f32],
-                direction:       1.0,
-                edge_color:      [1.0, 1.0, 1.0, 1.0],
-                color:           [1.0, 1.0, 1.0, 1.0],
-                _dummy0:         [0; 12],
-            };
-            let set = self.new_uniform_set(uniform);
-            command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+            let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.0));
+            let color = [1.0, 1.0, 1.0, 1.0];
+            command_buffer = self.render_buffers(command_buffer, &render, buffers.clone(), &transformation, color, color);
         }
 
-        for entity in render.entities {
+        for entity in &render.entities {
             match entity {
-                RenderEntity::Player(player) => {
-                    let dir = if player.face_right { 1.0 } else { -1.0 } as f32;
-                    let draw_pos = [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32];
+                &RenderEntity::Player(ref player) => {
+                    let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                    let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, 0.0));
+
                     // draw player ecb
                     if player.debug.ecb {
                         let buffers = Buffers::new_player(self.device.clone(), &player);
+                        let edge_color = [0.0, 1.0, 0.0, 1.0];
                         let color = if player.fighter_selected {
                             [0.0, 1.0, 0.0, 1.0]
                         } else {
                             [1.0, 1.0, 1.0, 1.0]
                         };
-                        let uniform = vs::ty::Data {
-                            zoom:            zoom,
-                            aspect_ratio:    aspect_ratio,
-                            position_offset: draw_pos,
-                            direction:       dir,
-                            edge_color:      [0.0, 1.0, 0.0, 1.0],
-                            color:           color,
-                            _dummy0:         [0; 12],
-                        };
-                        let set = self.new_uniform_set(uniform);
-                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        let transformation = position * dir;
+
+                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, edge_color, color);
                     }
 
                     // setup fighter uniform
@@ -475,22 +483,13 @@ impl<'a> VulkanGraphics<'a> {
                             } else {
                                 player.fighter_color
                             };
-                            let uniform = vs::ty::Data {
-                                zoom:            zoom,
-                                aspect_ratio:    aspect_ratio,
-                                position_offset: draw_pos,
-                                direction:       dir,
-                                edge_color:      edge_color,
-                                color:           color,
-                                _dummy0:         [0; 12],
-                            };
-                            let set = self.new_uniform_set(uniform);
+                            let transformation = position * dir;
 
                             // draw fighter
                             let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
                             if player.frame < fighter_frames.len() {
                                 if let &Some(ref buffers) = &fighter_frames[player.frame] {
-                                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                                    command_buffer = self.render_buffers(command_buffer, &render, buffers.clone(), &transformation, edge_color, color);
                                 }
                             }
                             else {
@@ -502,53 +501,33 @@ impl<'a> VulkanGraphics<'a> {
 
                     // draw selected hitboxes
                     if player.selected_colboxes.len() > 0 {
-                        // I could store which element each vertex is part of and handle this in the shader but then I wouldn't be able to highlight overlapping elements.
-                        // The extra vertex generation + draw should be fast enough (this only occurs on the pause screen)
-                        let uniform = vs::ty::Data {
-                            zoom:            zoom,
-                            aspect_ratio:    aspect_ratio,
-                            position_offset: [player.bps.0 + pan.0 as f32, player.bps.1 + pan.1 as f32],
-                            direction:       if player.face_right { 1.0 } else { -1.0 } as f32,
-                            edge_color:      [0.0, 1.0, 0.0, 1.0],
-                            color:           [0.0, 1.0, 0.0, 1.0],
-                            _dummy0:         [0; 12],
-                        };
-                        let set = self.new_uniform_set(uniform);
+                        let color = [0.0, 1.0, 0.0, 1.0];
+                        let transformation = position * dir;
                         let buffers = self.package_buffers.fighter_frame_colboxes(self.device.clone(), &player.fighter, player.action, player.frame, &player.selected_colboxes);
-                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, color, color);
+                    }
+
+                    // draw debug vector arrows
+                    let num_arrows = player.vector_arrows.len() as f32;
+                    for (i, arrow) in player.vector_arrows.iter().enumerate() {
+                        let buffers = Buffers::new_arrow(self.device.clone());
+                        let squish = Matrix4::from_nonuniform_scale((num_arrows - i as f32) / num_arrows, 1.0, 1.0); // consecutive arrows are drawn slightly thinner so we can see arrows behind
+                        let rotate = Matrix4::from_angle_z(Rad(arrow.y.atan2(arrow.x) - f32::consts::PI / 2.0));
+                        let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, 0.0));
+                        let transformation = position * rotate * squish;
+                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, arrow.color.clone(), arrow.color.clone())
                     }
 
                     // TODO: Edit::Player  - render selected player's BPS as green
                     // TODO: Edit::Fighter - Click and drag on ECB points
                     // TODO: Edit::Stage   - render selected platforms as green
                 },
-                RenderEntity::Selector(rect) => {
-                    let uniform = vs::ty::Data {
-                        zoom:            zoom,
-                        aspect_ratio:    aspect_ratio,
-                        position_offset: [pan.0 as f32, pan.1 as f32],
-                        direction:       1.0,
-                        edge_color:      [0.0, 1.0, 0.0, 1.0],
-                        color:           [0.0, 1.0, 0.0, 1.0],
-                        _dummy0:         [0; 12],
-                    };
-                    let set = self.new_uniform_set(uniform);
+                &RenderEntity::Selector (ref rect) |
+                &RenderEntity::Area     (ref rect) => {
+                    let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.0));
+                    let color = [0.0, 1.0, 0.0, 1.0];
                     let buffers = Buffers::rect_outline_buffers(self.device.clone(), rect);
-                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
-                },
-                RenderEntity::Area(rect) => {
-                    let uniform = vs::ty::Data {
-                        zoom:            zoom,
-                        aspect_ratio:    aspect_ratio,
-                        position_offset: [pan.0 as f32, pan.1 as f32],
-                        direction:       1.0,
-                        edge_color:      [0.0, 1.0, 0.0, 1.0],
-                        color:           [0.0, 1.0, 0.0, 1.0], // TODO: HMMM maybe i can use only the edge to get the outline from a normal rect?
-                        _dummy0:         [0; 12],
-                    };
-                    let set = self.new_uniform_set(uniform);
-                    let buffers = Buffers::rect_outline_buffers(self.device.clone(), rect);
-                    command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                    command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, color, color);
                 },
             }
         }
@@ -677,13 +656,9 @@ impl<'a> VulkanGraphics<'a> {
     // TODO: Then this bar can be drawn on top of the package banner text
     fn draw_back_counter(&mut self, entities: &mut Vec<MenuEntityAndSet>, back_counter: usize, back_counter_max: usize) {
         let uniform = vs::ty::Data {
-            zoom:            1.0,
-            aspect_ratio:    1.0,
-            position_offset: [0.0, 0.0],
-            direction:       1.0,
             edge_color:      [1.0, 1.0, 1.0, 1.0],
             color:           [1.0, 1.0, 1.0, 1.0],
-            _dummy0:         [0; 12],
+            transformation:  Matrix4::identity().into(),
         };
         let set = self.new_uniform_set(uniform);
 
@@ -815,27 +790,29 @@ impl<'a> VulkanGraphics<'a> {
                         fighter_selected:  false,
                         player_selected:   false,
                         selected_colboxes: HashSet::new(),
+                        vector_arrows:     vec!(),
                     };
 
                     // draw fighter
                     let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
                     if player.frame < fighter_frames.len() {
                         // TODO: dynamically calculate position and zoom (fit width/height of fighter into selection area)
-                        let zoom = 40.0;
+                        let zoom_divider = 40.0;
+                        let zoom = 1.0 / zoom_divider;
                         let fighter_x = start_x + (end_x - start_x) / 2.0;
                         let fighter_y = end_y - 0.2; // HACK: dont know why the fighters are drawing so low, so just put them 0.2 higher
-                        let fighter_x_scaled = fighter_x * zoom;
-                        let fighter_y_scaled = fighter_y * zoom * -1.0 + player.bps.1;
+                        let fighter_x_scaled = fighter_x * zoom_divider;
+                        let fighter_y_scaled = fighter_y * zoom_divider * -1.0 + player.bps.1;
 
                         if let &Some(_) = &fighter_frames[player.frame] {
+                            let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
+                            let position = Matrix4::from_translation(Vector3::new(fighter_x_scaled, fighter_y_scaled, 0.0));
+                            let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                            let transformation = camera * (position * dir);
                             let uniform = vs::ty::Data {
-                                zoom:            1.0 / zoom,
-                                aspect_ratio:    self.aspect_ratio(),
-                                position_offset: [fighter_x_scaled, fighter_y_scaled],
-                                direction:       if player.face_right { 1.0 } else { -1.0 } as f32,
                                 edge_color:      color,
                                 color:           [1.0, 1.0, 1.0, 1.0],
-                                _dummy0:         [0; 12],
+                                transformation:  transformation.into(),
                             };
                             let set = self.new_uniform_set(uniform);
 
@@ -865,21 +842,21 @@ impl<'a> VulkanGraphics<'a> {
             self.draw_text.queue_text(x, y, size, [1.0, 1.0, 1.0, 1.0], stage.name.as_ref());
 
             if stage_i == selection {
-                let zoom = 100.0;
-                let y = -0.2 * zoom;
+                let zoom_divider = 100.0;
+                let zoom = 1.0 / zoom_divider;
+                let y = -0.2 * zoom_divider;
 
+                let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
+                let position = Matrix4::from_translation(Vector3::new(1.0, y, 0.0));
+                let transformation = camera * position;
                 let uniform = vs::ty::Data {
-                    zoom:            1.0 / zoom,
-                    aspect_ratio:    self.aspect_ratio(),
-                    position_offset: [0.0, y],
-                    direction:       1.0,
                     edge_color:      [1.0, 1.0, 1.0, 1.0],
                     color:           [1.0, 1.0, 1.0, 1.0],
-                    _dummy0:         [0; 12],
+                    transformation:  transformation.into(),
                 };
+
                 let set = self.new_uniform_set(uniform);
                 let entity = MenuEntity::Stage(stage_key.clone());
-
                 entities.push(MenuEntityAndSet { set, entity });
             }
         }

@@ -29,12 +29,42 @@ fn vertex(x: f32, y: f32) -> Vertex {
     }
 }
 
+#[derive(Clone)]
 pub struct Buffers {
     pub vertex: Arc<CpuAccessibleBuffer<[Vertex]>>,
     pub index:  Arc<CpuAccessibleBuffer<[u16]>>,
 }
 
 impl Buffers {
+    pub fn new_arrow(device: Arc<Device>) -> Buffers {
+        let vertices: [Vertex; 7] = [
+            // stick
+            vertex(-0.7, 0.0),
+            vertex(0.7, 0.0),
+            vertex(-0.7, 10.0),
+            vertex(0.7, 10.0),
+
+            // head
+            vertex(0.0, 12.0),
+            vertex(-2.2, 10.0),
+            vertex(2.2, 10.0),
+        ];
+
+        let indices: [u16; 9] = [
+            // stick
+            0, 1, 2,
+            1, 2, 3,
+
+            //head
+            4, 5, 6
+        ];
+
+        Buffers {
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+        }
+    }
+
     pub fn rect_buffers(device: Arc<Device>, rect: RenderRect) -> Buffers {
         let min_x = rect.p1.0.min(rect.p2.0);
         let min_y = rect.p1.1.min(rect.p2.1);
@@ -59,7 +89,7 @@ impl Buffers {
         }
     }
 
-    pub fn rect_outline_buffers(device: Arc<Device>, rect: RenderRect) -> Buffers {
+    pub fn rect_outline_buffers(device: Arc<Device>, rect: &RenderRect) -> Buffers {
         let width = 0.5;
         let min_x = rect.p1.0.min(rect.p2.0);
         let min_y = rect.p1.1.min(rect.p2.1);

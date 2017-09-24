@@ -51,6 +51,8 @@ extern crate vulkano_shader_derive;
 extern crate vulkano_win;
 #[cfg(feature = "vulkan")]
 extern crate vulkano_text;
+#[cfg(feature = "vulkan")]
+extern crate cgmath;
 
 #[cfg(feature = "vulkan")]
 pub mod vulkan;

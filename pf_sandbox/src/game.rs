@@ -855,7 +855,9 @@ impl Game {
             }
 
             let color = graphics::get_controller_color(self.selected_controllers[i]);
-            let player_render = player.render(color, selected_colboxes, fighter_selected, player_selected, debug, &self.players, &self.package.fighters, &self.stage.platforms);
+            let fighters = &self.package.fighters;
+            let platforms = &self.stage.platforms;
+            let player_render = player.render(color, selected_colboxes, fighter_selected, player_selected, debug, &self.players, fighters, platforms);
             entities.push(RenderEntity::Player(player_render));
         }
 

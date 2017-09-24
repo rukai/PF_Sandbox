@@ -236,7 +236,7 @@ impl ActionFrame {
     }
 
     /// Returns all collisionboxes and linked collisionboxes
-    /// collisionboxes referenced by a link are not invluded individually
+    /// collisionboxes referenced by a link are not included individually
     pub fn get_colboxes_and_links(&self) -> Vec<ColboxOrLink> {
         let mut result: Vec<ColboxOrLink> = vec!();
         for (i, colbox) in self.colboxes.iter().enumerate() {
