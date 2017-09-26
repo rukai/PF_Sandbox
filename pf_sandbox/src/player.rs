@@ -7,6 +7,7 @@ use ::rules::Goal;
 use ::math;
 
 use std::f32;
+use std::f32::consts::PI;
 use std::collections::HashSet;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use rand::StdRng;
@@ -327,10 +328,11 @@ impl Player {
                     } else {
                         hitbox.angle
                     };
-                    let angle = angle_deg * f32::consts::PI / 180.0;
+                    let angle = angle_deg * PI / 180.0 + if angle_deg < 0.0 { PI * 2.0 } else { 0.0 };
 
                     // debug data
                     self.hit_angle_pre_di = Some(angle);
+                    self.hit_angle_post_di = None;
                     self.frames_since_hit = 0;
 
                     self.hitlag = Hitlag::Def { counter: (hitbox.damage / 3.0 + 3.0) as u64, kb_vel, angle, wobble_x: 0.0 };
@@ -355,7 +357,7 @@ impl Player {
                 self.hitlag.wobble(rng);
 
                 if self.hitlag.decrement() {
-                    self.hitlag_def_end(players, fighters, platforms, kb_vel, angle);
+                    self.hitlag_def_end(input, players, fighters, platforms, kb_vel, angle);
                 }
             }
             Hitlag::None => {
@@ -384,10 +386,32 @@ impl Player {
         }
     }
 
-    fn hitlag_def_end(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], kb_vel: f32, angle: f32) {
-        // TODO: DI
+    /// 0 < angle < 2pi
+    fn di(input: &PlayerInput, angle: f32) -> f32 {
+        let range = 18.0 * PI / 180.0;
+        let x = input[0].stick_x;
+        let y = input[0].stick_y;
+
+        let di_angle = y.atan2(x);                                                      // -pi  <= di_angle     <= pi
+        let pos_di_angle = di_angle + if di_angle < 0.0 { PI * 2.0 } else { 0.0 };      // 0    <= pos_di_angle <= 2pi
+        let angle_diff = angle - pos_di_angle;                                          // -2pi <= angle_diff   <= 2pi
+
+        let offset_distance = (angle_diff).sin() * (x * x + y * y).sqrt();                 // -1     <= offset_distance <= 1
+        let offset = offset_distance.signum() * offset_distance * offset_distance * range; // -range <= offset          <= range
+        angle - offset
+    }
+
+    fn hitlag_def_end(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], kb_vel: f32, angle: f32) {
+        let angle = if (kb_vel >= 80.0 || self.is_airbourne() || (angle != 0.0 && angle != PI)) // can di
+            && !(input[0].stick_x == 0.0 && input[0].stick_y == 0.0) // not deadzone
+        {
+            Player::di(input, angle)
+        } else {
+            angle
+        };
         self.hit_angle_post_di = Some(angle);
 
+        // launch velocity
         let (sin, cos) = angle.sin_cos();
         self.x_vel = 0.0;
         self.y_vel = 0.0;
