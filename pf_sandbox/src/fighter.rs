@@ -132,17 +132,38 @@ pub struct LCancel {
     pub lag_multiplier: f32, // use value < 1.0
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Shield {
-    pub size:          f32,
-    pub dec_per_frame: f32,
+    pub x_offset:   f32,
+    pub y_offset:   f32,
+    pub break_vel:  f32,
+    pub scaling:    f32,
+    pub hp_scaling: f32,
+    pub hp_max:     f32,
+    pub hp_regen:   f32,
+    pub hp_cost:    f32,
+}
+
+impl Default for Shield {
+    fn default() -> Self {
+        Shield {
+            x_offset:   0.0,
+            y_offset:   40.0,
+            break_vel:  3.0,
+            scaling:    10.0,
+            hp_scaling: 1.0,
+            hp_max:     60.0,
+            hp_regen:   0.1,
+            hp_cost:    0.3,
+        }
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PowerShield {
-    pub reflect_projectiles: bool,
-    pub instant_act:         bool,
-    pub enemy_stun_frames:   u64,
+    pub reflect_frames:    Option<usize>,
+    pub parry_frames:      Option<usize>,
+    pub enemy_stun_frames: u64,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
@@ -469,6 +490,7 @@ pub enum Action {
     LedgeGetupSlow,
 
     // Defense
+    PowerShield,
     ShieldOn,
     Shield,
     ShieldOff,
@@ -484,6 +506,11 @@ pub enum Action {
     Rebound, // State after clang
     LedgeRoll,
     LedgeRollSlow,
+
+    // Vulnerable
+    ShieldBreakFall,
+    ShieldBreakGetup,
+    Stun,
 
     // Attacks
     Jab,

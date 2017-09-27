@@ -73,7 +73,7 @@ impl Game {
                 // Stage can have less spawn points then players
                 let spawn = stage.spawn_points[i % stage.spawn_points.len()].clone();
                 let respawn = stage.respawn_points[i % stage.respawn_points.len()].clone();
-                players.push(Player::new(fighter.clone(), spawn, respawn, package.rules.stock_count));
+                players.push(Player::new(fighter.clone(), spawn, respawn, &package));
                 debug_players.push(Default::default());
             }
         }
