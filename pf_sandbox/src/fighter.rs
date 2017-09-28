@@ -148,7 +148,7 @@ impl Default for Shield {
     fn default() -> Self {
         Shield {
             x_offset:   0.0,
-            y_offset:   40.0,
+            y_offset:   10.0,
             break_vel:  3.0,
             scaling:    10.0,
             hp_scaling: 1.0,

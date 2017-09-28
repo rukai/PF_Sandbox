@@ -912,7 +912,7 @@ impl Player {
         let fighter = &fighters[self.fighter.as_ref()];
         if self.check_jump(input) { }
         else if self.check_pass_platform(input, players, fighters, platforms) { }
-        else if input[0].l_trigger < 0.3 && input[0].r_trigger < 0.3 && !input[0].l && !input[0].r {
+        else if input[0].l_trigger < 0.165 && input[0].r_trigger < 0.165 && !input[0].l && !input[0].r {
             self.set_action(Action::ShieldOff);
         }
         self.apply_friction(fighter);
@@ -951,7 +951,7 @@ impl Player {
                 input[0].l_trigger.max(input[0].r_trigger)
             };
 
-            self.shield_hp -= 0.28 * self.shield_analog - (1.0 - self.shield_analog) / 10.0;
+            self.shield_hp -= shield.hp_cost * self.shield_analog - (1.0 - self.shield_analog) / 10.0;
             if self.shield_hp <= 0.0 {
                 self.set_action(Action::ShieldBreakFall);
                 self.shield_hp = 0.0;
@@ -996,6 +996,16 @@ impl Player {
         let hp_size_unscaled = ((shield.hp_max - self.shield_hp) / shield.hp_max) * 2.0;
 
         shield.scaling * (analog_size + hp_size) + hp_size_unscaled
+    }
+
+    pub fn shield_pos(&self, shield: &Shield, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
+        let tilt_x = 0.0; // TODO
+        let tilt_y = 0.0; // TODO
+        let xy = self.bps_xy(players, fighters, platforms);
+        (
+            xy.0 + tilt_x + self.relative_f(shield.x_offset),
+            xy.1 + tilt_y + shield.y_offset
+        )
     }
 
     fn check_crouch(&mut self, input: &PlayerInput) -> bool {
@@ -1230,7 +1240,7 @@ impl Player {
                 if input.l.press || input.r.press {
                     self.set_action(Action::PowerShield);
                     true
-                } else if input[0].l || input[0].r || input[0].l_trigger > 0.235 || input[0].r_trigger > 0.235 {
+                } else if input[0].l || input[0].r || input[0].l_trigger > 0.165 || input[0].r_trigger > 0.165 {
                     self.set_action(Action::ShieldOn);
                     true
                 } else {
@@ -1238,7 +1248,7 @@ impl Player {
                 }
             }
             (&None, &Some(_)) => {
-                if input[0].l || input[0].r || input[0].l_trigger > 0.235 || input[0].r_trigger > 0.235 {
+                if input[0].l || input[0].r || input[0].l_trigger > 0.165 || input[0].r_trigger > 0.165 {
                     self.set_action(Action::PowerShield);
                     true
                 } else {
@@ -1246,7 +1256,7 @@ impl Player {
                 }
             }
             (&Some(_), &None) => {
-                if input[0].l || input[0].r || input[0].l_trigger > 0.235 || input[0].r_trigger > 0.235 {
+                if input[0].l || input[0].r || input[0].l_trigger > 0.165 || input[0].r_trigger > 0.165 {
                     self.set_action(Action::ShieldOn);
                     true
                 } else {
@@ -1895,6 +1905,7 @@ impl Player {
     }
 
     pub fn render(&self, fighter_color: [f32; 4], selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> RenderPlayer {
+        let fighter = &fighters[self.fighter.as_ref()];
         let mut vector_arrows = vec!();
         if debug.stick_vector {
             if let Some((x, y)) = self.stick {
@@ -1930,6 +1941,19 @@ impl Player {
                 });
             }
         }
+
+        let shield = if self.is_shielding() {
+            if let &Some(ref shield) = &fighter.shield {
+                let c = &fighter_color;
+                let m =  1.0 - self.shield_analog;
+                Some(RenderShield {
+                    color:  [c[0] + (1.0 - c[0]) * m, c[1] + (1.0 - c[1]) * m, c[2] + (1.0 - c[2]) * m, 0.2 + self.shield_analog / 2.0],
+                    radius: self.shield_size(shield),
+                    pos:    self.shield_pos(shield, players, fighters, platforms),
+                })
+            } else { None }
+        } else { None };
+
         RenderPlayer {
             debug:             debug,
             damage:            self.damage,
@@ -1944,6 +1968,7 @@ impl Player {
             fighter_selected:  fighter_selected,
             player_selected:   player_selected,
             selected_colboxes: selected_colboxes,
+            shield:            shield,
             vector_arrows:     vector_arrows,
         }
     }
@@ -1985,7 +2010,14 @@ pub struct RenderPlayer {
     pub fighter_selected:  bool,
     pub player_selected:   bool,
     pub selected_colboxes: HashSet<usize>,
+    pub shield:            Option<RenderShield>,
     pub vector_arrows:     Vec<VectorArrow>,
+}
+
+pub struct RenderShield {
+    pub color:  [f32; 4],
+    pub radius: f32,
+    pub pos:    (f32, f32),
 }
 
 pub struct VectorArrow {

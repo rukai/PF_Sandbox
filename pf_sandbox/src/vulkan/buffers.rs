@@ -1,4 +1,5 @@
 use ::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
+use ::player::RenderShield;
 use ::graphics;
 use ::graphics::RenderRect;
 use ::package::{Package, PackageUpdate};
@@ -36,6 +37,32 @@ pub struct Buffers {
 }
 
 impl Buffers {
+    pub fn new_shield(device: Arc<Device>, shield: &RenderShield) -> Buffers {
+        let mut vertices: Vec<Vertex> = vec!();
+        let mut indices: Vec<u16> = vec!();
+
+        let triangles = 50;
+        // triangles are drawn meeting at the centre, forming a circle
+        vertices.push(Vertex { position: [0.0, 0.0], edge: 0.0, render_id: 0.0});
+        for i in 0..triangles {
+            let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
+            let x = angle.cos() * shield.radius;
+            let y = angle.sin() * shield.radius;
+            vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: 0.0});
+            indices.push(0);
+            indices.push(i);
+            indices.push((i + 1) % triangles);
+        }
+        indices.push(0);
+        indices.push(1);
+        indices.push(triangles - 1);
+
+        Buffers {
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+        }
+    }
+
     pub fn new_arrow(device: Arc<Device>) -> Buffers {
         let vertices: [Vertex; 7] = [
             // stick

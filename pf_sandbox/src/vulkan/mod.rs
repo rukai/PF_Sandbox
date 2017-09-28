@@ -470,7 +470,7 @@ impl<'a> VulkanGraphics<'a> {
                         command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, edge_color, color);
                     }
 
-                    // setup fighter uniform
+                    // draw fighter
                     match player.debug.fighter {
                         RenderFighter::Normal | RenderFighter::Debug => {
                             let color = if let RenderFighter::Debug = player.debug.fighter {
@@ -497,6 +497,13 @@ impl<'a> VulkanGraphics<'a> {
                             }
                         }
                         RenderFighter::None => { }
+                    }
+
+                    // draw shield
+                    if let &Some(ref shield) = &player.shield {
+                        let position = Matrix4::from_translation(Vector3::new(shield.pos.0 + pan.0, shield.pos.1 + pan.1, 0.0));
+                        let buffers = Buffers::new_shield(self.device.clone(), shield);
+                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &position, shield.color, shield.color);
                     }
 
                     // draw selected hitboxes
@@ -790,6 +797,7 @@ impl<'a> VulkanGraphics<'a> {
                         fighter_selected:  false,
                         player_selected:   false,
                         selected_colboxes: HashSet::new(),
+                        shield:            None,
                         vector_arrows:     vec!(),
                     };
 
