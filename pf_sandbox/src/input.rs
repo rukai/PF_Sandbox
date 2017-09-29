@@ -5,11 +5,51 @@ use std::f32;
 
 use treeflection::{Node, NodeRunner, NodeToken};
 
+enum InputSource<'a> {
+    GCAdapter { handle: DeviceHandle<'a>, deadzones: [Deadzone; 4] },
+    #[allow(dead_code)]
+    GenericController { handle: usize, deadzone: Deadzone }
+}
+
+/// Stores the offset that should be subtracted from all analog data in a single input
+pub struct Deadzone {
+    plugged_in: bool,
+    stick_x:    u8,
+    stick_y:    u8,
+    c_stick_x:  u8,
+    c_stick_y:  u8,
+    l_trigger:  u8,
+    r_trigger:  u8,
+}
+
+impl Deadzone {
+    pub fn empty() -> Self {
+        Deadzone {
+            plugged_in: false,
+            stick_x:    0,
+            stick_y:    0,
+            c_stick_x:  0,
+            c_stick_y:  0,
+            l_trigger:  0,
+            r_trigger:  0,
+        }
+    }
+
+    pub fn empty4() -> [Self; 4] {
+        [
+            Deadzone::empty(),
+            Deadzone::empty(),
+            Deadzone::empty(),
+            Deadzone::empty()
+        ]
+    }
+}
+
 pub struct Input<'a> {
-    adapter_handles: Vec<DeviceHandle<'a>>,
-    current_inputs:  Vec<ControllerInput>,      // inputs for this frame
-    game_inputs:     Vec<Vec<ControllerInput>>, // game past and (potentially) future inputs, frame 0 has index 2
-    prev_start:      bool,
+    input_sources:  Vec<InputSource<'a>>,
+    current_inputs: Vec<ControllerInput>,      // inputs for this frame
+    game_inputs:    Vec<Vec<ControllerInput>>, // game past and (potentially) future inputs, frame 0 has index 2
+    prev_start:     bool,
 }
 
 // In/Out is from perspective of computer
@@ -48,13 +88,17 @@ impl<'a> Input<'a> {
             }
         }
 
-        let input = Input {
-            adapter_handles: adapter_handles,
+        let mut input_sources = vec!();
+        for handle in adapter_handles {
+            input_sources.push(InputSource::GCAdapter { handle, deadzones: Deadzone::empty4() });
+        }
+
+        Input {
+            input_sources,
             game_inputs:     vec!(),
             current_inputs:  vec!(),
             prev_start:      false,
-        };
-        input
+        }
     }
 
     fn handle_open_error(e: Error) {
@@ -87,13 +131,25 @@ impl<'a> Input<'a> {
     }
 
     /// Call this once every frame
-    pub fn update(&mut self, tas_inputs: &[ControllerInput], ai_inputs: &[ControllerInput]) {
+    pub fn update(&mut self, tas_inputs: &[ControllerInput], ai_inputs: &[ControllerInput], reset_deadzones: bool) {
+        // clear deadzones so they will be set at next read
+        if reset_deadzones {
+            for source in &mut self.input_sources {
+                match source {
+                    &mut InputSource::GCAdapter         { ref mut deadzones, .. } => { *deadzones = Deadzone::empty4() }
+                    &mut InputSource::GenericController { ref mut deadzone,  .. } => { *deadzone  = Deadzone::empty() }
+                }
+            }
+        }
+
         // read input from controllers
         let mut inputs: Vec<ControllerInput> = Vec::new();
-        for handle in &mut self.adapter_handles {
-            read_gc_adapter(handle, &mut inputs);
+        for source in &mut self.input_sources {
+            match source {
+                &mut InputSource::GCAdapter { ref mut handle, ref mut deadzones } => read_gc_adapter(handle, deadzones, &mut inputs),
+                &mut InputSource::GenericController { .. }                        => unimplemented!()
+            }
         }
-        read_usb_controllers(&mut inputs);
 
         // append AI inputs
         inputs.extend_from_slice(ai_inputs);
@@ -301,17 +357,43 @@ impl PlayerInput {
 }
 
 /// Add 4 GC adapter controllers to inputs
-fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<ControllerInput>) {
+fn read_gc_adapter(handle: &mut DeviceHandle, deadzones: &mut [Deadzone], inputs: &mut Vec<ControllerInput>) {
     let mut data: [u8; 37] = [0; 37];
     handle.read_interrupt(0x81, &mut data, Duration::new(1, 0)).unwrap();
 
     for port in 0..4 {
-        let (stick_x, stick_y)     = stick_filter(data[9*port+4], data[9*port+5]);
-        let (c_stick_x, c_stick_y) = stick_filter(data[9*port+6], data[9*port+7]);
+        let plugged_in    = data[9*port+1] == 20 || data[9*port+1] == 16;
+        let raw_stick_x   = data[9*port+4];
+        let raw_stick_y   = data[9*port+5];
+        let raw_c_stick_x = data[9*port+6];
+        let raw_c_stick_y = data[9*port+7];
+        let raw_l_trigger = data[9*port+8];
+        let raw_r_trigger = data[9*port+9];
+
+        if plugged_in && !deadzones[port].plugged_in // Only reset deadzone if a controller was just plugged in
+            && raw_stick_x != 0 // first response seems to give garbage data
+        {
+            deadzones[port] = Deadzone {
+                plugged_in: true,
+                stick_x:    raw_stick_x   - 128,
+                stick_y:    raw_stick_y   - 128,
+                c_stick_x:  raw_c_stick_x - 128,
+                c_stick_y:  raw_c_stick_y - 128,
+                l_trigger:  raw_l_trigger,
+                r_trigger:  raw_r_trigger,
+            };
+        }
+
+        if !plugged_in {
+            deadzones[port] = Deadzone::empty();
+        }
+
+        let deadzone = &deadzones[port];
+        let (stick_x, stick_y)     = stick_filter(raw_stick_x - deadzone.stick_x, raw_stick_y - deadzone.stick_y);
+        let (c_stick_x, c_stick_y) = stick_filter(raw_c_stick_x - deadzone.c_stick_x, raw_c_stick_y - deadzone.c_stick_y);
 
         inputs.push(ControllerInput {
-            plugged_in: data[9*port+1] == 20 || data[9*port+1] == 16,
-
+            plugged_in,
             up   : data[9*port+2] & 0b10000000 != 0,
             down : data[9*port+2] & 0b01000000 != 0,
             right: data[9*port+2] & 0b00100000 != 0,
@@ -325,23 +407,14 @@ fn read_gc_adapter(handle: &mut DeviceHandle, inputs: &mut Vec<ControllerInput>)
             z    : data[9*port+3] & 0b00000010 != 0,
             start: data[9*port+3] & 0b00000001 != 0,
 
-            l_trigger: trigger_filter(data[9*port+8]),
-            r_trigger: trigger_filter(data[9*port+9]),
+            l_trigger: trigger_filter(raw_l_trigger.saturating_sub(deadzone.l_trigger)),
+            r_trigger: trigger_filter(raw_r_trigger.saturating_sub(deadzone.r_trigger)),
 
             stick_x:   stick_x,
             stick_y:   stick_y,
             c_stick_x: c_stick_x,
             c_stick_y: c_stick_y,
-
         });
-    };
-}
-
-// TODO: implement
-/// Add 4 controllers from usb to inputs
-fn read_usb_controllers(inputs: &mut Vec<ControllerInput>) {
-    for _ in 0..0 {
-        inputs.push(ControllerInput::empty());
     }
 }
 
@@ -352,35 +425,33 @@ fn abs_min(a: f32, b: f32) -> f32 {
         a
     }
 }
+
 fn stick_filter(in_stick_x: u8, in_stick_y: u8) -> (f32, f32) {
     let raw_stick_x = in_stick_x as f32 - 128.0;
     let raw_stick_y = in_stick_y as f32 - 128.0;
     let angle = (raw_stick_y).atan2(raw_stick_x);
 
-    let max = (angle.cos() * 80.0).trunc();
-    let mut stick_x = abs_min(raw_stick_x, max) / 80.0;
-
-    let max = (angle.sin() * 80.0).trunc();
-    let mut stick_y = abs_min(raw_stick_y, max) / 80.0;
+    let max_x = (angle.cos() * 80.0).trunc();
+    let max_y = (angle.sin() * 80.0).trunc();
+    let stick_x = if in_stick_x == 128 { // avoid raw_stick_x = 0 and thus division by zero in the atan2)
+        0.0
+    } else {
+        abs_min(raw_stick_x, max_x) / 80.0
+    };
+    let stick_y = abs_min(raw_stick_y, max_y) / 80.0;
 
     let deadzone = 0.28;
-    if stick_x.abs() < deadzone {
-        stick_x = 0.0;
-    }
-    if stick_y.abs() < deadzone {
-        stick_y = 0.0;
-    }
-
-    (stick_x, stick_y)
+    (
+        if stick_x.abs() < deadzone { 0.0 } else { stick_x },
+        if stick_y.abs() < deadzone { 0.0 } else { stick_y }
+    )
 }
 
 fn trigger_filter(trigger: u8) -> f32 {
     let value = (trigger as f32) / 140.0;
-    if value > 1.0
-    {
+    if value > 1.0 {
         1.0
-    }
-    else {
+    } else {
         value
     }
 }

@@ -132,7 +132,7 @@ pub fn run(mut cli_results: CLIResults) {
                 // fill fighters/controllers
                 let mut controllers: Vec<usize> = vec!();
                 let mut fighters: Vec<String> = vec!();
-                input.update(&[], &[]); // run the first input step so that we can check for the number of controllers.
+                input.update(&[], &[], false); // run the first input step so that we can check for the number of controllers.
                 for (i, _) in input.players(0).iter().enumerate() {
                     controllers.push(i);
                     fighters.push(cli_results.fighter_names[i % cli_results.fighter_names.len()].clone());
@@ -192,7 +192,8 @@ pub fn run(mut cli_results: CLIResults) {
         let mut resume_menu: Option<ResumeMenu> = None;
         if let Some(ref mut game) = game {
             let ai_inputs = ai::gen_inputs(&game);
-            input.update(&game.tas, &ai_inputs);
+            let reset_deadzones = game.check_reset_deadzones();
+            input.update(&game.tas, &ai_inputs, reset_deadzones);
             if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block()) {
                 resume_menu = Some(resume_menu_inner)
             }
@@ -208,7 +209,7 @@ pub fn run(mut cli_results: CLIResults) {
             command_line.step(&os_input, game);
         }
         else {
-            input.update(&[], &[]);
+            input.update(&[], &[], false);
             if let Some(mut menu_game_setup) = menu.step(&mut input) {
                 let (package, config) = menu.reclaim();
                 input.set_history(std::mem::replace(&mut menu_game_setup.input_history, vec!()));

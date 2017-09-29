@@ -29,6 +29,7 @@ use treeflection::{Node, NodeRunner, NodeToken};
 
 #[NodeActions(
     NodeAction(function="save_replay", return_string),
+    NodeAction(function="reset_deadzones", return_string),
 )]
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Game {
@@ -53,7 +54,8 @@ pub struct Game {
     copied_frame:               Option<ActionFrame>,
     pub camera:                 Camera,
     pub tas:                    Vec<ControllerInput>,
-    pub save_replay:            bool,
+    save_replay:                bool,
+    reset_deadzones:            bool,
 }
 
 /// Frame 0 refers to the initial state of the game.
@@ -101,6 +103,7 @@ impl Game {
             camera:                 Camera::new(),
             tas:                    vec!(),
             save_replay:            false,
+            reset_deadzones:        false,
         }
     }
 
@@ -146,9 +149,20 @@ impl Game {
         self.state.clone()
     }
 
-    fn save_replay(&mut self) -> String{
+    fn save_replay(&mut self) -> String {
         self.save_replay = true;
         String::from("Save replay completed successfully")
+    }
+
+    fn reset_deadzones(&mut self) -> String {
+        self.reset_deadzones = true;
+        String::from("Deadzones succuessfully reset")
+    }
+
+    pub fn check_reset_deadzones(&mut self) -> bool {
+        let value = self.reset_deadzones;
+        self.reset_deadzones = false;
+        value
     }
 
     fn set_context(&mut self) {
