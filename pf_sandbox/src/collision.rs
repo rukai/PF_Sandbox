@@ -1,7 +1,7 @@
 use treeflection::KeyedContextVec;
 
 use ::player::Player;
-use ::fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole};
+use ::fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole, PowerShield};
 use ::stage::Platform;
 
 // def - player who was attacked
@@ -30,9 +30,17 @@ pub fn collision_check(players: &[Player], fighters: &KeyedContextVec<Fighter>, 
                     // TODO: break this out into a seperate function that can be called by the link checking code
                     let hitbox_atk = colbox_atk.hitbox_ref();
 
-                    if colbox_shield_collision_check(player_atk, colbox_atk, player_def, fighter_def) {
-                        result[player_atk_i].push(CollisionResult::HitShieldAtk (hitbox_atk.clone()));
-                        result[player_def_i].push(CollisionResult::HitShieldDef (hitbox_atk.clone()));
+                    if colbox_shield_collision_check(player_atk_xy, colbox_atk, player_def_xy, player_def, fighter_def) {
+                        result[player_atk_i].push(CollisionResult::HitShieldAtk {
+                            hitbox: hitbox_atk.clone(),
+                            power_shield: fighter_def.power_shield.clone(),
+                            player_def_i
+                        });
+                        result[player_def_i].push(CollisionResult::HitShieldDef {
+                            hitbox: hitbox_atk.clone(),
+                            power_shield: fighter_def.power_shield.clone(),
+                            player_atk_i
+                        });
                         break 'hitbox_atk;
                     }
 
@@ -147,19 +155,36 @@ enum ColBoxCollisionResult {
     None
 }
 
-#[allow(unused_variables)]
-fn colbox_shield_collision_check(player1: &Player, colbox1: &CollisionBox,  player2: &Player, fighter2: &Fighter) -> bool {
-    false
+fn colbox_shield_collision_check(player1_xy: (f32, f32), colbox1: &CollisionBox,  player2_xy: (f32, f32), player2: &Player, fighter2: &Fighter) -> bool {
+    if let &Some(ref shield) = &fighter2.shield {
+        if player2.is_shielding() {
+            let x1 = player1_xy.0 + colbox1.point.0;
+            let y1 = player1_xy.1 + colbox1.point.1;
+            let r1 = colbox1.radius;
+
+            let x2 = player2_xy.0 + player2.shield_offset_x + shield.offset_x;
+            let y2 = player2_xy.1 + player2.shield_offset_y + shield.offset_y;
+            let r2 = player2.shield_size(shield);
+
+            let check_distance = r1 + r2;
+            let real_distance = ((x1 - x2).powi(2) + (y1 - y2).powi(2)).sqrt();
+            check_distance > real_distance
+        } else {
+            false
+        }
+    }
+    else {
+        false
+    }
 }
 
-#[derive(Debug)]
 pub enum CollisionResult {
     PhantomDef   (HitBox, HurtBox),
     PhantomAtk   (HitBox, usize),
     HitDef       { hitbox: HitBox, hurtbox: HurtBox, player_atk_i: usize },
     HitAtk       { hitbox: HitBox, player_def_i: usize },
-    HitShieldAtk (HitBox),
-    HitShieldDef (HitBox),
+    HitShieldAtk { hitbox: HitBox, power_shield: Option<PowerShield>, player_def_i: usize },
+    HitShieldDef { hitbox: HitBox, power_shield: Option<PowerShield>, player_atk_i: usize },
     ReflectDef   (HitBox), // TODO: add further details required for recreating projectile
     ReflectAtk   (HitBox),
     AbsorbDef    (HitBox),

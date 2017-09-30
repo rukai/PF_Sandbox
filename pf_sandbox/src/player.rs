@@ -41,7 +41,9 @@ pub struct Player {
     pub shield_analog:      f32,
     pub shield_offset_x:    f32,
     pub shield_offset_y:    f32,
-    pub stun_timer:         f32,
+    pub stun_timer:         u64,
+    pub shield_stun_timer:  u64,
+    pub parry_timer:        u64,
     pub ecb:                ECB,
     pub hitlist:            Vec<usize>,
     pub hitlag:             Hitlag,
@@ -87,8 +89,8 @@ impl Default for LedgeLogic {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub enum Hitlag {
-    Atk (u64),
-    Def { counter: u64, kb_vel: f32, angle: f32, wobble_x: f32 },
+    Some (u64), // TODO: rename Some
+    Launch { counter: u64, kb_vel: f32, angle: f32, wobble_x: f32 },
     None
 }
 
@@ -101,11 +103,8 @@ impl Default for Hitlag {
 impl Hitlag {
     pub fn decrement(&mut self) -> bool {
         let end = match self {
-            &mut Hitlag::Atk (ref mut counter) => {
-                *counter -= 1;
-                *counter <= 1
-            }
-            &mut Hitlag::Def { ref mut counter, .. } => {
+            &mut Hitlag::Some (ref mut counter) |
+            &mut Hitlag::Launch { ref mut counter, .. } => {
                 *counter -= 1;
                 *counter <= 1
             }
@@ -120,7 +119,7 @@ impl Hitlag {
     }
 
     fn wobble(&mut self, rng: &mut StdRng) {
-        if let &mut Hitlag::Def { ref mut wobble_x, .. } = self {
+        if let &mut Hitlag::Launch { ref mut wobble_x, .. } = self {
             *wobble_x = (rng.next_f32() - 0.5) * 3.0;
         }
     }
@@ -152,7 +151,9 @@ impl Player {
             shield_analog:      0.0,
             shield_offset_x:    0.0,
             shield_offset_y:    0.0,
-            stun_timer:         0.0,
+            stun_timer:         0,
+            shield_stun_timer:  0,
+            parry_timer:        0,
             ecb:                ECB::default(),
             hitlist:            vec!(),
             hitlag:             Hitlag::None,
@@ -204,7 +205,7 @@ impl Player {
         };
 
         match &self.hitlag {
-            &Hitlag::Def { wobble_x, .. } => {
+            &Hitlag::Launch { wobble_x, .. } => {
                 (bps_xy.0 + wobble_x, bps_xy.1)
             }
             _ => {
@@ -293,7 +294,7 @@ impl Player {
             match col_result {
                 &CollisionResult::HitAtk { player_def_i, ref hitbox } => {
                     self.hitlist.push(player_def_i);
-                    self.hitlag = Hitlag::Atk ((hitbox.damage / 3.0 + 3.0) as u64);
+                    self.hitlag = Hitlag::Some ((hitbox.damage / 3.0 + 3.0) as u64);
                 }
                 &CollisionResult::HitDef { ref hitbox, ref hurtbox, player_atk_i } => {
                     let fighter = &fighters[self.fighter.as_ref()];
@@ -316,8 +317,7 @@ impl Player {
                         }
                     }
 
-                    let not_grabbed = true;
-                    if not_grabbed || kb_vel > 50.0 {
+                    if !self.is_grabbed() || kb_vel > 50.0 {
                         self.hitstun = match hitbox.hitstun {
                             HitStun::FramesTimesKnockback (frames) => { frames * kb_vel }
                             HitStun::Frames               (frames) => { frames as f32 }
@@ -357,9 +357,48 @@ impl Player {
                     self.hit_angle_post_di = None;
                     self.frames_since_hit = 0;
 
-                    self.hitlag = Hitlag::Def { counter: (hitbox.damage / 3.0 + 3.0) as u64, kb_vel, angle, wobble_x: 0.0 };
+                    self.hitlag = Hitlag::Launch { counter: (hitbox.damage / 3.0 + 3.0) as u64, kb_vel, angle, wobble_x: 0.0 };
                     self.hit_by = Some(player_atk_i);
                     self.face_right = self.bps_xy(players, fighters, platforms).0 < players[player_atk_i].bps_xy(players, fighters, platforms).0;
+                }
+                &CollisionResult::HitShieldAtk { ref hitbox, ref power_shield, player_def_i} => {
+                    self.hitlist.push(player_def_i);
+                    if let &Some(ref power_shield) = power_shield {
+                        if let (Some(Action::PowerShield), &Some(ref stun)) = (Action::from_index(self.action), &power_shield.enemy_stun) {
+                            if stun.window > players[player_def_i].frame {
+                                self.stun_timer = stun.duration;
+                            }
+                        }
+                    }
+
+                    let x_diff = self.bps_xy(players, fighters, platforms).0 - players[player_def_i].bps_xy(players, fighters, platforms).0;
+                    let vel = hitbox.damage.floor() * (players[player_def_i].shield_analog - 0.3) * 0.1 + 0.02;
+                    self.x_vel += vel * x_diff.signum();
+                    self.hitlag = Hitlag::Some ((hitbox.damage / 3.0 + 3.0) as u64);
+                }
+                &CollisionResult::HitShieldDef { ref hitbox, ref power_shield, player_atk_i } => {
+                    if let &Some(ref power_shield) = power_shield {
+                        if let (Some(Action::PowerShield), &Some(ref parry)) = (Action::from_index(self.action), &power_shield.parry) {
+                            if parry.window > self.frame {
+                                self.parry_timer = parry.duration;
+                            }
+                        }
+                    }
+
+                    if self.parry_timer == 0 {
+                        self.shield_hp -= hitbox.shield_damage;
+                        if self.shield_hp <= 0.0 {
+                            continue;
+                        }
+                    }
+
+                    let analog_mult = 1.0 - (self.shield_analog - 0.3) / 0.7;
+                    let vel_mult = if self.parry_timer > 0 { 1.0 } else { 0.6 };
+                    let x_diff = self.bps_xy(players, fighters, platforms).0 - players[player_atk_i].bps_xy(players, fighters, platforms).0;
+                    let vel = (hitbox.damage.floor() * (0.195 * analog_mult + 0.09) + 0.4) * vel_mult;
+                    self.x_vel = vel.min(2.0) * x_diff.signum();
+                    self.shield_stun_timer = (hitbox.damage.floor() * (analog_mult + 0.3) * 0.975 + 2.0) as u64;
+                    self.hitlag = Hitlag::Some ((hitbox.damage / 3.0 + 3.0) as u64);
                 }
                 _ => { }
             }
@@ -372,10 +411,10 @@ impl Player {
 
     pub fn action_hitlag_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], rng: &mut StdRng) {
         match self.hitlag.clone() {
-            Hitlag::Atk (_) => {
+            Hitlag::Some (_) => {
                 self.hitlag.decrement();
             }
-            Hitlag::Def { kb_vel, angle, .. } => {
+            Hitlag::Launch { kb_vel, angle, .. } => {
                 self.hitlag.wobble(rng);
 
                 if self.hitlag.decrement() {
@@ -385,6 +424,16 @@ impl Player {
             Hitlag::None => {
                 self.action_step(input, players, fighters, platforms);
             }
+        }
+
+        // Timers
+
+        if self.parry_timer > 0 {
+            self.parry_timer -= 1;
+        }
+
+        if self.shield_stun_timer > 0 {
+            self.shield_stun_timer -= 1;
         }
 
         self.frames_since_hit += 1;
@@ -900,12 +949,14 @@ impl Player {
     fn shield_on_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
+        let stun_lock = self.shield_stun_timer > 0;
+        let lock = stun_lock && stick_lock;
         let power_shield_len = fighter.actions[Action::PowerShield as usize].frames.len();
-        // allow the first frame to transition to power shield so that powershield input is more consistent
 
-        if !stick_lock && self.check_jump(input) { }
-        else if !stick_lock && self.check_pass_platform(input, players, fighters, platforms) { }
+        if !lock && self.check_jump(input) { }
+        else if !lock && self.check_pass_platform(input, players, fighters, platforms) { }
         else if fighter.power_shield.is_some() && self.frame == 1 && (input.l.press || input.r.press) {
+            // allow the first frame to transition to power shield so that powershield input is more consistent
             self.action = Action::PowerShield as u64;
             self.frame = if power_shield_len >= 2 { 1 } else { 0 }; // change self.frame so that a powershield isnt laggier than a normal shield
         }
@@ -916,11 +967,17 @@ impl Player {
     fn shield_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
+        let stun_lock = self.shield_stun_timer > 0;
+        let lock = stun_lock && stick_lock;
 
-        if !stick_lock && self.check_jump(input) { }
-        else if !stick_lock && self.check_pass_platform(input, players, fighters, platforms) { }
-        else if input[0].l_trigger < 0.165 && input[0].r_trigger < 0.165 && !input[0].l && !input[0].r {
-            self.set_action(Action::ShieldOff);
+        if !lock && self.check_jump(input) { }
+        else if !lock && self.check_pass_platform(input, players, fighters, platforms) { }
+        else if !stun_lock && input[0].l_trigger < 0.165 && input[0].r_trigger < 0.165 && !input[0].l && !input[0].r {
+            if self.parry_timer > 0 {
+                self.set_action(Action::Idle);
+            } else {
+                self.set_action(Action::ShieldOff);
+            }
         }
         self.apply_friction(fighter);
         self.shield_shared_action(input, players, fighters, platforms);
@@ -929,9 +986,11 @@ impl Player {
     fn shield_off_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
+        let stun_lock = self.shield_stun_timer > 0;
+        let lock = stun_lock && stick_lock;
 
-        if !stick_lock && self.check_jump(input) { }
-        else if !stick_lock && self.check_pass_platform(input, players, fighters, platforms) { }
+        if !lock && self.check_jump(input) { }
+        else if !lock && self.check_pass_platform(input, players, fighters, platforms) { }
         self.apply_friction(fighter);
         self.shield_shared_action(input, players, fighters, platforms);
     }
@@ -939,11 +998,13 @@ impl Player {
     fn power_shield_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
+        let stun_lock = self.shield_stun_timer > 0;
+        let lock = stun_lock && stick_lock;
 
         match (&fighter.shield, &fighter.power_shield) {
             (&Some(_), &Some(_)) => {
-                if !stick_lock && self.check_jump(input) { }
-                else if !stick_lock && self.check_pass_platform(input, players, fighters, platforms) { }
+                if !lock && self.check_jump(input) { }
+                else if !lock && self.check_pass_platform(input, players, fighters, platforms) { }
                 self.shield_shared_action(input, players, fighters, platforms);
             }
             _ => {
@@ -974,7 +1035,7 @@ impl Player {
             self.shield_offset_y += (target_y - self.shield_offset_y) / 5.0 + 0.01;
 
             // shield hp
-            self.shield_hp -= shield.hp_cost * self.shield_analog - (1.0 - self.shield_analog).min(0.0) / 10.0;
+            self.shield_hp -= shield.hp_cost * self.shield_analog - (1.0 - self.shield_analog) / 10.0;
             if self.shield_hp <= 0.0 {
                 self.set_action(Action::ShieldBreakFall);
                 self.shield_hp = 0.0;
@@ -1004,11 +1065,11 @@ impl Player {
             self.shield_hp = 30.0;
         }
 
-        self.stun_timer -= 1.0;
+        self.stun_timer -= 1;
 
         // TODO: Mashout
 
-        if self.stun_timer <= 0.0 {
+        if self.stun_timer <= 0 {
             self.set_action(Action::Idle);
         }
     }
@@ -1021,7 +1082,7 @@ impl Player {
         shield.scaling * (analog_size + hp_size) + hp_size_unscaled
     }
 
-    pub fn shield_pos(&self, shield: &Shield, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
+    fn shield_pos(&self, shield: &Shield, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
         let xy = self.bps_xy(players, fighters, platforms);
         (
             xy.0 + self.shield_offset_x + self.relative_f(shield.offset_x),
@@ -1409,7 +1470,7 @@ impl Player {
             Some(Action::ShieldBreakFall)  => self.set_action(Action::ShieldBreakFall),
             Some(Action::Stun)             => self.set_action(Action::Stun),
             Some(Action::ShieldBreakGetup) => {
-                self.stun_timer = 490.0;
+                self.stun_timer = 490;
                 self.set_action(Action::Stun);
             }
 

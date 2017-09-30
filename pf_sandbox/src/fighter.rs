@@ -165,9 +165,15 @@ impl Default for Shield {
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PowerShield {
-    pub reflect_window:      Option<usize>,
-    pub parry_window:        Option<usize>,
-    pub enemy_stun_duration: u64,
+    pub reflect_window: Option<u64>,
+    pub parry:          Option<PowerShieldEffect>,
+    pub enemy_stun:     Option<PowerShieldEffect>,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct PowerShieldEffect {
+    pub window:   u64,
+    pub duration: u64
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
