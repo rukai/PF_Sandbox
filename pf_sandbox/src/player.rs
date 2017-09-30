@@ -37,8 +37,10 @@ pub struct Player {
     pub air_jumps_left:     u64,
     pub jumpsquat_button:   bool,
     pub turn_dash_buffer:   bool,
-    pub shield_analog:      f32,
     pub shield_hp:          f32,
+    pub shield_analog:      f32,
+    pub shield_offset_x:    f32,
+    pub shield_offset_y:    f32,
     pub stun_timer:         f32,
     pub ecb:                ECB,
     pub hitlist:            Vec<usize>,
@@ -146,8 +148,10 @@ impl Player {
             air_jumps_left:     0,
             jumpsquat_button:   false,
             turn_dash_buffer:   false,
-            shield_analog:      0.0,
             shield_hp:          package.fighters[fighter.as_ref()].shield.as_ref().map_or(60.0, |x| x.hp_max),
+            shield_analog:      0.0,
+            shield_offset_x:    0.0,
+            shield_offset_y:    0.0,
             stun_timer:         0.0,
             ecb:                ECB::default(),
             hitlist:            vec!(),
@@ -895,11 +899,12 @@ impl Player {
 
     fn shield_on_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
+        let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
         let power_shield_len = fighter.actions[Action::PowerShield as usize].frames.len();
         // allow the first frame to transition to power shield so that powershield input is more consistent
 
-        if self.check_jump(input) { }
-        else if self.check_pass_platform(input, players, fighters, platforms) { }
+        if !stick_lock && self.check_jump(input) { }
+        else if !stick_lock && self.check_pass_platform(input, players, fighters, platforms) { }
         else if fighter.power_shield.is_some() && self.frame == 1 && (input.l.press || input.r.press) {
             self.action = Action::PowerShield as u64;
             self.frame = if power_shield_len >= 2 { 1 } else { 0 }; // change self.frame so that a powershield isnt laggier than a normal shield
@@ -910,8 +915,10 @@ impl Player {
 
     fn shield_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
-        if self.check_jump(input) { }
-        else if self.check_pass_platform(input, players, fighters, platforms) { }
+        let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
+
+        if !stick_lock && self.check_jump(input) { }
+        else if !stick_lock && self.check_pass_platform(input, players, fighters, platforms) { }
         else if input[0].l_trigger < 0.165 && input[0].r_trigger < 0.165 && !input[0].l && !input[0].r {
             self.set_action(Action::ShieldOff);
         }
@@ -921,18 +928,22 @@ impl Player {
 
     fn shield_off_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
-        if self.check_jump(input) { }
-        else if self.check_pass_platform(input, players, fighters, platforms) { }
+        let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
+
+        if !stick_lock && self.check_jump(input) { }
+        else if !stick_lock && self.check_pass_platform(input, players, fighters, platforms) { }
         self.apply_friction(fighter);
         self.shield_shared_action(input, players, fighters, platforms);
     }
 
     fn power_shield_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
+        let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
+
         match (&fighter.shield, &fighter.power_shield) {
             (&Some(_), &Some(_)) => {
-                if self.check_jump(input) { }
-                else if self.check_pass_platform(input, players, fighters, platforms) { }
+                if !stick_lock && self.check_jump(input) { }
+                else if !stick_lock && self.check_pass_platform(input, players, fighters, platforms) { }
                 self.shield_shared_action(input, players, fighters, platforms);
             }
             _ => {
@@ -945,13 +956,25 @@ impl Player {
         let fighter = &fighters[self.fighter.as_ref()];
         self.apply_friction(fighter);
         if let Some(ref shield) = fighter.shield {
+            // shield analog
             self.shield_analog = if input[0].l || input[0].r {
                 1.0
             } else {
                 input[0].l_trigger.max(input[0].r_trigger)
             };
 
-            self.shield_hp -= shield.hp_cost * self.shield_analog - (1.0 - self.shield_analog) / 10.0;
+            // shield offset
+            let stick_x = input[0].stick_x;
+            let stick_y = input[0].stick_y;
+            let target_offset = (stick_x * stick_x + stick_y * stick_y).sqrt() * fighter.shield.as_ref().map_or(1.0, |x| x.stick_mult);
+            let target_angle = stick_y.atan2(stick_x);
+            let target_x = target_angle.cos() * target_offset;
+            let target_y = target_angle.sin() * target_offset;
+            self.shield_offset_x += (target_x - self.shield_offset_x) / 5.0 + 0.01;
+            self.shield_offset_y += (target_y - self.shield_offset_y) / 5.0 + 0.01;
+
+            // shield hp
+            self.shield_hp -= shield.hp_cost * self.shield_analog - (1.0 - self.shield_analog).min(0.0) / 10.0;
             if self.shield_hp <= 0.0 {
                 self.set_action(Action::ShieldBreakFall);
                 self.shield_hp = 0.0;
@@ -999,12 +1022,10 @@ impl Player {
     }
 
     pub fn shield_pos(&self, shield: &Shield, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
-        let tilt_x = 0.0; // TODO
-        let tilt_y = 0.0; // TODO
         let xy = self.bps_xy(players, fighters, platforms);
         (
-            xy.0 + tilt_x + self.relative_f(shield.x_offset),
-            xy.1 + tilt_y + shield.y_offset
+            xy.0 + self.shield_offset_x + self.relative_f(shield.offset_x),
+            xy.1 + self.shield_offset_y + shield.offset_y
         )
     }
 

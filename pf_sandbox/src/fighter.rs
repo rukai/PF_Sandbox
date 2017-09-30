@@ -134,36 +134,40 @@ pub struct LCancel {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Shield {
-    pub x_offset:   f32,
-    pub y_offset:   f32,
-    pub break_vel:  f32,
-    pub scaling:    f32,
-    pub hp_scaling: f32,
-    pub hp_max:     f32,
-    pub hp_regen:   f32,
-    pub hp_cost:    f32,
+    pub stick_lock:  bool,
+    pub stick_mult: f32,
+    pub offset_x:    f32,
+    pub offset_y:    f32,
+    pub break_vel:   f32,
+    pub scaling:     f32,
+    pub hp_scaling:  f32,
+    pub hp_max:      f32,
+    pub hp_regen:    f32,
+    pub hp_cost:     f32,
 }
 
 impl Default for Shield {
     fn default() -> Self {
         Shield {
-            x_offset:   0.0,
-            y_offset:   10.0,
-            break_vel:  3.0,
-            scaling:    10.0,
-            hp_scaling: 1.0,
-            hp_max:     60.0,
-            hp_regen:   0.1,
-            hp_cost:    0.3,
+            stick_lock:  false,
+            stick_mult:  3.0,
+            offset_x:    0.0,
+            offset_y:    10.0,
+            break_vel:   3.0,
+            scaling:     10.0,
+            hp_scaling:  1.0,
+            hp_max:      60.0,
+            hp_regen:    0.1,
+            hp_cost:     0.3,
         }
     }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PowerShield {
-    pub reflect_frames:    Option<usize>,
-    pub parry_frames:      Option<usize>,
-    pub enemy_stun_frames: u64,
+    pub reflect_window:      Option<usize>,
+    pub parry_window:        Option<usize>,
+    pub enemy_stun_duration: u64,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
