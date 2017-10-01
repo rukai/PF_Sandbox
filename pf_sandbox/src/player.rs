@@ -373,7 +373,9 @@ impl Player {
 
                     let x_diff = self.bps_xy(players, fighters, platforms).0 - players[player_def_i].bps_xy(players, fighters, platforms).0;
                     let vel = hitbox.damage.floor() * (players[player_def_i].shield_analog - 0.3) * 0.1 + 0.02;
-                    self.x_vel += vel * x_diff.signum();
+                    if self.is_platform() {
+                        self.x_vel += vel * x_diff.signum();
+                    }
                     self.hitlag = Hitlag::Some ((hitbox.damage / 3.0 + 3.0) as u64);
                 }
                 &CollisionResult::HitShieldDef { ref hitbox, ref power_shield, player_atk_i } => {

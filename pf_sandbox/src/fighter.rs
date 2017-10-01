@@ -668,7 +668,7 @@ pub struct HitBox {
 impl Default for HitBox {
     fn default() -> HitBox {
         HitBox {
-            shield_damage:  10.0,
+            shield_damage:  0.0,
             damage:         10.0,
             bkb:            60.0,
             kbg:            1.0,
