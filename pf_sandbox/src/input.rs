@@ -11,7 +11,7 @@ enum InputSource<'a> {
     GenericController { handle: usize, deadzone: Deadzone }
 }
 
-/// Stores the offset that should be subtracted from all analog data in a single input
+/// Stores the first value returned from an input source
 pub struct Deadzone {
     plugged_in: bool,
     stick_x:    u8,
@@ -375,10 +375,10 @@ fn read_gc_adapter(handle: &mut DeviceHandle, deadzones: &mut [Deadzone], inputs
         {
             deadzones[port] = Deadzone {
                 plugged_in: true,
-                stick_x:    raw_stick_x   - 128,
-                stick_y:    raw_stick_y   - 128,
-                c_stick_x:  raw_c_stick_x - 128,
-                c_stick_y:  raw_c_stick_y - 128,
+                stick_x:    raw_stick_x,
+                stick_y:    raw_stick_y,
+                c_stick_x:  raw_c_stick_x,
+                c_stick_y:  raw_c_stick_y,
                 l_trigger:  raw_l_trigger,
                 r_trigger:  raw_r_trigger,
             };
@@ -389,8 +389,8 @@ fn read_gc_adapter(handle: &mut DeviceHandle, deadzones: &mut [Deadzone], inputs
         }
 
         let deadzone = &deadzones[port];
-        let (stick_x, stick_y)     = stick_filter(raw_stick_x - deadzone.stick_x, raw_stick_y - deadzone.stick_y);
-        let (c_stick_x, c_stick_y) = stick_filter(raw_c_stick_x - deadzone.c_stick_x, raw_c_stick_y - deadzone.c_stick_y);
+        let (stick_x, stick_y)     = stick_filter(stick_deadzone(raw_stick_x,   deadzone.stick_x),   stick_deadzone(raw_stick_y,   deadzone.stick_y));
+        let (c_stick_x, c_stick_y) = stick_filter(stick_deadzone(raw_c_stick_x, deadzone.c_stick_x), stick_deadzone(raw_c_stick_y, deadzone.c_stick_y));
 
         inputs.push(ControllerInput {
             plugged_in,
@@ -415,6 +415,16 @@ fn read_gc_adapter(handle: &mut DeviceHandle, deadzones: &mut [Deadzone], inputs
             c_stick_x: c_stick_x,
             c_stick_y: c_stick_y,
         });
+    }
+}
+
+
+/// use the first received stick value to reposition the current stick value around 128
+pub fn stick_deadzone(current: u8, first: u8) -> u8 {
+    if current > first {
+        128u8.saturating_add(current - first)
+    } else {
+        128u8.saturating_sub(first - current)
     }
 }
 
