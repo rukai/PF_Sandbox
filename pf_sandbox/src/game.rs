@@ -9,7 +9,6 @@ use ::input::{Input, PlayerInput, ControllerInput};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
-use ::rand::{StdRng, SeedableRng};
 use ::results::{GameResults, RawPlayerResult, PlayerResult};
 use ::replays::Replay;
 use ::replays;
@@ -17,6 +16,7 @@ use ::rules::Goal;
 use ::stage::{Area, Stage};
 use ::menu::ResumeMenu;
 
+use rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt;
@@ -895,6 +895,7 @@ impl Game {
         };
 
         RenderGame {
+            seed:        self.get_seed(),
             stage:       self.selected_stage.clone(),
             entities:    entities,
             state:       self.state.clone(),
@@ -999,6 +1000,7 @@ impl Selector {
 }
 
 pub struct RenderGame {
+    pub seed:        Vec<usize>,
     pub stage:       String,
     pub entities:    Vec<RenderEntity>,
     pub state:       GameState,

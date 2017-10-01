@@ -9,8 +9,9 @@ use ::fighter::{Action, ECB};
 use ::results::PlayerResult;
 use ::package::Verify;
 
-use cgmath::{Matrix4, Vector3, Rad};
 use cgmath::prelude::*;
+use cgmath::{Matrix4, Vector3, Rad};
+use rand::{StdRng, Rng, SeedableRng};
 use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
 use vulkano;
@@ -416,6 +417,7 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn game_render(&mut self, render: RenderGame, image_num: usize, command_output: &[String]) -> AutoCommandBufferBuilder {
+        let mut rng = StdRng::from_seed(&render.seed);
         if command_output.len() == 0 {
             self.game_hud_render(&render.entities);
             self.game_timer_render(&render.timer);
@@ -503,7 +505,13 @@ impl<'a> VulkanGraphics<'a> {
                     if let &Some(ref shield) = &player.shield {
                         let position = Matrix4::from_translation(Vector3::new(shield.pos.0 + pan.0, shield.pos.1 + pan.1, 0.0));
                         let buffers = Buffers::new_shield(self.device.clone(), shield);
-                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &position, shield.color, shield.color);
+                        let c = shield.color;
+                        let color = if shield.distort > 0 {
+                            [c[0] * rng.gen_range(0.75, 1.25), c[1] * rng.gen_range(0.75, 1.25), c[2] * rng.gen_range(0.75, 1.25), c[3] * rng.gen_range(0.8, 1.2)]
+                        } else {
+                            shield.color
+                        };
+                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &position, shield.color, color);
                     }
 
                     // draw selected hitboxes

@@ -425,36 +425,6 @@ impl Player {
                 self.action_step(input, players, fighters, platforms);
             }
         }
-
-        // Timers
-
-        if self.parry_timer > 0 {
-            self.parry_timer -= 1;
-        }
-
-        if self.shield_stun_timer > 0 {
-            self.shield_stun_timer -= 1;
-        }
-
-        self.frames_since_hit += 1;
-        if self.frames_since_hit > 60 {
-            self.hit_angle_pre_di = None;
-            self.hit_angle_post_di = None;
-        }
-
-        if input[0].stick_x == 0.0 && input[0].stick_y == 0.0 {
-            self.stick = None;
-        }
-        else {
-            self.stick = Some((input[0].stick_x, input[0].stick_y));
-        }
-
-        if input[0].c_stick_x == 0.0 && input[0].c_stick_y == 0.0 {
-            self.c_stick = None;
-        }
-        else {
-            self.c_stick = Some((input[0].c_stick_x, input[0].c_stick_y));
-        }
     }
 
     /// 0 < angle < 2pi
@@ -577,10 +547,40 @@ impl Player {
             }
         }
 
+        // Timers
+
         if !self.is_shielding() {
             if let Some(ref shield) = fighter.shield {
                 self.shield_hp = shield.hp_max.min(self.shield_hp + shield.hp_regen);
             }
+        }
+
+        if self.parry_timer > 0 {
+            self.parry_timer -= 1;
+        }
+
+        if self.shield_stun_timer > 0 {
+            self.shield_stun_timer -= 1;
+        }
+
+        self.frames_since_hit += 1;
+        if self.frames_since_hit > 60 {
+            self.hit_angle_pre_di = None;
+            self.hit_angle_post_di = None;
+        }
+
+        if input[0].stick_x == 0.0 && input[0].stick_y == 0.0 {
+            self.stick = None;
+        }
+        else {
+            self.stick = Some((input[0].stick_x, input[0].stick_y));
+        }
+
+        if input[0].c_stick_x == 0.0 && input[0].c_stick_y == 0.0 {
+            self.c_stick = None;
+        }
+        else {
+            self.c_stick = Some((input[0].c_stick_x, input[0].c_stick_y));
         }
     }
 
@@ -2029,9 +2029,10 @@ impl Player {
                 let c = &fighter_color;
                 let m =  1.0 - self.shield_analog;
                 Some(RenderShield {
-                    color:  [c[0] + (1.0 - c[0]) * m, c[1] + (1.0 - c[1]) * m, c[2] + (1.0 - c[2]) * m, 0.2 + self.shield_analog / 2.0],
-                    radius: self.shield_size(shield),
-                    pos:    self.shield_pos(shield, players, fighters, platforms),
+                    distort: self.shield_stun_timer,
+                    color:   [c[0] + (1.0 - c[0]) * m, c[1] + (1.0 - c[1]) * m, c[2] + (1.0 - c[2]) * m, 0.2 + self.shield_analog / 2.0],
+                    radius:  self.shield_size(shield),
+                    pos:     self.shield_pos(shield, players, fighters, platforms),
                 })
             } else { None }
         } else { None };
@@ -2097,9 +2098,10 @@ pub struct RenderPlayer {
 }
 
 pub struct RenderShield {
-    pub color:  [f32; 4],
-    pub radius: f32,
-    pub pos:    (f32, f32),
+    pub distort: u64,
+    pub color:   [f32; 4],
+    pub radius:  f32,
+    pub pos:     (f32, f32),
 }
 
 pub struct VectorArrow {

@@ -6,10 +6,10 @@ use ::package::{Package, PackageUpdate};
 use ::player::RenderPlayer;
 use ::stage::Stage;
 
-use std::collections::{HashSet, HashMap};
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
 
+use std::collections::{HashSet, HashMap};
 use std::f32::consts;
 use std::sync::Arc;
 
@@ -41,21 +41,28 @@ impl Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
 
-        let triangles = 50;
+        let triangles = match shield.distort {
+            0 => 100,
+            1 => 20,
+            2 => 10,
+            3 => 8,
+            4 => 7,
+            5 => 6,
+            _ => 5
+        };
+
         // triangles are drawn meeting at the centre, forming a circle
         vertices.push(Vertex { position: [0.0, 0.0], edge: 0.0, render_id: 0.0});
         for i in 0..triangles {
-            let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
-            let x = angle.cos() * shield.radius;
-            let y = angle.sin() * shield.radius;
+            let angle = i as f32 * 2.0 * consts::PI / (triangles as f32);
+            let (sin, cos) = angle.sin_cos();
+            let x = cos * shield.radius;
+            let y = sin * shield.radius;
             vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: 0.0});
             indices.push(0);
-            indices.push(i);
-            indices.push((i + 1) % triangles);
+            indices.push((i + 1));
+            indices.push((i + 1) % triangles + 1);
         }
-        indices.push(0);
-        indices.push(1);
-        indices.push(triangles - 1);
 
         Buffers {
             vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
@@ -219,17 +226,15 @@ impl Buffers {
         let point = &colbox.point;
         vertices.push(Vertex { position: [point.0, point.1], edge: 0.0, render_id: render_id});
         for i in 0..triangles {
-            let angle: f32 = ((i * 2) as f32) * consts::PI / (triangles as f32);
-            let x = point.0 + angle.cos() * colbox.radius;
-            let y = point.1 + angle.sin() * colbox.radius;
+            let angle = i as f32 * 2.0 * consts::PI / (triangles as f32);
+            let (sin, cos) = angle.sin_cos();
+            let x = point.0 + cos * colbox.radius;
+            let y = point.1 + sin * colbox.radius;
             vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id});
             indices.push(*index_count);
-            indices.push(*index_count + i);
-            indices.push(*index_count + (i + 1) % triangles);
+            indices.push(*index_count + i + 1);
+            indices.push(*index_count + (i + 1) % triangles + 1);
         }
-        indices.push(*index_count);
-        indices.push(*index_count + 1);
-        indices.push(*index_count + triangles - 1);
         *index_count += triangles + 1;
     }
 
