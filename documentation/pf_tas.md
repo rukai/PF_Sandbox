@@ -13,13 +13,13 @@
 *   d -> x
 *   f -> y
 
-*   y -> start
-*   h -> z
+*   g -> start
+*   y -> z
 
-*   n -> left button
+*   n -> left trigger digital
 *   m -> left trigger
 *   , -> right trigger
-*   . -> right button
+*   . -> right trigger digital
 
 *   u -> stick horizontal
 *   i -> stick vertical
@@ -32,15 +32,10 @@
 
 *   Enter -> Play
 *   Space -> Step
-*   Z     -> Replay Backwards
-*   X     -> Step Backwards
-*   C     -> Step Forwards
-*   V     -> Replay Forwards
-
-*   h  -> left button
-*   j  -> left trigger
-*   k  -> right trigger
-*   l  -> right button
+*   h     -> Replay backwards
+*   j     -> Step backwards
+*   k     -> Step forwards
+*   l     -> Replay forwards
 
 ## Config
 
