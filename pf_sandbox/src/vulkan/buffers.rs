@@ -37,6 +37,22 @@ pub struct Buffers {
 }
 
 impl Buffers {
+    /// Creates a single tringle with sides of length 1
+    pub fn new_triangle(device: Arc<Device>) -> Buffers {
+        let h = ((3.0/4.0) as f32).sqrt();
+        let vertices = [
+            Vertex { position: [0.0,    h  ], edge: 0.0, render_id: 0.0 },
+            Vertex { position: [h/-2.0, 0.0], edge: 0.0, render_id: 0.0 },
+            Vertex { position: [h/2.0,  0.0], edge: 0.0, render_id: 0.0 }
+        ];
+
+        let indices = [0, 1, 2];
+        Buffers {
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+        }
+    }
+
     pub fn new_shield(device: Arc<Device>, shield: &RenderShield) -> Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();

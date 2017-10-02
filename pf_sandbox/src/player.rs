@@ -3,6 +3,7 @@ use ::fighter::*;
 use ::input::{PlayerInput};
 use ::math;
 use ::package::Package;
+use ::particle::{Particle, ParticleType};
 use ::results::{RawPlayerResult, DeathRecord};
 use ::rules::Goal;
 use ::stage::{Stage, Platform, Area, SpawnPoint};
@@ -49,6 +50,7 @@ pub struct Player {
     pub hitlag:             Hitlag,
     pub hitstun:            f32,
     pub hit_by:             Option<usize>,
+    pub particles:          Vec<Particle>,
     pub result:             RawPlayerResult,
 
     // Only use for debug display
@@ -159,6 +161,7 @@ impl Player {
             hitlag:             Hitlag::None,
             hitstun:            0.0,
             hit_by:             None,
+            particles:          vec!(),
             result:             RawPlayerResult::default(),
             fighter:            fighter,
 
@@ -424,7 +427,7 @@ impl Player {
                 }
             }
             Hitlag::None => {
-                self.action_step(input, players, fighters, platforms);
+                self.action_step(input, players, fighters, platforms, rng);
             }
         }
     }
@@ -476,7 +479,7 @@ impl Player {
         }
     }
 
-    fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], rng: &mut StdRng) {
         let fighter = &fighters[self.fighter.as_ref()];
         let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
@@ -510,7 +513,7 @@ impl Player {
                 Action::Dair       | Action::Uair |
                 Action::Nair       | Action::JumpAerialB |
                 Action::DamageFall
-                => { self.aerial_action(input, fighter) }
+                => self.aerial_action(input, fighter),
 
                 Action::Jab       | Action::Jab2 |
                 Action::Jab3      | Action::Utilt |
@@ -518,11 +521,13 @@ impl Player {
                 Action::Dsmash    | Action::Fsmash |
                 Action::Usmash    | Action::Idle |
                 Action::Grab      | Action::DashGrab |
+                Action::CrouchEnd
+                => self.ground_idle_action(input, fighter),
+
                 Action::FairLand  | Action::BairLand |
                 Action::UairLand  | Action::DairLand |
-                Action::Land      | Action::SpecialLand |
-                Action::CrouchEnd
-                => { self.ground_idle_action(input, fighter) }
+                Action::Land      | Action::SpecialLand
+                => self.land_action(input, rng, players, fighters, platforms),
 
                 Action::Teeter |
                 Action::TeeterIdle       => self.teeter_action(input, fighter),
@@ -534,7 +539,7 @@ impl Player {
                 Action::CrouchStart      => self.crouch_start_action(input, players, fighters, platforms),
                 Action::Crouch           => self.crouch_action(input, fighter),
                 Action::Walk             => self.walk_action(input, fighter),
-                Action::Dash             => self.dash_action(input, fighter),
+                Action::Dash             => self.dash_action(input, rng, players, fighters, platforms),
                 Action::Run              => self.run_action(input, fighter),
                 Action::Turn             => self.turn_action(input, fighter),
                 Action::LedgeIdle        => self.ledge_idle_action(input, players, fighters, platforms),
@@ -549,7 +554,14 @@ impl Player {
             }
         }
 
-        // Timers
+        // TODO: Gankro plz ... https://github.com/rust-lang/rust/issues/43244
+        let mut new_particles = vec!();
+        for mut particle in self.particles.drain(..) {
+            if !particle.step() {
+                new_particles.push(particle);
+            }
+        }
+        self.particles = new_particles;
 
         if !self.is_shielding() {
             if let Some(ref shield) = fighter.shield {
@@ -803,6 +815,25 @@ impl Player {
         }
     }
 
+    fn land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let fighter = &fighters[self.fighter.as_ref()];
+        self.land_particles(rng, players, fighters, platforms);
+        self.apply_friction(fighter);
+
+        if self.interruptible(fighter) {
+            if self.check_jump(input) { }
+            else if self.check_shield(input, fighter) { }
+            else if self.check_special(input) { }
+            else if self.check_smash(input) { }
+            else if self.check_attacks(input) { }
+            else if self.check_taunt(input) { }
+            else if self.check_crouch(input) { }
+            else if self.check_dash(input, fighter) { }
+            else if self.check_turn(input) { }
+            else if self.check_walk(input, fighter) { }
+        }
+    }
+
     fn teeter_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         self.apply_friction(fighter);
         if self.interruptible(fighter) {
@@ -848,7 +879,9 @@ impl Player {
         }
     }
 
-    fn dash_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+    fn dash_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let fighter = &fighters[self.fighter.as_ref()];
+        self.dash_particles(rng, players, fighters, platforms);
         if self.frame == 2 {
             self.x_vel = self.relative_f(fighter.dash_init_vel);
             if self.x_vel.abs() > fighter.dash_run_term_vel {
@@ -2055,6 +2088,7 @@ impl Player {
             selected_colboxes: selected_colboxes,
             shield:            shield,
             vector_arrows:     vector_arrows,
+            particles:         self.particles.clone(),
         }
     }
 
@@ -2063,6 +2097,67 @@ impl Player {
         result.final_damage = Some(self.damage);
         result.ended_as_fighter = Some(self.fighter.clone());
         result
+    }
+
+    pub fn land_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let num = match self.frame {
+            1 => 1,
+            2 => 1,
+            3 => 2,
+            4 => 4,
+            5 => 3,
+            6 => 2,
+            _ => 0,
+        };
+
+        let (x, y) = self.bps_xy(players, fighters, platforms);
+
+        for _ in 0..num {
+            self.particles.push(Particle {
+                counter: 0,
+                x:       x,
+                y:       y,
+                angle:   rng.gen_range(0.0, 2.0 * PI),
+                p_type:  ParticleType::Spark {
+                    x_vel:      rng.gen_range(-0.3, 0.3),
+                    y_vel:      rng.gen_range(-0.3, 0.3),
+                    size:       rng.gen_range(1.0, 3.0),
+                    angle_vel:  rng.gen_range(0.0, 1.0),
+                    background: rng.gen_weighted_bool(2),
+                }
+            });
+        }
+    }
+
+    pub fn dash_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let num = match self.frame {
+            1 => 1,
+            2 => 1,
+            3 => 2,
+            4 => 4,
+            5 => 3,
+            6 => 2,
+            _ => 0,
+        };
+
+        let (x, y) = self.bps_xy(players, fighters, platforms);
+        let x_offset = self.relative_f(3.0);
+
+        for _ in 0..num {
+            self.particles.push(Particle {
+                counter: 0,
+                x:       x + x_offset,
+                y:       y,
+                angle:   rng.gen_range(0.0, 2.0 * PI),
+                p_type:  ParticleType::Spark {
+                    x_vel:      if self.face_right { rng.gen_range(-0.3, 0.0) }  else { rng.gen_range(0.0, 0.3) },
+                    y_vel:      rng.gen_range(-0.3, 0.3),
+                    size:       rng.gen_range(1.0, 3.0),
+                    angle_vel:  rng.gen_range(0.0, 1.0),
+                    background: rng.gen_weighted_bool(2),
+                }
+            });
+        }
     }
 }
 
@@ -2097,6 +2192,7 @@ pub struct RenderPlayer {
     pub selected_colboxes: HashSet<usize>,
     pub shield:            Option<RenderShield>,
     pub vector_arrows:     Vec<VectorArrow>,
+    pub particles:         Vec<Particle>,
 }
 
 pub struct RenderShield {

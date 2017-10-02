@@ -8,6 +8,7 @@ use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB};
 use ::results::PlayerResult;
 use ::package::Verify;
+use ::particle::ParticleType;
 
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector3, Rad};
@@ -505,8 +506,8 @@ impl<'a> VulkanGraphics<'a> {
                     if let &Some(ref shield) = &player.shield {
                         let position = Matrix4::from_translation(Vector3::new(shield.pos.0 + pan.0, shield.pos.1 + pan.1, 0.0));
                         let buffers = Buffers::new_shield(self.device.clone(), shield);
-                        let c = shield.color;
                         let color = if shield.distort > 0 {
+                            let c = shield.color;
                             [c[0] * rng.gen_range(0.75, 1.25), c[1] * rng.gen_range(0.75, 1.25), c[2] * rng.gen_range(0.75, 1.25), c[3] * rng.gen_range(0.8, 1.2)]
                         } else {
                             shield.color
@@ -531,6 +532,25 @@ impl<'a> VulkanGraphics<'a> {
                         let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, 0.0));
                         let transformation = position * rotate * squish;
                         command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, arrow.color.clone(), arrow.color.clone())
+                    }
+
+                    // draw particles {
+                    let triangle_buffers = Buffers::new_triangle(self.device.clone());
+                    for particle in &player.particles {
+                        match &particle.p_type {
+                            &ParticleType::Spark { size, .. }=> {
+                                let rotate = Matrix4::from_angle_z(Rad(particle.angle));
+                                let size = size * (1.0 - (particle.counter as f32) / 40.0);
+                                let size = Matrix4::from_nonuniform_scale(size, size, 1.0);
+                                let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, 0.0));
+                                let transformation = position * rotate * size;
+                                command_buffer = self.render_buffers(command_buffer, &render, triangle_buffers.clone(), &transformation, player.fighter_color.clone(), player.fighter_color.clone())
+                            }
+                            &ParticleType::Jump => {
+                            }
+                            &ParticleType::Hit { .. } => {
+                            }
+                        }
                     }
 
                     // TODO: Edit::Player  - render selected player's BPS as green
@@ -807,6 +827,7 @@ impl<'a> VulkanGraphics<'a> {
                         selected_colboxes: HashSet::new(),
                         shield:            None,
                         vector_arrows:     vec!(),
+                        particles:         vec!(),
                     };
 
                     // draw fighter

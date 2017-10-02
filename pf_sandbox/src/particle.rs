@@ -1,0 +1,44 @@
+use treeflection::{Node, NodeRunner, NodeToken};
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct Particle {
+    pub counter: u32,
+    pub x:       f32,
+    pub y:       f32,
+    pub angle:   f32,
+    pub p_type:  ParticleType
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub enum ParticleType {
+    Jump,
+    Hit  { knockback: f32, damage: f32 },
+    Spark { x_vel: f32, y_vel: f32, size: f32, angle_vel: f32, background: bool },
+}
+
+impl Default for ParticleType {
+    fn default() -> Self {
+        ParticleType::Jump
+    }
+}
+
+impl Particle {
+    /// returns true if should delete self
+    pub fn step(&mut self) -> bool {
+        self.counter += 1;
+        match self.p_type.clone() {
+            ParticleType::Spark { x_vel, y_vel, angle_vel, .. } => {
+                self.x += x_vel;
+                self.y += y_vel;
+                self.angle += angle_vel;
+                self.counter > 40
+            }
+            ParticleType::Jump => {
+                self.counter > 100
+            }
+            ParticleType::Hit { .. } => {
+                self.counter > 100
+            }
+        }
+    }
+}

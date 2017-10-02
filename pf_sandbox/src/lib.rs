@@ -35,9 +35,10 @@ pub mod menu;
 pub mod network;
 pub mod os_input;
 pub mod package;
+pub mod particle;
 pub mod player;
-pub mod results;
 pub mod replays;
+pub mod results;
 pub mod rules;
 pub mod stage;
 
