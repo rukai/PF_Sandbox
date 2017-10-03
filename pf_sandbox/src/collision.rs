@@ -49,15 +49,15 @@ pub fn collision_check(players: &[Player], fighters: &KeyedContextVec<Fighter>, 
                             match &colbox_def.role {
                             // TODO: How do we only run the clang handler once?
                                 &CollisionBoxRole::Hit (ref hitbox_def) => {
-                                    if let ColBoxCollisionResult::Hit = colbox_collision_check(player_atk_xy, colbox_atk, player_def_xy, colbox_def) {
+                                    if let ColBoxCollisionResult::Hit (point) = colbox_collision_check(player_atk_xy, colbox_atk, player_def_xy, colbox_def) {
                                         let damage_diff = hitbox_atk.damage as i64 - hitbox_def.damage as i64; // TODO: retrieve proper damage with move staling etc
 
                                         if damage_diff >= 9 {
                                             result[player_atk_i].push(CollisionResult::Clang { rebound: hitbox_atk.enable_rebound });
-                                            result[player_def_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i });
+                                            result[player_def_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i, point });
                                         }
                                         else if damage_diff <= -9 {
-                                            result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i });
+                                            result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i, point });
                                             result[player_def_i].push(CollisionResult::Clang { rebound: hitbox_def.enable_rebound });
                                         }
                                         else {
@@ -74,21 +74,21 @@ pub fn collision_check(players: &[Player], fighters: &KeyedContextVec<Fighter>, 
 
                     for colbox_def in &frame_def.get_colboxes() {
                         match colbox_collision_check(player_atk_xy, colbox_atk, player_def_xy, colbox_def) {
-                            ColBoxCollisionResult::Hit => {
+                            ColBoxCollisionResult::Hit (point) => {
                                 match &colbox_def.role {
                                     &CollisionBoxRole::Hurt (ref hurtbox) => {
-                                        result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i });
+                                        result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i, point });
                                         result[player_def_i].push(CollisionResult::HitDef { hitbox: hitbox_atk.clone(), hurtbox: hurtbox.clone(), player_atk_i: player_atk_i });
                                         break 'player_atk;
                                     }
                                     &CollisionBoxRole::Invincible => {
-                                        result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i });
+                                        result[player_atk_i].push(CollisionResult::HitAtk { hitbox: hitbox_atk.clone(), player_def_i: player_def_i, point });
                                         break 'player_atk;
                                     }
                                     _ => { }
                                 }
                             }
-                            ColBoxCollisionResult::Phantom => {
+                            ColBoxCollisionResult::Phantom (_) => {
                                 match &colbox_def.role {
                                     &CollisionBoxRole::Hurt (ref hurtbox) => {
                                         result[player_atk_i].push(CollisionResult::PhantomAtk (hitbox_atk.clone(), player_def_i));
@@ -107,7 +107,7 @@ pub fn collision_check(players: &[Player], fighters: &KeyedContextVec<Fighter>, 
                     match &colbox_atk.role {
                         &CollisionBoxRole::Grab => {
                             for colbox_def in &frame_def.colboxes[..] {
-                                if let ColBoxCollisionResult::Hit = colbox_collision_check(player_atk_xy, colbox_atk, player_def_xy, colbox_def) {
+                                if let ColBoxCollisionResult::Hit (_) = colbox_collision_check(player_atk_xy, colbox_atk, player_def_xy, colbox_def) {
                                     result[player_atk_i].push(CollisionResult::GrabAtk (player_def_i));
                                     result[player_def_i].push(CollisionResult::GrabDef (player_atk_i));
                                     break 'player_atk;
@@ -139,10 +139,10 @@ fn colbox_collision_check(player1_xy: (f32, f32), colbox1: &CollisionBox,  playe
     let real_distance = ((x1 - x2).powi(2) + (y1 - y2).powi(2)).sqrt();
 
     if check_distance > real_distance {
-        ColBoxCollisionResult::Hit
+        ColBoxCollisionResult::Hit (((x1 + x2) / 2.0, (y1 + y2) / 2.0))
     }
     else if check_distance + 0.01 > real_distance { // TODO: customizable phantom value
-        ColBoxCollisionResult::Phantom
+        ColBoxCollisionResult::Phantom (((x1 + x2) / 2.0, (y1 + y2) / 2.0))
     }
     else {
         ColBoxCollisionResult::None
@@ -150,8 +150,8 @@ fn colbox_collision_check(player1_xy: (f32, f32), colbox1: &CollisionBox,  playe
 }
 
 enum ColBoxCollisionResult {
-    Hit,
-    Phantom,
+    Hit ((f32, f32)),
+    Phantom ((f32, f32)),
     None
 }
 
@@ -182,7 +182,7 @@ pub enum CollisionResult {
     PhantomDef   (HitBox, HurtBox),
     PhantomAtk   (HitBox, usize),
     HitDef       { hitbox: HitBox, hurtbox: HurtBox, player_atk_i: usize },
-    HitAtk       { hitbox: HitBox, player_def_i: usize },
+    HitAtk       { hitbox: HitBox, player_def_i: usize, point: (f32, f32) },
     HitShieldAtk { hitbox: HitBox, power_shield: Option<PowerShield>, player_def_i: usize },
     HitShieldDef { hitbox: HitBox, power_shield: Option<PowerShield>, player_atk_i: usize },
     ReflectDef   (HitBox), // TODO: add further details required for recreating projectile

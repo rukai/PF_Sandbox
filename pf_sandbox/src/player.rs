@@ -301,7 +301,8 @@ impl Player {
     pub fn step_collision(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], col_results: &[CollisionResult]) {
         for col_result in col_results {
             match col_result {
-                &CollisionResult::HitAtk { player_def_i, ref hitbox } => {
+                &CollisionResult::HitAtk { player_def_i, ref hitbox, ref point } => {
+                    self.hit_particles(point.clone(), hitbox);
                     self.hitlist.push(player_def_i);
                     self.hitlag = Hitlag::Some ((hitbox.damage / 3.0 + 3.0) as u64);
                 }
@@ -2108,6 +2109,20 @@ impl Player {
         result.final_damage = Some(self.damage);
         result.ended_as_fighter = Some(self.fighter.clone());
         result
+    }
+
+    pub fn hit_particles(&mut self, point: (f32, f32), hitbox: &HitBox) {
+        self.particles.push(Particle {
+            counter:     0,
+            counter_max: 2,
+            x:           point.0,
+            y:           point.1,
+            angle:       hitbox.angle / 180.0 * PI,
+            p_type:      ParticleType::Hit {
+                knockback: hitbox.bkb + hitbox.kbg * 70.0, // TODO: get actual knockback
+                damage:    hitbox.damage, // TODO: get actual damage
+            }
+        });
     }
 
     pub fn air_jump_particles(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
