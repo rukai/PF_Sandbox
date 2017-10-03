@@ -539,7 +539,7 @@ impl<'a> VulkanGraphics<'a> {
                     let jump_buffers = Buffers::new_circle(self.device.clone());
                     for particle in &player.particles {
                         match &particle.p_type {
-                            &ParticleType::Spark { size, .. }=> {
+                            &ParticleType::Spark { size, .. } => {
                                 let rotate = Matrix4::from_angle_z(Rad(particle.angle));
                                 let size = size * (1.0 - particle.counter_mult());
                                 let size = Matrix4::from_nonuniform_scale(size, size, 1.0);

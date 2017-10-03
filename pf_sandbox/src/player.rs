@@ -21,6 +21,7 @@ pub struct Player {
     pub fighter:            String,
     pub action:             u64, // always change through self.set_action
     pub frame:              u64,
+    pub frame_norestart:    u64, // Used to keep track of total frames passed on states that loop
     pub stocks:             Option<u64>,
     pub damage:             f32,
     pub location:           Location,
@@ -132,6 +133,7 @@ impl Player {
         Player {
             action:             Action::DummyFramePreStart.index(),
             frame:              0,
+            frame_norestart:    0,
             stocks:             package.rules.stock_count,
             damage:             0.0,
             location:           Location::Airbourne { x: spawn.x, y: spawn.y },
@@ -283,9 +285,13 @@ impl Player {
 
     // always change self.action through this method
     fn set_action(&mut self, action: Action) {
-        self.action = action as u64;
-        self.hitlist.clear();
+        let action = action as u64;
+        if self.action != action {
+            self.frame_norestart = 0;
+            self.action = action;
+        }
         self.frame = 0;
+        self.hitlist.clear();
     }
 
     fn interruptible(&self, fighter: &Fighter) -> bool {
@@ -484,6 +490,7 @@ impl Player {
         let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
         self.frame += 1; // Action::DummyFramePreStart is used so that this doesnt skip a real frame when the game starts
+        self.frame_norestart += 1;
         if self.frame >= action_frames {
             self.action_expired(input, players, fighters, platforms);
         }
@@ -553,6 +560,8 @@ impl Player {
                 _ => { },
             }
         }
+
+        self.knockback_particles(rng, players, fighters, platforms);
 
         // TODO: Gankro plz ... https://github.com/rust-lang/rust/issues/43244
         let mut new_particles = vec!();
@@ -2113,6 +2122,35 @@ impl Player {
         });
     }
 
+    pub fn knockback_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let kb_vel = (self.kb_x_vel * self.kb_x_vel + self.kb_y_vel * self.kb_y_vel).sqrt();
+        let angle = self.kb_y_vel.atan2(self.kb_x_vel) + rng.gen_range(-0.2, 0.2);
+        let vec_mult = rng.gen_range(0.7, 1.0);
+        let (x, y) = self.bps_xy(players, fighters, platforms);
+        let num = if self.hitstun > 0.0 {
+            (kb_vel/2.0) as usize
+        } else {
+            0
+        };
+
+        for _ in 0..num {
+            self.particles.push(Particle {
+                counter:     0,
+                counter_max: 30,
+                x:           x,
+                y:           y + (self.ecb.left_y + self.ecb.right_y) / 2.0,
+                angle:       rng.gen_range(0.0, 2.0 * PI),
+                p_type:      ParticleType::Spark {
+                    x_vel:      angle.cos() * vec_mult * -1.0,
+                    y_vel:      angle.sin() * vec_mult * -1.0,
+                    size:       rng.gen_range(1.0, 3.0),
+                    angle_vel:  rng.gen_range(0.0, 1.0),
+                    background: true,
+                }
+            });
+        }
+    }
+
     pub fn land_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let num = match self.frame {
             1 => 1,
@@ -2134,7 +2172,7 @@ impl Player {
                 y:           y,
                 angle:       rng.gen_range(0.0, 2.0 * PI),
                 p_type:      ParticleType::Spark {
-                    x_vel:      rng.gen_range(-0.30, 0.30),
+                    x_vel:      rng.gen_range(-0.3, 0.3),
                     y_vel:      rng.gen_range(0.0, 0.2),
                     size:       rng.gen_range(1.0, 3.0),
                     angle_vel:  rng.gen_range(0.0, 1.0),

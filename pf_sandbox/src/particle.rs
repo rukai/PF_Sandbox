@@ -33,10 +33,7 @@ impl Particle {
                 self.y += y_vel;
                 self.angle += angle_vel;
             }
-            ParticleType::AirJump => {
-            }
-            ParticleType::Hit { .. } => {
-            }
+            _ => { }
         }
         self.counter > self.counter_max
     }
