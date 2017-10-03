@@ -536,17 +536,24 @@ impl<'a> VulkanGraphics<'a> {
 
                     // draw particles {
                     let triangle_buffers = Buffers::new_triangle(self.device.clone());
+                    let jump_buffers = Buffers::new_circle(self.device.clone());
                     for particle in &player.particles {
                         match &particle.p_type {
                             &ParticleType::Spark { size, .. }=> {
                                 let rotate = Matrix4::from_angle_z(Rad(particle.angle));
-                                let size = size * (1.0 - (particle.counter as f32) / 40.0);
+                                let size = size * (1.0 - particle.counter_mult());
                                 let size = Matrix4::from_nonuniform_scale(size, size, 1.0);
                                 let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, 0.0));
                                 let transformation = position * rotate * size;
                                 command_buffer = self.render_buffers(command_buffer, &render, triangle_buffers.clone(), &transformation, player.fighter_color.clone(), player.fighter_color.clone())
                             }
-                            &ParticleType::Jump => {
+                            &ParticleType::AirJump => {
+                                let size = Matrix4::from_nonuniform_scale(3.0 + particle.counter_mult(), 1.15 + particle.counter_mult(), 1.0);
+                                let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, 0.0));
+                                let transformation = position * size;
+                                let c = player.fighter_color.clone();
+                                let color = [c[0], c[1], c[2], (1.0 - particle.counter_mult()) * 0.7];
+                                command_buffer = self.render_buffers(command_buffer, &render, jump_buffers.clone(), &transformation, color, color)
                             }
                             &ParticleType::Hit { .. } => {
                             }

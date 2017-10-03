@@ -438,9 +438,9 @@ impl Player {
         let x = input[0].stick_x;
         let y = input[0].stick_y;
 
-        let di_angle = y.atan2(x);                                                      // -pi  <= di_angle     <= pi
-        let pos_di_angle = di_angle + if di_angle < 0.0 { PI * 2.0 } else { 0.0 };      // 0    <= pos_di_angle <= 2pi
-        let angle_diff = angle - pos_di_angle;                                          // -2pi <= angle_diff   <= 2pi
+        let di_angle = y.atan2(x);                                                 // -pi  <= di_angle     <= pi
+        let pos_di_angle = di_angle + if di_angle < 0.0 { PI * 2.0 } else { 0.0 }; // 0    <= pos_di_angle <= 2pi
+        let angle_diff = angle - pos_di_angle;                                     // -2pi <= angle_diff   <= 2pi
 
         let offset_distance = (angle_diff).sin() * (x * x + y * y).sqrt();                 // -1     <= offset_distance <= 1
         let offset = offset_distance.signum() * offset_distance * offset_distance * range; // -range <= offset          <= range
@@ -513,7 +513,7 @@ impl Player {
                 Action::Dair       | Action::Uair |
                 Action::Nair       | Action::JumpAerialB |
                 Action::DamageFall
-                => self.aerial_action(input, fighter),
+                => self.aerial_action(input, players, fighters, platforms),
 
                 Action::Jab       | Action::Jab2 |
                 Action::Jab3      | Action::Utilt |
@@ -684,13 +684,15 @@ impl Player {
         }
     }
 
-    fn aerial_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+    fn aerial_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let fighter = &fighters[self.fighter.as_ref()];
         if self.interruptible(fighter) {
             if self.check_attacks_aerial(input) { }
             else if input.b.press {
                 // special attack
             }
             else if self.jump_input(input).jump() && self.air_jumps_left > 0 {
+                self.air_jump_particles(players, fighters, platforms);
                 self.air_jumps_left -= 1;
                 self.y_vel = fighter.air_jump_y_vel;
                 self.x_vel = fighter.air_jump_x_vel * input[0].stick_x;
@@ -2099,6 +2101,18 @@ impl Player {
         result
     }
 
+    pub fn air_jump_particles(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let (x, y) = self.bps_xy(players, fighters, platforms);
+        self.particles.push(Particle {
+            counter:     0,
+            counter_max: 40,
+            x:           x,
+            y:           y,
+            angle:       0.0,
+            p_type:      ParticleType::AirJump
+        });
+    }
+
     pub fn land_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let num = match self.frame {
             1 => 1,
@@ -2114,13 +2128,14 @@ impl Player {
 
         for _ in 0..num {
             self.particles.push(Particle {
-                counter: 0,
-                x:       x,
-                y:       y,
-                angle:   rng.gen_range(0.0, 2.0 * PI),
-                p_type:  ParticleType::Spark {
-                    x_vel:      rng.gen_range(-0.3, 0.3),
-                    y_vel:      rng.gen_range(-0.3, 0.3),
+                counter:     0,
+                counter_max: 40,
+                x:           x,
+                y:           y,
+                angle:       rng.gen_range(0.0, 2.0 * PI),
+                p_type:      ParticleType::Spark {
+                    x_vel:      rng.gen_range(-0.30, 0.30),
+                    y_vel:      rng.gen_range(0.0, 0.2),
                     size:       rng.gen_range(1.0, 3.0),
                     angle_vel:  rng.gen_range(0.0, 1.0),
                     background: rng.gen_weighted_bool(2),
@@ -2145,13 +2160,14 @@ impl Player {
 
         for _ in 0..num {
             self.particles.push(Particle {
-                counter: 0,
-                x:       x + x_offset,
-                y:       y,
-                angle:   rng.gen_range(0.0, 2.0 * PI),
-                p_type:  ParticleType::Spark {
+                counter:     0,
+                counter_max: 40,
+                x:           x + x_offset,
+                y:           y,
+                angle:       rng.gen_range(0.0, 2.0 * PI),
+                p_type:      ParticleType::Spark {
                     x_vel:      if self.face_right { rng.gen_range(-0.3, 0.0) }  else { rng.gen_range(0.0, 0.3) },
-                    y_vel:      rng.gen_range(-0.3, 0.3),
+                    y_vel:      rng.gen_range(0.0, 0.3),
                     size:       rng.gen_range(1.0, 3.0),
                     angle_vel:  rng.gen_range(0.0, 1.0),
                     background: rng.gen_weighted_bool(2),

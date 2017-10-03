@@ -37,6 +37,29 @@ pub struct Buffers {
 }
 
 impl Buffers {
+    /// Creates a single tringle with radius 1 around the origin
+    pub fn new_circle(device: Arc<Device>) -> Buffers {
+        let mut vertices: Vec<Vertex> = vec!();
+        let mut indices: Vec<u16> = vec!();
+
+        let iterations = 40;
+
+        vertices.push(Vertex { position: [0.0, 0.0], edge: 0.0, render_id: 0.0});
+        for i in 0..iterations {
+            let angle = i as f32 * 2.0 * consts::PI / (iterations as f32);
+            let (sin, cos) = angle.sin_cos();
+            vertices.push(Vertex { position: [cos, sin], edge: 1.0, render_id: 0.0});
+            indices.push(0);
+            indices.push((i + 1));
+            indices.push((i + 1) % iterations + 1);
+        }
+
+        Buffers {
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+        }
+    }
+
     /// Creates a single tringle with sides of length 1
     pub fn new_triangle(device: Arc<Device>) -> Buffers {
         let h = ((3.0/4.0) as f32).sqrt();
