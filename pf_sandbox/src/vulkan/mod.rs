@@ -28,6 +28,7 @@ use vulkano::image::SwapchainImage;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::instance::{Instance, PhysicalDevice, PhysicalDeviceType};
 use vulkano::pipeline::GraphicsPipeline;
+use vulkano::pipeline::blend::LogicOp;
 use vulkano::pipeline::depth_stencil::{DepthStencil, DepthBounds, Compare};
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
@@ -69,7 +70,10 @@ pub struct VulkanGraphics<'a> {
     future:              Box<GpuFuture>,
     swapchain:           Arc<Swapchain>,
     queue:               Arc<Queue>,
+    vs:                  vs::Shader,
+    fs:                  fs::Shader,
     pipeline:            Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+    pipeline_invert:     Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
     render_pass:         Arc<RenderPassAbstract + Send + Sync>,
     framebuffers:        Vec<Arc<FramebufferAbstract + Send + Sync>>,
     uniform_buffer_pool: CpuBufferPool<vs::ty::Data>,
@@ -131,6 +135,9 @@ impl<'a> VulkanGraphics<'a> {
             Device::new(physical, physical.supported_features(), &device_ext, [(queue, 0.5)].iter().cloned()).unwrap()
         };
 
+        let vs = vs::Shader::load(device.clone()).unwrap();
+        let fs = fs::Shader::load(device.clone()).unwrap();
+
         let future = Box::new(vulkano::sync::now(device.clone())) as Box<GpuFuture>;
 
         let queue = queues.next().unwrap();
@@ -145,40 +152,45 @@ impl<'a> VulkanGraphics<'a> {
             ).unwrap()
         };
 
-
-        let (render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(device.clone(), swapchain.clone(), &images);
+        let (render_pass, pipeline, pipeline_invert, framebuffers) = VulkanGraphics::pipeline(&vs, &fs, device.clone(), swapchain.clone(), &images);
 
         let draw_text = DrawText::new(device.clone(), queue.clone(), swapchain.clone(), &images);
         let uniform_buffer_pool = CpuBufferPool::<vs::ty::Data>::new(device.clone(), BufferUsage::all());
 
         VulkanGraphics {
-            package_buffers:     PackageBuffers::new(),
-            window:              window,
-            events_loop:         events_loop,
-            device:              device,
-            future:              future,
-            swapchain:           swapchain,
-            queue:               queue,
-            pipeline:            pipeline,
-            render_pass:         render_pass,
-            framebuffers:        framebuffers,
-            uniform_buffer_pool: uniform_buffer_pool,
-            draw_text:           draw_text,
-            os_input_tx:         os_input_tx,
-            render_rx:           render_rx,
-            frame_durations:     vec!(),
-            fps:                 String::new(),
-            width:               0,
-            height:              0,
+            window,
+            events_loop,
+            device,
+            future,
+            swapchain,
+            queue,
+            vs,
+            fs,
+            pipeline,
+            pipeline_invert,
+            render_pass,
+            framebuffers,
+            uniform_buffer_pool,
+            draw_text,
+            os_input_tx,
+            render_rx,
+            package_buffers: PackageBuffers::new(),
+            frame_durations: vec!(),
+            fps:             String::new(),
+            width:           0,
+            height:          0,
         }
     }
 
     fn pipeline(
+        vs: &vs::Shader,
+        fs: &fs::Shader,
         device: Arc<Device>,
         swapchain: Arc<Swapchain>,
         images: &[Arc<SwapchainImage>]
     ) -> (
         Arc<RenderPassAbstract + Send + Sync>,
+        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
         Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
         Vec<Arc<FramebufferAbstract + Send + Sync>>
     ) {
@@ -203,7 +215,8 @@ impl<'a> VulkanGraphics<'a> {
             }
         ).unwrap()) as Arc<RenderPassAbstract + Send + Sync>;
 
-        let depthbuffer = AttachmentImage::transient(device.clone(), images[0].dimensions(), Format::D16Unorm).unwrap();
+        let dimensions = images[0].dimensions();
+        let depthbuffer = AttachmentImage::transient(device.clone(), dimensions, Format::D16Unorm).unwrap();
         let framebuffers = images.iter().map(|image| {
             Arc::new(
                 Framebuffer::start(render_pass.clone())
@@ -213,20 +226,30 @@ impl<'a> VulkanGraphics<'a> {
             ) as Arc<FramebufferAbstract + Send + Sync>
         }).collect::<Vec<_>>();
 
-        let vs = vs::Shader::load(device.clone()).unwrap();
-        let fs = fs::Shader::load(device.clone()).unwrap();
+        let dimensions = [dimensions[0] as f32, dimensions[1] as f32];
+        let pipeline        = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, false);
+        let pipeline_invert = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, true);
 
-        let pipeline = Arc::new(GraphicsPipeline::start()
+        (render_pass, pipeline, pipeline_invert, framebuffers)
+    }
+
+    fn pipeline_base(
+        vs: &vs::Shader,
+        fs: &fs::Shader,
+        device: Arc<Device>,
+        render_pass: Arc<RenderPassAbstract + Send + Sync>,
+        dimensions: [f32; 2],
+        invert: bool)
+        -> Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>
+    {
+        let builder = GraphicsPipeline::start()
             .vertex_input_single_buffer()
             .vertex_shader(vs.main_entry_point(), ())
             .triangle_list()
             .viewports(iter::once(Viewport {
                 origin:      [0.0, 0.0],
                 depth_range: 0.0..1.0,
-                dimensions:  [
-                    images[0].dimensions()[0] as f32,
-                    images[0].dimensions()[1] as f32
-                ],
+                dimensions
             }))
             .fragment_shader(fs.main_entry_point(), ())
             .blend_alpha_blending()
@@ -237,12 +260,15 @@ impl<'a> VulkanGraphics<'a> {
                 stencil_front:     Default::default(),
                 stencil_back:      Default::default(),
             })
-            .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
-            .build(device.clone())
-            .unwrap()
-        );
+            .render_pass(Subpass::from(render_pass.clone(), 0).unwrap());
 
-        (render_pass, pipeline, framebuffers)
+        let builder = if invert{
+            builder.blend_logic_op(LogicOp::Invert)
+        } else {
+            builder
+        };
+
+        Arc::new(builder.build(device.clone()).unwrap())
     }
 
     fn new_uniform_set(&self, uniform: vs::ty::Data) -> Arc<DescriptorSet + Send + Sync> {
@@ -314,9 +340,10 @@ impl<'a> VulkanGraphics<'a> {
                 self.height = height;
                 self.swapchain = new_swapchain.clone();
 
-                let (render_pass, pipeline, framebuffers) = VulkanGraphics::pipeline(self.device.clone(), new_swapchain, &new_images);
+                let (render_pass, pipeline, pipeline_invert, framebuffers) = VulkanGraphics::pipeline(&self.vs, &self.fs, self.device.clone(), new_swapchain, &new_images);
                 self.render_pass = render_pass;
                 self.pipeline = pipeline;
+                self.pipeline_invert = pipeline_invert;
                 self.framebuffers = framebuffers;
 
                 self.draw_text = DrawText::new(self.device.clone(), self.queue.clone(), self.swapchain.clone(), &new_images);
@@ -337,7 +364,7 @@ impl<'a> VulkanGraphics<'a> {
             Err(err) => { panic!("{:?}", err) }
         };
 
-        let mut command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
+        let command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
         .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), 1f32.into()]).unwrap();
 
         let final_command_buffer = match render.render_type {
@@ -421,6 +448,7 @@ impl<'a> VulkanGraphics<'a> {
 
     fn render_buffers(
         &self,
+        pipeline:       Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
         command_buffer: AutoCommandBufferBuilder,
         render:         &RenderGame,
         buffers:        Buffers,
@@ -437,8 +465,13 @@ impl<'a> VulkanGraphics<'a> {
             color,
             transformation:  transformation.into(),
         };
-        let set = self.new_uniform_set(uniform);
-        command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
+        let uniform_buffer = self.uniform_buffer_pool.next(uniform).unwrap();
+        let set = Arc::new(
+            PersistentDescriptorSet::start(pipeline.clone(), 0)
+            .add_buffer(uniform_buffer).unwrap()
+            .build().unwrap()
+        );
+        command_buffer.draw_indexed(pipeline, DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
     }
 
     fn game_render(&mut self, render: RenderGame, mut command_buffer: AutoCommandBufferBuilder, command_output: &[String]) -> AutoCommandBufferBuilder {
@@ -471,7 +504,7 @@ impl<'a> VulkanGraphics<'a> {
         if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
             let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
             let color = [1.0, 1.0, 1.0, 1.0];
-            command_buffer = self.render_buffers(command_buffer, &render, buffers.clone(), &transformation, color, color);
+            command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, color, color);
         }
 
         for (i, entity) in render.entities.iter().enumerate() {
@@ -496,7 +529,7 @@ impl<'a> VulkanGraphics<'a> {
                         };
                         let transformation = position * dir;
 
-                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, edge_color, color);
+                        command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, edge_color, color);
                     }
 
                     // draw fighter
@@ -518,7 +551,7 @@ impl<'a> VulkanGraphics<'a> {
                             let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
                             if player.frame < fighter_frames.len() {
                                 if let &Some(ref buffers) = &fighter_frames[player.frame] {
-                                    command_buffer = self.render_buffers(command_buffer, &render, buffers.clone(), &transformation, edge_color, color);
+                                    command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, edge_color, color);
                                 }
                             }
                             else {
@@ -538,7 +571,7 @@ impl<'a> VulkanGraphics<'a> {
                         } else {
                             shield.color
                         };
-                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &position, shield.color, color);
+                        command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &position, shield.color, color);
                     }
 
                     // draw selected hitboxes
@@ -546,7 +579,7 @@ impl<'a> VulkanGraphics<'a> {
                         let color = [0.0, 1.0, 0.0, 1.0];
                         let transformation = position * dir;
                         let buffers = self.package_buffers.fighter_frame_colboxes(self.device.clone(), &player.fighter, player.action, player.frame, &player.selected_colboxes);
-                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, color, color);
+                        command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, color, color);
                     }
 
                     // draw debug vector arrows
@@ -557,7 +590,7 @@ impl<'a> VulkanGraphics<'a> {
                         let rotate = Matrix4::from_angle_z(Rad(arrow.y.atan2(arrow.x) - f32::consts::PI / 2.0));
                         let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, z_debug));
                         let transformation = position * rotate * squish;
-                        command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, arrow.color.clone(), arrow.color.clone())
+                        command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, arrow.color.clone(), arrow.color.clone())
                     }
 
                     // draw particles
@@ -575,7 +608,7 @@ impl<'a> VulkanGraphics<'a> {
                                     if background { z_particle_bg } else { z_particle_fg }
                                 ));
                                 let transformation = position * rotate * size;
-                                command_buffer = self.render_buffers(command_buffer, &render, triangle_buffers.clone(), &transformation, player.fighter_color.clone(), player.fighter_color.clone())
+                                command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, triangle_buffers.clone(), &transformation, player.fighter_color.clone(), player.fighter_color.clone())
                             }
                             &ParticleType::AirJump => {
                                 let size = Matrix4::from_nonuniform_scale(3.0 + particle.counter_mult(), 1.15 + particle.counter_mult(), 1.0);
@@ -583,16 +616,16 @@ impl<'a> VulkanGraphics<'a> {
                                 let transformation = position * size;
                                 let c = player.fighter_color.clone();
                                 let color = [c[0], c[1], c[2], (1.0 - particle.counter_mult()) * 0.7];
-                                command_buffer = self.render_buffers(command_buffer, &render, jump_buffers.clone(), &transformation, color, color)
+                                command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, jump_buffers.clone(), &transformation, color, color)
                             }
                             &ParticleType::Hit { knockback, damage } => {
                                 // needs to rendered last to ensure we dont have anything drawn on top of the inversion
-                                let size = Matrix4::from_nonuniform_scale(0.1 * knockback, 0.05 * damage, 1.0);
+                                let size = Matrix4::from_nonuniform_scale(0.2 * knockback, 0.08 * damage, 1.0);
                                 let rotate = Matrix4::from_angle_z(Rad(particle.angle - f32::consts::PI / 2.0));
                                 let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, z_particle_fg));
                                 let transformation = position * rotate * size;
-                                let color = [0.5, 0.5, 0.5, 1.5]; // TODO: invert magic
-                                command_buffer = self.render_buffers(command_buffer, &render, jump_buffers.clone(), &transformation, color, color)
+                                let color = [0.5, 0.5, 0.5, 1.5];
+                                command_buffer = self.render_buffers(self.pipeline_invert.clone(), command_buffer, &render, jump_buffers.clone(), &transformation, color, color)
                             }
                         }
                     }
@@ -606,7 +639,7 @@ impl<'a> VulkanGraphics<'a> {
                     let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.0));
                     let color = [0.0, 1.0, 0.0, 1.0];
                     let buffers = Buffers::rect_outline_buffers(self.device.clone(), rect);
-                    command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, color, color);
+                    command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, color, color);
                 },
             }
         }
