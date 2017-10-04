@@ -1,6 +1,6 @@
 use winit::{WindowBuilder, EventsLoop};
 
-use vulkano_text::{DrawText, DrawTextTrait, UpdateTextCache};
+use vulkano_text::{DrawText, DrawTextTrait};
 
 use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
@@ -162,10 +162,9 @@ impl<'a> Graphics<'a> {
         self.draw_text.queue_text(100.0, 360.0, 20.0, [1.0, 1.0, 1.0, 1.0], &format!("Dpad Up: {:?}", controller.up));
 
         let command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
-            .update_text_cache(&mut self.draw_text)
             .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into()]).unwrap()
-            .draw_text(&mut self.draw_text, self.width, self.height)
             .end_render_pass().unwrap()
+            .draw_text(&mut self.draw_text, image_num)
             .build().unwrap();
 
         let mut old_future = Box::new(vulkano::sync::now(self.device.clone())) as Box<GpuFuture>; // TODO: Can I avoid making this dummy future?
