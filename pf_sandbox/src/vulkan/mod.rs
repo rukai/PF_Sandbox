@@ -16,16 +16,19 @@ use rand::{StdRng, Rng, SeedableRng};
 use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
 use vulkano;
-use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::buffer::BufferUsage;
+use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder};
 use vulkano::descriptor::descriptor_set::{PersistentDescriptorSet, DescriptorSet};
 use vulkano::descriptor::pipeline_layout::PipelineLayoutAbstract;
 use vulkano::device::{Device, Queue};
+use vulkano::format::Format;
 use vulkano::framebuffer::{Framebuffer, FramebufferAbstract, Subpass, RenderPassAbstract};
 use vulkano::image::SwapchainImage;
+use vulkano::image::attachment::AttachmentImage;
 use vulkano::instance::{Instance, PhysicalDevice, PhysicalDeviceType};
 use vulkano::pipeline::GraphicsPipeline;
+use vulkano::pipeline::depth_stencil::{DepthStencil, DepthBounds, Compare};
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
@@ -186,18 +189,26 @@ impl<'a> VulkanGraphics<'a> {
                     store:   Store,
                     format:  swapchain.format(),
                     samples: 1,
+                },
+                depth: {
+                    load:    Clear,
+                    store:   DontCare,
+                    format:  Format::D16Unorm,
+                    samples: 1,
                 }
             },
             pass: {
                 color: [color],
-                depth_stencil: {}
+                depth_stencil: {depth}
             }
         ).unwrap()) as Arc<RenderPassAbstract + Send + Sync>;
 
+        let depthbuffer = AttachmentImage::transient(device.clone(), images[0].dimensions(), Format::D16Unorm).unwrap();
         let framebuffers = images.iter().map(|image| {
             Arc::new(
                 Framebuffer::start(render_pass.clone())
                 .add(image.clone()).unwrap()
+                .add(depthbuffer.clone()).unwrap()
                 .build().unwrap()
             ) as Arc<FramebufferAbstract + Send + Sync>
         }).collect::<Vec<_>>();
@@ -219,6 +230,13 @@ impl<'a> VulkanGraphics<'a> {
             }))
             .fragment_shader(fs.main_entry_point(), ())
             .blend_alpha_blending()
+            .depth_stencil(DepthStencil {
+                depth_write:       true,
+                depth_compare:     Compare::LessOrEqual,
+                depth_bounds_test: DepthBounds::Disabled,
+                stencil_front:     Default::default(),
+                stencil_back:      Default::default(),
+            })
             .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
             .build(device.clone())
             .unwrap()
@@ -448,16 +466,22 @@ impl<'a> VulkanGraphics<'a> {
 
         let stage: &str = render.stage.as_ref();
         if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
+            //let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
             let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.0));
             let color = [1.0, 1.0, 1.0, 1.0];
             command_buffer = self.render_buffers(command_buffer, &render, buffers.clone(), &transformation, color, color);
         }
 
-        for entity in &render.entities {
+        for (i, entity) in render.entities.iter().enumerate() {
+            let z_debug       = 0.1 - i as f32 * 0.00001;
+            let z_particle_fg = 0.2 - i as f32 * 0.00001;
+            let z_shield      = 0.4 - i as f32 * 0.00001;
+            let z_player      = 0.5 - i as f32 * 0.00001;
+            let z_particle_bg = 0.8 - i as f32 * 0.00001;
             match entity {
                 &RenderEntity::Player(ref player) => {
                     let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
-                    let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, 0.0));
+                    let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, z_player));
 
                     // draw player ecb
                     if player.debug.ecb {
@@ -504,7 +528,7 @@ impl<'a> VulkanGraphics<'a> {
 
                     // draw shield
                     if let &Some(ref shield) = &player.shield {
-                        let position = Matrix4::from_translation(Vector3::new(shield.pos.0 + pan.0, shield.pos.1 + pan.1, 0.0));
+                        let position = Matrix4::from_translation(Vector3::new(shield.pos.0 + pan.0, shield.pos.1 + pan.1, z_shield));
                         let buffers = Buffers::new_shield(self.device.clone(), shield);
                         let color = if shield.distort > 0 {
                             let c = shield.color;
@@ -529,37 +553,41 @@ impl<'a> VulkanGraphics<'a> {
                         let buffers = Buffers::new_arrow(self.device.clone());
                         let squish = Matrix4::from_nonuniform_scale((num_arrows - i as f32) / num_arrows, 1.0, 1.0); // consecutive arrows are drawn slightly thinner so we can see arrows behind
                         let rotate = Matrix4::from_angle_z(Rad(arrow.y.atan2(arrow.x) - f32::consts::PI / 2.0));
-                        let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, 0.0));
+                        let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, z_debug));
                         let transformation = position * rotate * squish;
                         command_buffer = self.render_buffers(command_buffer, &render, buffers, &transformation, arrow.color.clone(), arrow.color.clone())
                     }
 
-                    // TODO: use depth buffer to handle particle.background
                     // draw particles
                     let triangle_buffers = Buffers::new_triangle(self.device.clone());
                     let jump_buffers = Buffers::new_circle(self.device.clone());
                     for particle in &player.particles {
                         match &particle.p_type {
-                            &ParticleType::Spark { size, .. } => {
+                            &ParticleType::Spark { size, background, .. } => {
                                 let rotate = Matrix4::from_angle_z(Rad(particle.angle));
                                 let size = size * (1.0 - particle.counter_mult());
                                 let size = Matrix4::from_nonuniform_scale(size, size, 1.0);
-                                let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, 0.0));
+                                let position = Matrix4::from_translation(Vector3::new(
+                                    particle.x + pan.0,
+                                    particle.y + pan.1,
+                                    if background { z_particle_bg } else { z_particle_fg }
+                                ));
                                 let transformation = position * rotate * size;
                                 command_buffer = self.render_buffers(command_buffer, &render, triangle_buffers.clone(), &transformation, player.fighter_color.clone(), player.fighter_color.clone())
                             }
                             &ParticleType::AirJump => {
                                 let size = Matrix4::from_nonuniform_scale(3.0 + particle.counter_mult(), 1.15 + particle.counter_mult(), 1.0);
-                                let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, 0.0));
+                                let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, z_particle_bg));
                                 let transformation = position * size;
                                 let c = player.fighter_color.clone();
                                 let color = [c[0], c[1], c[2], (1.0 - particle.counter_mult()) * 0.7];
                                 command_buffer = self.render_buffers(command_buffer, &render, jump_buffers.clone(), &transformation, color, color)
                             }
                             &ParticleType::Hit { knockback, damage } => {
+                                // needs to rendered last to ensure we dont have anything drawn on top of the inversion
                                 let size = Matrix4::from_nonuniform_scale(0.1 * knockback, 0.05 * damage, 1.0);
                                 let rotate = Matrix4::from_angle_z(Rad(particle.angle - f32::consts::PI / 2.0));
-                                let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, 0.0));
+                                let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, z_particle_fg));
                                 let transformation = position * rotate * size;
                                 let color = [0.5, 0.5, 0.5, 1.5]; // TODO: invert magic
                                 command_buffer = self.render_buffers(command_buffer, &render, jump_buffers.clone(), &transformation, color, color)
@@ -581,7 +609,7 @@ impl<'a> VulkanGraphics<'a> {
             }
         }
         command_buffer
-        .draw_text(&mut self.draw_text, self.width, self.height)
+        //.draw_text(&mut self.draw_text, self.width, self.height)
         .end_render_pass().unwrap()
     }
 
@@ -697,7 +725,7 @@ impl<'a> VulkanGraphics<'a> {
         }
 
         command_buffer
-        .draw_text(&mut self.draw_text, self.width, self.height)
+        //.draw_text(&mut self.draw_text, self.width, self.height)
         .end_render_pass().unwrap()
     }
 
