@@ -195,6 +195,7 @@ pub struct ActionFrame {
     pub grab_hold_y:    f32,
     pub pass_through:   bool, // only used on aerial actions
     pub ledge_cancel:   bool, // only used on ground actions
+    // TODO: pub land_cancel: bool // only used on aerial attacks
     pub ledge_grab_box: Option<LedgeGrabBox>,
     pub force_hitlist_reset: bool,
 }
@@ -654,15 +655,16 @@ impl Default for HurtBox {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub struct HitBox {
-    pub shield_damage:  f32,
-    pub damage:         f32,
-    pub bkb:            f32, // base knockback
-    pub kbg:            f32, // knockback growth = old value / 100
-    pub angle:          f32,
-    pub hitstun:        HitStun,
-    pub enable_clang:   bool,
-    pub enable_rebound: bool,
-    pub effect:         HitboxEffect,
+    pub shield_damage:     f32,
+    pub damage:            f32,
+    pub bkb:               f32, // base knockback
+    pub kbg:               f32, // knockback growth = old value / 100
+    pub angle:             f32,
+    pub hitstun:           HitStun,
+    pub enable_clang:      bool,
+    pub enable_rebound:    bool,
+    pub effect:            HitboxEffect,
+    //pub team_funnel_angle: Option<f32>, // degrees to +- towards nearest teammate
 }
 
 impl Default for HitBox {

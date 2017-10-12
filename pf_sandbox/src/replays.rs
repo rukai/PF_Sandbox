@@ -6,7 +6,7 @@ use std::cmp::Ordering;
 use chrono::{Local, DateTime};
 
 use player::Player;
-use game::Game;
+use game::{Game, PlayerSetup};
 use input::{Input, ControllerInput};
 use package::Package;
 use stage::Stage;
@@ -84,13 +84,18 @@ pub struct Replay {
     pub player_history:       Vec<Vec<Player>>,
     pub stage_history:        Vec<Stage>,
     pub selected_controllers: Vec<usize>,
-    pub selected_fighters:    Vec<String>,
+    pub selected_players:     Vec<PlayerSetup>,
     pub selected_ais:         Vec<usize>,
     pub selected_stage:       String,
 }
 
 impl Replay {
     pub fn new(game: &Game, input: &Input) -> Replay {
+        let selected_players = game.players.iter().map(|x| PlayerSetup {
+            fighter: x.fighter.clone(),
+            team:    x.team,
+        }).collect();
+
         Replay {
             init_seed:            game.init_seed.clone(),
             timestamp:            Local::now(),
@@ -98,9 +103,9 @@ impl Replay {
             player_history:       game.player_history.clone(),
             stage_history:        game.stage_history.clone(),
             selected_controllers: game.selected_controllers.clone(),
-            selected_fighters:    game.players.iter().map(|x| x.fighter.clone()).collect(),
             selected_ais:         game.selected_ais.clone(),
             selected_stage:       game.selected_stage.clone(),
+            selected_players
         }
     }
 }

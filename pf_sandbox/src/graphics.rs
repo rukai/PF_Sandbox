@@ -32,7 +32,7 @@ pub fn get_render_id(role: &CollisionBoxRole) -> f32 {
     }
 }
 
-pub fn get_controller_color(i: usize) -> [f32; 4] {
+pub fn get_team_color(i: usize) -> [f32; 4] {
     let colors: Vec<[f32; 3]> = vec!(
         [0.0,   90.0,  224.0], // orange
         [239.0, 100.0, 0.0],   // blue

@@ -1,5 +1,6 @@
 use ::collision::CollisionResult;
 use ::fighter::*;
+use ::graphics;
 use ::input::{PlayerInput};
 use ::math;
 use ::package::Package;
@@ -19,6 +20,7 @@ use enum_traits::{FromIndex, ToIndex};
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Player {
     pub fighter:            String,
+    pub team:               usize,
     pub action:             u64, // always change through self.set_action
     pub frame:              u64,
     pub frame_norestart:    u64, // Used to keep track of total frames passed on states that loop
@@ -129,9 +131,10 @@ impl Hitlag {
 }
 
 impl Player {
-    pub fn new(fighter: String, spawn: SpawnPoint, respawn: SpawnPoint, package: &Package) -> Player {
+    pub fn new(fighter: String, team: usize, spawn: SpawnPoint, respawn: SpawnPoint, package: &Package) -> Player {
         Player {
             action:             Action::DummyFramePreStart.index(),
+            team:               team,
             frame:              0,
             frame_norestart:    0,
             stocks:             package.rules.stock_count,
@@ -2033,7 +2036,8 @@ impl Player {
         lines
     }
 
-    pub fn render(&self, fighter_color: [f32; 4], selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> RenderPlayer {
+    pub fn render(&self, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> RenderPlayer {
+        let fighter_color = graphics::get_team_color(self.team);
         let fighter = &fighters[self.fighter.as_ref()];
         let mut vector_arrows = vec!();
         if debug.stick_vector {
@@ -2085,22 +2089,23 @@ impl Player {
         } else { None };
 
         RenderPlayer {
-            debug:             debug,
-            damage:            self.damage,
-            stocks:            self.stocks,
-            bps:               self.bps_xy(players, fighters, platforms),
-            ecb:               self.ecb.clone(),
-            frame:             self.frame as usize,
-            action:            self.action as usize,
-            fighter:           self.fighter.clone(),
-            face_right:        self.face_right,
-            fighter_color:     fighter_color,
-            fighter_selected:  fighter_selected,
-            player_selected:   player_selected,
-            selected_colboxes: selected_colboxes,
-            shield:            shield,
-            vector_arrows:     vector_arrows,
-            particles:         self.particles.clone(),
+            team:       self.team,
+            damage:     self.damage,
+            stocks:     self.stocks,
+            bps:        self.bps_xy(players, fighters, platforms),
+            ecb:        self.ecb.clone(),
+            frame:      self.frame as usize,
+            action:     self.action as usize,
+            fighter:    self.fighter.clone(),
+            face_right: self.face_right,
+            particles:  self.particles.clone(),
+            debug,
+            fighter_color,
+            fighter_selected,
+            player_selected,
+            selected_colboxes,
+            shield,
+            vector_arrows,
         }
     }
 
@@ -2108,6 +2113,7 @@ impl Player {
         let mut result = self.result.clone();
         result.final_damage = Some(self.damage);
         result.ended_as_fighter = Some(self.fighter.clone());
+        result.team = self.team;
         result
     }
 
@@ -2246,6 +2252,7 @@ impl JumpResult {
 }
 
 pub struct RenderPlayer {
+    pub team:              usize,
     pub debug:             DebugPlayer,
     pub damage:            f32,
     pub stocks:            Option<u64>,

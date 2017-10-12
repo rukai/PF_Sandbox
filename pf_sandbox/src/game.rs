@@ -4,17 +4,16 @@ use ::command_line::CommandLine;
 use ::config::Config;
 use ::fighter::{ActionFrame, CollisionBox, LinkType, Action};
 use ::graphics::{GraphicsMessage, Render, RenderType, RenderRect};
-use ::graphics;
 use ::input::{Input, PlayerInput, ControllerInput};
+use ::menu::ResumeMenu;
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
-use ::results::{GameResults, RawPlayerResult, PlayerResult};
 use ::replays::Replay;
 use ::replays;
+use ::results::{GameResults, RawPlayerResult, PlayerResult};
 use ::rules::Goal;
 use ::stage::{Area, Stage};
-use ::menu::ResumeMenu;
 
 use rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
@@ -71,11 +70,13 @@ impl Game {
         let mut players:       Vec<Player>      = vec!();
         let mut debug_players: Vec<DebugPlayer> = vec!();
         {
-            for (i, fighter) in setup.fighters.iter().enumerate() {
+            for (i, player) in setup.players.iter().enumerate() {
                 // Stage can have less spawn points then players
+                let fighter = player.fighter.clone();
+                let team = player.team;
                 let spawn = stage.spawn_points[i % stage.spawn_points.len()].clone();
                 let respawn = stage.respawn_points[i % stage.respawn_points.len()].clone();
-                players.push(Player::new(fighter.clone(), spawn, respawn, &package));
+                players.push(Player::new(fighter, team, spawn, respawn, &package));
                 debug_players.push(Default::default());
             }
         }
@@ -718,6 +719,7 @@ impl Game {
 
     pub fn generate_game_results(&self, input: &Input) -> GameState {
         let raw_player_results: Vec<RawPlayerResult> = self.players.iter().map(|x| x.result()).collect();
+        // TODO: Players on the same team score to the same pool, and share their place.
         let places: Vec<usize> = match self.package.rules.goal {
             Goal::LastManStanding => {
                 // most stocks remaining wins
@@ -785,6 +787,7 @@ impl Game {
             };
             player_results.push(PlayerResult {
                 fighter:         raw_player_result.ended_as_fighter.clone().unwrap(),
+                team:            raw_player_result.team,
                 controller:      self.selected_controllers[i],
                 place:           places[i],
                 kills:           vec!(), // TODO
@@ -868,10 +871,9 @@ impl Game {
                 entities.push(RenderEntity::Area(area_to_render(cam_area)));
             }
 
-            let color = graphics::get_controller_color(self.selected_controllers[i]);
             let fighters = &self.package.fighters;
             let platforms = &self.stage.platforms;
-            let player_render = player.render(color, selected_colboxes, fighter_selected, player_selected, debug, &self.players, fighters, platforms);
+            let player_render = player.render(selected_colboxes, fighter_selected, player_selected, debug, &self.players, fighters, platforms);
             entities.push(RenderEntity::Player(player_render));
         }
 
@@ -1022,10 +1024,16 @@ pub struct GameSetup {
     pub player_history: Vec<Vec<Player>>,
     pub stage_history:  Vec<Stage>,
     pub controllers:    Vec<usize>,
-    pub fighters:       Vec<String>,
+    pub players :       Vec<PlayerSetup>,
     pub ais:            Vec<usize>,
     pub stage:          String,
     pub state:          GameState,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct PlayerSetup {
+    pub fighter: String,
+    pub team:    usize,
 }
 
 impl GameSetup {

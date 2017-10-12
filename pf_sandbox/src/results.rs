@@ -23,6 +23,7 @@ impl Default for GameResults {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct PlayerResult {
     pub fighter:          String,
+    pub team:             usize,
     pub controller:       usize,
     pub place:            usize,
     pub kills:            Vec<DeathRecord>,
@@ -33,6 +34,7 @@ pub struct PlayerResult {
 /// An individual players results: unprocessed
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct RawPlayerResult {
+    pub team:             usize,
     pub deaths:           Vec<DeathRecord>,
     pub lcancel_attempts: u64,
     pub lcancel_success:  u64,

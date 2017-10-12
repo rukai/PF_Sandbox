@@ -1,6 +1,6 @@
 use ::command_line::CommandLine;
 use ::config::Config;
-use ::game::{GameSetup, GameState};
+use ::game::{GameSetup, GameState, PlayerSetup};
 use ::graphics::{GraphicsMessage, Render, RenderType};
 use ::input::{Input, PlayerInput};
 use ::package::{Package, PackageMeta, Verify};
@@ -141,7 +141,7 @@ impl Menu {
                             player_history: replay.player_history,
                             stage_history:  replay.stage_history,
                             controllers:    replay.selected_controllers,
-                            fighters:       replay.selected_fighters,
+                            players:        replay.selected_players,
                             ais:            replay.selected_ais,
                             stage:          replay.selected_stage,
                             state:          GameState::ReplayForwards,
@@ -171,11 +171,13 @@ impl Menu {
                 } else {
                     PlayerSelectUi::HumanUnplugged
                 };
+                let team = Menu::get_free_team(&self.fighter_selections);
                 self.fighter_selections.push(PlayerSelect {
                     controller: Some((i, MenuTicker::new(1))),
                     fighter:    None,
                     cpu_ai:     None,
                     ui:         ui,
+                    team
                 });
             }
         }
@@ -188,6 +190,34 @@ impl Menu {
         let mut new_state: Option<MenuState> = None;
         if let &mut MenuState::CharacterSelect { ref mut back_counter } = &mut self.state {
             let fighters = &self.package.get().fighters;
+
+            // plug/unplug humans
+            for (input_i, input) in player_inputs.iter().enumerate() {
+                let free_team = Menu::get_free_team(&self.fighter_selections);
+                if input.plugged_in {
+                    let selection = &mut self.fighter_selections[input_i];
+                    if let PlayerSelectUi::HumanUnplugged = selection.ui {
+                        selection.ui = PlayerSelectUi::human_fighter(self.package.get());
+                        selection.team = free_team;
+                        selection.controller = Some((input_i, MenuTicker::new(1)));
+                    }
+                }
+                else {
+                    if let PlayerSelectUi::HumanFighter (_) = self.fighter_selections[input_i].ui {
+                        self.fighter_selections[input_i].ui = PlayerSelectUi::HumanUnplugged;
+
+                        // Handle CPU's who are currently manipulated by the input
+                        for selection in &mut self.fighter_selections {
+                            if let Some((controller, _)) = selection.controller.clone() {
+                                if controller == input_i {
+                                    selection.controller = None
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             for (controller_i, ref input) in player_inputs.iter().enumerate() {
                 if !input.plugged_in {
                     continue;
@@ -258,11 +288,10 @@ impl Menu {
             // update selections
             let mut add_cpu = false;
             let mut remove_cpu: Option<usize> = None;
-            for (selection_i, ref mut selection) in self.fighter_selections.iter_mut().enumerate() {
+
+            for (selection_i, selection) in self.fighter_selections.iter_mut().enumerate() {
                 if let Some((controller, _)) = selection.controller {
                     let input = &player_inputs[controller];
-                    selection.update_plugged_in(input.plugged_in, self.package.get());
-
                     if input.b.press {
                         selection.fighter = None;
                     }
@@ -321,13 +350,16 @@ impl Menu {
                 self.fighter_selections[home_selection_i].controller = self.fighter_selections[selection_i].controller.clone();
                 self.fighter_selections.remove(selection_i);
             }
+
             if add_cpu {
                 if self.fighter_selections.iter().filter(|x| x.ui.is_visible()).count() < 4 {
+                    let team = Menu::get_free_team(&self.fighter_selections);
                     self.fighter_selections.push(PlayerSelect {
                         controller: None,
                         fighter:    None,
                         cpu_ai:     None,
                         ui:         PlayerSelectUi::cpu_fighter(self.package.get()),
+                        team
                     });
                 }
             }
@@ -354,6 +386,14 @@ impl Menu {
         if let Some(state) = new_state {
             self.state = state;
         }
+    }
+
+    fn get_free_team(selections: &[PlayerSelect]) -> usize {
+        let mut team = 0;
+        while selections.iter().any(|x| x.ui.is_visible() && x.team == team) {
+            team += 1;
+        }
+        team
     }
 
     fn step_stage_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
@@ -384,7 +424,7 @@ impl Menu {
     }
 
     pub fn game_setup(&mut self) {
-        let mut selected_fighters: Vec<String> = vec!();
+        let mut players: Vec<PlayerSetup> = vec!();
         let mut controllers: Vec<usize> = vec!();
         let mut ais: Vec<usize> = vec!();
         let mut ais_skipped = 0;
@@ -392,7 +432,10 @@ impl Menu {
             // add human players
             if let PlayerSelectUi::HumanFighter (_) = selection.ui {
                 if let Some(fighter) = selection.fighter {
-                    selected_fighters.push(self.package.get().fighters.index_to_key(fighter).unwrap());
+                    players.push(PlayerSetup {
+                        fighter: self.package.get().fighters.index_to_key(fighter).unwrap(),
+                        team:    selection.team,
+                    });
                     controllers.push(i);
                 }
             }
@@ -401,7 +444,10 @@ impl Menu {
             if selection.ui.is_cpu() {
                 if selection.fighter.is_some() /* && selection.cpu.is_some() TODO */ {
                     let fighter = selection.fighter.unwrap();
-                    selected_fighters.push(self.package.get().fighters.index_to_key(fighter).unwrap());
+                    players.push(PlayerSetup {
+                        fighter: self.package.get().fighters.index_to_key(fighter).unwrap(),
+                        team:    selection.team,
+                    });
                     controllers.push(i - ais_skipped);
                     ais.push(0); // TODO: delete this
                     // ais.push(selection.cpu_ai.unwrap()); TODO: add this
@@ -421,7 +467,7 @@ impl Menu {
             stage_history:  vec!(),
             controllers:    controllers,
             ais:            ais,
-            fighters:       selected_fighters,
+            players:        players,
             stage:          stage,
             state:          GameState::Local,
         });
@@ -751,23 +797,11 @@ pub struct PlayerSelect {
     pub controller: Option<(usize, MenuTicker)>, // the cursor of the ticker is ignored
     pub fighter:    Option<usize>,
     pub cpu_ai:     Option<usize>,
+    pub team:       usize,
     pub ui:         PlayerSelectUi,
 }
 
 impl PlayerSelect {
-    pub fn update_plugged_in(&mut self, plugged_in: bool, package: &Package) {
-        if plugged_in {
-            if let PlayerSelectUi::HumanUnplugged = self.ui {
-                self.ui = PlayerSelectUi::human_fighter(package);
-            }
-        }
-        else {
-            if let PlayerSelectUi::HumanFighter (_) = self.ui {
-                self.ui = PlayerSelectUi::HumanUnplugged;
-            }
-        }
-    }
-
     /// Returns true iff a controller can move to this selection
     pub fn is_free(&self) -> bool {
         self.ui.is_cpu() && self.controller.is_none()

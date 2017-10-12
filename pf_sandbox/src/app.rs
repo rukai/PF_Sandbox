@@ -14,7 +14,7 @@ use ::ai;
 use ::cli::{CLIResults, ContinueFrom};
 use ::command_line::CommandLine;
 use ::config::Config;
-use ::game::{Game, GameState, GameSetup};
+use ::game::{Game, GameState, GameSetup, PlayerSetup};
 use ::input::Input;
 use ::menu::{Menu, MenuState, ResumeMenu};
 use ::network::Network;
@@ -129,30 +129,37 @@ pub fn run(mut cli_results: CLIResults) {
                     cli_results.fighter_names.push(package.fighters.index_to_key(0).unwrap());
                 }
 
-                // fill fighters/controllers
+                // fill players/controllers
                 let mut controllers: Vec<usize> = vec!();
-                let mut fighters: Vec<String> = vec!();
+                let mut players: Vec<PlayerSetup> = vec!();
                 input.update(&[], &[], false); // run the first input step so that we can check for the number of controllers.
-                for (i, _) in input.players(0).iter().enumerate() {
+                let input_len = input.players(0).len();
+                for i in 0..input_len {
                     controllers.push(i);
-                    fighters.push(cli_results.fighter_names[i % cli_results.fighter_names.len()].clone());
+                    players.push(PlayerSetup {
+                        fighter: cli_results.fighter_names[i % cli_results.fighter_names.len()].clone(),
+                        team:    i
+                    });
                 }
 
-                // remove extra fighters/controllers
+                // remove extra players/controllers
                 if let Some(max_players) = cli_results.max_human_players {
                     while controllers.len() > max_players {
                         controllers.pop();
-                        fighters.pop();
+                        players.pop();
                     }
                 }
 
                 // add cpu players
                 let mut ais: Vec<usize> = vec!();
-                let last_fighter_i = fighters.len();
+                let players_len = players.len();
                 if let Some(total_players) = cli_results.total_cpu_players {
                     for i in 0..total_players {
-                        fighters.push(cli_results.fighter_names[(last_fighter_i + i) % cli_results.fighter_names.len()].clone());
-                        controllers.push(last_fighter_i + i);
+                        players.push(PlayerSetup {
+                            fighter: cli_results.fighter_names[(players_len + i) % cli_results.fighter_names.len()].clone(),
+                            team:    players_len + i
+                        });
+                        controllers.push(input_len + i);
                         ais.push(0);
                     }
                 }
@@ -166,11 +173,11 @@ pub fn run(mut cli_results: CLIResults) {
                     input_history:  vec!(),
                     player_history: vec!(),
                     stage_history:  vec!(),
-                    controllers:    controllers,
-                    fighters:       fighters,
-                    ais:            ais,
                     stage:          cli_results.stage_name.unwrap(),
                     state:          GameState::Local,
+                    controllers,
+                    players,
+                    ais,
                 };
                 (
                     Menu::new(None, config.clone(), menu_state),
