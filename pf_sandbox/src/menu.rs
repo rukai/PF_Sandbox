@@ -2,6 +2,7 @@ use ::command_line::CommandLine;
 use ::config::Config;
 use ::game::{GameSetup, GameState, PlayerSetup};
 use ::graphics::{GraphicsMessage, Render, RenderType};
+use ::graphics;
 use ::input::{Input, PlayerInput};
 use ::package::{Package, PackageMeta, Verify};
 use ::package;
@@ -293,7 +294,21 @@ impl Menu {
                 if let Some((controller, _)) = selection.controller {
                     let input = &player_inputs[controller];
                     if input.b.press {
-                        selection.fighter = None;
+                        match selection.ui.clone() {
+                            PlayerSelectUi::HumanFighter (_) |
+                            PlayerSelectUi::CpuFighter (_) => {
+                                selection.fighter = None;
+                            }
+                            PlayerSelectUi::HumanTeam (_) => {
+                                selection.ui = PlayerSelectUi::human_fighter(self.package.get());
+                            }
+                            PlayerSelectUi::CpuTeam (_) |
+                            PlayerSelectUi::CpuAi (_) => {
+                                selection.ui = PlayerSelectUi::cpu_fighter(self.package.get());
+                                selection.ui = PlayerSelectUi::cpu_fighter(self.package.get());
+                            }
+                            PlayerSelectUi::HumanUnplugged => unreachable!(),
+                        }
                     }
                     else if input.a.press {
                         match selection.ui.clone() {
@@ -303,7 +318,8 @@ impl Menu {
                                 }
                                 else {
                                     match ticker.cursor - fighters.len() {
-                                        0 => { add_cpu = true; }
+                                        0 => { selection.ui = PlayerSelectUi::human_team() }
+                                        1 => { add_cpu = true; }
                                         _ => { unreachable!() }
                                     }
                                 }
@@ -314,20 +330,45 @@ impl Menu {
                                 }
                                 else {
                                     match ticker.cursor - fighters.len() {
-                                        0 => { /* TODO: selection.ui = PlayerSelectUi::cpu_ai()*/ }
-                                        1 => { remove_cpu = Some(selection_i); }
+                                        0 => { selection.ui = PlayerSelectUi::cpu_team() }
+                                        1 => { /* TODO: selection.ui = PlayerSelectUi::cpu_ai()*/ }
+                                        2 => { remove_cpu = Some(selection_i); }
+                                        _ => { unreachable!() }
+                                    }
+                                }
+                            }
+                            PlayerSelectUi::HumanTeam (ticker) => {
+                                let colors = graphics::get_colors();
+                                if ticker.cursor < colors.len() {
+                                    selection.team = ticker.cursor;
+                                } else {
+                                    match ticker.cursor - colors.len() {
+                                        0 => { selection.ui = PlayerSelectUi::human_fighter(self.package.get()) }
+                                        _ => { unreachable!() }
+                                    }
+                                }
+                            }
+                            PlayerSelectUi::CpuTeam (ticker) => {
+                                let colors = graphics::get_colors();
+                                if ticker.cursor < colors.len() {
+                                    selection.team = ticker.cursor;
+                                } else {
+                                    match ticker.cursor - colors.len() {
+                                        0 => { selection.ui = PlayerSelectUi::cpu_fighter(self.package.get()) }
                                         _ => { unreachable!() }
                                     }
                                 }
                             }
                             PlayerSelectUi::CpuAi (_) => { }
-                            PlayerSelectUi::HumanUnplugged => { }
+                            PlayerSelectUi::HumanUnplugged => unreachable!(),
                         }
                     }
 
                     match selection.ui {
                         PlayerSelectUi::HumanFighter (ref mut ticker) |
                         PlayerSelectUi::CpuFighter   (ref mut ticker) |
+                        PlayerSelectUi::HumanTeam    (ref mut ticker) |
+                        PlayerSelectUi::CpuTeam      (ref mut ticker) |
                         PlayerSelectUi::CpuAi        (ref mut ticker) => {
                             if input[0].stick_y > 0.4 || input[0].up {
                                 ticker.up();
@@ -430,7 +471,7 @@ impl Menu {
         let mut ais_skipped = 0;
         for (i, selection) in (&self.fighter_selections).iter().enumerate() {
             // add human players
-            if let PlayerSelectUi::HumanFighter (_) = selection.ui {
+            if selection.ui.is_human_plugged_in() {
                 if let Some(fighter) = selection.fighter {
                     players.push(PlayerSetup {
                         fighter: self.package.get().fighters.index_to_key(fighter).unwrap(),
@@ -810,9 +851,11 @@ impl PlayerSelect {
 
 #[derive(Clone)]
 pub enum PlayerSelectUi {
-    CpuAi (MenuTicker),
-    CpuFighter (MenuTicker),
+    CpuAi        (MenuTicker),
+    CpuFighter   (MenuTicker),
+    CpuTeam      (MenuTicker),
     HumanFighter (MenuTicker),
+    HumanTeam    (MenuTicker),
     HumanUnplugged,
 }
 
@@ -822,11 +865,19 @@ impl PlayerSelectUi {
     }
 
     pub fn cpu_fighter(package: &Package) -> Self {
-        PlayerSelectUi::CpuFighter (MenuTicker::new(package.fighters.len() + 2))
+        PlayerSelectUi::CpuFighter (MenuTicker::new(package.fighters.len() + 3))
     }
 
     pub fn human_fighter(package: &Package) -> Self {
-        PlayerSelectUi::HumanFighter (MenuTicker::new(package.fighters.len() + 1))
+        PlayerSelectUi::HumanFighter (MenuTicker::new(package.fighters.len() + 2))
+    }
+
+    pub fn cpu_team() -> Self {
+        PlayerSelectUi::CpuTeam (MenuTicker::new(graphics::get_colors().len() + 1))
+    }
+
+    pub fn human_team() -> Self {
+        PlayerSelectUi::HumanTeam (MenuTicker::new(graphics::get_colors().len() + 1))
     }
 
     pub fn is_visible(&self) -> bool {
@@ -839,8 +890,17 @@ impl PlayerSelectUi {
     pub fn is_cpu(&self) -> bool {
         match self {
             &PlayerSelectUi::CpuAi (_) |
-            &PlayerSelectUi::CpuFighter (_) => true,
-            _                               => false
+            &PlayerSelectUi::CpuFighter (_) |
+            &PlayerSelectUi::CpuTeam (_) => true,
+            _                            => false
+        }
+    }
+
+    pub fn is_human_plugged_in(&self) -> bool {
+        match self {
+            &PlayerSelectUi::HumanFighter (_) |
+            &PlayerSelectUi::HumanTeam (_) => true,
+            _                              => false
         }
     }
 
@@ -848,6 +908,8 @@ impl PlayerSelectUi {
         match self {
             &PlayerSelectUi::HumanFighter (ref ticker) |
             &PlayerSelectUi::CpuFighter   (ref ticker) |
+            &PlayerSelectUi::HumanTeam    (ref ticker) |
+            &PlayerSelectUi::CpuTeam      (ref ticker) |
             &PlayerSelectUi::CpuAi        (ref ticker) => { ticker }
             &PlayerSelectUi::HumanUnplugged => {
                 panic!("Tried to unwrap the PlayerSelectUi ticker but was HumanUnplugged")
@@ -859,6 +921,8 @@ impl PlayerSelectUi {
         match self {
             &mut PlayerSelectUi::HumanFighter (ref mut ticker) |
             &mut PlayerSelectUi::CpuFighter   (ref mut ticker) |
+            &mut PlayerSelectUi::HumanTeam    (ref mut ticker) |
+            &mut PlayerSelectUi::CpuTeam      (ref mut ticker) |
             &mut PlayerSelectUi::CpuAi        (ref mut ticker) => {
                 ticker.reset();
                 ticker.cursor = 0;

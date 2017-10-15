@@ -861,32 +861,66 @@ impl<'a> VulkanGraphics<'a> {
                 PlayerSelectUi::CpuAi        (_) => format!("CPU AI"),
                 PlayerSelectUi::CpuFighter   (_) => format!("CPU Fighter"),
                 PlayerSelectUi::HumanFighter (_) => format!("Port #{}", controller_i+1),
+                PlayerSelectUi::HumanTeam    (_) => format!("Port #{} Team", controller_i+1),
+                PlayerSelectUi::CpuTeam      (_) => format!("CPU Team"),
                 PlayerSelectUi::HumanUnplugged   => unreachable!()
             };
             self.draw_text.queue_text(x, y, size, color, name.as_ref());
         }
 
         // render UI
-        let options = fighters.iter().map(|x| x.name.clone())
-        .chain(match selection.ui {
-            PlayerSelectUi::HumanFighter (_) => vec!(String::from("Add CPU")),
-            PlayerSelectUi::CpuFighter   (_) => vec!(String::from("Change AI"), String::from("Remove CPU")),
-            PlayerSelectUi::CpuAi        (_) => vec!(),
-            PlayerSelectUi::HumanUnplugged   => unreachable!()
-        });
-        for (fighter_i, fighter_name) in options.enumerate() {
-            let x_offset = if fighter_i == selection.ui.ticker_unwrap().cursor { 0.1 } else { 0.0 };
+        let mut options = vec!();
+        match selection.ui {
+            PlayerSelectUi::HumanFighter (_) => {
+                options.extend(fighters.iter().map(|x| x.name.clone()));
+                options.push(String::from("Change Team"));
+                options.push(String::from("Add CPU"));
+            }
+            PlayerSelectUi::CpuFighter (_) => {
+                options.extend(fighters.iter().map(|x| x.name.clone()));
+                options.push(String::from("Change Team"));
+                options.push(String::from("Change AI"));
+                options.push(String::from("Remove CPU"));
+            }
+            PlayerSelectUi::HumanTeam (_) => {
+                options.extend(graphics::get_colors().iter().map(|x| x.name.clone()));
+                options.push(String::from("Return"));
+            }
+            PlayerSelectUi::CpuTeam (_) => {
+                options.extend(graphics::get_colors().iter().map(|x| x.name.clone()));
+                options.push(String::from("Return"));
+            }
+            PlayerSelectUi::CpuAi (_) => {
+                options.push(String::from("Return"));
+            }
+            PlayerSelectUi::HumanUnplugged => unreachable!()
+        }
+
+        for (option_i, option) in options.iter().enumerate() {
+            let x_offset = if option_i == selection.ui.ticker_unwrap().cursor { 0.1 } else { 0.0 };
             let x = ((start_x+1.0 + x_offset) / 2.0) * self.width  as f32;
-            let y = ((start_y+1.0           ) / 2.0) * self.height as f32 + (fighter_i+1) as f32 * 50.0;
+            let y = ((start_y+1.0           ) / 2.0) * self.height as f32 + (option_i+1) as f32 * 40.0;
 
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos
             let mut color = [1.0, 1.0, 1.0, 1.0];
-            if let Some(selected_fighter_i) = selection.fighter {
-                if selected_fighter_i == fighter_i {
-                    color = graphics::get_team_color(selection.team);
+            match selection.ui {
+                PlayerSelectUi::HumanFighter (_) |
+                PlayerSelectUi::CpuFighter (_) => {
+                    if let Some(selected_option_i) = selection.fighter {
+                        if selected_option_i == option_i {
+                            color = graphics::get_team_color(selection.team);
+                        }
+                    }
                 }
+                PlayerSelectUi::HumanTeam (_) |
+                PlayerSelectUi::CpuTeam (_) => {
+                    if option_i < graphics::get_colors().len() {
+                        color = graphics::get_team_color(option_i);
+                    }
+                }
+                _ => { }
             }
-            self.draw_text.queue_text(x, y, size, color, fighter_name.as_ref());
+            self.draw_text.queue_text(x, y, size, color, option.as_ref());
         }
 
         // render fighter
