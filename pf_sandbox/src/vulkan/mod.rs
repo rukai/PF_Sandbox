@@ -510,7 +510,7 @@ impl<'a> VulkanGraphics<'a> {
         for (i, entity) in render.entities.iter().enumerate() {
             let z_debug       = 0.1 - i as f32 * 0.00001;
             let z_particle_fg = 0.2 - i as f32 * 0.00001;
-            let z_shield      = 0.4 - i as f32 * 0.00001;
+            //let z_shield    = 0.4 - i as f32 * 0.00001; // used in transparent pass below
             let z_player      = 0.5 - i as f32 * 0.00001;
             let z_particle_bg = 0.8 - i as f32 * 0.00001;
             match entity {
@@ -559,19 +559,6 @@ impl<'a> VulkanGraphics<'a> {
                             }
                         }
                         RenderFighter::None => { }
-                    }
-
-                    // draw shield
-                    if let &Some(ref shield) = &player.shield {
-                        let position = Matrix4::from_translation(Vector3::new(shield.pos.0 + pan.0, shield.pos.1 + pan.1, z_shield));
-                        let buffers = Buffers::new_shield(self.device.clone(), shield);
-                        let color = if shield.distort > 0 {
-                            let c = shield.color;
-                            [c[0] * rng.gen_range(0.75, 1.25), c[1] * rng.gen_range(0.75, 1.25), c[2] * rng.gen_range(0.75, 1.25), c[3] * rng.gen_range(0.8, 1.2)]
-                        } else {
-                            shield.color
-                        };
-                        command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &position, shield.color, color);
                     }
 
                     // draw selected hitboxes
@@ -643,6 +630,29 @@ impl<'a> VulkanGraphics<'a> {
                 },
             }
         }
+
+        // Some things need to be rendered after everything else as they are transparent
+        for (i, entity) in render.entities.iter().enumerate() {
+            let z_shield = 0.4 - i as f32 * 0.00001;
+            match entity {
+                &RenderEntity::Player(ref player) => {
+                    // draw shield
+                    if let &Some(ref shield) = &player.shield {
+                        let position = Matrix4::from_translation(Vector3::new(shield.pos.0 + pan.0, shield.pos.1 + pan.1, z_shield));
+                        let buffers = Buffers::new_shield(self.device.clone(), shield);
+                        let color = if shield.distort > 0 {
+                            let c = shield.color;
+                            [c[0] * rng.gen_range(0.75, 1.25), c[1] * rng.gen_range(0.75, 1.25), c[2] * rng.gen_range(0.75, 1.25), c[3] * rng.gen_range(0.8, 1.2)]
+                        } else {
+                            shield.color
+                        };
+                        command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &position, shield.color, color);
+                    }
+                }
+                _ => { }
+            }
+        }
+
         command_buffer
     }
 
