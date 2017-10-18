@@ -10,6 +10,7 @@ use ::results::PlayerResult;
 use ::package::Verify;
 use ::particle::ParticleType;
 
+use enum_traits::FromIndex;
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector3, Rad};
 use rand::{StdRng, Rng, SeedableRng};
@@ -421,7 +422,24 @@ impl<'a> VulkanGraphics<'a> {
         for entity in entities {
             if let &RenderEntity::Player(ref player) = entity {
                 location += distance;
-                self.draw_text.queue_text(location, self.height as f32 - 50.0, 110.0, player.fighter_color, format!("{}%", player.damage).as_ref());
+                match Action::from_index(player.action as u64) {
+                    Some(Action::Eliminated) => { }
+                    _ => {
+                        if let Some(stocks) = player.stocks {
+                            let stocks_string = if stocks > 5 {
+                                format!("⬤ x {}", stocks)
+                            } else {
+                                let mut stocks_string = String::new();
+                                for _ in 0..stocks {
+                                    stocks_string.push('⬤');
+                                }
+                                stocks_string
+                            };
+                            self.draw_text.queue_text(location + 10.0, self.height as f32 - 130.0, 22.0, player.fighter_color, stocks_string.as_ref());
+                        }
+                        self.draw_text.queue_text(location, self.height as f32 - 47.0, 110.0, player.fighter_color, format!("{}%", player.damage).as_ref());
+                    }
+                }
             }
         }
     }
