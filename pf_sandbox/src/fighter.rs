@@ -40,40 +40,42 @@ impl Default for Fighter {
             css_hide:   false,
 
             // in game attributes
-            air_jumps:               1,
-            weight:                  1.0, // weight = old value / 100
-            gravity:                 -0.1,
-            terminal_vel:            -2.0,
-            fastfall_terminal_vel:   -3.0,
-            jump_y_init_vel:         3.0,
-            jump_y_init_vel_short:   2.0,
-            jump_x_init_vel:         1.0,
-            jump_x_term_vel:         1.5,
-            jump_x_vel_ground_mult:  1.0,
-            air_mobility_a:          0.04,
-            air_mobility_b:          0.02,
-            air_x_term_vel:          1.0,
-            air_friction:            0.05,
-            air_jump_x_vel:          1.0,
-            air_jump_y_vel:          3.0,
-            walk_init_vel:           0.2,
-            walk_acc:                0.1,
-            walk_max_vel:            1.0,
-            slow_walk_max_vel:       1.0,
-            dash_init_vel:           2.0,
-            dash_run_acc_a:          0.01,
-            dash_run_acc_b:          0.2,
-            dash_run_term_vel:       2.0,
-            friction:                0.1,
-            aerialdodge_mult:        3.0,
-            aerialdodge_drift_frame: 20,
-            forward_roll:            false,
-            backward_roll:           false,
-            spot_dodge:              false,
-            lcancel:                 None,
-            shield:                  None,
-            power_shield:            None,
-            actions:                 actions,
+            air_jumps:                1,
+            weight:                   1.0, // weight = old value / 100
+            gravity:                  -0.1,
+            terminal_vel:             -2.0,
+            fastfall_terminal_vel:    -3.0,
+            jump_y_init_vel:          3.0,
+            jump_y_init_vel_short:    2.0,
+            jump_x_init_vel:          1.0,
+            jump_x_term_vel:          1.5,
+            jump_x_vel_ground_mult:   1.0,
+            air_mobility_a:           0.04,
+            air_mobility_b:           0.02,
+            air_x_term_vel:           1.0,
+            air_friction:             0.05,
+            air_jump_x_vel:           1.0,
+            air_jump_y_vel:           3.0,
+            walk_init_vel:            0.2,
+            walk_acc:                 0.1,
+            walk_max_vel:             1.0,
+            slow_walk_max_vel:        1.0,
+            dash_init_vel:            2.0,
+            dash_run_acc_a:           0.01,
+            dash_run_acc_b:           0.2,
+            dash_run_term_vel:        2.0,
+            friction:                 0.1,
+            aerialdodge_mult:         3.0,
+            aerialdodge_drift_frame:  20,
+            forward_roll:             false,
+            backward_roll:            false,
+            spot_dodge:               false,
+            lcancel:                  None,
+            shield:                   None,
+            power_shield:             None,
+            tech:                     None,
+            missed_tech_forced_getup: None,
+            actions:                  actions,
         }
     }
 }
@@ -90,46 +92,72 @@ pub struct Fighter {
     pub css_hide:   bool,
 
     // in game attributes
-    pub air_jumps:               u64,
-    pub weight:                  f32,
-    pub gravity:                 f32,
-    pub terminal_vel:            f32,
-    pub fastfall_terminal_vel:   f32,
-    pub jump_y_init_vel:         f32,
-    pub jump_y_init_vel_short:   f32,
-    pub jump_x_init_vel:         f32,
-    pub jump_x_term_vel:         f32,
-    pub jump_x_vel_ground_mult:  f32,
-    pub air_mobility_a:          f32,
-    pub air_mobility_b:          f32,
-    pub air_x_term_vel:          f32,
-    pub air_friction:            f32,
-    pub air_jump_x_vel:          f32,
-    pub air_jump_y_vel:          f32,
-    pub walk_init_vel:           f32,
-    pub walk_acc:                f32,
-    pub walk_max_vel:            f32,
-    pub slow_walk_max_vel:       f32,
-    pub dash_init_vel:           f32,
-    pub dash_run_acc_a:          f32,
-    pub dash_run_acc_b:          f32,
-    pub dash_run_term_vel:       f32,
-    pub friction:                f32,
-    pub aerialdodge_mult:        f32,
-    pub aerialdodge_drift_frame: u64,
-    pub forward_roll:            bool,
-    pub backward_roll:           bool,
-    pub spot_dodge:              bool,
-    pub lcancel:                 Option<LCancel>,
-    pub shield:                  Option<Shield>,
-    pub power_shield:            Option<PowerShield>,
-    pub actions:                 ContextVec<ActionDef>,
+    pub air_jumps:                u64,
+    pub weight:                   f32,
+    pub gravity:                  f32,
+    pub terminal_vel:             f32,
+    pub fastfall_terminal_vel:    f32,
+    pub jump_y_init_vel:          f32,
+    pub jump_y_init_vel_short:    f32,
+    pub jump_x_init_vel:          f32,
+    pub jump_x_term_vel:          f32,
+    pub jump_x_vel_ground_mult:   f32,
+    pub air_mobility_a:           f32,
+    pub air_mobility_b:           f32,
+    pub air_x_term_vel:           f32,
+    pub air_friction:             f32,
+    pub air_jump_x_vel:           f32,
+    pub air_jump_y_vel:           f32,
+    pub walk_init_vel:            f32,
+    pub walk_acc:                 f32,
+    pub walk_max_vel:             f32,
+    pub slow_walk_max_vel:        f32,
+    pub dash_init_vel:            f32,
+    pub dash_run_acc_a:           f32,
+    pub dash_run_acc_b:           f32,
+    pub dash_run_term_vel:        f32,
+    pub friction:                 f32,
+    pub aerialdodge_mult:         f32,
+    pub aerialdodge_drift_frame:  u64,
+    pub forward_roll:             bool,
+    pub backward_roll:            bool,
+    pub spot_dodge:               bool,
+    pub lcancel:                  Option<LCancel>,
+    pub shield:                   Option<Shield>,
+    pub power_shield:             Option<PowerShield>,
+    pub tech:                     Option<Tech>,
+    pub missed_tech_forced_getup: Option<u64>,
+    pub actions:                  ContextVec<ActionDef>,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub struct Tech {
+    pub active_window: u64,
+    pub locked_window: u64,
+}
+
+impl Default for Tech {
+    fn default() -> Self {
+        Tech {
+            active_window: 20,
+            locked_window: 20
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct LCancel {
     pub input_window:   u64,
     pub lag_multiplier: f32, // use value < 1.0
+}
+
+impl Default for LCancel {
+    fn default() -> Self {
+        LCancel {
+            input_window:   11,
+            lag_multiplier: 0.5
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]
@@ -473,6 +501,7 @@ pub enum Action {
     LedgeIdle,
     Teeter,
     TeeterIdle,
+    MissedTechIdle,
 
     // Movement
     Fall,
@@ -512,8 +541,11 @@ pub enum Action {
     SpecialFall,
     SpecialLand,
     TechF,
-    TechS,
+    TechN,
     TechB,
+    MissedTechGetupF,
+    MissedTechGetupN,
+    MissedTechGetupB,
     Rebound, // State after clang
     LedgeRoll,
     LedgeRollSlow,
@@ -522,6 +554,7 @@ pub enum Action {
     ShieldBreakFall,
     ShieldBreakGetup,
     Stun,
+    MissedTechStart,
 
     // Attacks
     Jab,
@@ -538,6 +571,7 @@ pub enum Action {
     DashGrab,
     LedgeAttack,
     LedgeAttackSlow,
+    MissedTechAttack,
 
     // Aerials
     Uair,

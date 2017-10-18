@@ -48,6 +48,7 @@ pub struct Player {
     pub stun_timer:         u64,
     pub shield_stun_timer:  u64,
     pub parry_timer:        u64,
+    pub tech_timer:         LockTimer,
     pub ecb:                ECB,
     pub hitlist:            Vec<usize>,
     pub hitlag:             Hitlag,
@@ -62,6 +63,28 @@ pub struct Player {
     pub hit_angle_post_di:  Option<f32>,
     pub stick:              Option<(f32, f32)>,
     pub c_stick:            Option<(f32, f32)>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub enum LockTimer {
+    Active (u64),
+    Locked (u64),
+    Free
+}
+
+impl LockTimer {
+    pub fn is_active(&self) -> bool {
+        match self {
+            &LockTimer::Active (_) => true,
+            _                      => false
+        }
+    }
+}
+
+impl Default for LockTimer {
+    fn default() -> Self {
+        LockTimer::Free
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
@@ -161,6 +184,7 @@ impl Player {
             stun_timer:         0,
             shield_stun_timer:  0,
             parry_timer:        0,
+            tech_timer:         LockTimer::default(),
             ecb:                ECB::default(),
             hitlist:            vec!(),
             hitlag:             Hitlag::None,
@@ -522,8 +546,7 @@ impl Player {
                 Action::JumpF      | Action::JumpB |
                 Action::Fair       | Action::Bair |
                 Action::Dair       | Action::Uair |
-                Action::Nair       | Action::JumpAerialB |
-                Action::DamageFall
+                Action::Nair       | Action::JumpAerialB
                 => self.aerial_action(input, players, fighters, platforms),
 
                 Action::Jab       | Action::Jab2 |
@@ -542,8 +565,11 @@ impl Player {
 
                 Action::Teeter |
                 Action::TeeterIdle       => self.teeter_action(input, fighter),
-                Action::DamageFly        => self.damagefly_action(fighter),
+                Action::DamageFly        => self.damage_fly_action(fighter),
+                Action::DamageFall       => self.damage_fall_action(input, players, fighters, platforms),
                 Action::Damage           => self.damage_action(fighter),
+                Action::MissedTechIdle   => self.missed_tech_action(input, fighter),
+                Action::MissedTechStart  => self.missed_tech_start_action(fighter),
                 Action::AerialDodge      => self.aerialdodge_action(input, fighter),
                 Action::SpecialFall      => self.specialfall_action(input, fighter),
                 Action::Dtilt            => self.dtilt_action(input, fighter),
@@ -595,6 +621,33 @@ impl Player {
             self.hit_angle_pre_di = None;
             self.hit_angle_post_di = None;
         }
+
+        self.tech_timer = match (self.tech_timer.clone(), fighter.tech.clone()) {
+            (LockTimer::Active (timer), Some(tech)) => {
+                if timer > tech.active_window {
+                    LockTimer::Locked(0)
+                } else {
+                    LockTimer::Active(timer + 1)
+                }
+            }
+            (LockTimer::Locked (timer), Some(tech)) => {
+                if timer > tech.locked_window {
+                    LockTimer::Free
+                } else {
+                    LockTimer::Locked(timer + 1)
+                }
+            }
+            (LockTimer::Free, Some(_)) => {
+                if input.l.press || input.r.press {
+                    LockTimer::Active(0)
+                } else {
+                    LockTimer::Free
+                }
+            }
+            _ => {
+                LockTimer::Free
+            }
+        };
 
         if input[0].stick_x == 0.0 && input[0].stick_y == 0.0 {
             self.stick = None;
@@ -669,6 +722,39 @@ impl Player {
         self.ledge_idle_timer += 1;
     }
 
+    fn missed_tech_start_action(&mut self, fighter: &Fighter) {
+        if self.frame == 0 {
+            self.apply_friction(fighter);
+        } else {
+            self.x_vel = 0.0;
+        }
+    }
+
+    fn missed_tech_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if self.relative_f(input[0].stick_x) < -0.7 {
+            self.set_action(Action::MissedTechGetupB);
+        }
+        else if self.relative_f(input[0].stick_x) > 0.7 {
+            self.set_action(Action::MissedTechGetupF);
+        }
+        else if self.relative_f(input[0].stick_x) > 0.7 {
+            self.set_action(Action::MissedTechGetupF);
+        }
+        else if input[0].stick_y > 0.7 {
+            self.set_action(Action::MissedTechGetupN);
+        }
+        else {
+            if let Some(getup_frame) = fighter.missed_tech_forced_getup {
+                if self.frame_norestart > getup_frame {
+                    self.set_action(Action::MissedTechGetupN);
+                }
+            }
+        }
+
+        self.hitstun -= 1.0;
+        self.apply_friction(fighter);
+    }
+
     fn damage_action(&mut self, fighter: &Fighter) {
         self.hitstun -= 1.0;
         if self.hitstun <= 0.0 {
@@ -689,12 +775,35 @@ impl Player {
         }
     }
 
-    fn damagefly_action(&mut self, fighter: &Fighter) {
+    fn damage_fly_action(&mut self, fighter: &Fighter) {
         self.hitstun -= 1.0;
         self.fall_action(fighter);
         if self.hitstun <= 0.0 {
             self.set_action(Action::DamageFall);
         }
+    }
+
+    fn damage_fall_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let fighter = &fighters[self.fighter.as_ref()];
+        if self.interruptible(fighter) {
+            if self.check_attacks_aerial(input) { }
+            else if input.b.press {
+                // special attack
+            }
+            else if self.check_jump_aerial(input, players, fighters, platforms) { }
+            else if
+                (input[0].stick_x >  0.7 && input[1].stick_x <  0.7) ||
+                (input[0].stick_x < -0.7 && input[1].stick_x > -0.7) ||
+                (input[0].stick_y >  0.7 && input[1].stick_y <  0.7) ||
+                (input[0].stick_y < -0.7 && input[1].stick_y > -0.7)
+            {
+                self.set_action(Action::Fall);
+            }
+
+        }
+
+        self.air_drift(input, fighter);
+        self.fastfall_action(input, fighter);
     }
 
     fn aerial_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
@@ -704,20 +813,7 @@ impl Player {
             else if input.b.press {
                 // special attack
             }
-            else if self.jump_input(input).jump() && self.air_jumps_left > 0 {
-                self.air_jump_particles(players, fighters, platforms);
-                self.air_jumps_left -= 1;
-                self.y_vel = fighter.air_jump_y_vel;
-                self.x_vel = fighter.air_jump_x_vel * input[0].stick_x;
-                self.fastfalled = false;
-
-                if self.relative_f(input.stick_x.value) < -0.3 {
-                    self.set_action(Action::JumpAerialB);
-                }
-                else {
-                    self.set_action(Action::JumpAerialF);
-                }
-            }
+            else if self.check_jump_aerial(input, players, fighters, platforms) { }
             else if input.l.press || input.r.press {
                 self.aerialdodge(input, fighter);
             }
@@ -1098,11 +1194,7 @@ impl Player {
     }
 
     fn shield_break_fall_action(&mut self, fighter: &Fighter) {
-        if !self.is_airbourne() {
-            self.set_action(Action::ShieldBreakGetup);
-        } else {
-            self.fall_action(fighter);
-        }
+        self.fall_action(fighter);
     }
 
     fn shield_break_getup_action(&mut self) {
@@ -1233,6 +1325,27 @@ impl Player {
             JumpResult::None => {
                 false
             }
+        }
+    }
+
+    fn check_jump_aerial(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> bool {
+        let fighter = &fighters[self.fighter.as_ref()];
+        if self.jump_input(input).jump() && self.air_jumps_left > 0 {
+            self.air_jump_particles(players, fighters, platforms);
+            self.air_jumps_left -= 1;
+            self.y_vel = fighter.air_jump_y_vel;
+            self.x_vel = fighter.air_jump_x_vel * input[0].stick_x;
+            self.fastfalled = false;
+
+            if self.relative_f(input.stick_x.value) < -0.3 {
+                self.set_action(Action::JumpAerialB);
+            }
+            else {
+                self.set_action(Action::JumpAerialF);
+            }
+            true
+        } else {
+            false
         }
     }
 
@@ -1421,12 +1534,13 @@ impl Player {
             None => { panic!("Custom defined action expirations have not been implemented"); },
 
             // Idle
-            Some(Action::Spawn)      => self.set_action(Action::SpawnIdle),
-            Some(Action::SpawnIdle)  => self.set_action(Action::SpawnIdle),
-            Some(Action::Idle)       => self.set_action(Action::Idle),
-            Some(Action::LedgeIdle)  => self.set_action(Action::LedgeIdle),
-            Some(Action::Teeter)     => self.set_action(Action::TeeterIdle),
-            Some(Action::TeeterIdle) => self.set_action(Action::TeeterIdle),
+            Some(Action::Spawn)          => self.set_action(Action::SpawnIdle),
+            Some(Action::SpawnIdle)      => self.set_action(Action::SpawnIdle),
+            Some(Action::Idle)           => self.set_action(Action::Idle),
+            Some(Action::LedgeIdle)      => self.set_action(Action::LedgeIdle),
+            Some(Action::Teeter)         => self.set_action(Action::TeeterIdle),
+            Some(Action::TeeterIdle)     => self.set_action(Action::TeeterIdle),
+            Some(Action::MissedTechIdle) => self.set_action(Action::MissedTechIdle),
 
             // crouch
             Some(Action::CrouchStart) => self.set_action(Action::Crouch),
@@ -1499,24 +1613,28 @@ impl Player {
             },
 
             // Defense
-            Some(Action::PowerShield)   => if fighter.shield.is_some() { self.set_action(Action::Shield) } else { self.set_action(Action::Idle) },
-            Some(Action::ShieldOn)      => self.set_action(Action::Shield),
-            Some(Action::Shield)        => self.set_action(Action::Shield),
-            Some(Action::ShieldOff)     => self.set_action(Action::Idle),
-            Some(Action::RollF)         => self.set_action(Action::Idle),
-            Some(Action::RollB)         => self.set_action(Action::Idle),
-            Some(Action::SpotDodge)     => self.set_action(Action::Idle),
-            Some(Action::AerialDodge)   => self.set_action(Action::SpecialFall),
-            Some(Action::SpecialFall)   => self.set_action(Action::SpecialFall),
-            Some(Action::SpecialLand)   => self.set_action(Action::Idle),
-            Some(Action::TechF)         => self.set_action(Action::Idle),
-            Some(Action::TechS)         => self.set_action(Action::Idle),
-            Some(Action::TechB)         => self.set_action(Action::Idle),
-            Some(Action::Rebound)       => self.set_action(Action::Idle),
-            Some(Action::LedgeRoll)     => self.set_action_idle_from_ledge(players, fighters, platforms),
-            Some(Action::LedgeRollSlow) => self.set_action_idle_from_ledge(players, fighters, platforms),
+            Some(Action::PowerShield)      => if fighter.shield.is_some() { self.set_action(Action::Shield) } else { self.set_action(Action::Idle) },
+            Some(Action::ShieldOn)         => self.set_action(Action::Shield),
+            Some(Action::Shield)           => self.set_action(Action::Shield),
+            Some(Action::ShieldOff)        => self.set_action(Action::Idle),
+            Some(Action::RollF)            => self.set_action(Action::Idle),
+            Some(Action::RollB)            => self.set_action(Action::Idle),
+            Some(Action::SpotDodge)        => self.set_action(Action::Idle),
+            Some(Action::AerialDodge)      => self.set_action(Action::SpecialFall),
+            Some(Action::SpecialFall)      => self.set_action(Action::SpecialFall),
+            Some(Action::SpecialLand)      => self.set_action(Action::Idle),
+            Some(Action::TechF)            => self.set_action(Action::Idle),
+            Some(Action::TechN)            => self.set_action(Action::Idle),
+            Some(Action::TechB)            => self.set_action(Action::Idle),
+            Some(Action::MissedTechGetupF) => self.set_action(Action::Idle),
+            Some(Action::MissedTechGetupN) => self.set_action(Action::Idle),
+            Some(Action::MissedTechGetupB) => self.set_action(Action::Idle),
+            Some(Action::Rebound)          => self.set_action(Action::Idle),
+            Some(Action::LedgeRoll)        => self.set_action_idle_from_ledge(players, fighters, platforms),
+            Some(Action::LedgeRollSlow)    => self.set_action_idle_from_ledge(players, fighters, platforms),
 
             // Vulnerable
+            Some(Action::MissedTechStart)  => self.set_action(Action::MissedTechIdle),
             Some(Action::ShieldBreakFall)  => self.set_action(Action::ShieldBreakFall),
             Some(Action::Stun)             => self.set_action(Action::Stun),
             Some(Action::ShieldBreakGetup) => {
@@ -1525,20 +1643,21 @@ impl Player {
             }
 
             // Attack
-            Some(Action::Jab)             => self.set_action(Action::Idle),
-            Some(Action::Jab2)            => self.set_action(Action::Idle),
-            Some(Action::Jab3)            => self.set_action(Action::Idle),
-            Some(Action::Utilt)           => self.set_action(Action::Idle),
-            Some(Action::Dtilt)           => self.set_action(Action::Crouch),
-            Some(Action::Ftilt)           => self.set_action(Action::Idle),
-            Some(Action::DashAttack)      => self.set_action(Action::Idle),
-            Some(Action::Usmash)          => self.set_action(Action::Idle),
-            Some(Action::Dsmash)          => self.set_action(Action::Idle),
-            Some(Action::Fsmash)          => self.set_action(Action::Idle),
-            Some(Action::Grab)            => self.set_action(Action::Idle),
-            Some(Action::DashGrab)        => self.set_action(Action::Idle),
-            Some(Action::LedgeAttack)     => self.set_action_idle_from_ledge(players, fighters, platforms),
-            Some(Action::LedgeAttackSlow) => self.set_action_idle_from_ledge(players, fighters, platforms),
+            Some(Action::Jab)              => self.set_action(Action::Idle),
+            Some(Action::Jab2)             => self.set_action(Action::Idle),
+            Some(Action::Jab3)             => self.set_action(Action::Idle),
+            Some(Action::Utilt)            => self.set_action(Action::Idle),
+            Some(Action::Dtilt)            => self.set_action(Action::Crouch),
+            Some(Action::Ftilt)            => self.set_action(Action::Idle),
+            Some(Action::DashAttack)       => self.set_action(Action::Idle),
+            Some(Action::Usmash)           => self.set_action(Action::Idle),
+            Some(Action::Dsmash)           => self.set_action(Action::Idle),
+            Some(Action::Fsmash)           => self.set_action(Action::Idle),
+            Some(Action::Grab)             => self.set_action(Action::Idle),
+            Some(Action::DashGrab)         => self.set_action(Action::Idle),
+            Some(Action::MissedTechAttack) => self.set_action(Action::Idle),
+            Some(Action::LedgeAttack)      => self.set_action_idle_from_ledge(players, fighters, platforms),
+            Some(Action::LedgeAttackSlow)  => self.set_action_idle_from_ledge(players, fighters, platforms),
 
             // Aerials
             Some(Action::Uair)     => self.set_action(Action::Fall),
@@ -1688,7 +1807,7 @@ impl Player {
                     let new_y = y + self.y_vel + self.kb_y_vel;
                     if let Some(platform_i) = self.land_stage_collision(fighter, stage, (x, y), (new_x, new_y), input) {
                         let x = stage.platforms[platform_i].world_x_to_plat_x(new_x);
-                        self.land(fighter, platform_i, x);
+                        self.land(fighter, input, platform_i, x);
                     } else {
                         self.location = Location::Airbourne { x: new_x, y: new_y };
                     }
@@ -1852,7 +1971,7 @@ impl Player {
         }
     }
 
-    fn land(&mut self, fighter: &Fighter, platform_i: usize, x: f32) {
+    fn land(&mut self, fighter: &Fighter, input: &PlayerInput, platform_i: usize, x: f32) {
         match Action::from_index(self.action) {
             Some(Action::Uair)            => self.set_action(Action::UairLand),
             Some(Action::Dair)            => self.set_action(Action::DairLand),
@@ -1860,15 +1979,32 @@ impl Player {
             Some(Action::Bair)            => self.set_action(Action::BairLand),
             Some(Action::Nair)            => self.set_action(Action::NairLand),
             Some(Action::ShieldBreakFall) => self.set_action(Action::ShieldBreakGetup),
-            _ if self.y_vel >= -1.0 => { self.set_action(Action::Idle) }, // no impact land
-
+            Some(Action::DamageFly) | Some(Action::DamageFall) => {
+                if self.tech_timer.is_active() {
+                    if self.relative_f(input[0].stick_x) > 0.5 {
+                        self.set_action(Action::TechF);
+                    }
+                    else if self.relative_f(input[0].stick_x) < -0.5 {
+                        self.set_action(Action::TechB);
+                    }
+                    else {
+                        self.set_action(Action::TechN);
+                    }
+                }
+                else {
+                    self.set_action(Action::MissedTechStart);
+                }
+            }
             Some(Action::SpecialFall) |
             Some(Action::AerialDodge) |
-            None    => self.set_action(Action::SpecialLand),
+            None => self.set_action(Action::SpecialLand),
+            _ if self.y_vel >= -1.0 => { self.set_action(Action::Idle) }, // no impact land
             Some(_) => self.set_action(Action::Land)
         }
 
         self.y_vel = 0.0;
+        self.kb_y_vel = 0.0;
+        self.hitstun = 0.0;
         self.fastfalled = false;
         self.air_jumps_left = fighter.air_jumps;
         self.hit_by = None;
