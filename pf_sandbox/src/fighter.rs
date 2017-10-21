@@ -20,8 +20,9 @@ impl Default for Fighter {
             };
             action_def_new.frames[0].ledge_cancel = match action {
                 Action::Teeter | Action::TeeterIdle |
-                Action::TechB  | Action::TechF |
                 Action::RollB  | Action::RollF |
+                Action::TechB  | Action::TechF |
+                Action::MissedTechGetupB | Action::MissedTechGetupF |
                 Action::SpotDodge
                   => false,
                 _ => true
@@ -216,11 +217,12 @@ pub struct ActionFrame {
     pub colboxes:       ContextVec<CollisionBox>,
     pub colbox_links:   Vec<CollisionBoxLink>,
     pub render_order:   Vec<RenderOrder>,
-    pub effects:        Vec<FrameEffect>,
     pub item_hold_x:    f32,
     pub item_hold_y:    f32,
     pub grab_hold_x:    f32,
     pub grab_hold_y:    f32,
+    pub set_x_vel:      Option<f32>,
+    pub set_y_vel:      Option<f32>,
     pub pass_through:   bool, // only used on aerial actions
     pub ledge_cancel:   bool, // only used on ground actions
     // TODO: pub land_cancel: bool // only used on aerial attacks
@@ -234,12 +236,13 @@ impl Default for ActionFrame {
             colboxes:       ContextVec::new(),
             colbox_links:   vec!(),
             render_order:   vec!(),
-            effects:        vec!(),
             ecb:            ECB::default(),
             item_hold_x:    4.0,
             item_hold_y:    11.0,
             grab_hold_x:    4.0,
             grab_hold_y:    11.0,
+            set_x_vel:      None,
+            set_y_vel:      None,
             pass_through:   true,
             ledge_cancel:   true,
             ledge_grab_box: None,
@@ -602,18 +605,6 @@ pub enum Action {
 impl Default for Action {
     fn default() -> Action {
         Action::Spawn
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Node)]
-pub enum FrameEffect {
-    Velocity     {x: f32, y: f32},
-    Acceleration {x: f32, y: f32},
-}
-
-impl Default for FrameEffect {
-    fn default() -> FrameEffect {
-        FrameEffect::Velocity { x: 0.0, y: 0.0 }
     }
 }
 

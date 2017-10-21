@@ -82,7 +82,7 @@ Use the following keys to toggle debug displays:
 *   F2 - Input
 *   F2 + Shift - Input difference
 *   F3 - Current action
-*   F4 - Frame (terminal only)
+*   F4 - Timers and Counters
 *   F5 - Main stick vector
 *   F6 - CStick vector
 *   F7 - DI vector

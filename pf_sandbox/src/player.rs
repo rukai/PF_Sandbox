@@ -65,7 +65,7 @@ pub struct Player {
     pub c_stick:            Option<(f32, f32)>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
+#[derive(Clone, Debug, Serialize, Deserialize, Node)]
 pub enum LockTimer {
     Active (u64),
     Locked (u64),
@@ -1726,18 +1726,8 @@ impl Player {
             }
         }
 
-        // fix effects
-        let mut relative_effects: Vec<FrameEffect> = vec!();
-        for effect in frame.effects {
-            relative_effects.push(
-                match effect {
-                    FrameEffect::Velocity     { x, y } => { FrameEffect::Velocity     { x: self.relative_f(x), y: y } },
-                    FrameEffect::Acceleration { x, y } => { FrameEffect::Acceleration { x: self.relative_f(x), y: y } },
-                    //_                                  => { effect }, // When the time comes, uncomment this
-                }
-            );
-        }
-        frame.effects = relative_effects;
+        // fix velocity setter
+        frame.set_x_vel = frame.set_x_vel.map(|x| self.relative_f(x));
         frame
     }
 
@@ -1775,6 +1765,7 @@ impl Player {
     pub fn physics_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
         if let Hitlag::None = self.hitlag {
             let fighter = &fighters[self.fighter.as_ref()];
+            let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
 
             if self.kb_x_vel.abs() > 0.0 {
                 let vel_dir = self.kb_x_vel.signum();
@@ -1801,10 +1792,23 @@ impl Player {
                 }
             }
 
+            // calculate velocity
+            let x_vel = if let Some(x_vel) = fighter_frame.set_x_vel {
+                self.relative_f(x_vel) + self.kb_x_vel
+            } else {
+                self.x_vel + self.kb_x_vel
+            };
+            let y_vel = if let Some(y_vel) = fighter_frame.set_y_vel {
+                self.relative_f(y_vel) + self.kb_y_vel
+            } else {
+                self.y_vel + self.kb_y_vel
+            };
+
+            // update position
             match self.location.clone() {
                 Location::Airbourne { x, y } => {
-                    let new_x = x + self.x_vel + self.kb_x_vel;
-                    let new_y = y + self.y_vel + self.kb_y_vel;
+                    let new_x = x + x_vel;
+                    let new_y = y + y_vel;
                     if let Some(platform_i) = self.land_stage_collision(fighter, stage, (x, y), (new_x, new_y), input) {
                         let x = stage.platforms[platform_i].world_x_to_plat_x(new_x);
                         self.land(fighter, input, platform_i, x);
@@ -1814,7 +1818,7 @@ impl Player {
                 }
                 Location::Platform { platform_i, mut x } => {
                     let platform = &stage.platforms[platform_i];
-                    x += self.x_vel + self.kb_x_vel;
+                    x += x_vel;
                     if stage.platforms.get(platform_i).map_or(false, |plat| plat.plat_x_in_bounds(x)) {
                         self.location = Location::Platform { platform_i, x };
                     }
@@ -2152,22 +2156,13 @@ impl Player {
             let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
             let iasa = fighter.actions[self.action as usize].iasa;
 
-            lines.push(format!("Player: {}    action: {:?}    frame: {}/{}    IASA: {}",
-                index, action, self.frame, action_frames, iasa));
+            lines.push(format!("Player: {}    action: {:?}    frame: {}/{}    frame no restart: {}    IASA: {}",
+                index, action, self.frame, action_frames, self.frame_norestart, iasa));
         }
 
         if debug.frame {
-            let frames = &fighter.actions[self.action as usize].frames;
-            if frames.len() > self.frame as usize {
-                let frame = &frames[self.frame as usize];
-                let hitbox_count = frame.colboxes.len();
-                let effects_count = frame.effects.len();
-                lines.push(format!("Player: {}    colboxes: {}    effects: {}",
-                    index, hitbox_count, effects_count));
-            }
-            else {
-                lines.push(format!("Player: {}    frame {} does not exist.", index, self.frame));
-            }
+            lines.push(format!("Player: {}    shield HP: {:.5}    hitstun: {:.5}    hitlag: {:?}    tech_timer: {:?}",
+                index, self.shield_hp, self.hitstun, self.hitlag, self.tech_timer));
         }
         lines
     }
@@ -2361,7 +2356,7 @@ impl Player {
                 y:           y,
                 angle:       rng.gen_range(0.0, 2.0 * PI),
                 p_type:      ParticleType::Spark {
-                    x_vel:      if self.face_right { rng.gen_range(-0.3, 0.0) }  else { rng.gen_range(0.0, 0.3) },
+                    x_vel:      if self.face_right { rng.gen_range(-0.3, 0.0) } else { rng.gen_range(0.0, 0.3) },
                     y_vel:      rng.gen_range(0.0, 0.3),
                     size:       rng.gen_range(1.0, 3.0),
                     angle_vel:  rng.gen_range(0.0, 1.0),

@@ -311,7 +311,7 @@ impl Game {
             self.saved_frame = self.current_frame;
         }
         else if os_input.key_pressed(VirtualKeyCode::I) {
-            self.jump_frame();
+            //self.jump_frame(); // TODO: Fix
         }
         else if os_input.key_pressed(VirtualKeyCode::Return) {
             self.state = GameState::Local;
@@ -646,15 +646,16 @@ impl Game {
     }
 
     /// Jump to the saved frame in history
-    fn jump_frame(&mut self) {
-        let frame = self.saved_frame;
-        if (frame+1) < self.player_history.len() {
-            self.players = self.player_history.get(frame).unwrap().clone();
+    // TODO: FIX
+    //fn jump_frame(&mut self) {
+    //    let frame = self.saved_frame;
+    //    if (frame+1) < self.player_history.len() {
+    //        self.players = self.player_history.get(frame).unwrap().clone();
 
-            self.current_frame = frame;
-            self.update_frame();
-        }
-    }
+    //        self.current_frame = frame;
+    //        self.update_frame();
+    //    }
+    //}
 
     fn get_seed(&self) -> Vec<usize> {
         let mut seed = self.init_seed.clone();
