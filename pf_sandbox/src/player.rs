@@ -387,7 +387,7 @@ impl Player {
                     } else {
                         hitbox.angle
                     };
-                    let angle = angle_deg * PI / 180.0 + if angle_deg < 0.0 { PI * 2.0 } else { 0.0 };
+                    let angle = angle_deg.to_radians() + if angle_deg < 0.0 { PI * 2.0 } else { 0.0 };
 
                     // debug data
                     self.hit_angle_pre_di = Some(angle);
@@ -468,7 +468,7 @@ impl Player {
 
     /// 0 < angle < 2pi
     fn di(input: &PlayerInput, angle: f32) -> f32 {
-        let range = 18.0 * PI / 180.0;
+        let range = 18f32.to_radians();
         let x = input[0].stick_x;
         let y = input[0].stick_y;
 
@@ -2259,7 +2259,7 @@ impl Player {
             counter_max: 2,
             x:           point.0,
             y:           point.1,
-            angle:       hitbox.angle / 180.0 * PI,
+            angle:       hitbox.angle.to_radians(),
             p_type:      ParticleType::Hit {
                 knockback: hitbox.bkb + hitbox.kbg * 70.0, // TODO: get actual knockback
                 damage:    hitbox.damage, // TODO: get actual damage

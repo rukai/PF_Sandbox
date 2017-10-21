@@ -131,9 +131,9 @@ impl Platform {
     /// If it goes beyond the range of the platform, it is clamped to the edges
     pub fn world_x_to_plat_x_clamp(&self, world_x: f32) -> f32 {
         if world_x > self.x1 && world_x > self.x2 {
-            self.x1.max(self.x2)
+            (self.x2 - self.x1).abs() / 2.0
         } else if world_x < self.x1 && world_x < self.x2 {
-            self.x1.min(self.x2)
+            (self.x2 - self.x1).abs() / -2.0
         } else {
             world_x - (self.x1 + self.x2) / 2.0
         }
