@@ -425,6 +425,9 @@ impl<'a> VulkanGraphics<'a> {
                 match Action::from_index(player.action as u64) {
                     Some(Action::Eliminated) => { }
                     _ => {
+                        let c = player.fighter_color.clone();
+                        let color = [c[0], c[1], c[2], 1.0];
+
                         if let Some(stocks) = player.stocks {
                             let stocks_string = if stocks > 5 {
                                 format!("⬤ x {}", stocks)
@@ -435,9 +438,9 @@ impl<'a> VulkanGraphics<'a> {
                                 }
                                 stocks_string
                             };
-                            self.draw_text.queue_text(location + 10.0, self.height as f32 - 130.0, 22.0, player.fighter_color, stocks_string.as_ref());
+                            self.draw_text.queue_text(location + 10.0, self.height as f32 - 130.0, 22.0, color, stocks_string.as_ref());
                         }
-                        self.draw_text.queue_text(location, self.height as f32 - 47.0, 110.0, player.fighter_color, format!("{}%", player.damage).as_ref());
+                        self.draw_text.queue_text(location, self.height as f32 - 47.0, 110.0, color, format!("{}%", player.damage).as_ref());
                     }
                 }
             }
@@ -561,7 +564,8 @@ impl<'a> VulkanGraphics<'a> {
                             let edge_color = if player.fighter_selected {
                                 [0.0, 1.0, 0.0, 1.0]
                             } else {
-                                player.fighter_color
+                                let c = player.fighter_color.clone();
+                                [c[0], c[1], c[2], 1.0]
                             };
                             let transformation = position * dir;
 
@@ -602,6 +606,7 @@ impl<'a> VulkanGraphics<'a> {
                     let triangle_buffers = Buffers::new_triangle(self.device.clone());
                     let jump_buffers = Buffers::new_circle(self.device.clone());
                     for particle in &player.particles {
+                        let c = particle.color.clone();
                         match &particle.p_type {
                             &ParticleType::Spark { size, background, .. } => {
                                 let rotate = Matrix4::from_angle_z(Rad(particle.angle));
@@ -613,13 +618,13 @@ impl<'a> VulkanGraphics<'a> {
                                     if background { z_particle_bg } else { z_particle_fg }
                                 ));
                                 let transformation = position * rotate * size;
-                                command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, triangle_buffers.clone(), &transformation, player.fighter_color.clone(), player.fighter_color.clone())
+                                let color = [c[0], c[1], c[2], 1.0];
+                                command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, triangle_buffers.clone(), &transformation, color, color)
                             }
                             &ParticleType::AirJump => {
                                 let size = Matrix4::from_nonuniform_scale(3.0 + particle.counter_mult(), 1.15 + particle.counter_mult(), 1.0);
                                 let position = Matrix4::from_translation(Vector3::new(particle.x + pan.0, particle.y + pan.1, z_particle_bg));
                                 let transformation = position * size;
-                                let c = player.fighter_color.clone();
                                 let color = [c[0], c[1], c[2], (1.0 - particle.counter_mult()) * 0.7];
                                 command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, jump_buffers.clone(), &transformation, color, color)
                             }
@@ -839,7 +844,7 @@ impl<'a> VulkanGraphics<'a> {
 
     fn draw_player_result(&mut self, result: &PlayerResult, start_x: f32) {
         let fighter_name = self.package_buffers.package.as_ref().unwrap().fighters[result.fighter.as_ref()].name.as_ref();
-        let color = graphics::get_team_color(result.team);
+        let color = graphics::get_team_color4(result.team);
         let x = (start_x + 0.05) * self.width as f32;
         let mut y = 100.0;
         self.draw_text.queue_text(x, y, 100.0, color, (result.place + 1).to_string().as_ref());
@@ -871,7 +876,7 @@ impl<'a> VulkanGraphics<'a> {
                         team = controller_selection.team;
                     }
                 }
-                graphics::get_team_color(team)
+                graphics::get_team_color4(team)
             } else {
                 [0.5, 0.5, 0.5, 1.0]
             };
@@ -926,14 +931,14 @@ impl<'a> VulkanGraphics<'a> {
                 PlayerSelectUi::CpuFighter (_) => {
                     if let Some(selected_option_i) = selection.fighter {
                         if selected_option_i == option_i {
-                            color = graphics::get_team_color(selection.team);
+                            color = graphics::get_team_color4(selection.team);
                         }
                     }
                 }
                 PlayerSelectUi::HumanTeam (_) |
                 PlayerSelectUi::CpuTeam (_) => {
                     if option_i < graphics::get_colors().len() {
-                        color = graphics::get_team_color(option_i);
+                        color = graphics::get_team_color4(option_i);
                     }
                 }
                 _ => { }
@@ -945,8 +950,6 @@ impl<'a> VulkanGraphics<'a> {
         for (fighter_i, fighter_key) in fighters.key_iter().enumerate() {
             if let Some(selection_i) = selection.fighter {
                 if fighter_i == selection_i {
-                    let color = graphics::get_team_color(selection.team);
-
                     // fudge player data (One day I would like to have the menu selection fighters (mostly) playable)
                     let player = RenderPlayer {
                         team:              selection.team,
@@ -959,7 +962,7 @@ impl<'a> VulkanGraphics<'a> {
                         action:            Action::Idle as usize,
                         fighter:           fighter_key.clone(),
                         face_right:        start_x < 0.0,
-                        fighter_color:     color,
+                        fighter_color:     graphics::get_team_color3(selection.team),
                         fighter_selected:  false,
                         player_selected:   false,
                         selected_colboxes: HashSet::new(),
@@ -985,9 +988,9 @@ impl<'a> VulkanGraphics<'a> {
                             let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
                             let transformation = camera * (position * dir);
                             let uniform = vs::ty::Data {
-                                edge_color:      color,
-                                color:           [1.0, 1.0, 1.0, 1.0],
-                                transformation:  transformation.into(),
+                                edge_color:     graphics::get_team_color4(selection.team),
+                                color:          [1.0, 1.0, 1.0, 1.0],
+                                transformation: transformation.into(),
                             };
                             let set = self.new_uniform_set(uniform);
 

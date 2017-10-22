@@ -32,10 +32,16 @@ pub fn get_render_id(role: &CollisionBoxRole) -> f32 {
     }
 }
 
-pub fn get_team_color(i: usize) -> [f32; 4] {
+pub fn get_team_color4(i: usize) -> [f32; 4] {
     let colors = get_colors();
     let color = colors[i % colors.len()].value;
     [color[0]/255.0, color[1]/255.0, color[2]/255.0, 1.0]
+}
+
+pub fn get_team_color3(i: usize) -> [f32; 3] {
+    let colors = get_colors();
+    let color = colors[i % colors.len()].value;
+    [color[0]/255.0, color[1]/255.0, color[2]/255.0]
 }
 
 pub struct Color {

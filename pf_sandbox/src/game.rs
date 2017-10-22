@@ -21,7 +21,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::time::Duration;
 use chrono::Local;
-use enum_traits::ToIndex;
+use enum_traits::{FromIndex, ToIndex};
 
 use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};
@@ -322,8 +322,18 @@ impl Game {
                 let fighter_string = self.players[player].fighter.clone();
                 let fighter = fighter_string.as_ref();
                 let action = self.players[player].action as usize;
+                let action_enum = Action::from_index(self.players[player].action);
                 let frame  = self.players[player].frame as usize;
+                let land_frame_skip  = self.players[player].land_frame_skip;
                 self.set_debug(os_input, player);
+
+                // by adding the same amount of frames that are skipped in the player logic,
+                // the user continues to see the same frames as they step through the action
+                let repeat_frames = if action_enum.as_ref().map_or(false, |x| x.is_land()) {
+                     land_frame_skip + 1
+                } else {
+                    1
+                };
 
                 // move collisionboxes
                 if self.selector.moving {
@@ -353,26 +363,30 @@ impl Game {
 
                     // new frame
                     if os_input.key_pressed(VirtualKeyCode::M) {
-                        self.package.new_fighter_frame(fighter, action, frame);
+                        for i in 0..repeat_frames {
+                            self.package.new_fighter_frame(fighter, action, frame + i as usize);
+                        }
                         // We want to step just the players current frame to simplify the animation work flow
                         // However we need to do a proper full step so that the history doesn't get mucked up.
                         self.step_local(input);
                     }
                     // delete frame
                     if os_input.key_pressed(VirtualKeyCode::N) {
-                        if self.package.delete_fighter_frame(fighter, action, frame) {
-                            // Correct any players that are now on a nonexistent frame due to the frame deletion.
-                            // This is purely to stay on the same action for usability.
-                            // The player itself must handle being on a frame that has been deleted in order for replays to work.
-                            for any_player in &mut self.players {
-                                if any_player.fighter == fighter && any_player.action as usize == action
-                                    && any_player.frame as usize == self.package.fighters[fighter].actions[action].frames.len()
-                                {
-                                    any_player.frame -= 1;
+                        let i = 0; //for i in 0..repeat_frames { // TODO: Panic
+                            if self.package.delete_fighter_frame(fighter, action, frame - i as usize) {
+                                // Correct any players that are now on a nonexistent frame due to the frame deletion.
+                                // This is purely to stay on the same action for usability.
+                                // The player itself must handle being on a frame that has been deleted in order for replays to work.
+                                for any_player in &mut self.players {
+                                    if any_player.fighter == fighter && any_player.action as usize == action
+                                        && any_player.frame as usize == self.package.fighters[fighter].actions[action].frames.len()
+                                    {
+                                        any_player.frame -= 1;
+                                    }
                                 }
+                                self.update_frame();
                             }
-                            self.update_frame();
-                        }
+                        //}
                     }
 
                     // start move collisionbox

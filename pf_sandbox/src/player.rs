@@ -17,54 +17,6 @@ use rand::StdRng;
 use rand::Rng;
 use enum_traits::{FromIndex, ToIndex};
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
-pub struct Player {
-    pub fighter:            String,
-    pub team:               usize,
-    pub action:             u64, // always change through self.set_action
-    pub frame:              u64,
-    pub frame_norestart:    u64, // Used to keep track of total frames passed on states that loop
-    pub stocks:             Option<u64>,
-    pub damage:             f32,
-    pub location:           Location,
-    pub respawn:            SpawnPoint,
-    pub x_vel:              f32,
-    pub y_vel:              f32,
-    pub kb_x_vel:           f32,
-    pub kb_y_vel:           f32,
-    pub kb_x_dec:           f32,
-    pub kb_y_dec:           f32,
-    pub face_right:         bool,
-    pub frames_since_ledge: u64,
-    pub ledge_idle_timer:   u64,
-    pub fastfalled:         bool,
-    pub air_jumps_left:     u64,
-    pub jumpsquat_button:   bool,
-    pub turn_dash_buffer:   bool,
-    pub shield_hp:          f32,
-    pub shield_analog:      f32,
-    pub shield_offset_x:    f32,
-    pub shield_offset_y:    f32,
-    pub stun_timer:         u64,
-    pub shield_stun_timer:  u64,
-    pub parry_timer:        u64,
-    pub tech_timer:         LockTimer,
-    pub ecb:                ECB,
-    pub hitlist:            Vec<usize>,
-    pub hitlag:             Hitlag,
-    pub hitstun:            f32,
-    pub hit_by:             Option<usize>,
-    pub particles:          Vec<Particle>,
-    pub result:             RawPlayerResult,
-
-    // Only use for debug display
-    pub frames_since_hit:   u64,
-    pub hit_angle_pre_di:   Option<f32>,
-    pub hit_angle_post_di:  Option<f32>,
-    pub stick:              Option<(f32, f32)>,
-    pub c_stick:            Option<(f32, f32)>,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, Node)]
 pub enum LockTimer {
     Active (u64),
@@ -153,6 +105,57 @@ impl Hitlag {
     }
 }
 
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct Player {
+    pub fighter:            String,
+    pub team:               usize,
+    pub action:             u64, // always change through self.set_action
+    pub frame:              u64,
+    pub frame_norestart:    u64, // Used to keep track of total frames passed on states that loop
+    pub stocks:             Option<u64>,
+    pub damage:             f32,
+    pub location:           Location,
+    pub respawn:            SpawnPoint,
+    pub x_vel:              f32,
+    pub y_vel:              f32,
+    pub kb_x_vel:           f32,
+    pub kb_y_vel:           f32,
+    pub kb_x_dec:           f32,
+    pub kb_y_dec:           f32,
+    pub face_right:         bool,
+    pub frames_since_ledge: u64,
+    pub ledge_idle_timer:   u64,
+    pub fastfalled:         bool,
+    pub air_jumps_left:     u64,
+    pub jumpsquat_button:   bool,
+    pub turn_dash_buffer:   bool,
+    pub shield_hp:          f32,
+    pub shield_analog:      f32,
+    pub shield_offset_x:    f32,
+    pub shield_offset_y:    f32,
+    pub stun_timer:         u64,
+    pub shield_stun_timer:  u64,
+    pub parry_timer:        u64,
+    pub tech_timer:         LockTimer,
+    pub lcancel_timer:      u64,
+    pub land_frame_skip:    u8,
+    pub ecb:                ECB,
+    pub hitlist:            Vec<usize>,
+    pub hitlag:             Hitlag,
+    pub hitstun:            f32,
+    pub hit_by:             Option<usize>,
+    pub particles:          Vec<Particle>,
+    pub aerial_dodge_frame: Option<u64>,
+    pub result:             RawPlayerResult,
+
+    // Only use for debug display
+    pub frames_since_hit:  u64,
+    pub hit_angle_pre_di:  Option<f32>,
+    pub hit_angle_post_di: Option<f32>,
+    pub stick:             Option<(f32, f32)>,
+    pub c_stick:           Option<(f32, f32)>,
+}
+
 impl Player {
     pub fn new(fighter: String, team: usize, spawn: SpawnPoint, respawn: SpawnPoint, package: &Package) -> Player {
         Player {
@@ -185,21 +188,24 @@ impl Player {
             shield_stun_timer:  0,
             parry_timer:        0,
             tech_timer:         LockTimer::default(),
+            lcancel_timer:      0,
+            land_frame_skip:    0,
             ecb:                ECB::default(),
             hitlist:            vec!(),
             hitlag:             Hitlag::None,
             hitstun:            0.0,
             hit_by:             None,
             particles:          vec!(),
+            aerial_dodge_frame: None,
             result:             RawPlayerResult::default(),
             fighter:            fighter,
 
             // Only use for debug display
-            frames_since_hit:   0,
-            hit_angle_pre_di:   None,
-            hit_angle_post_di:  None,
-            stick:              None,
-            c_stick:            None,
+            frames_since_hit:  0,
+            hit_angle_pre_di:  None,
+            hit_angle_post_di: None,
+            stick:             None,
+            c_stick:           None,
         }
     }
 
@@ -323,6 +329,10 @@ impl Player {
 
     fn interruptible(&self, fighter: &Fighter) -> bool {
         self.frame >= fighter.actions[self.action as usize].iasa
+    }
+
+    fn first_interruptible(&self, fighter: &Fighter) -> bool {
+        self.frame == fighter.actions[self.action as usize].iasa
     }
 
     pub fn step_collision(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], col_results: &[CollisionResult]) {
@@ -558,13 +568,14 @@ impl Player {
                 Action::CrouchEnd
                 => self.ground_idle_action(input, fighter),
 
-                Action::FairLand  | Action::BairLand |
-                Action::UairLand  | Action::DairLand |
-                Action::Land      | Action::SpecialLand
-                => self.land_action(input, rng, players, fighters, platforms),
+                Action::FairLand | Action::BairLand |
+                Action::UairLand | Action::DairLand |
+                Action::NairLand | Action::SpecialLand
+                => self.attack_land_action(input, rng, players, fighters, platforms),
 
                 Action::Teeter |
                 Action::TeeterIdle       => self.teeter_action(input, fighter),
+                Action::Land             => self.land_action(input, rng, players, fighters, platforms),
                 Action::DamageFly        => self.damage_fly_action(fighter),
                 Action::DamageFall       => self.damage_fall_action(input, players, fighters, platforms),
                 Action::Damage           => self.damage_action(fighter),
@@ -614,6 +625,17 @@ impl Player {
 
         if self.shield_stun_timer > 0 {
             self.shield_stun_timer -= 1;
+        }
+
+        if self.lcancel_timer > 0 {
+            self.lcancel_timer -= 1;
+        }
+        else if input.l.press || input.r.press || input[0].l_trigger > 0.165 || input[0].r_trigger > 0.165 ||
+            input.z.press && !(self.frame == 0 && Action::from_index(self.action).as_ref().map_or(false, |x| x.is_air_attack())) // only register z press if its not from an attack
+        {
+            if let &Some(ref lcancel) = &fighter.lcancel {
+                self.lcancel_timer = lcancel.active_window;
+            }
         }
 
         self.frames_since_hit += 1;
@@ -926,6 +948,29 @@ impl Player {
         }
     }
 
+    fn attack_land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+        let fighter = &fighters[self.fighter.as_ref()];
+        let action_last_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
+        self.frame = action_last_frame.min(self.frame + self.land_frame_skip as u64);
+        self.land_particles(rng, players, fighters, platforms);
+        self.apply_friction(fighter);
+
+        if self.interruptible(fighter) {
+            if self.check_jump(input) { }
+            else if self.check_shield(input, fighter) { }
+            else if self.check_special(input) { }
+            else if self.check_smash(input) { }
+            else if self.check_attacks(input) { }
+            else if self.check_taunt(input) { }
+            else if self.check_dash(input, fighter) { }
+            else if self.check_turn(input) { }
+            else if self.check_walk(input, fighter) { }
+            else if self.first_interruptible(fighter) && input[0].stick_y < -0.5 {
+                self.set_action(Action::Crouch);
+            }
+        }
+    }
+
     fn land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let fighter = &fighters[self.fighter.as_ref()];
         self.land_particles(rng, players, fighters, platforms);
@@ -938,10 +983,12 @@ impl Player {
             else if self.check_smash(input) { }
             else if self.check_attacks(input) { }
             else if self.check_taunt(input) { }
-            else if self.check_crouch(input) { }
             else if self.check_dash(input, fighter) { }
             else if self.check_turn(input) { }
             else if self.check_walk(input, fighter) { }
+            else if self.first_interruptible(fighter) && input[0].stick_y < -0.5 {
+                self.set_action(Action::Crouch);
+            }
         }
     }
 
@@ -1976,7 +2023,16 @@ impl Player {
     }
 
     fn land(&mut self, fighter: &Fighter, input: &PlayerInput, platform_i: usize, x: f32) {
-        match Action::from_index(self.action) {
+        let action = Action::from_index(self.action);
+
+        self.land_frame_skip = if action.as_ref().map_or(false, |x| x.is_air_attack()) && self.lcancel_timer > 0 { 1 }
+        else if action.as_ref().map_or(false, |x| x.is_aerial_dodge()) { 2 }
+        else { 0 };
+
+        self.aerial_dodge_frame = if action.as_ref().map_or(false, |x| x.is_aerial_dodge())
+            { Some(self.frame) } else { None };
+
+        match action {
             Some(Action::Uair)            => self.set_action(Action::UairLand),
             Some(Action::Dair)            => self.set_action(Action::DairLand),
             Some(Action::Fair)            => self.set_action(Action::FairLand),
@@ -2161,14 +2217,14 @@ impl Player {
         }
 
         if debug.frame {
-            lines.push(format!("Player: {}    shield HP: {:.5}    hitstun: {:.5}    hitlag: {:?}    tech_timer: {:?}",
-                index, self.shield_hp, self.hitstun, self.hitlag, self.tech_timer));
+            lines.push(format!("Player: {}    shield HP: {:.5}    hitstun: {:.5}    hitlag: {:?}    tech timer: {:?}    lcancel timer: {}",
+                index, self.shield_hp, self.hitstun, self.hitlag, self.tech_timer, self.lcancel_timer));
         }
         lines
     }
 
     pub fn render(&self, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> RenderPlayer {
-        let fighter_color = graphics::get_team_color(self.team);
+        let fighter_color = graphics::get_team_color3(self.team);
         let fighter = &fighters[self.fighter.as_ref()];
         let mut vector_arrows = vec!();
         if debug.stick_vector {
@@ -2250,6 +2306,7 @@ impl Player {
 
     pub fn hit_particles(&mut self, point: (f32, f32), hitbox: &HitBox) {
         self.particles.push(Particle {
+            color:       graphics::get_team_color3(self.team),
             counter:     0,
             counter_max: 2,
             x:           point.0,
@@ -2265,6 +2322,7 @@ impl Player {
     pub fn air_jump_particles(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
         let (x, y) = self.bps_xy(players, fighters, platforms);
         self.particles.push(Particle {
+            color:       graphics::get_team_color3(self.team),
             counter:     0,
             counter_max: 40,
             x:           x,
@@ -2287,6 +2345,7 @@ impl Player {
 
         for _ in 0..num {
             self.particles.push(Particle {
+                color:       graphics::get_team_color3(self.team),
                 counter:     0,
                 counter_max: 30,
                 x:           x,
@@ -2304,7 +2363,7 @@ impl Player {
     }
 
     pub fn land_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
-        let num = match self.frame {
+        let num = match self.frame_norestart { // use _norestart instead as it doesnt get skipped during lcancel
             1 => 1,
             2 => 1,
             3 => 2,
@@ -2315,9 +2374,20 @@ impl Player {
         };
 
         let (x, y) = self.bps_xy(players, fighters, platforms);
+        let action = Action::from_index(self.action);
+
+        let color = if
+            action.map_or(false, |x| x.is_attack_land()) && self.land_frame_skip == 0 || // missed LCancel
+            self.aerial_dodge_frame.map_or(false, |x| x > 0) // imperfect wavedash
+        {
+            [1.0, 1.0, 1.0]
+        } else {
+            graphics::get_team_color3(self.team)
+        };
 
         for _ in 0..num {
             self.particles.push(Particle {
+                color,
                 counter:     0,
                 counter_max: 40,
                 x:           x,
@@ -2350,6 +2420,7 @@ impl Player {
 
         for _ in 0..num {
             self.particles.push(Particle {
+                color:       graphics::get_team_color3(self.team),
                 counter:     0,
                 counter_max: 40,
                 x:           x + x_offset,
@@ -2393,7 +2464,7 @@ pub struct RenderPlayer {
     pub action:            usize,
     pub fighter:           String,
     pub face_right:        bool,
-    pub fighter_color:     [f32; 4],
+    pub fighter_color:     [f32; 3],
     pub fighter_selected:  bool,
     pub player_selected:   bool,
     pub selected_colboxes: HashSet<usize>,

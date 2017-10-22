@@ -148,15 +148,17 @@ impl Default for Tech {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct LCancel {
-    pub input_window:   u64,
-    pub lag_multiplier: f32, // use value < 1.0
+    pub active_window: u64,
+    pub frame_skip:    u8,
+    pub normal_land:   bool,
 }
 
 impl Default for LCancel {
     fn default() -> Self {
         LCancel {
-            input_window:   11,
-            lag_multiplier: 0.5
+            active_window: 7,
+            frame_skip:    1,
+            normal_land:   false
         }
     }
 }
@@ -605,6 +607,46 @@ pub enum Action {
 impl Default for Action {
     fn default() -> Action {
         Action::Spawn
+    }
+}
+
+impl Action {
+    pub fn is_air_attack(&self) -> bool {
+        match self {
+            &Action::Fair | &Action::Bair |
+            &Action::Uair | &Action::Dair |
+            &Action::Nair
+              => true,
+            _ => false
+        }
+    }
+
+    pub fn is_attack_land(&self) -> bool {
+        match self {
+            &Action::FairLand | &Action::BairLand |
+            &Action::UairLand | &Action::DairLand |
+            &Action::NairLand
+              => true,
+            _ => false
+        }
+    }
+
+    pub fn is_land(&self) -> bool {
+        match self {
+            &Action::FairLand | &Action::BairLand |
+            &Action::UairLand | &Action::DairLand |
+            &Action::NairLand | &Action::SpecialLand |
+            &Action::Land
+              => true,
+            _ => false
+        }
+    }
+
+    pub fn is_aerial_dodge(&self) -> bool {
+        match self {
+            &Action::AerialDodge => true,
+            _                    => false
+        }
     }
 }
 

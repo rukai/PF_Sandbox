@@ -1,13 +1,20 @@
 use treeflection::{Node, NodeRunner, NodeToken};
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Particle {
+    pub color:       [f32; 3],
     pub counter:     u32,
     pub counter_max: u32,
     pub x:           f32,
     pub y:           f32,
     pub angle:       f32,
     pub p_type:      ParticleType
+}
+
+impl Node for Particle {
+    fn node_step(&mut self, _: NodeRunner) -> String {
+        String::from("TODO: Unimplemented")
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]
