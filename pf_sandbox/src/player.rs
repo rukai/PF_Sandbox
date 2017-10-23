@@ -1864,30 +1864,14 @@ impl Player {
                     }
                 }
                 Location::Platform { platform_i, mut x } => {
-                    let platform = &stage.platforms[platform_i];
                     x += x_vel;
-                    if stage.platforms.get(platform_i).map_or(false, |plat| plat.plat_x_in_bounds(x)) {
-                        self.location = Location::Platform { platform_i, x };
-                    }
-                    else if !fighter.actions[self.action as usize].frames[self.frame as usize].ledge_cancel {
-                        self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
-                    }
-                    else if self.face_right && x < 0.0 || !self.face_right && x >= 0.0 || // facing away from the ledge
-                      self.relative_f(input.stick_x.value) > 0.6
-                    {
-                        // fall
-                        self.set_action(Action::Fall);
-                        self.set_airbourne(players, fighters, &stage.platforms);
 
-                        // force set past platform
-                        let x_offset = if x > 0.0 { 0.000001 } else { -0.000001 }; // just being cautious, probably dont need this
-                        let (air_x, air_y) = platform.plat_x_to_world_p(x + x_offset);
-                        self.location = Location::Airbourne { x: air_x, y: air_y };
+                    if let Some(platform) = stage.platforms.get(platform_i) {
+                        self.move_off_floor(input, players, fighters, stage, platform, platform_i, x);
                     }
                     else {
-                        self.x_vel = 0.0;
-                        self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
-                        self.set_action(Action::Teeter);
+                        self.set_action(Action::Fall); // TODO: use miss step state ^.^
+                        self.set_airbourne(players, fighters, &stage.platforms);
                     }
                 }
                 _ => { }
@@ -1908,6 +1892,48 @@ impl Player {
                     self.check_ledge_grab(players, &fighter, &ledge_grab_box, &stage.platforms);
                 }
             }
+        }
+    }
+
+    fn move_off_floor(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, platform: &Platform, platform_i: usize, x: f32) {
+        let fighter = &fighters[self.fighter.as_ref()];
+        let connected_floors = stage.connected_floors(platform_i);
+        if platform.plat_x_in_bounds(x) {
+            self.location = Location::Platform { platform_i, x };
+        }
+        else if x < 0.0 && connected_floors.left_i.is_some() {
+            let new_platform_i = connected_floors.left_i.unwrap();
+            let new_platform = &stage.platforms[new_platform_i];
+            let world_x = platform.plat_x_to_world_x(x);
+            let x = new_platform.world_x_to_plat_x(world_x);
+            self.move_off_floor(input, players, fighters, stage, new_platform, new_platform_i, x);
+        }
+        else if x > 0.0 && connected_floors.right_i.is_some() {
+            let new_platform_i = connected_floors.right_i.unwrap();
+            let new_platform = &stage.platforms[new_platform_i];
+            let world_x = platform.plat_x_to_world_x(x);
+            let x = new_platform.world_x_to_plat_x(world_x);
+            self.move_off_floor(input, players, fighters, stage, new_platform, new_platform_i, x);
+        }
+        else if !fighter.actions[self.action as usize].frames[self.frame as usize].ledge_cancel {
+            self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
+        }
+        else if self.face_right && x < 0.0 || !self.face_right && x >= 0.0 || // facing away from the ledge
+          self.relative_f(input.stick_x.value) > 0.6
+        {
+            // fall
+            self.set_action(Action::Fall);
+            self.set_airbourne(players, fighters, &stage.platforms);
+
+            // force set past platform
+            let x_offset = if x > 0.0 { 0.000001 } else { -0.000001 }; // just being cautious, probably dont need this
+            let (air_x, air_y) = platform.plat_x_to_world_p(x + x_offset);
+            self.location = Location::Airbourne { x: air_x, y: air_y };
+        }
+        else {
+            self.x_vel = 0.0;
+            self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
+            self.set_action(Action::Teeter);
         }
     }
 

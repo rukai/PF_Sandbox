@@ -10,13 +10,6 @@ pub struct Stage {
     pub respawn_points: ContextVec<SpawnPoint>,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
-pub struct SpawnPoint {
-    pub x:          f32,
-    pub y:          f32,
-    pub face_right: bool,
-}
-
 impl Default for Stage {
     fn default() -> Stage {
         let main_platform = Platform {
@@ -89,6 +82,48 @@ impl Default for Stage {
     }
 }
 
+impl Stage {
+    /// return indexes to the floors connected to the passed floor
+    pub fn connected_floors(&self, platform_i: usize) -> FloorInfo {
+        let mut left_i = None;
+        let mut right_i = None;
+        if let Some(plat) = self.platforms.get(platform_i) {
+            for (check_i, check_plat) in self.platforms.iter().enumerate() {
+                if platform_i != check_i/* && check_plat.is_floor() TODO */ {
+                    if plat.x1 == check_plat.x1 && plat.y1 == check_plat.y1 ||
+                       plat.x1 == check_plat.x2 && plat.y1 == check_plat.y2
+                    {
+                        if plat.x1 > plat.x2 {
+                            right_i = Some(check_i);
+                        } else {
+                            left_i = Some(check_i);
+                        }
+                    }
+                    if plat.x2 == check_plat.x1 && plat.y2 == check_plat.y1 ||
+                       plat.x2 == check_plat.x2 && plat.y2 == check_plat.y2
+                    {
+                        if plat.x2 > plat.x1 {
+                            right_i = Some(check_i);
+                        } else {
+                            left_i = Some(check_i);
+                        }
+                    }
+                }
+            }
+        }
+
+        FloorInfo {
+            left_i,
+            right_i,
+        }
+    }
+}
+
+pub struct FloorInfo {
+    pub left_i:  Option<usize>,
+    pub right_i: Option<usize>,
+}
+
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Platform {
     pub x1:           f32,
@@ -100,7 +135,6 @@ pub struct Platform {
     pub traction:     f32,
     pub pass_through: bool,
 }
-
 
 /// plat_x/plat_y/plat_p is offset from the centre of the platform
 /// world_x/world_y/world_p is world coordinates
@@ -205,4 +239,11 @@ pub struct Area {
     pub right: f32,
     pub bot:   f32,
     pub top:   f32,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct SpawnPoint {
+    pub x:          f32,
+    pub y:          f32,
+    pub face_right: bool,
 }
