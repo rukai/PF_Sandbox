@@ -6,10 +6,6 @@ environment:
 
 image: Visual Studio 2015
 
-# Workaround delete tomorrow
-init:
-- ps: Disable-NetFirewallRule -DisplayName 'Core Networking - Group Policy (LSASS-Out)'
-
 install:
     # setup rust
   - curl -sSf -o rustup-init.exe https://win.rustup.rs/

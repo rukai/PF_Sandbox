@@ -29,6 +29,8 @@ use treeflection::{Node, NodeRunner, NodeToken};
 #[NodeActions(
     NodeAction(function="save_replay", return_string),
     NodeAction(function="reset_deadzones", return_string),
+    NodeAction(function="copy_stage_to_package", return_string),
+    NodeAction(function="copy_package_to_stage", return_string),
 )]
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct Game {
@@ -60,7 +62,7 @@ pub struct Game {
 /// Frame 0 refers to the initial state of the game.
 /// Any changes occur in the proceeding frames i.e. frames 1, 2, 3 ...
 
-/// All previous frame state is used to calculate the next frame then the current_frame is incremented
+/// All previous frame state is used to calculate the next frame, then the current_frame is incremented.
 
 impl Game {
     pub fn new(package: Package, config: Config, setup: GameSetup) -> Game {
@@ -152,12 +154,22 @@ impl Game {
 
     fn save_replay(&mut self) -> String {
         self.save_replay = true;
-        String::from("Save replay completed successfully")
+        String::from("Save replay completed")
     }
 
     fn reset_deadzones(&mut self) -> String {
         self.reset_deadzones = true;
-        String::from("Deadzones succuessfully reset")
+        String::from("Deadzones reset")
+    }
+
+    fn copy_stage_to_package(&mut self) -> String {
+        self.package.stages[self.selected_stage.as_ref()] = self.stage.clone();
+        String::from("Current stage state copied to package")
+    }
+
+    fn copy_package_to_stage(&mut self) -> String {
+        self.stage = self.package.stages[self.selected_stage.as_ref()].clone();
+        String::from("Package copied to current stage state")
     }
 
     pub fn check_reset_deadzones(&mut self) -> bool {

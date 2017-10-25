@@ -91,7 +91,7 @@ pub fn exists(name: &str) -> bool {
 pub struct Package {
     pub meta:               PackageMeta,
     pub rules:              Rules,
-    pub stages:             KeyedContextVec<Stage>,
+    pub stages:             KeyedContextVec<Stage>, // TODO: Can just use a std map here
     pub fighters:           KeyedContextVec<Fighter>,
         package_updates:    Vec<PackageUpdate>,
 }
