@@ -70,29 +70,22 @@ pub fn run(mut cli_results: CLIResults) {
             }
         }
 
-        let package = if let Some(package_string) = package_string {
-            Package::open_or_generate(&package_string)
-        } else {
-            None
-        };
-        let menu_state: MenuState = if let Some(_) = package {
-            MenuState::character_select()
-        } else {
-            MenuState::package_select()
-        };
-
         match cli_results.continue_from {
             ContinueFrom::Menu => {
                 (
-                    Menu::new(package, config, menu_state),
+                    Menu::new(None, config, MenuState::package_select()),
                     None,
                     os_input
                 )
             }
             ContinueFrom::Game => {
-                // handle no package
-                let package = if let Some(package) = package {
-                    package
+                let package = if let Some(package_string) = package_string {
+                    if let Some(package) = Package::open_or_generate(&package_string) {
+                        package
+                    } else {
+                        println!("Could not load selected package");
+                        return;
+                    }
                 } else {
                     println!("No package was selected.");
                     println!("As a fallback we tried to use the last used package, but that wasnt available either.");
@@ -180,7 +173,7 @@ pub fn run(mut cli_results: CLIResults) {
                     ais,
                 };
                 (
-                    Menu::new(None, config.clone(), menu_state),
+                    Menu::new(None, config.clone(), MenuState::character_select()),
                     Some(Game::new(package, config, setup)),
                     os_input
                 )
