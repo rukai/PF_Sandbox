@@ -925,7 +925,7 @@ impl Game {
 
         RenderGame {
             seed:        self.get_seed(),
-            stage:       self.selected_stage.clone(),
+            stage:       self.stage.clone(),
             entities:    entities,
             state:       self.state.clone(),
             camera:      self.camera.clone(),
@@ -1030,7 +1030,7 @@ impl Selector {
 
 pub struct RenderGame {
     pub seed:        Vec<usize>,
-    pub stage:       String,
+    pub stage:       Stage,
     pub entities:    Vec<RenderEntity>,
     pub state:       GameState,
     pub camera:      Camera,

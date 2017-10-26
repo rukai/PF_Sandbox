@@ -196,7 +196,7 @@ impl Buffers {
         }
     }
 
-    fn new_stage(device: Arc<Device>, stage: &Stage) -> Option<Buffers> {
+    pub fn new_stage(device: Arc<Device>, stage: &Stage) -> Option<Buffers> {
         if stage.platforms.len() == 0 {
             return None;
         }
@@ -372,7 +372,7 @@ impl Buffers {
 }
 
 pub struct PackageBuffers {
-    pub stages:   HashMap<String, Option<Buffers>>,
+    pub stages:   HashMap<String, Option<Buffers>>, // Only used in menu, ingame stages are recreated every frame
     pub fighters: HashMap<String, Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
     pub package:  Option<Package>,
 }

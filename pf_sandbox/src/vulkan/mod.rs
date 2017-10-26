@@ -521,8 +521,7 @@ impl<'a> VulkanGraphics<'a> {
             _ => { }
         }
 
-        let stage: &str = render.stage.as_ref();
-        if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
+        if let Some(buffers) = Buffers::new_stage(self.device.clone(), &render.stage) {
             let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
             let color = [1.0, 1.0, 1.0, 1.0];
             command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, color, color);
