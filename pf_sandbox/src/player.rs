@@ -1,13 +1,15 @@
 use ::collision::CollisionResult;
 use ::fighter::*;
+use ::geometry::Rect;
+use ::geometry;
 use ::graphics;
 use ::input::{PlayerInput};
-use ::math;
 use ::package::Package;
 use ::particle::{Particle, ParticleType};
 use ::results::{RawPlayerResult, DeathRecord};
 use ::rules::Goal;
-use ::stage::{Stage, Platform, Area, SpawnPoint};
+use ::stage::{Stage, Platform, SpawnPoint};
+use ::os_input::OsInput;
 
 use std::f32;
 use std::f32::consts::PI;
@@ -16,6 +18,7 @@ use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use rand::StdRng;
 use rand::Rng;
 use enum_traits::{FromIndex, ToIndex};
+use winit::VirtualKeyCode;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Node)]
 pub enum LockTimer {
@@ -1880,7 +1883,7 @@ impl Player {
             // death
             let blast = &stage.blast;
             let (x, y) = self.bps_xy(players, fighters, &stage.platforms);
-            if x < blast.left || x > blast.right || y < blast.bot || y > blast.top {
+            if x < blast.left() || x > blast.right() || y < blast.bot() || y > blast.top() {
                 self.die(fighter, game_frame, goal);
             }
 
@@ -1989,7 +1992,7 @@ impl Player {
 
         for (platform_i, platform) in stage.platforms.iter().enumerate() {
             if !self.pass_through_platform(fighter, platform, input) &&
-              math::segments_intersect(old_p, new_p, platform.p1(), platform.p2()) {
+              geometry::segments_intersect(old_p, new_p, platform.p1(), platform.p2()) {
                 return Some(platform_i)
             }
         }
@@ -2001,8 +2004,8 @@ impl Player {
         platform.pass_through && fighter_frame.pass_through && input[0].stick_y <= -0.56
     }
 
-    /// Returns the area sorounding the player that the camera must include
-    pub fn cam_area(&self, cam_max: &Area, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> Area {
+    /// Returns the Rect surrounding the player that the camera must include
+    pub fn cam_area(&self, cam_max: &Rect, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> Rect {
         let (x, y) = self.bps_xy(players, fighters, platforms);
         let mut left  = x;
         let mut right = x;
@@ -2018,33 +2021,33 @@ impl Player {
             right += 7.0;
         }
 
-        if left < cam_max.left {
-            let diff = left - cam_max.left;
+        if left < cam_max.left() {
+            let diff = left - cam_max.left();
             left  -= diff;
             right -= diff;
         }
-        else if right > cam_max.right {
-            let diff = right - cam_max.right;
+        else if right > cam_max.right() {
+            let diff = right - cam_max.right();
             left  -= diff;
             right -= diff;
         }
 
-        if bot < cam_max.bot {
-            let diff = bot - cam_max.bot;
+        if bot < cam_max.bot() {
+            let diff = bot - cam_max.bot();
             bot -= diff;
             top -= diff;
         }
-        else if top > cam_max.top {
-            let diff = top - cam_max.top;
+        else if top > cam_max.top() {
+            let diff = top - cam_max.top();
             bot -= diff;
             top -= diff;
         }
 
-        Area {
-            left:  left,
-            right: right,
-            bot:   bot,
-            top:   top,
+        Rect {
+            x1: left,
+            x2: right,
+            y1: bot,
+            y2: top,
         }
     }
 
@@ -2512,6 +2515,19 @@ pub struct VectorArrow {
     pub color: [f32; 4]
 }
 
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub enum RenderFighter {
+    Normal,
+    Debug,
+    None,
+}
+
+impl Default for RenderFighter {
+    fn default() -> RenderFighter {
+        RenderFighter::Normal
+    }
+}
+
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct DebugPlayer {
     pub physics:        bool,
@@ -2527,15 +2543,70 @@ pub struct DebugPlayer {
     pub cam_area:       bool,
 }
 
-#[derive(Clone, Serialize, Deserialize, Node)]
-pub enum RenderFighter {
-    Normal,
-    Debug,
-    None,
-}
-
-impl Default for RenderFighter {
-    fn default() -> RenderFighter {
-        RenderFighter::Normal
+impl DebugPlayer {
+    pub fn step(&mut self, os_input: &OsInput) {
+        if os_input.key_pressed(VirtualKeyCode::F1) {
+            self.physics = !self.physics;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F2) {
+            if os_input.held_shift() {
+                self.input_diff = !self.input_diff;
+            }
+            else {
+                self.input = !self.input;
+            }
+        }
+        if os_input.key_pressed(VirtualKeyCode::F3) {
+            self.action = !self.action;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F4) {
+            self.frame = !self.frame;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F5) {
+            self.stick_vector = !self.stick_vector;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F6) {
+            self.c_stick_vector = !self.c_stick_vector;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F7) {
+            self.di_vector = !self.di_vector;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F8) {
+            self.ecb = !self.ecb;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F9) {
+            self.fighter = match self.fighter {
+                RenderFighter::Normal => {
+                    RenderFighter::Debug
+                }
+                RenderFighter::Debug => {
+                    RenderFighter::None
+                }
+                RenderFighter::None => {
+                    RenderFighter::Normal
+                }
+            };
+        }
+        if os_input.key_pressed(VirtualKeyCode::F10) {
+            self.cam_area = !self.cam_area;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F11) {
+            *self = DebugPlayer {
+                physics:        true,
+                input:          true,
+                input_diff:     true,
+                action:         true,
+                frame:          true,
+                stick_vector:   true,
+                c_stick_vector: true,
+                di_vector:      true,
+                ecb:            true,
+                fighter:        RenderFighter::Debug,
+                cam_area:       true,
+            }
+        }
+        if os_input.key_pressed(VirtualKeyCode::F12) {
+            *self = DebugPlayer::default();
+        }
     }
 }

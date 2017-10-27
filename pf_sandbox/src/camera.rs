@@ -80,58 +80,58 @@ impl Camera {
             // grow cam_area to cover all other players
             for player in player_iter {
                 let next_area = player.cam_area(&stage.camera, players, fighters, &stage.platforms);
-                cam_area.left  = cam_area.left.min  (next_area.left);
-                cam_area.right = cam_area.right.max (next_area.right);
-                cam_area.bot   = cam_area.bot.min   (next_area.bot);
-                cam_area.top   = cam_area.top.max   (next_area.top);
+                cam_area.x1 = cam_area.x1.min(next_area.left());
+                cam_area.x2 = cam_area.x2.max(next_area.right());
+                cam_area.y1 = cam_area.y1.min(next_area.bot());
+                cam_area.y2 = cam_area.y2.max(next_area.top());
             }
 
             // grow cam_area to fill aspect ratio
-            let mut width  = (cam_area.left - cam_area.right).abs();
-            let mut height = (cam_area.bot  - cam_area.top  ).abs();
+            let mut width  = (cam_area.x1 - cam_area.x2).abs();
+            let mut height = (cam_area.y1 - cam_area.y2).abs();
             if width / height > self.aspect_ratio {
                 height = width / self.aspect_ratio;
 
                 // TODO: push changes back so it doesnt go past the stage camera area
-                let avg_vertical = (cam_area.top + cam_area.bot) / 2.0;
-                cam_area.top = avg_vertical + height / 2.0;
-                cam_area.bot = avg_vertical - height / 2.0;
+                let avg_vertical = (cam_area.y2 + cam_area.y1) / 2.0;
+                cam_area.y2 = avg_vertical + height / 2.0;
+                cam_area.y1 = avg_vertical - height / 2.0;
             }
             else {
                 width = height * self.aspect_ratio;
 
                 // TODO: push changes back so it doesnt go past the stage camera area
-                let avg_horizontal = (cam_area.right + cam_area.left) / 2.0;
-                cam_area.right = avg_horizontal + width / 2.0;
-                cam_area.left  = avg_horizontal - width / 2.0;
+                let avg_horizontal = (cam_area.x2 + cam_area.x1) / 2.0;
+                cam_area.x2 = avg_horizontal + width / 2.0;
+                cam_area.x1 = avg_horizontal - width / 2.0;
             }
 
             // push aspect_ratio changes back so it doesnt go past the stage camera area
             let cam_max = &stage.camera;
-            if cam_area.left < cam_max.left {
-                let diff = cam_area.left - cam_max.left;
-                cam_area.left  -= diff;
-                cam_area.right -= diff;
+            if cam_area.x1 < cam_max.left() {
+                let diff = cam_area.x1 - cam_max.left();
+                cam_area.x1 -= diff;
+                cam_area.x2 -= diff;
             }
-            else if cam_area.right > cam_max.right {
-                let diff = cam_area.right - cam_max.right;
-                cam_area.left  -= diff;
-                cam_area.right -= diff;
+            else if cam_area.x2 > cam_max.right() {
+                let diff = cam_area.x2 - cam_max.right();
+                cam_area.x1 -= diff;
+                cam_area.x2 -= diff;
             }
-            if cam_area.bot < cam_max.bot {
-                let diff = cam_area.bot - cam_max.bot;
-                cam_area.bot -= diff;
-                cam_area.top -= diff;
+            if cam_area.y1 < cam_max.bot() {
+                let diff = cam_area.y1 - cam_max.bot();
+                cam_area.y1 -= diff;
+                cam_area.y2 -= diff;
             }
-            else if cam_area.top > cam_max.top {
-                let diff = cam_area.top - cam_max.top;
-                cam_area.bot -= diff;
-                cam_area.top -= diff;
+            else if cam_area.y2 > cam_max.top() {
+                let diff = cam_area.y2 - cam_max.top();
+                cam_area.y1 -= diff;
+                cam_area.y2 -= diff;
             }
 
             // set new camera values
-            let dest_pan_x = -((cam_area.left + cam_area.right) / 2.0);
-            let dest_pan_y = -((cam_area.bot  + cam_area.top  ) / 2.0);
+            let dest_pan_x = -((cam_area.x1 + cam_area.x2) / 2.0);
+            let dest_pan_y = -((cam_area.y1 + cam_area.y2) / 2.0);
             let dest_zoom = width / 2.0;
 
             let diff_pan_x = dest_pan_x - self.pan.0;

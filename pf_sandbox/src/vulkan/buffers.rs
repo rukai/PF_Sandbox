@@ -1,7 +1,7 @@
 use ::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
 use ::player::RenderShield;
+use ::geometry::Rect;
 use ::graphics;
-use ::graphics::RenderRect;
 use ::package::{Package, PackageUpdate};
 use ::player::RenderPlayer;
 use ::stage::Stage;
@@ -109,6 +109,45 @@ impl Buffers {
         }
     }
 
+    pub fn new_spawn_point(device: Arc<Device>) -> Buffers {
+        let vertices: [Vertex; 11] = [
+            // vertical bar
+            vertex(-0.15, -4.0),
+            vertex( 0.15, -4.0),
+            vertex(-0.15,  4.0),
+            vertex( 0.15,  4.0),
+
+            // horizontal bar
+            vertex(-4.0, -0.15),
+            vertex(-4.0,  0.15),
+            vertex( 4.0, -0.15),
+            vertex( 4.0,  0.15),
+
+            // arrow head
+            vertex(4.2, 0.0),
+            vertex(3.0, -1.0),
+            vertex(3.0, 1.0),
+        ];
+
+        let indices: [u16; 15] = [
+            // vertical bar
+            0, 1, 2,
+            3, 2, 1,
+
+            // horizontal bar
+            4, 5, 6,
+            7, 6, 5,
+
+            // arrow head
+            8, 9, 10
+        ];
+
+        Buffers {
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+        }
+    }
+
     pub fn new_arrow(device: Arc<Device>) -> Buffers {
         let vertices: [Vertex; 7] = [
             // stick
@@ -138,17 +177,17 @@ impl Buffers {
         }
     }
 
-    pub fn rect_buffers(device: Arc<Device>, rect: RenderRect) -> Buffers {
-        let min_x = rect.p1.0.min(rect.p2.0);
-        let min_y = rect.p1.1.min(rect.p2.1);
-        let max_x = rect.p1.0.max(rect.p2.0);
-        let max_y = rect.p1.1.max(rect.p2.1);
+    pub fn rect_buffers(device: Arc<Device>, rect: Rect) -> Buffers {
+        let left  = rect.left();
+        let right = rect.right();
+        let bot   = rect.bot();
+        let top   = rect.top();
 
         let vertices: [Vertex; 4] = [
-            vertex(min_x, min_y),
-            vertex(max_x, min_y),
-            vertex(max_x, max_y),
-            vertex(min_x, max_y),
+            vertex(left,  bot),
+            vertex(right, bot),
+            vertex(right, top),
+            vertex(left,  top),
         ];
 
         let indices: [u16; 6] = [
@@ -162,25 +201,25 @@ impl Buffers {
         }
     }
 
-    pub fn rect_outline_buffers(device: Arc<Device>, rect: &RenderRect) -> Buffers {
+    pub fn rect_outline_buffers(device: Arc<Device>, rect: &Rect) -> Buffers {
         let width = 0.5;
-        let min_x = rect.p1.0.min(rect.p2.0);
-        let min_y = rect.p1.1.min(rect.p2.1);
-        let max_x = rect.p1.0.max(rect.p2.0);
-        let max_y = rect.p1.1.max(rect.p2.1);
+        let left  = rect.left();
+        let right = rect.right();
+        let bot   = rect.bot();
+        let top   = rect.top();
 
         let vertices: [Vertex; 8] = [
             // outer rectangle
-            vertex(min_x, min_y),
-            vertex(max_x, min_y),
-            vertex(max_x, max_y),
-            vertex(min_x, max_y),
+            vertex(left,  bot),
+            vertex(right, bot),
+            vertex(right, top),
+            vertex(left,  top),
 
             // inner rectangle
-            vertex(min_x+width, min_y+width),
-            vertex(max_x-width, min_y+width),
-            vertex(max_x-width, max_y-width),
-            vertex(min_x+width, max_y-width),
+            vertex(left+width,  bot+width),
+            vertex(right-width, bot+width),
+            vertex(right-width, top-width),
+            vertex(left+width,  top-width),
         ];
 
         let indices: [u16; 24] = [
@@ -336,25 +375,26 @@ impl Buffers {
     }
 
     pub fn new_player(device: Arc<Device>, player: &RenderPlayer) -> Buffers {
-        // ecb
-        let vertex0 = vertex(player.ecb.bot_x,   player.ecb.bot_y);
-        let vertex1 = vertex(player.ecb.left_x,  player.ecb.left_y);
-        let vertex2 = vertex(player.ecb.right_x, player.ecb.right_y);
-        let vertex3 = vertex(player.ecb.top_x,   player.ecb.top_y);
+        let vertices: [Vertex; 12] = [
+            // ecb
+            vertex(player.ecb.bot_x,   player.ecb.bot_y),
+            vertex(player.ecb.left_x,  player.ecb.left_y),
+            vertex(player.ecb.right_x, player.ecb.right_y),
+            vertex(player.ecb.top_x,   player.ecb.top_y),
 
-        // horizontal bps
-        let vertex4 = vertex(-4.0, -0.15);
-        let vertex5 = vertex(-4.0,  0.15);
-        let vertex6 = vertex( 4.0, -0.15);
-        let vertex7 = vertex( 4.0,  0.15);
+            // horizontal bps
+            vertex(-4.0, -0.15),
+            vertex(-4.0,  0.15),
+            vertex( 4.0, -0.15),
+            vertex( 4.0,  0.15),
 
-        // vertical bps
-        let vertex8  = vertex(-0.15, -4.0);
-        let vertex9  = vertex( 0.15, -4.0);
-        let vertex10 = vertex(-0.15,  4.0);
-        let vertex11 = vertex( 0.15,  4.0);
+            // vertical bps
+            vertex(-0.15, -4.0),
+            vertex( 0.15, -4.0),
+            vertex(-0.15,  4.0),
+            vertex( 0.15,  4.0),
+        ];
 
-        let vertices = vec![vertex0, vertex1, vertex2, vertex3, vertex4, vertex5, vertex6, vertex7, vertex8, vertex9, vertex10, vertex11];
         let indices: [u16; 18] = [
             1,  2,  0,
             1,  2,  3,

@@ -1,3 +1,5 @@
+use treeflection::{Node, NodeRunner, NodeToken};
+
 /// Checks if segment p1q1 intersects with segment p2q2
 /// Implemented as described here http://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
 pub fn segments_intersect(p1: (f32, f32), q1: (f32, f32), p2: (f32, f32), q2: (f32, f32)) -> bool {
@@ -37,4 +39,39 @@ fn triplet_orientation(p: (f32, f32), q: (f32, f32), r: (f32, f32)) -> u8 {
 fn point_on_segment(p: (f32, f32), q: (f32, f32), r: (f32, f32)) -> bool {
     q.0 <= p.0.max(r.0) && q.0 >= p.0.min(r.0) && 
     q.1 <= p.1.max(r.1) && q.1 >= p.1.min(r.1)
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct Rect {
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32
+}
+
+impl Rect {
+    pub fn from_tuple(p1: (f32, f32), p2: (f32, f32)) -> Rect {
+        Rect {
+            x1: p1.0,
+            y1: p1.1,
+            x2: p2.0,
+            y2: p2.1
+        }
+    }
+
+    pub fn left(&self) -> f32 {
+        self.x1.min(self.x2)
+    }
+
+    pub fn right(&self) -> f32 {
+        self.x1.max(self.x2)
+    }
+
+    pub fn bot(&self) -> f32 {
+        self.y1.min(self.y2)
+    }
+
+    pub fn top(&self) -> f32 {
+        self.y1.max(self.y2)
+    }
 }

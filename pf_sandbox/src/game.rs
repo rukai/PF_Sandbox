@@ -3,17 +3,18 @@ use ::collision::collision_check;
 use ::command_line::CommandLine;
 use ::config::Config;
 use ::fighter::{ActionFrame, CollisionBox, LinkType, Action};
-use ::graphics::{GraphicsMessage, Render, RenderType, RenderRect};
+use ::geometry::Rect;
+use ::graphics::{GraphicsMessage, Render, RenderType};
 use ::input::{Input, PlayerInput, ControllerInput};
 use ::menu::ResumeMenu;
 use ::os_input::OsInput;
 use ::package::Package;
-use ::player::{Player, RenderPlayer, DebugPlayer, RenderFighter};
+use ::player::{Player, RenderPlayer, DebugPlayer};
 use ::replays::Replay;
 use ::replays;
 use ::results::{GameResults, RawPlayerResult, PlayerResult};
 use ::rules::Goal;
-use ::stage::{Area, Stage};
+use ::stage::{Stage, DebugStage, SpawnPoint};
 
 use rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
@@ -44,6 +45,7 @@ pub struct Game {
     pub saved_frame:            usize,
     pub stage:                  Stage,
     pub players:                Vec<Player>,
+    pub debug_stage:            DebugStage,
     pub debug_players:          Vec<DebugPlayer>,
     pub selected_controllers:   Vec<usize>,
     pub selected_ais:           Vec<usize>,
@@ -92,8 +94,9 @@ impl Game {
             stage_history:          setup.stage_history,
             current_frame:          0,
             saved_frame:            0,
-            players:                players,
             stage:                  stage,
+            players:                players,
+            debug_stage:            Default::default(),
             debug_players:          debug_players,
             selected_controllers:   setup.controllers,
             selected_ais:           setup.ais,
@@ -337,7 +340,7 @@ impl Game {
                 let action_enum = Action::from_index(self.players[player].action);
                 let frame  = self.players[player].frame as usize;
                 let land_frame_skip  = self.players[player].land_frame_skip;
-                self.set_debug(os_input, player);
+                self.debug_players[player].step(os_input);
 
                 // by adding the same amount of frames that are skipped in the player logic,
                 // the user continues to see the same frames as they step through the action
@@ -534,85 +537,13 @@ impl Game {
                     }
                 }
                 self.selector.mouse = os_input.game_mouse(&self.camera); // hack to access mouse during render call, dont use this otherwise
-            },
+            }
             Edit::Player (player) => {
-                self.set_debug(os_input, player);
-            },
-            Edit::Stage => { },
-        }
-    }
-
-
-    // TODO: Shift to apply to all players
-    // TODO: F09 - load preset from player profile
-    // TODO: F10 - save preset to player profile
-    fn set_debug(&mut self, os_input: &OsInput, player: usize) {
-        {
-            let debug = &mut self.debug_players[player];
-
-            if os_input.key_pressed(VirtualKeyCode::F1) {
-                debug.physics = !debug.physics;
+                self.debug_players[player].step(os_input);
             }
-            if os_input.key_pressed(VirtualKeyCode::F2) {
-                if os_input.held_shift() {
-                    debug.input_diff = !debug.input_diff;
-                }
-                else {
-                    debug.input = !debug.input;
-                }
+            Edit::Stage => {
+                self.debug_stage.step(os_input);
             }
-            if os_input.key_pressed(VirtualKeyCode::F3) {
-                debug.action = !debug.action;
-            }
-            if os_input.key_pressed(VirtualKeyCode::F4) {
-                debug.frame = !debug.frame;
-            }
-            if os_input.key_pressed(VirtualKeyCode::F5) {
-                debug.stick_vector = !debug.stick_vector;
-            }
-            if os_input.key_pressed(VirtualKeyCode::F6) {
-                debug.c_stick_vector = !debug.c_stick_vector;
-            }
-            if os_input.key_pressed(VirtualKeyCode::F7) {
-                debug.di_vector = !debug.di_vector;
-            }
-            if os_input.key_pressed(VirtualKeyCode::F8) {
-                debug.ecb = !debug.ecb;
-            }
-            if os_input.key_pressed(VirtualKeyCode::F9) {
-                debug.fighter = match debug.fighter {
-                    RenderFighter::Normal => {
-                        RenderFighter::Debug
-                    }
-                    RenderFighter::Debug => {
-                        RenderFighter::None
-                    }
-                    RenderFighter::None => {
-                        RenderFighter::Normal
-                    }
-                };
-            }
-            if os_input.key_pressed(VirtualKeyCode::F10) {
-                debug.cam_area = !debug.cam_area;
-            }
-        }
-        if os_input.key_pressed(VirtualKeyCode::F11) {
-            self.debug_players[player] = DebugPlayer {
-                physics:        true,
-                input:          true,
-                input_diff:     true,
-                action:         true,
-                frame:          true,
-                stick_vector:   true,
-                c_stick_vector: true,
-                di_vector:      true,
-                ecb:            true,
-                fighter:        RenderFighter::Debug,
-                cam_area:       true,
-            }
-        }
-        if os_input.key_pressed(VirtualKeyCode::F12) {
-            self.debug_players[player] = DebugPlayer::default();
         }
     }
 
@@ -869,10 +800,6 @@ impl Game {
     pub fn render(&self) -> RenderGame {
         let mut entities = vec!();
 
-        // stage areas
-        entities.push(RenderEntity::Area(area_to_render(&self.stage.camera)));
-        entities.push(RenderEntity::Area(area_to_render(&self.stage.blast)));
-
         for (i, player) in self.players.iter().enumerate() {
             let mut selected_colboxes = HashSet::new();
             let mut fighter_selected = false;
@@ -894,8 +821,8 @@ impl Game {
 
             let debug = self.debug_players[i].clone();
             if debug.cam_area {
-                let cam_area = &player.cam_area(&self.stage.camera, &self.players, &self.package.fighters, &self.stage.platforms);
-                entities.push(RenderEntity::Area(area_to_render(cam_area)));
+                let cam_area = player.cam_area(&self.stage.camera, &self.players, &self.package.fighters, &self.stage.platforms);
+                entities.push(RenderEntity::rect_outline(cam_area, 0.0, 0.0, 1.0));
             }
 
             let fighters = &self.package.fighters;
@@ -904,14 +831,29 @@ impl Game {
             entities.push(RenderEntity::Player(player_render));
         }
 
+        // render stage debug entities
+        if self.debug_stage.blast {
+            entities.push(RenderEntity::rect_outline(self.stage.blast.clone(),  1.0, 0.0, 0.0));
+        }
+        if self.debug_stage.camera {
+            entities.push(RenderEntity::rect_outline(self.stage.camera.clone(), 0.0, 0.0, 1.0));
+        }
+        if self.debug_stage.spawn_points {
+            for point in self.stage.spawn_points.iter() {
+                entities.push(RenderEntity::spawn_point(point.clone(), 1.0, 0.0, 1.0));
+            }
+        }
+        if self.debug_stage.respawn_points {
+            for point in self.stage.respawn_points.iter() {
+                entities.push(RenderEntity::spawn_point(point.clone(), 1.0, 1.0, 0.0));
+            }
+        }
+
         // render selector box
         if let Some(point) = self.selector.point {
             if let Some(mouse) = self.selector.mouse {
-                let render_box = RenderRect {
-                    p1: point,
-                    p2: mouse,
-                };
-                entities.push(RenderEntity::Selector(render_box));
+                let render_box = Rect::from_tuple(point, mouse);
+                entities.push(RenderEntity::rect_outline(render_box, 0.0, 1.0, 0.0));
             }
         }
 
@@ -948,13 +890,6 @@ impl Game {
 
     pub fn reclaim(self) -> (Package, Config) {
         (self.package, self.config)
-    }
-}
-
-fn area_to_render(area: &Area) -> RenderRect {
-    RenderRect {
-        p1: (area.left,  area.bot),
-        p2: (area.right, area.top)
     }
 }
 
@@ -1039,9 +974,38 @@ pub struct RenderGame {
 }
 
 pub enum RenderEntity {
-    Player    (RenderPlayer),
-    Selector  (RenderRect),
-    Area      (RenderRect),
+    Player      (RenderPlayer),
+    RectOutline (RenderRect),
+    SpawnPoint  (RenderSpawnPoint),
+}
+
+impl RenderEntity {
+    pub fn rect_outline(rect: Rect, r: f32, g: f32, b: f32) -> RenderEntity {
+        RenderEntity::RectOutline (
+            RenderRect {
+                rect,
+                color: [r, g, b, 1.0]
+            }
+        )
+    }
+    pub fn spawn_point(point: SpawnPoint, r: f32, g: f32, b: f32) -> RenderEntity {
+        RenderEntity::SpawnPoint (
+            RenderSpawnPoint {
+                point,
+                color: [r, g, b, 1.0]
+            }
+        )
+    }
+}
+
+pub struct RenderRect {
+    pub rect:  Rect,
+    pub color: [f32; 4]
+}
+
+pub struct RenderSpawnPoint {
+    pub point: SpawnPoint,
+    pub color: [f32; 4]
 }
 
 #[derive(Clone)]
@@ -1051,7 +1015,7 @@ pub struct GameSetup {
     pub player_history: Vec<Vec<Player>>,
     pub stage_history:  Vec<Stage>,
     pub controllers:    Vec<usize>,
-    pub players :       Vec<PlayerSetup>,
+    pub players:        Vec<PlayerSetup>,
     pub ais:            Vec<usize>,
     pub stage:          String,
     pub state:          GameState,

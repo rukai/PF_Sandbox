@@ -1,11 +1,15 @@
+use ::geometry::Rect;
+use ::os_input::OsInput;
+
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
+use winit::VirtualKeyCode;
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Stage {
     pub name:           String,
     pub platforms:      ContextVec<Platform>,
-    pub blast:          Area,
-    pub camera:         Area,
+    pub blast:          Rect,
+    pub camera:         Rect,
     pub spawn_points:   ContextVec<SpawnPoint>,
     pub respawn_points: ContextVec<SpawnPoint>,
 }
@@ -34,18 +38,18 @@ impl Default for Stage {
             pass_through: true,
         };
 
-        let blast = Area {
-            left: -200.0,
-            right: 200.0,
-            bot:  -200.0,
-            top:   200.0,
+        let blast = Rect {
+            x1: -200.0,
+            x2: 200.0,
+            y1:  -200.0,
+            y2:   200.0,
         };
 
-        let camera = Area {
-            left: -150.0,
-            right: 150.0,
-            bot:  -150.0,
-            top:   150.0,
+        let camera = Rect {
+            x1: -150.0,
+            x2: 150.0,
+            y1:  -150.0,
+            y2:   150.0,
         };
 
         let spawn_points = ContextVec::from_vec(vec!(
@@ -234,16 +238,44 @@ impl Platform {
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
-pub struct Area {
-    pub left:  f32,
-    pub right: f32,
-    pub bot:   f32,
-    pub top:   f32,
-}
-
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct SpawnPoint {
     pub x:          f32,
     pub y:          f32,
     pub face_right: bool,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct DebugStage {
+    pub blast:          bool,
+    pub camera:         bool,
+    pub spawn_points:   bool,
+    pub respawn_points: bool,
+}
+
+impl DebugStage {
+    pub fn step(&mut self, os_input: &OsInput) {
+        if os_input.key_pressed(VirtualKeyCode::F1) {
+            self.blast = !self.blast;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F2) {
+            self.camera = !self.camera;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F3) {
+            self.spawn_points = !self.spawn_points;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F4) {
+            self.respawn_points = !self.respawn_points;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F11) {
+            *self = DebugStage {
+                blast:          true,
+                camera:         true,
+                spawn_points:   true,
+                respawn_points: true,
+            }
+        }
+        if os_input.key_pressed(VirtualKeyCode::F12) {
+            *self = DebugStage::default();
+        }
+    }
 }

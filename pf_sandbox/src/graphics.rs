@@ -2,7 +2,6 @@ use ::menu::RenderMenu;
 use ::package::PackageUpdate;
 use ::game::RenderGame;
 use ::fighter::CollisionBoxRole;
-use treeflection::{Node, NodeRunner, NodeToken};
 
 pub struct GraphicsMessage {
     pub render: Render,
@@ -61,10 +60,4 @@ pub fn get_colors() -> Vec<Color> {
         Color { name: String::from("Purple"),     value: [120.0, 46.0,  252.0] },
         Color { name: String::from("Light Blue"), value: [81.0,  229.0, 237.0] },
     )
-}
-
-#[derive(Clone, Default, Serialize, Deserialize, Node)]
-pub struct RenderRect {
-    pub p1: (f32, f32),
-    pub p2: (f32, f32),
 }

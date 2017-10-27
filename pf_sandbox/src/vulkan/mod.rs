@@ -3,12 +3,13 @@ mod buffers;
 use self::buffers::{Vertex, Buffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
 use ::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
-use ::graphics::{self, GraphicsMessage, Render, RenderType, RenderRect};
+use ::graphics::{self, GraphicsMessage, Render, RenderType};
 use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB};
 use ::results::PlayerResult;
 use ::package::Verify;
 use ::particle::ParticleType;
+use ::geometry::Rect;
 
 use enum_traits::FromIndex;
 use cgmath::prelude::*;
@@ -643,13 +644,21 @@ impl<'a> VulkanGraphics<'a> {
                     // TODO: Edit::Fighter - Click and drag on ECB points
                     // TODO: Edit::Stage   - render selected platforms as green
                 },
-                &RenderEntity::Selector (ref rect) |
-                &RenderEntity::Area     (ref rect) => {
+                &RenderEntity::RectOutline (ref render_rect) => {
                     let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.0));
-                    let color = [0.0, 1.0, 0.0, 1.0];
-                    let buffers = Buffers::rect_outline_buffers(self.device.clone(), rect);
+                    let color = render_rect.color;
+                    let buffers = Buffers::rect_outline_buffers(self.device.clone(), &render_rect.rect);
                     command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, color, color);
                 },
+
+                &RenderEntity::SpawnPoint (ref render_point) => {
+                    let point = &render_point.point;
+                    let buffers = Buffers::new_spawn_point(self.device.clone());
+                    let flip = Matrix4::from_nonuniform_scale(if point.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                    let position = Matrix4::from_translation(Vector3::new(point.x + pan.0, point.y + pan.1, z_debug));
+                    let transformation = position * flip;
+                    command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, render_point.color.clone(), render_point.color.clone())
+                }
             }
         }
 
@@ -706,6 +715,7 @@ impl<'a> VulkanGraphics<'a> {
                     }
                     1 => {
                         self.draw_fighter_selector(&mut entities, &plugged_in_selections, 0, -0.9, -0.8, 0.9, 0.9);
+
                     }
                     2 => {
                         self.draw_fighter_selector(&mut entities, &plugged_in_selections, 0, -0.9, -0.8, 0.0, 0.9);
@@ -795,9 +805,11 @@ impl<'a> VulkanGraphics<'a> {
         };
         let set = self.new_uniform_set(uniform);
 
-        let entity = MenuEntity::Rect (RenderRect {
-            p1: ( -1.0, -0.85),
-            p2: (back_counter as f32 / back_counter_max as f32 * 2.0 - 1.0, -1.0),
+        let entity = MenuEntity::Rect (Rect {
+            x1: -1.0,
+            y1: -0.85,
+            x2: back_counter as f32 / back_counter_max as f32 * 2.0 - 1.0,
+            y2: -1.0,
         });
 
         entities.push(MenuEntityAndSet { set, entity });
@@ -1103,7 +1115,7 @@ impl<'a> VulkanGraphics<'a> {
 enum MenuEntity {
     Fighter { fighter: String, action: usize, frame: usize },
     Stage   (String),
-    Rect    (RenderRect),
+    Rect    (Rect),
 }
 
 struct MenuEntityAndSet {
