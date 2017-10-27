@@ -50,7 +50,7 @@ pub struct Rect {
 }
 
 impl Rect {
-    pub fn from_tuple(p1: (f32, f32), p2: (f32, f32)) -> Rect {
+    pub fn from_tuples(p1: (f32, f32), p2: (f32, f32)) -> Rect {
         Rect {
             x1: p1.0,
             y1: p1.1,
@@ -73,5 +73,12 @@ impl Rect {
 
     pub fn top(&self) -> f32 {
         self.y1.max(self.y2)
+    }
+
+    /// Returns true iff the passed point is within this Rect
+    pub fn contains_point(&self, x: f32, y: f32) -> bool {
+        ((x > self.x1 && x < self.x2) || (x > self.x2 && x < self.x1))
+        &&
+        ((y > self.y1 && y < self.y2) || (y > self.y2 && y < self.y1))
     }
 }

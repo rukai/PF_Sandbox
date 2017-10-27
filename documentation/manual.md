@@ -12,9 +12,7 @@ There is no need to perform the steps listed under Dolphin Setup.
 Use `a` on your GC controller to: select package, select local, select characters, select stages and FIGHT!
 Use `b` on your GC controller to go to previous menus (keep pressing to reach package select screen)
 
-These player outlines are used to signify which team they belong to:
-*   Orange
-*   Blue
+The player outlines are used to signify which team they belong to, you can change this on the CSS.
 
 ### Camera
 
@@ -40,7 +38,7 @@ You can safely copy fighter and stage files between packages.
 You can use the `:open_package $package_folder_name` command on the menu to open the package stored at the specified folder name.
 If the package does not exist at that folder a new package is created there.
 
-## Game Editing
+## Editor
 
 Always backup any packages you are working on.
 Due to the nature of the interface it is super easy to accidentally destroy work without realising.
@@ -54,29 +52,48 @@ Make sure you are on the pause screen to make use of the following tools.
 
 Use the following keys to alter the flow of the game
 *   Spacebar - step game
-*   H - Rewind
-*   J - Step rewind
-*   K - Step replay
-*   L - Replay
+*   H        - Rewind
+*   J        - Step rewind
+*   K        - Step replay
+*   L        - Replay
 
 ### Editor Selector
 
 Before editing anything you must first select what you wish to edit:
 
-*   0 - Stage
-*   1 - Player 1's fighter
-*   2 - Player 2's fighter
-*   3 - Player 3's fighter
-*   4 - Player 4's fighter
+*   0         - Stage
+*   1         - Player 1's fighter
+*   2         - Player 2's fighter
+*   3         - Player 3's fighter
+*   4         - Player 4's fighter
 *   1 + Shift - Player 1
 *   2 + Shift - Player 2
 *   3 + Shift - Player 3
 *   4 + Shift - Player 4
 
+### Element Selection
+
+Sometimes you need to make ANOTHER selection with your mouse.
+In different editor modes you can select different elements to modify them.
+
+*   Left click           - Select one element
+*   Right click and drag - Select multiple elements
+
+#### Modifiers
+
+*   Default   - Delete the previous selection
+*   Shift key - Add to the previous selection
+*   Alt key   - Remove from previous selection
+
 ### Debug Displays
 
-Debug output is displayed to the terminal every time a frame is changed or modified.
-Use the following keys to toggle debug displays:
+While in the relevant editor mode (keys 0-9) you can toggle various debug displays.
+Textual debug output is also written to stdout every time a frame is changed or modified.
+Use F1-F12 to toggle them.
+
+## Fighter Editor (1-9)
+
+### Debug Displays
 
 *   F1 - Player physics
 *   F2 - Input
@@ -91,14 +108,6 @@ Use the following keys to toggle debug displays:
 *   F10 - Display player camera area
 *   F11 - Set all
 *   F12 - Reset all
-
-### Selection
-
-By default making a selection will replace the previous selection.
-To add to the previous selection hold the Shift key.
-
-*   Left click - Select one colbox
-*   Right click - Select mutliple colboxes
 
 ### Frame editing
 *   V - Copy frame
@@ -133,7 +142,26 @@ Any collisionbox can now be click and drag'ed around the root box.
 
 Press `S` again to leave pivot mode.
 
-### Stage Editing (TODO)
+## Stage Editor (0)
+
+### Debug Displays
+
+*   F1 - Display blast zone boundary
+*   F2 - Display camera boundary
+*   F3 - Display/edit spawn points
+*   F4 - Display/edit respawn points
+*   F11 - Set all
+*   F12 - Reset all
+
+### Element Editing
+
+The following operations apply to all selected platforms and re/spawn points
+
+*   A - Move element
+*   D - Delete element
+*   F - Place platform
+*   G - place spawn point
+*   H - place respawn point
 
 ## Command line
 
@@ -245,4 +273,4 @@ Select the hitboxes you want in game then run:
 Note:
 If PF Sandbox encounters any errors while updating a package, it will "silently" fail and continue loading the package as normal.
 This is because we dont want to prevent users playing local games due to network issues.
-However to troubleshoot issues with your published package you can check the terminal output for errors.
+However to troubleshoot issues with PF Sandbox downloading/updating your package you can check stdout for errors.

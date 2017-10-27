@@ -465,33 +465,29 @@ impl Game {
                         self.package.fighter_colboxes_send_to_back(fighter, action, frame, &self.selector.colboxes)
                     }
 
-                    // single click collisionbox selection
-                    if os_input.mouse_pressed(0) {
-                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
-                            let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
+                    // handle single selection
+                    if let Some((m_x, m_y)) = self.selector.step_single_selection(os_input, &self.camera) {
+                        let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
+                        let frame = &self.package.fighters[fighter].actions[action].frames[frame];
+                        let frame = self.players[player].relative_frame(frame);
+                        for (i, colbox) in frame.colboxes.iter().enumerate() {
+                            let hit_x = colbox.point.0 + player_x;
+                            let hit_y = colbox.point.1 + player_y;
 
-                            if !(os_input.held_shift() || os_input.held_alt()) {
-                                self.selector.colboxes = HashSet::new();
-                            }
-                            let frame = &self.package.fighters[fighter].actions[action].frames[frame];
-                            let frame = self.players[player].relative_frame(frame);
-                            for (i, colbox) in frame.colboxes.iter().enumerate() {
-                                let hit_x = colbox.point.0 + player_x;
-                                let hit_y = colbox.point.1 + player_y;
-
-                                let distance = ((m_x - hit_x).powi(2) + (m_y - hit_y).powi(2)).sqrt();
-                                if distance < colbox.radius {
+                            let distance = ((m_x - hit_x).powi(2) + (m_y - hit_y).powi(2)).sqrt();
+                            if distance < colbox.radius {
+                                if os_input.held_alt() {
                                     self.selector.colboxes.remove(&i);
-                                    if !os_input.held_alt() {
-                                        self.selector.colboxes.insert(i);
-                                    }
+                                } else {
+                                    self.selector.colboxes.insert(i);
                                 }
                             }
                         }
 
                         // Select topmost colbox
+                        // TODO: Broken by the addition of ActionFrame.render_order, fix by taking it into account
                         if os_input.held_control() {
-                            let mut selector_vec: Vec<usize> = self.selector.colboxes.iter().cloned().collect();
+                            let mut selector_vec = self.selector.colboxes_vec();
                             selector_vec.sort();
                             selector_vec.reverse();
                             selector_vec.truncate(1);
@@ -499,52 +495,91 @@ impl Game {
                         }
                     }
 
-                    // begin multiple collisionbox selection
-                    if os_input.mouse_pressed(1) {
-                        if let Some(mouse) = os_input.game_mouse(&self.camera) {
-                            self.selector.start(mouse);
-                        }
-                    }
+                    // handle multiple selection
+                    if let Some(rect) = self.selector.step_multiple_selection(os_input, &self.camera) {
+                        let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
+                        let frame = &self.package.fighters[fighter].actions[action].frames[frame];
+                        let frame = self.players[player].relative_frame(frame);
 
-                    // complete multiple collisionbox selection
-                    if let Some(selection) = self.selector.point {
-                        let (x1, y1) = selection;
-                        if os_input.mouse_released(1) {
-                            if let Some((x2, y2)) = os_input.game_mouse(&self.camera) {
-                                if !(os_input.held_shift() || os_input.held_alt()) {
-                                    self.selector.colboxes = HashSet::new();
+                        for (i, colbox) in frame.colboxes.iter().enumerate() {
+                            let hit_x = colbox.point.0 + player_x;
+                            let hit_y = colbox.point.1 + player_y;
+
+                            if rect.contains_point(hit_x, hit_y) {
+                                if os_input.held_alt() {
+                                    self.selector.colboxes.remove(&i);
+                                } else {
+                                    self.selector.colboxes.insert(i);
                                 }
-                                let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
-                                let frame = &self.package.fighters[fighter].actions[action].frames[frame];
-                                let frame = self.players[player].relative_frame(frame);
-
-                                for (i, colbox) in frame.colboxes.iter().enumerate() {
-                                    let hit_x = colbox.point.0 + player_x;
-                                    let hit_y = colbox.point.1 + player_y;
-
-                                    let x_check = (hit_x > x1 && hit_x < x2) || (hit_x > x2 && hit_x < x1);
-                                    let y_check = (hit_y > y1 && hit_y < y2) || (hit_y > y2 && hit_y < y1);
-                                    if x_check && y_check {
-                                        self.selector.colboxes.remove(&i);
-                                        if !os_input.held_alt() {
-                                            self.selector.colboxes.insert(i);
-                                        }
-                                    }
-                                }
-                                self.selector.point = None;
                             }
                         }
+                        self.selector.point = None;
                     }
                 }
-                self.selector.mouse = os_input.game_mouse(&self.camera); // hack to access mouse during render call, dont use this otherwise
             }
             Edit::Player (player) => {
                 self.debug_players[player].step(os_input);
             }
             Edit::Stage => {
                 self.debug_stage.step(os_input);
+
+                // handle single selection
+                if let Some((m_x, m_y)) = self.selector.step_single_selection(os_input, &self.camera) {
+                    if self.debug_stage.spawn_points {
+                        for (i, point) in self.stage.spawn_points.iter().enumerate() {
+                            let distance = ((m_x - point.x).powi(2) + (m_y - point.y).powi(2)).sqrt();
+                            if distance < 4.0 {
+                                if os_input.held_alt() {
+                                    self.selector.spawn_points.remove(&i);
+                                } else {
+                                    self.selector.spawn_points.insert(i);
+                                }
+                            }
+                        }
+                    }
+                    if self.debug_stage.respawn_points {
+                        for (i, point) in self.stage.respawn_points.iter().enumerate() {
+                            let distance = ((m_x - point.x).powi(2) + (m_y - point.y).powi(2)).sqrt();
+                            if distance < 4.0 {
+                                if os_input.held_alt() {
+                                    self.selector.respawn_points.remove(&i);
+                                } else {
+                                    self.selector.respawn_points.insert(i);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // handle multiple selection
+                if let Some(rect) = self.selector.step_multiple_selection(os_input, &self.camera) {
+                    if self.debug_stage.spawn_points {
+                        for (i, point) in self.stage.spawn_points.iter().enumerate() {
+                            if rect.contains_point(point.x, point.y) {
+                                if os_input.held_alt() {
+                                    self.selector.spawn_points.remove(&i);
+                                } else {
+                                    self.selector.spawn_points.insert(i);
+                                }
+                            }
+                        }
+                    }
+                    if self.debug_stage.respawn_points {
+                        for (i, point) in self.stage.respawn_points.iter().enumerate() {
+                            if rect.contains_point(point.x, point.y) {
+                                if os_input.held_alt() {
+                                    self.selector.respawn_points.remove(&i);
+                                } else {
+                                    self.selector.respawn_points.insert(i);
+                                }
+                            }
+                        }
+                    }
+                    self.selector.point = None;
+                }
             }
         }
+        self.selector.mouse = os_input.game_mouse(&self.camera); // hack to access mouse during render call, dont use this otherwise
     }
 
     /// next frame is advanced by using the input history on the current frame
@@ -839,20 +874,28 @@ impl Game {
             entities.push(RenderEntity::rect_outline(self.stage.camera.clone(), 0.0, 0.0, 1.0));
         }
         if self.debug_stage.spawn_points {
-            for point in self.stage.spawn_points.iter() {
-                entities.push(RenderEntity::spawn_point(point.clone(), 1.0, 0.0, 1.0));
+            for (i, point) in self.stage.spawn_points.iter().enumerate() {
+                if self.selector.spawn_points.contains(&i) {
+                    entities.push(RenderEntity::spawn_point(point.clone(), 0.0, 1.0, 0.0));
+                } else {
+                    entities.push(RenderEntity::spawn_point(point.clone(), 1.0, 0.0, 1.0));
+                }
             }
         }
         if self.debug_stage.respawn_points {
-            for point in self.stage.respawn_points.iter() {
-                entities.push(RenderEntity::spawn_point(point.clone(), 1.0, 1.0, 0.0));
+            for (i, point) in self.stage.respawn_points.iter().enumerate() {
+                if self.selector.respawn_points.contains(&i) {
+                    entities.push(RenderEntity::spawn_point(point.clone(), 0.0, 1.0, 0.0));
+                } else {
+                    entities.push(RenderEntity::spawn_point(point.clone(), 1.0, 1.0, 0.0));
+                }
             }
         }
 
         // render selector box
         if let Some(point) = self.selector.point {
             if let Some(mouse) = self.selector.mouse {
-                let render_box = Rect::from_tuple(point, mouse);
+                let render_box = Rect::from_tuples(point, mouse);
                 entities.push(RenderEntity::rect_outline(render_box, 0.0, 1.0, 0.0));
             }
         }
@@ -945,10 +988,13 @@ impl Default for Edit {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct Selector {
-    colboxes: HashSet<usize>,
-    moving:   bool,
-    point:    Option<(f32, f32)>, // selector starting point
-    mouse:    Option<(f32, f32)>, // used to know mouse point during render
+    colboxes:       HashSet<usize>,
+    platforms:      HashSet<usize>,
+    spawn_points:   HashSet<usize>,
+    respawn_points: HashSet<usize>,
+    moving:         bool,
+    point:          Option<(f32, f32)>, // selector starting point
+    mouse:          Option<(f32, f32)>, // used to know mouse point during render
 }
 
 impl Selector {
@@ -956,10 +1002,51 @@ impl Selector {
         self.colboxes.iter().cloned().collect()
     }
 
-    pub fn start(&mut self, mouse: (f32, f32)) {
+    fn start(&mut self, mouse: (f32, f32)) {
         self.point  = Some(mouse);
         self.moving = false;
         self.mouse  = None;
+    }
+
+    fn clear(&mut self) {
+        self.colboxes.clear();
+        self.platforms.clear();
+        self.spawn_points.clear();
+        self.respawn_points.clear();
+    }
+
+    /// Returns a selection rect iff a multiple selection is finished.
+    fn step_multiple_selection(&mut self, os_input: &OsInput, camera: &Camera) -> Option<Rect> {
+        // start selection
+        if os_input.mouse_pressed(1) {
+            if let Some(mouse) = os_input.game_mouse(camera) {
+                self.start(mouse);
+            }
+        }
+
+        // finish selection
+        if let (Some(p1), Some(p2)) = (self.point, os_input.game_mouse(camera)) {
+            if os_input.mouse_released(1) {
+                if !(os_input.held_shift() || os_input.held_alt()) {
+                    self.clear();
+                }
+                return Some(Rect::from_tuples(p1, p2))
+            }
+        }
+        None
+    }
+
+    /// Returns a selection point iff a single selection is made.
+    fn step_single_selection(&mut self, os_input: &OsInput, camera: &Camera) -> Option<(f32, f32)> {
+        if os_input.mouse_pressed(0) {
+            if let point @ Some(_) = os_input.game_mouse(camera) {
+                if !(os_input.held_shift() || os_input.held_alt()) {
+                    self.clear();
+                }
+                return point;
+            }
+        }
+        None
     }
 }
 
