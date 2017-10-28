@@ -336,6 +336,26 @@ impl Player {
         self.frame == fighter.actions[self.action as usize].iasa
     }
 
+    pub fn platform_deleted(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], deleted_platform_i: usize) {
+        let fall = match &mut self.location {
+            &mut Location::Platform     { ref mut platform_i, .. } |
+            &mut Location::GrabbedLedge { ref mut platform_i, .. } => {
+                if *platform_i == deleted_platform_i {
+                    true
+                } else if *platform_i > deleted_platform_i {
+                    *platform_i -= 1;
+                    false
+                } else { false }
+            }
+            _ => { false }
+        };
+
+        if fall {
+            self.set_airbourne(players, fighters, platforms);
+            self.set_action(Action::Fall); // TODO: use miss step state ^.^
+        }
+    }
+
     pub fn step_collision(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], col_results: &[CollisionResult]) {
         for col_result in col_results {
             match col_result {
@@ -1874,8 +1894,8 @@ impl Player {
                         self.move_off_floor(input, players, fighters, stage, platform, platform_i, x);
                     }
                     else {
-                        self.set_action(Action::Fall); // TODO: use miss step state ^.^
-                        self.set_airbourne(players, fighters, &stage.platforms);
+                        self.location = Location::Airbourne { x: 0.0, y: 0.0 };
+                        self.set_action(Action::Fall);
                     }
                 }
                 _ => { }
@@ -1928,6 +1948,11 @@ impl Player {
             // fall
             self.set_action(Action::Fall);
             self.set_airbourne(players, fighters, &stage.platforms);
+
+            // set max velocity
+            if self.x_vel.abs() > fighter.air_x_term_vel {
+                self.x_vel = self.x_vel.signum() * fighter.air_x_term_vel;
+            }
 
             // force set past platform
             let x_offset = if x > 0.0 { 0.000001 } else { -0.000001 }; // just being cautious, probably dont need this
@@ -2055,12 +2080,14 @@ impl Player {
     fn land(&mut self, fighter: &Fighter, input: &PlayerInput, platform_i: usize, x: f32) {
         let action = Action::from_index(self.action);
 
-        self.land_frame_skip = if action.as_ref().map_or(false, |x| x.is_air_attack()) && self.lcancel_timer > 0 { 1 }
-        else if action.as_ref().map_or(false, |x| x.is_aerial_dodge()) { 2 }
-        else { 0 };
+        self.land_frame_skip = match action {
+            Some(_) if action.as_ref().map_or(false, |x| x.is_air_attack()) && self.lcancel_timer > 0 => 1,
+            Some(Action::AerialDodge) => 2,
+            Some(Action::SpecialFall) => 2,
+            _ => 0
+        };
 
-        self.aerial_dodge_frame = if action.as_ref().map_or(false, |x| x.is_aerial_dodge())
-            { Some(self.frame) } else { None };
+        self.aerial_dodge_frame = if let Some(Action::AerialDodge) = action { Some(self.frame) } else { None };
 
         match action {
             Some(Action::Uair)            => self.set_action(Action::UairLand),

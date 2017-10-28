@@ -641,13 +641,6 @@ impl Action {
             _ => false
         }
     }
-
-    pub fn is_aerial_dodge(&self) -> bool {
-        match self {
-            &Action::AerialDodge => true,
-            _                    => false
-        }
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]

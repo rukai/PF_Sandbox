@@ -92,25 +92,18 @@ impl Stage {
         let mut left_i = None;
         let mut right_i = None;
         if let Some(plat) = self.platforms.get(platform_i) {
+            let (l_x, l_y) = plat.left_ledge();
+            let (r_x, r_y) = plat.right_ledge();
             for (check_i, check_plat) in self.platforms.iter().enumerate() {
                 if platform_i != check_i/* && check_plat.is_floor() TODO */ {
-                    if plat.x1 == check_plat.x1 && plat.y1 == check_plat.y1 ||
-                       plat.x1 == check_plat.x2 && plat.y1 == check_plat.y2
-                    {
-                        if plat.x1 > plat.x2 {
-                            right_i = Some(check_i);
-                        } else {
-                            left_i = Some(check_i);
-                        }
+                    let (check_l_x, check_l_y) = check_plat.left_ledge();
+                    let (check_r_x, check_r_y) = check_plat.right_ledge();
+
+                    if l_x == check_r_x && l_y == check_r_y {
+                        left_i = Some(check_i);
                     }
-                    if plat.x2 == check_plat.x1 && plat.y2 == check_plat.y1 ||
-                       plat.x2 == check_plat.x2 && plat.y2 == check_plat.y2
-                    {
-                        if plat.x2 > plat.x1 {
-                            right_i = Some(check_i);
-                        } else {
-                            left_i = Some(check_i);
-                        }
+                    if r_x == check_l_x && r_y == check_l_y {
+                        right_i = Some(check_i);
                     }
                 }
             }

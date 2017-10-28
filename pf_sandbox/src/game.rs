@@ -588,7 +588,11 @@ impl Game {
                         let mut platforms_to_delete: Vec<usize> = self.selector.platforms_vec();
                         platforms_to_delete.sort();
                         platforms_to_delete.reverse();
+                        let players = self.players.clone();
                         for platform_i in platforms_to_delete {
+                            for player in self.players.iter_mut() {
+                                player.platform_deleted(&players, &self.package.fighters, &self.stage.platforms, platform_i);
+                            }
                             self.stage.platforms.remove(platform_i);
                         }
 
