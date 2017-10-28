@@ -211,10 +211,13 @@ impl Game {
                 let colboxes = &mut frames[player_frame].colboxes;
                 colboxes.set_context_vec(player_colboxes);
             }
+            Edit::Stage => {
+                self.stage.platforms.set_context_vec(self.selector.platforms_vec());
+                self.stage.spawn_points.set_context_vec(self.selector.spawn_points.iter().cloned().collect());
+                self.stage.respawn_points.set_context_vec(self.selector.respawn_points.iter().cloned().collect());
+            }
             _ => { }
         }
-        let index = self.package.stages.key_to_index(self.selected_stage.as_ref()).unwrap();
-        self.package.stages.set_context(index);
     }
 
     fn step_local(&mut self, input: &mut Input) {
@@ -542,6 +545,17 @@ impl Game {
                         }
                     }
 
+                    for (i, platform) in self.stage.platforms.iter_mut().enumerate() {
+                        if self.selector.platforms.contains(&PlatformSelection::P1(i)) {
+                            platform.x1 += d_x;
+                            platform.y1 += d_y;
+                        }
+                        if self.selector.platforms.contains(&PlatformSelection::P2(i)) {
+                            platform.x2 += d_x;
+                            platform.y2 += d_y;
+                        }
+                    }
+
                     // end move
                     if os_input.mouse_pressed(0) {
                         self.update_frame();
@@ -556,33 +570,50 @@ impl Game {
                     }
                     // delete elements
                     if os_input.key_pressed(VirtualKeyCode::D) {
+                        // the indexes are sorted in reverse order to preserve index order while deleting.
                         let mut spawns_to_delete: Vec<usize> = self.selector.spawn_points.iter().cloned().collect();
                         spawns_to_delete.sort();
-                        spawns_to_delete.reverse(); // preserve index order while deleting
-
+                        spawns_to_delete.reverse();
                         for spawn_i in spawns_to_delete {
                             self.stage.spawn_points.remove(spawn_i);
                         }
 
                         let mut respawns_to_delete: Vec<usize> = self.selector.respawn_points.iter().cloned().collect();
                         respawns_to_delete.sort();
-                        respawns_to_delete.reverse(); // preserve index order while deleting
-
+                        respawns_to_delete.reverse();
                         for respawn_i in respawns_to_delete {
                             self.stage.respawn_points.remove(respawn_i);
                         }
 
+                        let mut platforms_to_delete: Vec<usize> = self.selector.platforms_vec();
+                        platforms_to_delete.sort();
+                        platforms_to_delete.reverse();
+                        for platform_i in platforms_to_delete {
+                            self.stage.platforms.remove(platform_i);
+                        }
+
                         self.update_frame();
                     }
-                    // add platform // TODO
                     if os_input.key_pressed(VirtualKeyCode::F) {
-                        if self.selector.platforms.len() == 1 {
-                            // p1 = selected platform point
-                            // p2 = mouse location
-                        }
-                        else {
-                            // step 1. place p1 at mouse location
-                            // step 2. F or click to place p2 at mouse location
+                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+                            if self.selector.platforms.len() == 1 {
+                                // create new platform, p1 is selected platform, p2 is current mouse
+                                let (x, y) = match self.selector.platforms.iter().next().unwrap() {
+                                    &PlatformSelection::P1 (i) => (self.stage.platforms[i].x1, self.stage.platforms[i].y1),
+                                    &PlatformSelection::P2 (i) => (self.stage.platforms[i].x2, self.stage.platforms[i].y2)
+                                };
+
+                                self.selector.clear();
+                                self.selector.platforms.insert(PlatformSelection::P2(self.stage.platforms.len()));
+                                self.stage.platforms.push(Platform::new(x, y, m_x, m_y));
+                            }
+                            else if self.selector.platforms.len() == 0 {
+                                // create new platform, p1 is current mouse, p2 is moving
+                                self.selector.clear();
+                                self.selector.platforms.insert(PlatformSelection::P2(self.stage.platforms.len()));
+                                self.selector.moving = true;
+                                self.stage.platforms.push(Platform::new(m_x, m_y, m_x, m_y));
+                            }
                         }
                     }
                     // add spawn point
@@ -1121,6 +1152,26 @@ impl Selector {
         self.colboxes.iter().cloned().collect()
     }
 
+    fn platforms_vec(&self) -> Vec<usize> {
+        let mut result = vec!();
+        let mut prev_i: Option<usize> = None;
+        let mut platforms: Vec<usize> = self.platforms.iter().map(|x| x.index()).collect();
+        platforms.sort();
+
+        for platform_i in platforms {
+            if let Some(prev_i) = prev_i {
+                if prev_i != platform_i {
+                    result.push(platform_i)
+                }
+            }
+            else {
+                result.push(platform_i)
+            }
+            prev_i = Some(platform_i);
+        }
+        result
+    }
+
     fn start(&mut self, mouse: (f32, f32)) {
         self.point  = Some(mouse);
         self.moving = false;
@@ -1173,6 +1224,15 @@ impl Selector {
 pub enum PlatformSelection {
     P1 (usize),
     P2 (usize)
+}
+
+impl PlatformSelection {
+    fn index(&self) -> usize {
+        match self {
+            &PlatformSelection::P1 (index) |
+            &PlatformSelection::P2 (index) => index
+        }
+    }
 }
 
 impl Default for PlatformSelection {

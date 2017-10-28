@@ -143,6 +143,19 @@ pub struct Platform {
 /// plat_x/plat_y/plat_p is offset from the centre of the platform
 /// world_x/world_y/world_p is world coordinates
 impl Platform {
+    pub fn new(x1: f32, y1: f32, x2: f32, y2: f32) -> Platform {
+        Platform {
+            x1,
+            y1,
+            x2,
+            y2,
+            grab1:        false,
+            grab2:        false,
+            traction:     1.0,
+            pass_through: true,
+        }
+    }
+
     pub fn angle(&self) -> f32 {
         (self.y1-self.y2).atan2(self.x1-self.x2)
     }
