@@ -522,9 +522,15 @@ impl<'a> VulkanGraphics<'a> {
             _ => { }
         }
 
-        if let Some(buffers) = Buffers::new_stage(self.device.clone(), &render.stage) {
+        if let Some(buffers) = Buffers::new_platforms(self.device.clone(), &render.platforms) {
             let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
             let color = [1.0, 1.0, 1.0, 1.0];
+            command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, color, color);
+        }
+
+        if let Some(buffers) = Buffers::new_selected_platforms(self.device.clone(), &render.platforms, &render.selected_platforms) {
+            let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
+            let color = [0.0, 1.0, 0.0, 1.0];
             command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, color, color);
         }
 

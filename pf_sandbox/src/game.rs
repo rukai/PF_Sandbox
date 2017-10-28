@@ -14,7 +14,7 @@ use ::replays::Replay;
 use ::replays;
 use ::results::{GameResults, RawPlayerResult, PlayerResult};
 use ::rules::Goal;
-use ::stage::{Stage, DebugStage, SpawnPoint};
+use ::stage::{Stage, DebugStage, SpawnPoint, Platform};
 
 use rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
@@ -183,9 +183,9 @@ impl Game {
     fn set_context(&mut self) {
         match self.edit {
             Edit::Fighter (player) => {
-                let player_fighter = self.players[player].fighter.as_ref();
-                let player_action = self.players[player].action as usize;
-                let player_frame  = self.players[player].frame as usize;
+                let player_fighter  = self.players[player].fighter.as_ref();
+                let player_action   = self.players[player].action as usize;
+                let player_frame    = self.players[player].frame as usize;
                 let player_colboxes = self.selector.colboxes_vec();
 
                 let fighters = &mut self.package.fighters;
@@ -627,13 +627,31 @@ impl Game {
                             }
                         }
                     }
+                    for (i, platform) in self.stage.platforms.iter().enumerate() {
+                        let distance1 = ((m_x - platform.x1).powi(2) + (m_y - platform.y1).powi(2)).sqrt();
+                        if distance1 < 3.0 { // TODO: check entire half of platform, not just the edge
+                            if os_input.held_alt() {
+                                self.selector.platforms.remove(&PlatformSelection::P1(i));
+                            } else {
+                                self.selector.platforms.insert(PlatformSelection::P1(i));
+                            }
+                        }
+                        let distance2 = ((m_x - platform.x2).powi(2) + (m_y - platform.y2).powi(2)).sqrt();
+                        if distance2 < 3.0 {
+                            if os_input.held_alt() {
+                                self.selector.platforms.remove(&PlatformSelection::P2(i));
+                            } else {
+                                self.selector.platforms.insert(PlatformSelection::P2(i));
+                            }
+                        }
+                    }
                 }
 
                 // handle multiple selection
                 if let Some(rect) = self.selector.step_multiple_selection(os_input, &self.camera) {
                     if self.debug_stage.spawn_points {
                         for (i, point) in self.stage.spawn_points.iter().enumerate() {
-                            if rect.contains_point(point.x, point.y) {
+                            if rect.contains_point(point.x, point.y) { // TODO: check entire half of platform, not just the edge
                                 if os_input.held_alt() {
                                     self.selector.spawn_points.remove(&i);
                                 } else {
@@ -650,6 +668,22 @@ impl Game {
                                 } else {
                                     self.selector.respawn_points.insert(i);
                                 }
+                            }
+                        }
+                    }
+                    for (i, platform) in self.stage.platforms.iter().enumerate() {
+                        if rect.contains_point(platform.x1, platform.y1) {
+                            if os_input.held_alt() {
+                                self.selector.platforms.remove(&PlatformSelection::P1(i));
+                            } else {
+                                self.selector.platforms.insert(PlatformSelection::P1(i));
+                            }
+                        }
+                        if rect.contains_point(platform.x2, platform.y2) {
+                            if os_input.held_alt() {
+                                self.selector.platforms.remove(&PlatformSelection::P2(i));
+                            } else {
+                                self.selector.platforms.insert(PlatformSelection::P2(i));
                             }
                         }
                     }
@@ -993,13 +1027,14 @@ impl Game {
         };
 
         RenderGame {
-            seed:        self.get_seed(),
-            stage:       self.stage.clone(),
-            entities:    entities,
-            state:       self.state.clone(),
-            camera:      self.camera.clone(),
-            debug_lines: self.debug_lines.clone(),
-            timer:       timer,
+            seed:               self.get_seed(),
+            platforms:          self.stage.platforms.to_vec(),
+            selected_platforms: self.selector.platforms.clone(),
+            entities:           entities,
+            state:              self.state.clone(),
+            camera:             self.camera.clone(),
+            debug_lines:        self.debug_lines.clone(),
+            timer:              timer,
         }
     }
 
@@ -1073,7 +1108,7 @@ impl Default for Edit {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct Selector {
     colboxes:       HashSet<usize>,
-    platforms:      HashSet<usize>,
+    platforms:      HashSet<PlatformSelection>,
     spawn_points:   HashSet<usize>,
     respawn_points: HashSet<usize>,
     moving:         bool,
@@ -1134,14 +1169,27 @@ impl Selector {
     }
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Node)]
+pub enum PlatformSelection {
+    P1 (usize),
+    P2 (usize)
+}
+
+impl Default for PlatformSelection {
+    fn default() -> PlatformSelection {
+        PlatformSelection::P1 (0)
+    }
+}
+
 pub struct RenderGame {
-    pub seed:        Vec<usize>,
-    pub stage:       Stage,
-    pub entities:    Vec<RenderEntity>,
-    pub state:       GameState,
-    pub camera:      Camera,
-    pub debug_lines: Vec<String>,
-    pub timer:       Option<Duration>,
+    pub seed:               Vec<usize>,
+    pub platforms:          Vec<Platform>,
+    pub selected_platforms: HashSet<PlatformSelection>,
+    pub entities:           Vec<RenderEntity>,
+    pub state:              GameState,
+    pub camera:             Camera,
+    pub debug_lines:        Vec<String>,
+    pub timer:              Option<Duration>,
 }
 
 pub enum RenderEntity {

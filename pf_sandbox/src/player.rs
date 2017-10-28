@@ -1632,6 +1632,9 @@ impl Player {
             },
             Some(Action::JumpSquat) => {
                 self.set_airbourne(players, fighters, platforms);
+                if let &mut Location::Airbourne { ref mut y, .. } = &mut self.location {
+                    *y += 0.0001;
+                }
 
                 let shorthop = if self.jumpsquat_button {
                     !input[0].x && !input[0].y

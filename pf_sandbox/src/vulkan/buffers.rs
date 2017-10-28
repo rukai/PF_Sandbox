@@ -4,7 +4,8 @@ use ::geometry::Rect;
 use ::graphics;
 use ::package::{Package, PackageUpdate};
 use ::player::RenderPlayer;
-use ::stage::Stage;
+use ::stage::Platform;
+use ::game::PlatformSelection;
 
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
@@ -235,19 +236,68 @@ impl Buffers {
         }
     }
 
-    pub fn new_stage(device: Arc<Device>, stage: &Stage) -> Option<Buffers> {
-        if stage.platforms.len() == 0 {
+    pub fn new_selected_platforms(device: Arc<Device>, platforms: &[Platform], selected_platforms: &HashSet<PlatformSelection>) -> Option<Buffers> {
+        if platforms.len() == 0 {
             return None;
         }
 
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
-        for platform in &stage.platforms[..] {
+        for (i, platform) in platforms.iter().enumerate() {
+            let x_mid = (platform.x1 + platform.x2) / 2.0;
+            let y_mid = (platform.y1 + platform.y2) / 2.0;
+
+            if selected_platforms.contains(&PlatformSelection::P1(i)) {
+                vertices.push(vertex(platform.x1, platform.y1));
+                vertices.push(vertex(x_mid, y_mid));
+                vertices.push(vertex(platform.x1, platform.y1 - 0.5));
+                vertices.push(vertex(x_mid, y_mid - 0.5));
+
+                indices.push(indice_count + 0);
+                indices.push(indice_count + 1);
+                indices.push(indice_count + 2);
+                indices.push(indice_count + 1);
+                indices.push(indice_count + 2);
+                indices.push(indice_count + 3);
+                indice_count += 4;
+            }
+
+            if selected_platforms.contains(&PlatformSelection::P2(i)) {
+                vertices.push(vertex(platform.x2, platform.y2));
+                vertices.push(vertex(x_mid, y_mid));
+                vertices.push(vertex(platform.x2, platform.y2 - 0.5));
+                vertices.push(vertex(x_mid, y_mid - 0.5));
+
+                indices.push(indice_count + 0);
+                indices.push(indice_count + 1);
+                indices.push(indice_count + 2);
+                indices.push(indice_count + 1);
+                indices.push(indice_count + 2);
+                indices.push(indice_count + 3);
+                indice_count += 4;
+            }
+        }
+
+        Some(Buffers {
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+        })
+    }
+
+    pub fn new_platforms(device: Arc<Device>, platforms: &[Platform]) -> Option<Buffers> {
+        if platforms.len() == 0 {
+            return None;
+        }
+
+        let mut vertices: Vec<Vertex> = vec!();
+        let mut indices: Vec<u16> = vec!();
+        let mut indice_count = 0;
+        for platform in platforms {
             vertices.push(vertex(platform.x1, platform.y1));
             vertices.push(vertex(platform.x2, platform.y2));
-            vertices.push(vertex(platform.x1, platform.y1 - 2.0));
-            vertices.push(vertex(platform.x2, platform.y2 - 2.0));
+            vertices.push(vertex(platform.x1, platform.y1 - 0.5));
+            vertices.push(vertex(platform.x2, platform.y2 - 0.5));
 
             indices.push(indice_count + 0);
             indices.push(indice_count + 1);
@@ -447,7 +497,7 @@ impl PackageBuffers {
                     }
 
                     for (key, stage) in package.stages.key_value_iter() {
-                        self.stages.insert(key.clone(), Buffers::new_stage(device.clone(), &stage));
+                        self.stages.insert(key.clone(), Buffers::new_platforms(device.clone(), &stage.platforms));
                     }
                     self.package = Some(package);
                 }
@@ -473,7 +523,7 @@ impl PackageBuffers {
                     }
                 }
                 PackageUpdate::InsertStage { index, key, stage } => {
-                    self.stages.insert(key.clone(), Buffers::new_stage(device.clone(), &stage));
+                    self.stages.insert(key.clone(), Buffers::new_platforms(device.clone(), &stage.platforms));
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.stages.insert(index, key, stage);
                     }
