@@ -79,8 +79,7 @@ impl Game {
                 let fighter = player.fighter.clone();
                 let team = player.team;
                 let spawn = stage.spawn_points[i % stage.spawn_points.len()].clone();
-                let respawn = stage.respawn_points[i % stage.respawn_points.len()].clone();
-                players.push(Player::new(fighter, team, spawn, respawn, &package));
+                players.push(Player::new(fighter, team, spawn, &package));
                 debug_players.push(Default::default());
             }
         }
@@ -220,11 +219,15 @@ impl Game {
 
     fn step_local(&mut self, input: &mut Input) {
         self.player_history.push(self.players.clone());
+        self.stage_history .push(self.stage.clone());
         self.current_frame += 1;
 
         // erase any future history
         for _ in self.current_frame..self.player_history.len() {
             self.player_history.pop();
+        }
+        for _ in self.current_frame..self.stage_history.len() {
+            self.stage_history.pop();
         }
 
         // run game loop
@@ -246,6 +249,7 @@ impl Game {
 
     fn step_netplay(&mut self, input: &mut Input) {
         self.player_history.push(self.players.clone());
+        self.stage_history.push(self.stage.clone());
         self.current_frame += 1;
 
         input.game_update(self.current_frame);
@@ -522,6 +526,80 @@ impl Game {
             }
             Edit::Stage => {
                 self.debug_stage.step(os_input);
+                if self.selector.moving {
+                    let (d_x, d_y) = os_input.game_mouse_diff(&self.camera);
+                    for (i, spawn) in self.stage.spawn_points.iter_mut().enumerate() {
+                        if self.selector.spawn_points.contains(&i) {
+                            spawn.x += d_x;
+                            spawn.y += d_y;
+                        }
+                    }
+
+                    for (i, respawn) in self.stage.respawn_points.iter_mut().enumerate() {
+                        if self.selector.respawn_points.contains(&i) {
+                            respawn.x += d_x;
+                            respawn.y += d_y;
+                        }
+                    }
+
+                    // end move
+                    if os_input.mouse_pressed(0) {
+                        self.update_frame();
+                    }
+                }
+                else {
+                    // start move elements
+                    if os_input.key_pressed(VirtualKeyCode::A) {
+                        if self.selector.platforms.len() + self.selector.spawn_points.len() + self.selector.respawn_points.len() > 0 {
+                            self.selector.moving = true;
+                        }
+                    }
+                    // delete elements
+                    if os_input.key_pressed(VirtualKeyCode::D) {
+                        let mut spawns_to_delete: Vec<usize> = self.selector.spawn_points.iter().cloned().collect();
+                        spawns_to_delete.sort();
+                        spawns_to_delete.reverse(); // preserve index order while deleting
+
+                        for spawn_i in spawns_to_delete {
+                            self.stage.spawn_points.remove(spawn_i);
+                        }
+
+                        let mut respawns_to_delete: Vec<usize> = self.selector.respawn_points.iter().cloned().collect();
+                        respawns_to_delete.sort();
+                        respawns_to_delete.reverse(); // preserve index order while deleting
+
+                        for respawn_i in respawns_to_delete {
+                            self.stage.respawn_points.remove(respawn_i);
+                        }
+
+                        self.update_frame();
+                    }
+                    // add platform // TODO
+                    if os_input.key_pressed(VirtualKeyCode::F) {
+                        if self.selector.platforms.len() == 1 {
+                            // p1 = selected platform point
+                            // p2 = mouse location
+                        }
+                        else {
+                            // step 1. place p1 at mouse location
+                            // step 2. F or click to place p2 at mouse location
+                        }
+                    }
+                    // add spawn point
+                    if os_input.key_pressed(VirtualKeyCode::Z) {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+                            self.stage.spawn_points.push(SpawnPoint::new(m_x, m_y));
+                            self.update_frame();
+                        }
+                    }
+                    // add respawn point
+                    if os_input.key_pressed(VirtualKeyCode::X) {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+                            self.stage.respawn_points.push(SpawnPoint::new(m_x, m_y));
+                            self.update_frame();
+                        }
+                    }
+                }
 
                 // handle single selection
                 if let Some((m_x, m_y)) = self.selector.step_single_selection(os_input, &self.camera) {
@@ -583,8 +661,8 @@ impl Game {
     }
 
     /// next frame is advanced by using the input history on the current frame
-    // TODO: Allow choice between using input history and game history
-    fn step_replay_forwards(&mut self, input: &mut Input) {
+    // TODO: Activate by shift+K/L
+    fn step_replay_forwards(&mut self, input: &mut Input) { // TODO: rename: step_replay_forwards_from_input
         if self.current_frame <= input.last_frame() {
             self.current_frame += 1;
             let player_inputs = &input.players(self.current_frame);
@@ -601,6 +679,11 @@ impl Game {
         }
     }
 
+    // TODO: Activate by K/L
+    // fn step_replay_forwards_from_history() {
+    //     TODO
+    // }
+
     fn step_replay_forwards_os_input(&mut self, os_input: &OsInput) {
         if os_input.key_pressed(VirtualKeyCode::H) {
             self.state = GameState::ReplayBackwards;
@@ -615,6 +698,7 @@ impl Game {
         if self.current_frame > 0 {
             self.current_frame -= 1;
             self.players = self.player_history.get(self.current_frame).unwrap().clone();
+            self.stage   = self.stage_history .get(self.current_frame).unwrap().clone();
             self.update_frame();
         }
         else {
@@ -676,7 +760,7 @@ impl Game {
             for (i, player) in action_players.iter().enumerate() {
                 let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.physics_step(input, &action_players, &self.package.fighters, &self.stage, self.current_frame, self.package.rules.goal.clone());
+                player.physics_step(input, &action_players, i, &self.package.fighters, &self.stage, self.current_frame, self.package.rules.goal.clone());
                 physics_players.push(player);
             }
 

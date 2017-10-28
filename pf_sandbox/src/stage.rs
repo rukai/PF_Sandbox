@@ -244,6 +244,16 @@ pub struct SpawnPoint {
     pub face_right: bool,
 }
 
+impl SpawnPoint {
+    pub fn new(x: f32, y: f32) -> SpawnPoint {
+        SpawnPoint {
+            x,
+            y,
+            face_right: true
+        }
+    }
+}
+
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct DebugStage {
     pub blast:          bool,

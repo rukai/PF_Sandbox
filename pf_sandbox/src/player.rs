@@ -118,7 +118,6 @@ pub struct Player {
     pub stocks:             Option<u64>,
     pub damage:             f32,
     pub location:           Location,
-    pub respawn:            SpawnPoint,
     pub x_vel:              f32,
     pub y_vel:              f32,
     pub kb_x_vel:           f32,
@@ -160,7 +159,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(fighter: String, team: usize, spawn: SpawnPoint, respawn: SpawnPoint, package: &Package) -> Player {
+    pub fn new(fighter: String, team: usize, spawn: SpawnPoint, package: &Package) -> Player {
         Player {
             action:             Action::DummyFramePreStart.index(),
             team:               team,
@@ -169,7 +168,6 @@ impl Player {
             stocks:             package.rules.stock_count,
             damage:             0.0,
             location:           Location::Airbourne { x: spawn.x, y: spawn.y },
-            respawn:            respawn,
             x_vel:              0.0,
             y_vel:              0.0,
             kb_x_vel:           0.0,
@@ -1812,7 +1810,7 @@ impl Player {
      *  Begin physics section
      */
 
-    pub fn physics_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
+    pub fn physics_step(&mut self, input: &PlayerInput, players: &[Player], player_i: usize, fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
         if let Hitlag::None = self.hitlag {
             let fighter = &fighters[self.fighter.as_ref()];
             let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
@@ -1884,7 +1882,7 @@ impl Player {
             let blast = &stage.blast;
             let (x, y) = self.bps_xy(players, fighters, &stage.platforms);
             if x < blast.left() || x > blast.right() || y < blast.bot() || y > blast.top() {
-                self.die(fighter, game_frame, goal);
+                self.die(player_i, fighter, stage, game_frame, goal);
             }
 
             // ledge grabs
@@ -2124,10 +2122,16 @@ impl Player {
         self.set_action(Action::TurnDash);
     }
 
-    fn die(&mut self, fighter: &Fighter, game_frame: usize, goal: Goal) {
+    fn die(&mut self, player_i: usize, fighter: &Fighter, stage: &Stage, game_frame: usize, goal: Goal) {
+        if stage.respawn_points.len() == 0 {
+            self.location = Location::Airbourne { x: 0.0, y: 0.0 };
+            self.face_right = true;
+        } else {
+            let respawn = &stage.respawn_points[player_i % stage.respawn_points.len()];
+            self.location = Location::Airbourne { x: respawn.x, y: respawn.y };
+            self.face_right = respawn.face_right;
+        }
         self.damage = 0.0;
-        self.location = Location::Airbourne { x: self.respawn.x, y: self.respawn.y };
-        self.face_right = self.respawn.face_right;
         self.x_vel = 0.0;
         self.y_vel = 0.0;
         self.kb_x_vel = 0.0;
@@ -2164,7 +2168,7 @@ impl Player {
 
     fn check_ledge_grab(&mut self, players: &[Player], fighter: &Fighter, ledge_grab_box: &LedgeGrabBox, platforms: &[Platform]) {
         for (platform_i, platform) in platforms.iter().enumerate() {
-            let left_grab  = platform.left_grab()  && self.check_ledge_collision(ledge_grab_box, platform.left_ledge()) && players.iter().all(|x| !x.is_hogging_ledge(platform_i, true));
+            let left_grab  = platform.left_grab()  && self.check_ledge_collision(ledge_grab_box, platform.left_ledge())  && players.iter().all(|x| !x.is_hogging_ledge(platform_i, true));
             let right_grab = platform.right_grab() && self.check_ledge_collision(ledge_grab_box, platform.right_ledge()) && players.iter().all(|x| !x.is_hogging_ledge(platform_i, false));
 
             // If both left and right ledges are in range then keep the same direction.
