@@ -27,6 +27,12 @@ impl Default for Fighter {
                   => false,
                 _ => true
             };
+            action_def_new.frames[0].use_platform_angle = match action {
+                Action::Dsmash | Action::Fsmash |
+                Action::Dtilt  | Action::MissedTechIdle
+                  => true,
+                _ => false
+            };
             actions.push(action_def_new);
         }
 
@@ -215,39 +221,41 @@ pub struct ActionDef {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct ActionFrame {
-    pub ecb:            ECB,
-    pub colboxes:       ContextVec<CollisionBox>,
-    pub colbox_links:   Vec<CollisionBoxLink>,
-    pub render_order:   Vec<RenderOrder>,
-    pub item_hold_x:    f32,
-    pub item_hold_y:    f32,
-    pub grab_hold_x:    f32,
-    pub grab_hold_y:    f32,
-    pub set_x_vel:      Option<f32>,
-    pub set_y_vel:      Option<f32>,
-    pub pass_through:   bool, // only used on aerial actions
-    pub ledge_cancel:   bool, // only used on ground actions
+    pub ecb:                 ECB,
+    pub colboxes:            ContextVec<CollisionBox>,
+    pub colbox_links:        Vec<CollisionBoxLink>,
+    pub render_order:        Vec<RenderOrder>,
+    pub item_hold_x:         f32,
+    pub item_hold_y:         f32,
+    pub grab_hold_x:         f32,
+    pub grab_hold_y:         f32,
+    pub set_x_vel:           Option<f32>,
+    pub set_y_vel:           Option<f32>,
+    pub pass_through:        bool, // only used on aerial actions
+    pub ledge_cancel:        bool, // only used on ground actions
+    pub use_platform_angle:  bool, // only used on ground actions
     // TODO: pub land_cancel: bool // only used on aerial attacks
-    pub ledge_grab_box: Option<LedgeGrabBox>,
+    pub ledge_grab_box:      Option<LedgeGrabBox>,
     pub force_hitlist_reset: bool,
 }
 
 impl Default for ActionFrame {
     fn default() -> ActionFrame {
         ActionFrame {
-            colboxes:       ContextVec::new(),
-            colbox_links:   vec!(),
-            render_order:   vec!(),
-            ecb:            ECB::default(),
-            item_hold_x:    4.0,
-            item_hold_y:    11.0,
-            grab_hold_x:    4.0,
-            grab_hold_y:    11.0,
-            set_x_vel:      None,
-            set_y_vel:      None,
-            pass_through:   true,
-            ledge_cancel:   true,
-            ledge_grab_box: None,
+            colboxes:            ContextVec::new(),
+            colbox_links:        vec!(),
+            render_order:        vec!(),
+            ecb:                 ECB::default(),
+            item_hold_x:         4.0,
+            item_hold_y:         11.0,
+            grab_hold_x:         4.0,
+            grab_hold_y:         11.0,
+            set_x_vel:           None,
+            set_y_vel:           None,
+            pass_through:        true,
+            ledge_cancel:        true,
+            use_platform_angle:  false,
+            ledge_grab_box:      None,
             force_hitlist_reset: false,
         }
     }

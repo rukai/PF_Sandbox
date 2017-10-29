@@ -150,7 +150,9 @@ impl Platform {
     }
 
     pub fn angle(&self) -> f32 {
-        (self.y1-self.y2).atan2(self.x1-self.x2)
+        let (l_x, l_y) = self.left_ledge();
+        let (r_x, r_y) = self.right_ledge();
+        (r_y-l_y).atan2(r_x-l_x)
     }
 
     pub fn plat_x_in_bounds(&self, plat_x: f32) -> bool {

@@ -359,8 +359,12 @@ impl Game {
 
                 // move collisionboxes
                 if self.selector.moving {
-                    let (d_x, d_y) = os_input.game_mouse_diff(&self.camera);
-                    let distance = (self.players[player].relative_f(d_x), d_y);
+                    // undo the operations used to render the player
+                    let (raw_d_x, raw_d_y) = os_input.game_mouse_diff(&self.camera);
+                    let angle = -self.players[player].angle(&self.package.fighters[fighter], &self.stage.platforms); // rotate by the inverse of the angle
+                    let d_x = raw_d_x * angle.cos() - raw_d_y * angle.sin();
+                    let d_y = raw_d_x * angle.sin() + raw_d_y * angle.cos();
+                    let distance = (self.players[player].relative_f(d_x), d_y); // *= -1 is its own inverse
                     self.package.move_fighter_colboxes(fighter, action, frame, &self.selector.colboxes, distance);
 
                     // end move
@@ -475,8 +479,8 @@ impl Game {
                     // handle single selection
                     if let Some((m_x, m_y)) = self.selector.step_single_selection(os_input, &self.camera) {
                         let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
-                        let frame = &self.package.fighters[fighter].actions[action].frames[frame];
-                        let frame = self.players[player].relative_frame(frame);
+                        let frame = self.players[player].relative_frame(&self.package.fighters[fighter], &self.stage.platforms);
+
                         for (i, colbox) in frame.colboxes.iter().enumerate() {
                             let hit_x = colbox.point.0 + player_x;
                             let hit_y = colbox.point.1 + player_y;
@@ -505,8 +509,7 @@ impl Game {
                     // handle multiple selection
                     if let Some(rect) = self.selector.step_multiple_selection(os_input, &self.camera) {
                         let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
-                        let frame = &self.package.fighters[fighter].actions[action].frames[frame];
-                        let frame = self.players[player].relative_frame(frame);
+                        let frame = self.players[player].relative_frame(&self.package.fighters[fighter], &self.stage.platforms);
 
                         for (i, colbox) in frame.colboxes.iter().enumerate() {
                             let hit_x = colbox.point.0 + player_x;

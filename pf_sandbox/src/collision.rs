@@ -22,8 +22,8 @@ pub fn collision_check(players: &[Player], fighters: &KeyedContextVec<Fighter>, 
             if player_atk_i != player_def_i && player_atk.hitlist.iter().all(|x| *x != player_def_i) {
                 let fighter_def = &fighters[player_def.fighter.as_ref()];
 
-                let frame_atk = &player_atk.relative_frame(&fighter_atk.actions[player_atk.action as usize].frames[player_atk.frame as usize]);
-                let frame_def = &player_def.relative_frame(&fighter_def.actions[player_def.action as usize].frames[player_def.frame as usize]);
+                let frame_atk = &player_atk.relative_frame(fighter_atk, platforms);
+                let frame_def = &player_def.relative_frame(fighter_def, platforms);
                 let colboxes_atk = frame_atk.get_hitboxes();
 
                 'hitbox_atk: for colbox_atk in &colboxes_atk {

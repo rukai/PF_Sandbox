@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde_json::{Value, Number};
 
-pub fn engine_version() -> u64 { 8 }
+pub fn engine_version() -> u64 { 9 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
@@ -38,6 +38,7 @@ pub fn upgrade_to_latest(meta: &mut Option<Value>, rules: &mut Option<Value>, fi
     else if meta_engine_version < engine_version() {
         for upgrade_from in meta_engine_version..engine_version() {
             match upgrade_from {
+                8 => { upgrade8(fighters) }
                 7 => { upgrade7(fighters) }
                 6 => { upgrade6(fighters) }
                 5 => { upgrade5(fighters) }
@@ -66,6 +67,23 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
+
+/// Add use_platform_angle to ActionFrame
+fn upgrade8(fighters: &mut HashMap<String, Value>) {
+    for fighter in fighters.values_mut() {
+        if let Some (actions) = get_vec(fighter, "actions") {
+            for action in actions {
+                if let Some (frames) = get_vec(action, "frames") {
+                    for frame in frames {
+                        if let &mut Value::Object (ref mut frame) = frame {
+                            frame.insert(String::from("use_platform_angle"), Value::Bool(false));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Add MissedTech states
 fn upgrade7(fighters: &mut HashMap<String, Value>) {

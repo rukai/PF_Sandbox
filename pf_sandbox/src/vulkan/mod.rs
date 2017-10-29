@@ -543,6 +543,7 @@ impl<'a> VulkanGraphics<'a> {
             match entity {
                 &RenderEntity::Player(ref player) => {
                     let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                    let rotate   = Matrix4::from_angle_z(Rad(player.angle));
                     let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, z_player));
 
                     // draw player ecb
@@ -573,7 +574,7 @@ impl<'a> VulkanGraphics<'a> {
                                 let c = player.fighter_color.clone();
                                 [c[0], c[1], c[2], 1.0]
                             };
-                            let transformation = position * dir;
+                            let transformation = position * rotate * dir;
 
                             // draw fighter
                             let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
@@ -592,7 +593,7 @@ impl<'a> VulkanGraphics<'a> {
                     // draw selected hitboxes
                     if player.selected_colboxes.len() > 0 {
                         let color = [0.0, 1.0, 0.0, 1.0];
-                        let transformation = position * dir;
+                        let transformation = position * rotate * dir;
                         let buffers = self.package_buffers.fighter_frame_colboxes(self.device.clone(), &player.fighter, player.action, player.frame, &player.selected_colboxes);
                         command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, color, color);
                     }
@@ -979,6 +980,7 @@ impl<'a> VulkanGraphics<'a> {
                         action:            Action::Idle as usize,
                         fighter:           fighter_key.clone(),
                         face_right:        start_x < 0.0,
+                        angle:             0.0,
                         fighter_color:     graphics::get_team_color3(selection.team),
                         fighter_selected:  false,
                         player_selected:   false,

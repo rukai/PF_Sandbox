@@ -1783,13 +1783,17 @@ impl Player {
         }
     }
 
-    pub fn relative_frame(&self, frame: &ActionFrame) -> ActionFrame {
-        let mut frame = frame.clone();
+    pub fn relative_frame(&self, fighter: &Fighter, platforms: &[Platform]) -> ActionFrame {
+        let angle = self.angle(fighter, platforms);
+        let mut fighter_frame = fighter.actions[self.action as usize].frames[self.frame as usize].clone();
 
         // fix hitboxes
-        for colbox in &mut frame.colboxes[..] {
-            let (x, y) = colbox.point;
-            colbox.point = (self.relative_f(x), y);
+        for colbox in fighter_frame.colboxes.iter_mut() {
+            let (raw_x, y) = colbox.point;
+            let x = self.relative_f(raw_x);
+            let angled_x = x * angle.cos() - y * angle.sin();
+            let angled_y = x * angle.sin() + y * angle.cos();
+            colbox.point = (angled_x, angled_y);
             if let &mut CollisionBoxRole::Hit (ref mut hitbox) = &mut colbox.role {
                 if !self.face_right {
                     hitbox.angle = 180.0 - hitbox.angle
@@ -1798,8 +1802,8 @@ impl Player {
         }
 
         // fix velocity setter
-        frame.set_x_vel = frame.set_x_vel.map(|x| self.relative_f(x));
-        frame
+        fighter_frame.set_x_vel = fighter_frame.set_x_vel.map(|x| self.relative_f(x));
+        fighter_frame
     }
 
     fn specialfall_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
@@ -1888,10 +1892,9 @@ impl Player {
                     }
                 }
                 Location::Platform { platform_i, mut x } => {
-                    x += x_vel;
-
                     if let Some(platform) = stage.platforms.get(platform_i) {
-                        self.move_off_floor(input, players, fighters, stage, platform, platform_i, x);
+                        x += x_vel * platform.angle().cos();
+                        self.floor_move(input, players, fighters, stage, platform, platform_i, x);
                     }
                     else {
                         self.location = Location::Airbourne { x: 0.0, y: 0.0 };
@@ -1919,7 +1922,7 @@ impl Player {
         }
     }
 
-    fn move_off_floor(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, platform: &Platform, platform_i: usize, x: f32) {
+    fn floor_move(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, platform: &Platform, platform_i: usize, x: f32) {
         let fighter = &fighters[self.fighter.as_ref()];
         let connected_floors = stage.connected_floors(platform_i);
         if platform.plat_x_in_bounds(x) {
@@ -1930,14 +1933,14 @@ impl Player {
             let new_platform = &stage.platforms[new_platform_i];
             let world_x = platform.plat_x_to_world_x(x);
             let x = new_platform.world_x_to_plat_x(world_x);
-            self.move_off_floor(input, players, fighters, stage, new_platform, new_platform_i, x);
+            self.floor_move(input, players, fighters, stage, new_platform, new_platform_i, x);
         }
         else if x > 0.0 && connected_floors.right_i.is_some() {
             let new_platform_i = connected_floors.right_i.unwrap();
             let new_platform = &stage.platforms[new_platform_i];
             let world_x = platform.plat_x_to_world_x(x);
             let x = new_platform.world_x_to_plat_x(world_x);
-            self.move_off_floor(input, players, fighters, stage, new_platform, new_platform_i, x);
+            self.floor_move(input, players, fighters, stage, new_platform, new_platform_i, x);
         }
         else if !fighter.actions[self.action as usize].frames[self.frame as usize].ledge_cancel {
             self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
@@ -2349,6 +2352,7 @@ impl Player {
             fighter:    self.fighter.clone(),
             face_right: self.face_right,
             particles:  self.particles.clone(),
+            angle:      self.angle(fighter, platforms),
             debug,
             fighter_color,
             fighter_selected,
@@ -2356,6 +2360,16 @@ impl Player {
             selected_colboxes,
             shield,
             vector_arrows,
+        }
+    }
+
+    pub fn angle(&self, fighter: &Fighter, platforms: &[Platform]) -> f32 {
+        let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
+        match self.location {
+            Location::Platform { platform_i, .. } if fighter_frame.use_platform_angle => {
+                platforms.get(platform_i).map_or(0.0, |x| x.angle())
+            }
+            _ => 0.0,
         }
     }
 
@@ -2527,6 +2541,7 @@ pub struct RenderPlayer {
     pub action:            usize,
     pub fighter:           String,
     pub face_right:        bool,
+    pub angle:             f32,
     pub fighter_color:     [f32; 3],
     pub fighter_selected:  bool,
     pub player_selected:   bool,
