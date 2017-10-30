@@ -4,8 +4,8 @@ use ::geometry::Rect;
 use ::graphics;
 use ::package::{Package, PackageUpdate};
 use ::player::RenderPlayer;
-use ::stage::Platform;
-use ::game::PlatformSelection;
+use ::stage::Surface;
+use ::game::SurfaceSelection;
 
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
@@ -236,19 +236,19 @@ impl Buffers {
         }
     }
 
-    pub fn new_selected_platforms(device: Arc<Device>, platforms: &[Platform], selected_platforms: &HashSet<PlatformSelection>) -> Option<Buffers> {
-        if platforms.len() == 0 {
+    pub fn new_selected_surfaces(device: Arc<Device>, surfaces: &[Surface], selected_surfaces: &HashSet<SurfaceSelection>) -> Option<Buffers> {
+        if surfaces.len() == 0 {
             return None;
         }
 
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
-        for (i, platform) in platforms.iter().enumerate() {
+        for (i, platform) in surfaces.iter().enumerate() {
             let x_mid = (platform.x1 + platform.x2) / 2.0;
             let y_mid = (platform.y1 + platform.y2) / 2.0;
 
-            if selected_platforms.contains(&PlatformSelection::P1(i)) {
+            if selected_surfaces.contains(&SurfaceSelection::P1(i)) {
                 vertices.push(vertex(platform.x1, platform.y1));
                 vertices.push(vertex(x_mid, y_mid));
                 vertices.push(vertex(platform.x1, platform.y1 - 0.5));
@@ -263,7 +263,7 @@ impl Buffers {
                 indice_count += 4;
             }
 
-            if selected_platforms.contains(&PlatformSelection::P2(i)) {
+            if selected_surfaces.contains(&SurfaceSelection::P2(i)) {
                 vertices.push(vertex(platform.x2, platform.y2));
                 vertices.push(vertex(x_mid, y_mid));
                 vertices.push(vertex(platform.x2, platform.y2 - 0.5));
@@ -285,15 +285,15 @@ impl Buffers {
         })
     }
 
-    pub fn new_platforms(device: Arc<Device>, platforms: &[Platform]) -> Option<Buffers> {
-        if platforms.len() == 0 {
+    pub fn new_surfaces(device: Arc<Device>, surfaces: &[Surface]) -> Option<Buffers> {
+        if surfaces.len() == 0 {
             return None;
         }
 
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
-        for platform in platforms {
+        for platform in surfaces {
             vertices.push(vertex(platform.x1, platform.y1));
             vertices.push(vertex(platform.x2, platform.y2));
             vertices.push(vertex(platform.x1, platform.y1 - 0.5));
@@ -497,7 +497,7 @@ impl PackageBuffers {
                     }
 
                     for (key, stage) in package.stages.key_value_iter() {
-                        self.stages.insert(key.clone(), Buffers::new_platforms(device.clone(), &stage.platforms));
+                        self.stages.insert(key.clone(), Buffers::new_surfaces(device.clone(), &stage.surfaces));
                     }
                     self.package = Some(package);
                 }
@@ -523,7 +523,7 @@ impl PackageBuffers {
                     }
                 }
                 PackageUpdate::InsertStage { index, key, stage } => {
-                    self.stages.insert(key.clone(), Buffers::new_platforms(device.clone(), &stage.platforms));
+                    self.stages.insert(key.clone(), Buffers::new_surfaces(device.clone(), &stage.surfaces));
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.stages.insert(index, key, stage);
                     }

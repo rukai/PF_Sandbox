@@ -68,7 +68,7 @@ impl Camera {
             let mut player_iter = players.iter();
             let mut cam_area = match player_iter.next() {
                 Some(player) => {
-                    player.cam_area(&stage.camera, players, fighters, &stage.platforms)
+                    player.cam_area(&stage.camera, players, fighters, &stage.surfaces)
                 },
                 None => {
                     self.pan = (0.0, 0.0);
@@ -79,7 +79,7 @@ impl Camera {
 
             // grow cam_area to cover all other players
             for player in player_iter {
-                let next_area = player.cam_area(&stage.camera, players, fighters, &stage.platforms);
+                let next_area = player.cam_area(&stage.camera, players, fighters, &stage.surfaces);
                 cam_area.x1 = cam_area.x1.min(next_area.left());
                 cam_area.x2 = cam_area.x2.max(next_area.right());
                 cam_area.y1 = cam_area.y1.min(next_area.bot());

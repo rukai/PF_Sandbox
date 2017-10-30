@@ -7,7 +7,7 @@ use winit::VirtualKeyCode;
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Stage {
     pub name:           String,
-    pub platforms:      ContextVec<Platform>,
+    pub surfaces:       ContextVec<Surface>,
     pub blast:          Rect,
     pub camera:         Rect,
     pub spawn_points:   ContextVec<SpawnPoint>,
@@ -16,40 +16,48 @@ pub struct Stage {
 
 impl Default for Stage {
     fn default() -> Stage {
-        let main_platform = Platform {
-            x1:           -75.0,
-            y1:           0.0,
-            grab1:        true,
-            x2:           75.0,
-            y2:           0.0,
-            grab2:        false,
-            traction:     1.0,
-            pass_through: false,
+        let main_platform = Surface {
+            x1:      -75.0,
+            y1:      0.0,
+            grab1:   true,
+            x2:      75.0,
+            y2:      0.0,
+            grab2:   false,
+            wall:    false,
+            ceiling: false,
+            floor: Some(Floor {
+                traction:     1.0,
+                pass_through: false
+            })
         };
 
-        let second_platform = Platform {
-            x1:           25.0,
-            y1:           50.0,
-            grab1:        false,
-            x2:           75.0,
-            y2:           50.0,
-            grab2:        false,
-            traction:     1.0,
-            pass_through: true,
+        let second_platform = Surface {
+            x1:      25.0,
+            y1:      50.0,
+            grab1:   false,
+            x2:      75.0,
+            y2:      50.0,
+            grab2:   false,
+            wall:    false,
+            ceiling: false,
+            floor: Some(Floor {
+                traction:     1.0,
+                pass_through: true,
+            })
         };
 
         let blast = Rect {
             x1: -200.0,
-            x2: 200.0,
-            y1:  -200.0,
-            y2:   200.0,
+            x2:  200.0,
+            y1: -200.0,
+            y2:  200.0,
         };
 
         let camera = Rect {
             x1: -150.0,
-            x2: 150.0,
-            y1:  -150.0,
-            y2:   150.0,
+            x2:  150.0,
+            y1: -150.0,
+            y2:  150.0,
         };
 
         let spawn_points = ContextVec::from_vec(vec!(
@@ -77,7 +85,7 @@ impl Default for Stage {
 
         Stage {
             name:           "Base Stage".to_string(),
-            platforms:      ContextVec::from_vec(vec!(main_platform, second_platform)),
+            surfaces:       ContextVec::from_vec(vec!(main_platform, second_platform)),
             blast:          blast,
             camera:         camera,
             spawn_points:   spawn_points.clone(),
@@ -91,11 +99,11 @@ impl Stage {
     pub fn connected_floors(&self, platform_i: usize) -> FloorInfo {
         let mut left_i = None;
         let mut right_i = None;
-        if let Some(plat) = self.platforms.get(platform_i) {
+        if let Some(plat) = self.surfaces.get(platform_i) {
             let (l_x, l_y) = plat.left_ledge();
             let (r_x, r_y) = plat.right_ledge();
-            for (check_i, check_plat) in self.platforms.iter().enumerate() {
-                if platform_i != check_i/* && check_plat.is_floor() TODO */ {
+            for (check_i, check_plat) in self.surfaces.iter().enumerate() {
+                if platform_i != check_i && check_plat.floor.is_some() {
                     let (check_l_x, check_l_y) = check_plat.left_ledge();
                     let (check_r_x, check_r_y) = check_plat.right_ledge();
 
@@ -122,30 +130,69 @@ pub struct FloorInfo {
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
-pub struct Platform {
-    pub x1:           f32,
-    pub y1:           f32,
-    pub grab1:        bool,
-    pub x2:           f32,
-    pub y2:           f32,
-    pub grab2:        bool,
+pub struct Surface {
+    pub x1:      f32,
+    pub y1:      f32,
+    pub grab1:   bool,
+    pub x2:      f32,
+    pub y2:      f32,
+    pub grab2:   bool,
+    pub wall:    bool,
+    pub ceiling: bool,
+    pub floor:   Option<Floor>,
+}
+
+// TODO: coloring
+// r = if floor and pass_through { 0.5 } else if floor { 0.25 } else { 0.0 }
+// g = if ceiling { 0.5 } else { 0.0 }
+// b = if wall { 0.5 } else { 0.0 }
+
+#[derive(Clone, Serialize, Deserialize, Node)]
+pub struct Floor {
     pub traction:     f32,
     pub pass_through: bool,
 }
 
+impl Default for Floor {
+    fn default() -> Floor {
+        Floor {
+            traction:     1.0,
+            pass_through: true,
+        }
+    }
+}
+
 /// plat_x/plat_y/plat_p is offset from the centre of the platform
 /// world_x/world_y/world_p is world coordinates
-impl Platform {
-    pub fn new(x1: f32, y1: f32, x2: f32, y2: f32) -> Platform {
-        Platform {
+impl Surface {
+    pub fn new(x1: f32, y1: f32, x2: f32, y2: f32, floor: bool, wall: bool, ceiling: bool) -> Surface {
+        let floor = if floor {
+            Some(Floor {
+                traction:     1.0,
+                pass_through: true
+            })
+        } else {
+            None
+        };
+
+        Surface {
             x1,
             y1,
             x2,
             y2,
-            grab1:        false,
-            grab2:        false,
-            traction:     1.0,
-            pass_through: true,
+            wall,
+            ceiling,
+            floor,
+            grab1:   false,
+            grab2:   false,
+        }
+    }
+
+    pub fn can_pass_through(&self) -> bool {
+        if let &Some(ref floor) = &self.floor {
+            floor.pass_through
+        } else {
+            false
         }
     }
 

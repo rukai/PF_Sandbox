@@ -522,13 +522,13 @@ impl<'a> VulkanGraphics<'a> {
             _ => { }
         }
 
-        if let Some(buffers) = Buffers::new_platforms(self.device.clone(), &render.platforms) {
+        if let Some(buffers) = Buffers::new_surfaces(self.device.clone(), &render.surfaces) {
             let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
             let color = [1.0, 1.0, 1.0, 1.0];
             command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, color, color);
         }
 
-        if let Some(buffers) = Buffers::new_selected_platforms(self.device.clone(), &render.platforms, &render.selected_platforms) {
+        if let Some(buffers) = Buffers::new_selected_surfaces(self.device.clone(), &render.surfaces, &render.selected_surfaces) {
             let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
             let color = [0.0, 1.0, 0.0, 1.0];
             command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, color, color);
@@ -649,7 +649,7 @@ impl<'a> VulkanGraphics<'a> {
 
                     // TODO: Edit::Player  - render selected player's BPS as green
                     // TODO: Edit::Fighter - Click and drag on ECB points
-                    // TODO: Edit::Stage   - render selected platforms as green
+                    // TODO: Edit::Stage   - render selected surfaces as green
                 },
                 &RenderEntity::RectOutline (ref render_rect) => {
                     let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.0));

@@ -8,7 +8,7 @@ use ::package::Package;
 use ::particle::{Particle, ParticleType};
 use ::results::{RawPlayerResult, DeathRecord};
 use ::rules::Goal;
-use ::stage::{Stage, Platform, SpawnPoint};
+use ::stage::{Stage, Surface, SpawnPoint};
 use ::os_input::OsInput;
 
 use std::f32;
@@ -52,7 +52,7 @@ pub enum LedgeLogic {
 // Describes the player location by offsets from other locations
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub enum Location {
-    Platform { platform_i: usize, x: f32 },
+    Surface { platform_i: usize, x: f32 },
     GrabbedLedge { platform_i: usize, d_x: f32, d_y: f32, logic: LedgeLogic }, // player.face_right determines which edge on the platform
     GrabbedByPlayer (usize),
     Airbourne { x: f32, y: f32 },
@@ -210,17 +210,17 @@ impl Player {
         }
     }
 
-    pub fn bps_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
+    pub fn bps_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> (f32, f32) {
         let bps_xy = match self.location {
-            Location::Platform { platform_i, x } => {
-                if let Some(platform) = platforms.get(platform_i) {
+            Location::Surface { platform_i, x } => {
+                if let Some(platform) = surfaces.get(platform_i) {
                     platform.plat_x_to_world_p(x)
                 } else {
                     (0.0, 0.0)
                 }
             }
             Location::GrabbedLedge { platform_i, d_x, d_y, .. } => {
-                if let Some(platform) = platforms.get(platform_i) {
+                if let Some(platform) = surfaces.get(platform_i) {
                     let (ledge_x, ledge_y) = if self.face_right {
                         platform.left_ledge()
                     } else {
@@ -233,7 +233,7 @@ impl Player {
             }
             Location::GrabbedByPlayer (player_i) => {
                 if let Some(player) = players.get(player_i) {
-                     player.grab_xy(players, fighters, platforms)
+                     player.grab_xy(players, fighters, surfaces)
                 } else {
                     (0.0, 0.0)
                 }
@@ -253,14 +253,14 @@ impl Player {
         }
     }
 
-    pub fn grab_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
-        let (x, y) = self.bps_xy(players, fighters, platforms);
+    pub fn grab_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> (f32, f32) {
+        let (x, y) = self.bps_xy(players, fighters, surfaces);
         let fighter_frame = &fighters[self.fighter.as_ref()].actions[self.action as usize].frames[self.frame as usize];
         (x + fighter_frame.grab_hold_x, y + fighter_frame.grab_hold_y)
     }
 
     pub fn is_platform(&self) -> bool {
-        if let &Location::Platform { .. } = &self.location {
+        if let &Location::Surface { .. } = &self.location {
             true
         } else {
             false
@@ -311,8 +311,8 @@ impl Player {
         }
     }
 
-    pub fn set_airbourne(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
-        let (x, y) = self.bps_xy(players, fighters, platforms);
+    pub fn set_airbourne(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
+        let (x, y) = self.bps_xy(players, fighters, surfaces);
         self.fastfalled = false;
         self.location = Location::Airbourne { x, y };
     }
@@ -336,9 +336,9 @@ impl Player {
         self.frame == fighter.actions[self.action as usize].iasa
     }
 
-    pub fn platform_deleted(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], deleted_platform_i: usize) {
+    pub fn platform_deleted(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], deleted_platform_i: usize) {
         let fall = match &mut self.location {
-            &mut Location::Platform     { ref mut platform_i, .. } |
+            &mut Location::Surface     { ref mut platform_i, .. } |
             &mut Location::GrabbedLedge { ref mut platform_i, .. } => {
                 if *platform_i == deleted_platform_i {
                     true
@@ -351,12 +351,12 @@ impl Player {
         };
 
         if fall {
-            self.set_airbourne(players, fighters, platforms);
+            self.set_airbourne(players, fighters, surfaces);
             self.set_action(Action::Fall); // TODO: use miss step state ^.^
         }
     }
 
-    pub fn step_collision(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], col_results: &[CollisionResult]) {
+    pub fn step_collision(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], col_results: &[CollisionResult]) {
         for col_result in col_results {
             match col_result {
                 &CollisionResult::HitAtk { player_def_i, ref hitbox, ref point } => {
@@ -391,7 +391,7 @@ impl Player {
                             HitStun::Frames               (frames) => { frames as f32 }
                         };
 
-                        self.set_airbourne(players, fighters, platforms);
+                        self.set_airbourne(players, fighters, surfaces);
 
                         if kb_vel > 80.0 {
                             self.set_action(Action::DamageFly);
@@ -427,7 +427,7 @@ impl Player {
 
                     self.hitlag = Hitlag::Launch { counter: (hitbox.damage / 3.0 + 3.0) as u64, kb_vel, angle, wobble_x: 0.0 };
                     self.hit_by = Some(player_atk_i);
-                    self.face_right = self.bps_xy(players, fighters, platforms).0 < players[player_atk_i].bps_xy(players, fighters, platforms).0;
+                    self.face_right = self.bps_xy(players, fighters, surfaces).0 < players[player_atk_i].bps_xy(players, fighters, surfaces).0;
                 }
                 &CollisionResult::HitShieldAtk { ref hitbox, ref power_shield, player_def_i} => {
                     self.hitlist.push(player_def_i);
@@ -439,7 +439,7 @@ impl Player {
                         }
                     }
 
-                    let x_diff = self.bps_xy(players, fighters, platforms).0 - players[player_def_i].bps_xy(players, fighters, platforms).0;
+                    let x_diff = self.bps_xy(players, fighters, surfaces).0 - players[player_def_i].bps_xy(players, fighters, surfaces).0;
                     let vel = hitbox.damage.floor() * (players[player_def_i].shield_analog - 0.3) * 0.1 + 0.02;
                     if self.is_platform() {
                         self.x_vel += vel * x_diff.signum();
@@ -464,7 +464,7 @@ impl Player {
 
                     let analog_mult = 1.0 - (self.shield_analog - 0.3) / 0.7;
                     let vel_mult = if self.parry_timer > 0 { 1.0 } else { 0.6 };
-                    let x_diff = self.bps_xy(players, fighters, platforms).0 - players[player_atk_i].bps_xy(players, fighters, platforms).0;
+                    let x_diff = self.bps_xy(players, fighters, surfaces).0 - players[player_atk_i].bps_xy(players, fighters, surfaces).0;
                     let vel = (hitbox.damage.floor() * (0.195 * analog_mult + 0.09) + 0.4) * vel_mult;
                     self.x_vel = vel.min(2.0) * x_diff.signum();
                     self.shield_stun_timer = (hitbox.damage.floor() * (analog_mult + 0.3) * 0.975 + 2.0) as u64;
@@ -479,7 +479,7 @@ impl Player {
      *  Begin action section
      */
 
-    pub fn action_hitlag_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], rng: &mut StdRng) {
+    pub fn action_hitlag_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], rng: &mut StdRng) {
         match self.hitlag.clone() {
             Hitlag::Some (_) => {
                 self.hitlag.decrement();
@@ -488,11 +488,11 @@ impl Player {
                 self.hitlag.wobble(rng);
 
                 if self.hitlag.decrement() {
-                    self.hitlag_def_end(input, players, fighters, platforms, kb_vel, angle);
+                    self.hitlag_def_end(input, players, fighters, surfaces, kb_vel, angle);
                 }
             }
             Hitlag::None => {
-                self.action_step(input, players, fighters, platforms, rng);
+                self.action_step(input, players, fighters, surfaces, rng);
             }
         }
     }
@@ -512,7 +512,7 @@ impl Player {
         angle - offset
     }
 
-    fn hitlag_def_end(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], kb_vel: f32, angle: f32) {
+    fn hitlag_def_end(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], kb_vel: f32, angle: f32) {
         let angle = if (kb_vel >= 80.0 || self.is_airbourne() || (angle != 0.0 && angle != PI)) // can di
             && !(input[0].stick_x == 0.0 && input[0].stick_y == 0.0) // not deadzone
         {
@@ -533,25 +533,25 @@ impl Player {
 
         if self.kb_y_vel == 0.0 {
             if kb_vel >= 80.0 {
-                self.set_airbourne(players, fighters, platforms);
+                self.set_airbourne(players, fighters, surfaces);
                 if let &mut Location::Airbourne { ref mut y, .. } = &mut self.location {
                     *y += 0.0001;
                 }
             }
         }
         else if self.kb_y_vel > 0.0 {
-            self.set_airbourne(players, fighters, platforms);
+            self.set_airbourne(players, fighters, surfaces);
         }
     }
 
-    fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform], rng: &mut StdRng) {
+    fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], rng: &mut StdRng) {
         let fighter = &fighters[self.fighter.as_ref()];
         let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
 
         self.frame += 1; // Action::DummyFramePreStart is used so that this doesnt skip a real frame when the game starts
         self.frame_norestart += 1;
         if self.frame >= action_frames {
-            self.action_expired(input, players, fighters, platforms);
+            self.action_expired(input, players, fighters, surfaces);
         }
 
         let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
@@ -578,7 +578,7 @@ impl Player {
                 Action::Fair       | Action::Bair |
                 Action::Dair       | Action::Uair |
                 Action::Nair       | Action::JumpAerialB
-                => self.aerial_action(input, players, fighters, platforms),
+                => self.aerial_action(input, players, fighters, surfaces),
 
                 Action::Jab       | Action::Jab2 |
                 Action::Jab3      | Action::Utilt |
@@ -592,30 +592,30 @@ impl Player {
                 Action::FairLand | Action::BairLand |
                 Action::UairLand | Action::DairLand |
                 Action::NairLand | Action::SpecialLand
-                => self.attack_land_action(input, rng, players, fighters, platforms),
+                => self.attack_land_action(input, rng, players, fighters, surfaces),
 
                 Action::Teeter |
                 Action::TeeterIdle       => self.teeter_action(input, fighter),
-                Action::Land             => self.land_action(input, rng, players, fighters, platforms),
+                Action::Land             => self.land_action(input, rng, players, fighters, surfaces),
                 Action::DamageFly        => self.damage_fly_action(fighter),
-                Action::DamageFall       => self.damage_fall_action(input, players, fighters, platforms),
+                Action::DamageFall       => self.damage_fall_action(input, players, fighters, surfaces),
                 Action::Damage           => self.damage_action(fighter),
                 Action::MissedTechIdle   => self.missed_tech_action(input, fighter),
                 Action::MissedTechStart  => self.missed_tech_start_action(fighter),
                 Action::AerialDodge      => self.aerialdodge_action(input, fighter),
                 Action::SpecialFall      => self.specialfall_action(input, fighter),
                 Action::Dtilt            => self.dtilt_action(input, fighter),
-                Action::CrouchStart      => self.crouch_start_action(input, players, fighters, platforms),
+                Action::CrouchStart      => self.crouch_start_action(input, players, fighters, surfaces),
                 Action::Crouch           => self.crouch_action(input, fighter),
                 Action::Walk             => self.walk_action(input, fighter),
-                Action::Dash             => self.dash_action(input, rng, players, fighters, platforms),
+                Action::Dash             => self.dash_action(input, rng, players, fighters, surfaces),
                 Action::Run              => self.run_action(input, fighter),
                 Action::Turn             => self.turn_action(input, fighter),
-                Action::LedgeIdle        => self.ledge_idle_action(input, players, fighters, platforms),
-                Action::ShieldOn         => self.shield_on_action(input, players, fighters, platforms),
-                Action::PowerShield      => self.power_shield_action(input, players, fighters, platforms),
-                Action::Shield           => self.shield_action(input, players, fighters, platforms),
-                Action::ShieldOff        => self.shield_off_action(input, players, fighters, platforms),
+                Action::LedgeIdle        => self.ledge_idle_action(input, players, fighters, surfaces),
+                Action::ShieldOn         => self.shield_on_action(input, players, fighters, surfaces),
+                Action::PowerShield      => self.power_shield_action(input, players, fighters, surfaces),
+                Action::Shield           => self.shield_action(input, players, fighters, surfaces),
+                Action::ShieldOff        => self.shield_off_action(input, players, fighters, surfaces),
                 Action::ShieldBreakFall  => self.shield_break_fall_action(fighter),
                 Action::ShieldBreakGetup => self.shield_break_getup_action(),
                 Action::Stun             => self.stun_action(fighter),
@@ -623,7 +623,7 @@ impl Player {
             }
         }
 
-        self.knockback_particles(rng, players, fighters, platforms);
+        self.knockback_particles(rng, players, fighters, surfaces);
 
         // TODO: Gankro plz ... https://github.com/rust-lang/rust/issues/43244
         let mut new_particles = vec!();
@@ -707,14 +707,14 @@ impl Player {
         }
     }
 
-    fn ledge_idle_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn ledge_idle_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         if
             (input[0].  stick_y < -0.2 && input[1].  stick_y >= -0.2) ||
             (input[0].c_stick_y < -0.2 && input[1].c_stick_y >= -0.2) ||
             (self.relative_f(input[0].  stick_x) < -0.2 && self.relative_f(input[1].  stick_x) >= -0.2) ||
             (self.relative_f(input[0].c_stick_x) < -0.2 && self.relative_f(input[1].c_stick_x) >= -0.2)
         {
-            self.set_airbourne(players, fighters, platforms);
+            self.set_airbourne(players, fighters, surfaces);
             self.set_action(Action::Fall);
             self.frames_since_ledge = 0;
         }
@@ -758,7 +758,7 @@ impl Player {
             }
         }
         else if self.ledge_idle_timer > 600 {
-            self.set_airbourne(players, fighters, platforms);
+            self.set_airbourne(players, fighters, surfaces);
             self.set_action(Action::DamageFall);
             self.frames_since_ledge = 0;
         }
@@ -826,14 +826,14 @@ impl Player {
         }
     }
 
-    fn damage_fall_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn damage_fall_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         if self.interruptible(fighter) {
             if self.check_attacks_aerial(input) { }
             else if input.b.press {
                 // special attack
             }
-            else if self.check_jump_aerial(input, players, fighters, platforms) { }
+            else if self.check_jump_aerial(input, players, fighters, surfaces) { }
             else if
                 (input[0].stick_x >  0.7 && input[1].stick_x <  0.7) ||
                 (input[0].stick_x < -0.7 && input[1].stick_x > -0.7) ||
@@ -849,14 +849,14 @@ impl Player {
         self.fastfall_action(input, fighter);
     }
 
-    fn aerial_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn aerial_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         if self.interruptible(fighter) {
             if self.check_attacks_aerial(input) { }
             else if input.b.press {
                 // special attack
             }
-            else if self.check_jump_aerial(input, players, fighters, platforms) { }
+            else if self.check_jump_aerial(input, players, fighters, surfaces) { }
             else if input.l.press || input.r.press {
                 self.aerialdodge(input, fighter);
             }
@@ -909,10 +909,10 @@ impl Player {
         }
     }
 
-    fn crouch_start_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn crouch_start_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         if self.interruptible(fighter) {
-            if self.check_pass_platform(input, players, fighters, platforms) { }
+            if self.check_pass_platform(input, players, fighters, surfaces) { }
             else if self.check_shield(input, fighter) { }
             else if self.check_special(input) { } // TODO: no neutral/side special
             else if self.check_smash(input) { }
@@ -969,11 +969,11 @@ impl Player {
         }
     }
 
-    fn attack_land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn attack_land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let action_last_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
         self.frame = action_last_frame.min(self.frame + self.land_frame_skip as u64);
-        self.land_particles(rng, players, fighters, platforms);
+        self.land_particles(rng, players, fighters, surfaces);
         self.apply_friction(fighter);
 
         if self.interruptible(fighter) {
@@ -992,9 +992,9 @@ impl Player {
         }
     }
 
-    fn land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
-        self.land_particles(rng, players, fighters, platforms);
+        self.land_particles(rng, players, fighters, surfaces);
         self.apply_friction(fighter);
 
         if self.interruptible(fighter) {
@@ -1058,9 +1058,9 @@ impl Player {
         }
     }
 
-    fn dash_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn dash_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
-        self.dash_particles(rng, players, fighters, platforms);
+        self.dash_particles(rng, players, fighters, surfaces);
         if self.frame == 2 {
             self.x_vel = self.relative_f(fighter.dash_init_vel);
             if self.x_vel.abs() > fighter.dash_run_term_vel {
@@ -1160,7 +1160,7 @@ impl Player {
         }
     }
 
-    fn shield_on_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn shield_on_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
         let stun_lock = self.shield_stun_timer > 0;
@@ -1168,24 +1168,24 @@ impl Player {
         let power_shield_len = fighter.actions[Action::PowerShield as usize].frames.len();
 
         if !lock && self.check_jump(input) { }
-        else if !lock && self.check_pass_platform(input, players, fighters, platforms) { }
+        else if !lock && self.check_pass_platform(input, players, fighters, surfaces) { }
         else if fighter.power_shield.is_some() && self.frame == 1 && (input.l.press || input.r.press) {
             // allow the first frame to transition to power shield so that powershield input is more consistent
             self.action = Action::PowerShield as u64;
             self.frame = if power_shield_len >= 2 { 1 } else { 0 }; // change self.frame so that a powershield isnt laggier than a normal shield
         }
         self.apply_friction(fighter);
-        self.shield_shared_action(input, players, fighters, platforms);
+        self.shield_shared_action(input, players, fighters, surfaces);
     }
 
-    fn shield_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn shield_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
         let stun_lock = self.shield_stun_timer > 0;
         let lock = stun_lock && stick_lock;
 
         if !lock && self.check_jump(input) { }
-        else if !lock && self.check_pass_platform(input, players, fighters, platforms) { }
+        else if !lock && self.check_pass_platform(input, players, fighters, surfaces) { }
         else if !stun_lock && input[0].l_trigger < 0.165 && input[0].r_trigger < 0.165 && !input[0].l && !input[0].r {
             if self.parry_timer > 0 {
                 self.set_action(Action::Idle);
@@ -1194,22 +1194,22 @@ impl Player {
             }
         }
         self.apply_friction(fighter);
-        self.shield_shared_action(input, players, fighters, platforms);
+        self.shield_shared_action(input, players, fighters, surfaces);
     }
 
-    fn shield_off_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn shield_off_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
         let stun_lock = self.shield_stun_timer > 0;
         let lock = stun_lock && stick_lock;
 
         if !lock && self.check_jump(input) { }
-        else if !lock && self.check_pass_platform(input, players, fighters, platforms) { }
+        else if !lock && self.check_pass_platform(input, players, fighters, surfaces) { }
         self.apply_friction(fighter);
-        self.shield_shared_action(input, players, fighters, platforms);
+        self.shield_shared_action(input, players, fighters, surfaces);
     }
 
-    fn power_shield_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn power_shield_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         let stick_lock = fighter.shield.as_ref().map_or(false, |x| x.stick_lock) && input[0].b;
         let stun_lock = self.shield_stun_timer > 0;
@@ -1218,8 +1218,8 @@ impl Player {
         match (&fighter.shield, &fighter.power_shield) {
             (&Some(_), &Some(_)) => {
                 if !lock && self.check_jump(input) { }
-                else if !lock && self.check_pass_platform(input, players, fighters, platforms) { }
-                self.shield_shared_action(input, players, fighters, platforms);
+                else if !lock && self.check_pass_platform(input, players, fighters, surfaces) { }
+                self.shield_shared_action(input, players, fighters, surfaces);
             }
             _ => {
                 self.apply_friction(fighter);
@@ -1227,7 +1227,7 @@ impl Player {
         }
     }
 
-    fn shield_shared_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn shield_shared_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         self.apply_friction(fighter);
         if let Some(ref shield) = fighter.shield {
@@ -1256,7 +1256,7 @@ impl Player {
                 self.kb_y_vel = shield.break_vel;
                 self.kb_y_dec = 0.051;
                 self.kb_x_dec = 0.0;
-                self.set_airbourne(players, fighters, platforms);
+                self.set_airbourne(players, fighters, surfaces);
             }
         }
     }
@@ -1292,8 +1292,8 @@ impl Player {
         shield.scaling * (analog_size + hp_size) + hp_size_unscaled
     }
 
-    fn shield_pos(&self, shield: &Shield, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> (f32, f32) {
-        let xy = self.bps_xy(players, fighters, platforms);
+    fn shield_pos(&self, shield: &Shield, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> (f32, f32) {
+        let xy = self.bps_xy(players, fighters, surfaces);
         (
             xy.0 + self.shield_offset_x + self.relative_f(shield.offset_x),
             xy.1 + self.shield_offset_y + shield.offset_y
@@ -1318,14 +1318,14 @@ impl Player {
         }
     }
 
-    fn check_pass_platform(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> bool {
+    fn check_pass_platform(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> bool {
         let fighter = &fighters[self.fighter.as_ref()];
-        if let Location::Platform { platform_i, .. } = self.location {
-            if let Some(platform) = platforms.get(platform_i) {
+        if let Location::Surface { platform_i, .. } = self.location {
+            if let Some(platform) = surfaces.get(platform_i) {
                 let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
-                if platform.pass_through && self.frame == action_frames && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
+                if platform.can_pass_through() && self.frame == action_frames && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
                     self.set_action(Action::PassPlatform);
-                    self.set_airbourne(players, fighters, platforms);
+                    self.set_airbourne(players, fighters, surfaces);
                     return true;
                 }
             }
@@ -1396,10 +1396,10 @@ impl Player {
         }
     }
 
-    fn check_jump_aerial(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> bool {
+    fn check_jump_aerial(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> bool {
         let fighter = &fighters[self.fighter.as_ref()];
         if self.jump_input(input).jump() && self.air_jumps_left > 0 {
-            self.air_jump_particles(players, fighters, platforms);
+            self.air_jump_particles(players, fighters, surfaces);
             self.air_jumps_left -= 1;
             self.y_vel = fighter.air_jump_y_vel;
             self.x_vel = fighter.air_jump_x_vel * input[0].stick_x;
@@ -1596,7 +1596,7 @@ impl Player {
         input[0].stick_x.abs() > 0.79 && input[2].stick_x.abs() < 0.3
     }
 
-    fn action_expired(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    fn action_expired(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         match Action::from_index(self.action) {
             None => { panic!("Custom defined action expirations have not been implemented"); },
@@ -1633,10 +1633,10 @@ impl Player {
             Some(Action::Damage)         => self.set_action(Action::Damage),
             Some(Action::DamageFly)      => self.set_action(Action::DamageFly),
             Some(Action::DamageFall)     => self.set_action(Action::DamageFall),
-            Some(Action::LedgeGetup)     => self.set_action_idle_from_ledge(players, fighters, platforms),
-            Some(Action::LedgeGetupSlow) => self.set_action_idle_from_ledge(players, fighters, platforms),
-            Some(Action::LedgeJump)      => self.set_action_fall_from_ledge_jump(players, fighters, platforms),
-            Some(Action::LedgeJumpSlow)  => self.set_action_fall_from_ledge_jump(players, fighters, platforms),
+            Some(Action::LedgeGetup)     => self.set_action_idle_from_ledge(players, fighters, surfaces),
+            Some(Action::LedgeGetupSlow) => self.set_action_idle_from_ledge(players, fighters, surfaces),
+            Some(Action::LedgeJump)      => self.set_action_fall_from_ledge_jump(players, fighters, surfaces),
+            Some(Action::LedgeJumpSlow)  => self.set_action_fall_from_ledge_jump(players, fighters, surfaces),
             Some(Action::LedgeGrab) => {
                 self.set_action(Action::LedgeIdle);
                 self.ledge_idle_timer = 0;
@@ -1651,7 +1651,7 @@ impl Player {
                 self.set_action(new_action);
             },
             Some(Action::JumpSquat) => {
-                self.set_airbourne(players, fighters, platforms);
+                self.set_airbourne(players, fighters, surfaces);
                 if let &mut Location::Airbourne { ref mut y, .. } = &mut self.location {
                     *y += 0.0001;
                 }
@@ -1701,8 +1701,8 @@ impl Player {
             Some(Action::MissedTechGetupN) => self.set_action(Action::Idle),
             Some(Action::MissedTechGetupB) => self.set_action(Action::Idle),
             Some(Action::Rebound)          => self.set_action(Action::Idle),
-            Some(Action::LedgeRoll)        => self.set_action_idle_from_ledge(players, fighters, platforms),
-            Some(Action::LedgeRollSlow)    => self.set_action_idle_from_ledge(players, fighters, platforms),
+            Some(Action::LedgeRoll)        => self.set_action_idle_from_ledge(players, fighters, surfaces),
+            Some(Action::LedgeRollSlow)    => self.set_action_idle_from_ledge(players, fighters, surfaces),
 
             // Vulnerable
             Some(Action::MissedTechStart)  => self.set_action(Action::MissedTechIdle),
@@ -1727,8 +1727,8 @@ impl Player {
             Some(Action::Grab)             => self.set_action(Action::Idle),
             Some(Action::DashGrab)         => self.set_action(Action::Idle),
             Some(Action::MissedTechAttack) => self.set_action(Action::Idle),
-            Some(Action::LedgeAttack)      => self.set_action_idle_from_ledge(players, fighters, platforms),
-            Some(Action::LedgeAttackSlow)  => self.set_action_idle_from_ledge(players, fighters, platforms),
+            Some(Action::LedgeAttack)      => self.set_action_idle_from_ledge(players, fighters, surfaces),
+            Some(Action::LedgeAttackSlow)  => self.set_action_idle_from_ledge(players, fighters, surfaces),
 
             // Aerials
             Some(Action::Uair)     => self.set_action(Action::Fall),
@@ -1753,13 +1753,13 @@ impl Player {
         };
     }
 
-    pub fn set_action_idle_from_ledge(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    pub fn set_action_idle_from_ledge(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         if let Location::GrabbedLedge { platform_i, .. } = self.location {
-            let platform = &platforms[platform_i];
-            let (world_x, _) = self.bps_xy(players, fighters, platforms);
+            let platform = &surfaces[platform_i];
+            let (world_x, _) = self.bps_xy(players, fighters, surfaces);
             let x = platform.world_x_to_plat_x_clamp(world_x);
 
-            self.location = Location::Platform { platform_i, x };
+            self.location = Location::Surface { platform_i, x };
             self.set_action(Action::Idle);
             self.frames_since_ledge = 0;
         }
@@ -1768,8 +1768,8 @@ impl Player {
         }
     }
 
-    pub fn set_action_fall_from_ledge_jump(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
-        self.set_airbourne(players, fighters, platforms);
+    pub fn set_action_fall_from_ledge_jump(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
+        self.set_airbourne(players, fighters, surfaces);
         self.set_action(Action::Fall);
         self.frames_since_ledge = 0;
     }
@@ -1783,8 +1783,8 @@ impl Player {
         }
     }
 
-    pub fn relative_frame(&self, fighter: &Fighter, platforms: &[Platform]) -> ActionFrame {
-        let angle = self.angle(fighter, platforms);
+    pub fn relative_frame(&self, fighter: &Fighter, surfaces: &[Surface]) -> ActionFrame {
+        let angle = self.angle(fighter, surfaces);
         let mut fighter_frame = fighter.actions[self.action as usize].frames[self.frame as usize].clone();
 
         // fix hitboxes
@@ -1885,14 +1885,14 @@ impl Player {
                     let new_x = x + x_vel;
                     let new_y = y + y_vel;
                     if let Some(platform_i) = self.land_stage_collision(fighter, stage, (x, y), (new_x, new_y), input) {
-                        let x = stage.platforms[platform_i].world_x_to_plat_x(new_x);
+                        let x = stage.surfaces[platform_i].world_x_to_plat_x(new_x);
                         self.land(fighter, input, platform_i, x);
                     } else {
                         self.location = Location::Airbourne { x: new_x, y: new_y };
                     }
                 }
-                Location::Platform { platform_i, mut x } => {
-                    if let Some(platform) = stage.platforms.get(platform_i) {
+                Location::Surface { platform_i, mut x } => {
+                    if let Some(platform) = stage.surfaces.get(platform_i) {
                         x += x_vel * platform.angle().cos();
                         self.floor_move(input, players, fighters, stage, platform, platform_i, x);
                     }
@@ -1906,7 +1906,7 @@ impl Player {
 
             // death
             let blast = &stage.blast;
-            let (x, y) = self.bps_xy(players, fighters, &stage.platforms);
+            let (x, y) = self.bps_xy(players, fighters, &stage.surfaces);
             if x < blast.left() || x > blast.right() || y < blast.bot() || y > blast.top() {
                 self.die(player_i, fighter, stage, game_frame, goal);
             }
@@ -1916,41 +1916,41 @@ impl Player {
             self.frames_since_ledge += 1;
             if self.frames_since_ledge >= 30 && self.y_vel < 0.0 && input.stick_y.value > -0.5 {
                 if let Some(ref ledge_grab_box) = fighter_frame.ledge_grab_box {
-                    self.check_ledge_grab(players, &fighter, &ledge_grab_box, &stage.platforms);
+                    self.check_ledge_grab(players, &fighter, &ledge_grab_box, &stage.surfaces);
                 }
             }
         }
     }
 
-    fn floor_move(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, platform: &Platform, platform_i: usize, x: f32) {
+    fn floor_move(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage, platform: &Surface, platform_i: usize, x: f32) {
         let fighter = &fighters[self.fighter.as_ref()];
         let connected_floors = stage.connected_floors(platform_i);
         if platform.plat_x_in_bounds(x) {
-            self.location = Location::Platform { platform_i, x };
+            self.location = Location::Surface { platform_i, x };
         }
         else if x < 0.0 && connected_floors.left_i.is_some() {
             let new_platform_i = connected_floors.left_i.unwrap();
-            let new_platform = &stage.platforms[new_platform_i];
+            let new_platform = &stage.surfaces[new_platform_i];
             let world_x = platform.plat_x_to_world_x(x);
             let x = new_platform.world_x_to_plat_x(world_x);
             self.floor_move(input, players, fighters, stage, new_platform, new_platform_i, x);
         }
         else if x > 0.0 && connected_floors.right_i.is_some() {
             let new_platform_i = connected_floors.right_i.unwrap();
-            let new_platform = &stage.platforms[new_platform_i];
+            let new_platform = &stage.surfaces[new_platform_i];
             let world_x = platform.plat_x_to_world_x(x);
             let x = new_platform.world_x_to_plat_x(world_x);
             self.floor_move(input, players, fighters, stage, new_platform, new_platform_i, x);
         }
         else if !fighter.actions[self.action as usize].frames[self.frame as usize].ledge_cancel {
-            self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
+            self.location = Location::Surface { platform_i, x: platform.plat_x_clamp(x) };
         }
         else if self.face_right && x < 0.0 || !self.face_right && x >= 0.0 || // facing away from the ledge
           self.relative_f(input.stick_x.value) > 0.6
         {
             // fall
             self.set_action(Action::Fall);
-            self.set_airbourne(players, fighters, &stage.platforms);
+            self.set_airbourne(players, fighters, &stage.surfaces);
 
             // set max velocity
             if self.x_vel.abs() > fighter.air_x_term_vel {
@@ -1964,7 +1964,7 @@ impl Player {
         }
         else {
             self.x_vel = 0.0;
-            self.location = Location::Platform { platform_i, x: platform.plat_x_clamp(x) };
+            self.location = Location::Surface { platform_i, x: platform.plat_x_clamp(x) };
             self.set_action(Action::Teeter);
         }
     }
@@ -2019,7 +2019,7 @@ impl Player {
             return None;
         }
 
-        for (platform_i, platform) in stage.platforms.iter().enumerate() {
+        for (platform_i, platform) in stage.surfaces.iter().enumerate() {
             if !self.pass_through_platform(fighter, platform, input) &&
               geometry::segments_intersect(old_p, new_p, platform.p1(), platform.p2()) {
                 return Some(platform_i)
@@ -2028,14 +2028,14 @@ impl Player {
         None
     }
 
-    pub fn pass_through_platform(&self, fighter: &Fighter, platform: &Platform, input: &PlayerInput) -> bool {
+    pub fn pass_through_platform(&self, fighter: &Fighter, platform: &Surface, input: &PlayerInput) -> bool {
         let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
-        platform.pass_through && fighter_frame.pass_through && input[0].stick_y <= -0.56
+        platform.can_pass_through() && fighter_frame.pass_through && input[0].stick_y <= -0.56
     }
 
     /// Returns the Rect surrounding the player that the camera must include
-    pub fn cam_area(&self, cam_max: &Rect, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> Rect {
-        let (x, y) = self.bps_xy(players, fighters, platforms);
+    pub fn cam_area(&self, cam_max: &Rect, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> Rect {
+        let (x, y) = self.bps_xy(players, fighters, surfaces);
         let mut left  = x;
         let mut right = x;
         let mut bot   = y - 5.0;
@@ -2128,7 +2128,7 @@ impl Player {
         self.fastfalled = false;
         self.air_jumps_left = fighter.air_jumps;
         self.hit_by = None;
-        self.location = Location::Platform { platform_i, x };
+        self.location = Location::Surface { platform_i, x };
     }
 
     fn walk(&mut self, fighter: &Fighter) {
@@ -2199,13 +2199,13 @@ impl Player {
         }
     }
 
-    fn check_ledge_grab(&mut self, players: &[Player], fighter: &Fighter, ledge_grab_box: &LedgeGrabBox, platforms: &[Platform]) {
-        for (platform_i, platform) in platforms.iter().enumerate() {
+    fn check_ledge_grab(&mut self, players: &[Player], fighter: &Fighter, ledge_grab_box: &LedgeGrabBox, surfaces: &[Surface]) {
+        for (platform_i, platform) in surfaces.iter().enumerate() {
             let left_grab  = platform.left_grab()  && self.check_ledge_collision(ledge_grab_box, platform.left_ledge())  && players.iter().all(|x| !x.is_hogging_ledge(platform_i, true));
             let right_grab = platform.right_grab() && self.check_ledge_collision(ledge_grab_box, platform.right_ledge()) && players.iter().all(|x| !x.is_hogging_ledge(platform_i, false));
 
             // If both left and right ledges are in range then keep the same direction.
-            // This prevents always facing left or right on small platforms.
+            // This prevents always facing left or right on small surfaces.
             if left_grab && !right_grab {
                 self.face_right = true;
             }
@@ -2289,7 +2289,7 @@ impl Player {
         lines
     }
 
-    pub fn render(&self, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) -> RenderPlayer {
+    pub fn render(&self, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> RenderPlayer {
         let fighter_color = graphics::get_team_color3(self.team);
         let fighter = &fighters[self.fighter.as_ref()];
         let mut vector_arrows = vec!();
@@ -2336,7 +2336,7 @@ impl Player {
                     distort: self.shield_stun_timer,
                     color:   [c[0] + (1.0 - c[0]) * m, c[1] + (1.0 - c[1]) * m, c[2] + (1.0 - c[2]) * m, 0.2 + self.shield_analog / 2.0],
                     radius:  self.shield_size(shield),
-                    pos:     self.shield_pos(shield, players, fighters, platforms),
+                    pos:     self.shield_pos(shield, players, fighters, surfaces),
                 })
             } else { None }
         } else { None };
@@ -2345,14 +2345,14 @@ impl Player {
             team:       self.team,
             damage:     self.damage,
             stocks:     self.stocks,
-            bps:        self.bps_xy(players, fighters, platforms),
+            bps:        self.bps_xy(players, fighters, surfaces),
             ecb:        self.ecb.clone(),
             frame:      self.frame as usize,
             action:     self.action as usize,
             fighter:    self.fighter.clone(),
             face_right: self.face_right,
             particles:  self.particles.clone(),
-            angle:      self.angle(fighter, platforms),
+            angle:      self.angle(fighter, surfaces),
             debug,
             fighter_color,
             fighter_selected,
@@ -2363,11 +2363,11 @@ impl Player {
         }
     }
 
-    pub fn angle(&self, fighter: &Fighter, platforms: &[Platform]) -> f32 {
+    pub fn angle(&self, fighter: &Fighter, surfaces: &[Surface]) -> f32 {
         let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
         match self.location {
-            Location::Platform { platform_i, .. } if fighter_frame.use_platform_angle => {
-                platforms.get(platform_i).map_or(0.0, |x| x.angle())
+            Location::Surface { platform_i, .. } if fighter_frame.use_platform_angle => {
+                surfaces.get(platform_i).map_or(0.0, |x| x.angle())
             }
             _ => 0.0,
         }
@@ -2396,8 +2396,8 @@ impl Player {
         });
     }
 
-    pub fn air_jump_particles(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
-        let (x, y) = self.bps_xy(players, fighters, platforms);
+    pub fn air_jump_particles(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
+        let (x, y) = self.bps_xy(players, fighters, surfaces);
         self.particles.push(Particle {
             color:       graphics::get_team_color3(self.team),
             counter:     0,
@@ -2409,11 +2409,11 @@ impl Player {
         });
     }
 
-    pub fn knockback_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    pub fn knockback_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let kb_vel = (self.kb_x_vel * self.kb_x_vel + self.kb_y_vel * self.kb_y_vel).sqrt();
         let angle = self.kb_y_vel.atan2(self.kb_x_vel) + rng.gen_range(-0.2, 0.2);
         let vec_mult = rng.gen_range(0.7, 1.0);
-        let (x, y) = self.bps_xy(players, fighters, platforms);
+        let (x, y) = self.bps_xy(players, fighters, surfaces);
         let num = if self.hitstun > 0.0 {
             (kb_vel/2.0) as usize
         } else {
@@ -2439,7 +2439,7 @@ impl Player {
         }
     }
 
-    pub fn land_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    pub fn land_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let num = match self.frame_norestart { // use _norestart instead as it doesnt get skipped during lcancel
             1 => 1,
             2 => 1,
@@ -2450,7 +2450,7 @@ impl Player {
             _ => 0,
         };
 
-        let (x, y) = self.bps_xy(players, fighters, platforms);
+        let (x, y) = self.bps_xy(players, fighters, surfaces);
         let action = Action::from_index(self.action);
 
         let color = if
@@ -2481,7 +2481,7 @@ impl Player {
         }
     }
 
-    pub fn dash_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, platforms: &[Platform]) {
+    pub fn dash_particles(&mut self, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let num = match self.frame {
             1 => 1,
             2 => 1,
@@ -2492,7 +2492,7 @@ impl Player {
             _ => 0,
         };
 
-        let (x, y) = self.bps_xy(players, fighters, platforms);
+        let (x, y) = self.bps_xy(players, fighters, surfaces);
         let x_offset = self.relative_f(3.0);
 
         for _ in 0..num {

@@ -14,7 +14,7 @@ use ::replays::Replay;
 use ::replays;
 use ::results::{GameResults, RawPlayerResult, PlayerResult};
 use ::rules::Goal;
-use ::stage::{Stage, DebugStage, SpawnPoint, Platform};
+use ::stage::{Stage, DebugStage, SpawnPoint, Surface};
 
 use rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
@@ -212,7 +212,7 @@ impl Game {
                 colboxes.set_context_vec(player_colboxes);
             }
             Edit::Stage => {
-                self.stage.platforms.set_context_vec(self.selector.platforms_vec());
+                self.stage.surfaces.set_context_vec(self.selector.surfaces_vec());
                 self.stage.spawn_points.set_context_vec(self.selector.spawn_points.iter().cloned().collect());
                 self.stage.respawn_points.set_context_vec(self.selector.respawn_points.iter().cloned().collect());
             }
@@ -361,7 +361,7 @@ impl Game {
                 if self.selector.moving {
                     // undo the operations used to render the player
                     let (raw_d_x, raw_d_y) = os_input.game_mouse_diff(&self.camera);
-                    let angle = -self.players[player].angle(&self.package.fighters[fighter], &self.stage.platforms); // rotate by the inverse of the angle
+                    let angle = -self.players[player].angle(&self.package.fighters[fighter], &self.stage.surfaces); // rotate by the inverse of the angle
                     let d_x = raw_d_x * angle.cos() - raw_d_y * angle.sin();
                     let d_y = raw_d_x * angle.sin() + raw_d_y * angle.cos();
                     let distance = (self.players[player].relative_f(d_x), d_y); // *= -1 is its own inverse
@@ -435,7 +435,7 @@ impl Game {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             let selected = {
                                 let player = &self.players[player];
-                                let (p_x, p_y) = player.bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
+                                let (p_x, p_y) = player.bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
 
                                 let point = (player.relative_f(m_x - p_x), m_y - p_y);
                                 let new_colbox = CollisionBox::new(point);
@@ -478,8 +478,8 @@ impl Game {
 
                     // handle single selection
                     if let Some((m_x, m_y)) = self.selector.step_single_selection(os_input, &self.camera) {
-                        let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
-                        let frame = self.players[player].relative_frame(&self.package.fighters[fighter], &self.stage.platforms);
+                        let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
+                        let frame = self.players[player].relative_frame(&self.package.fighters[fighter], &self.stage.surfaces);
 
                         for (i, colbox) in frame.colboxes.iter().enumerate() {
                             let hit_x = colbox.point.0 + player_x;
@@ -508,8 +508,8 @@ impl Game {
 
                     // handle multiple selection
                     if let Some(rect) = self.selector.step_multiple_selection(os_input, &self.camera) {
-                        let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.platforms);
-                        let frame = self.players[player].relative_frame(&self.package.fighters[fighter], &self.stage.platforms);
+                        let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
+                        let frame = self.players[player].relative_frame(&self.package.fighters[fighter], &self.stage.surfaces);
 
                         for (i, colbox) in frame.colboxes.iter().enumerate() {
                             let hit_x = colbox.point.0 + player_x;
@@ -548,14 +548,14 @@ impl Game {
                         }
                     }
 
-                    for (i, platform) in self.stage.platforms.iter_mut().enumerate() {
-                        if self.selector.platforms.contains(&PlatformSelection::P1(i)) {
-                            platform.x1 += d_x;
-                            platform.y1 += d_y;
+                    for (i, surface) in self.stage.surfaces.iter_mut().enumerate() {
+                        if self.selector.surfaces.contains(&SurfaceSelection::P1(i)) {
+                            surface.x1 += d_x;
+                            surface.y1 += d_y;
                         }
-                        if self.selector.platforms.contains(&PlatformSelection::P2(i)) {
-                            platform.x2 += d_x;
-                            platform.y2 += d_y;
+                        if self.selector.surfaces.contains(&SurfaceSelection::P2(i)) {
+                            surface.x2 += d_x;
+                            surface.y2 += d_y;
                         }
                     }
 
@@ -567,7 +567,7 @@ impl Game {
                 else {
                     // start move elements
                     if os_input.key_pressed(VirtualKeyCode::A) {
-                        if self.selector.platforms.len() + self.selector.spawn_points.len() + self.selector.respawn_points.len() > 0 {
+                        if self.selector.surfaces.len() + self.selector.spawn_points.len() + self.selector.respawn_points.len() > 0 {
                             self.selector.moving = true;
                         }
                     }
@@ -588,38 +588,38 @@ impl Game {
                             self.stage.respawn_points.remove(respawn_i);
                         }
 
-                        let mut platforms_to_delete: Vec<usize> = self.selector.platforms_vec();
-                        platforms_to_delete.sort();
-                        platforms_to_delete.reverse();
+                        let mut surfaces_to_delete: Vec<usize> = self.selector.surfaces_vec();
+                        surfaces_to_delete.sort();
+                        surfaces_to_delete.reverse();
                         let players = self.players.clone();
-                        for platform_i in platforms_to_delete {
+                        for surface_i in surfaces_to_delete {
                             for player in self.players.iter_mut() {
-                                player.platform_deleted(&players, &self.package.fighters, &self.stage.platforms, platform_i);
+                                player.platform_deleted(&players, &self.package.fighters, &self.stage.surfaces, surface_i);
                             }
-                            self.stage.platforms.remove(platform_i);
+                            self.stage.surfaces.remove(surface_i);
                         }
 
                         self.update_frame();
                     }
-                    if os_input.key_pressed(VirtualKeyCode::F) {
+                    if os_input.key_pressed(VirtualKeyCode::F) { // TODODO
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
-                            if self.selector.platforms.len() == 1 {
-                                // create new platform, p1 is selected platform, p2 is current mouse
-                                let (x, y) = match self.selector.platforms.iter().next().unwrap() {
-                                    &PlatformSelection::P1 (i) => (self.stage.platforms[i].x1, self.stage.platforms[i].y1),
-                                    &PlatformSelection::P2 (i) => (self.stage.platforms[i].x2, self.stage.platforms[i].y2)
+                            if self.selector.surfaces.len() == 1 {
+                                // create new surface, p1 is selected surface, p2 is current mouse
+                                let (x, y) = match self.selector.surfaces.iter().next().unwrap() {
+                                    &SurfaceSelection::P1 (i) => (self.stage.surfaces[i].x1, self.stage.surfaces[i].y1),
+                                    &SurfaceSelection::P2 (i) => (self.stage.surfaces[i].x2, self.stage.surfaces[i].y2)
                                 };
 
                                 self.selector.clear();
-                                self.selector.platforms.insert(PlatformSelection::P2(self.stage.platforms.len()));
-                                self.stage.platforms.push(Platform::new(x, y, m_x, m_y));
+                                self.selector.surfaces.insert(SurfaceSelection::P2(self.stage.surfaces.len()));
+                                self.stage.surfaces.push(Surface::new(x, y, m_x, m_y, os_input.held_shift(), os_input.held_alt(), os_input.held_control()));
                             }
-                            else if self.selector.platforms.len() == 0 {
-                                // create new platform, p1 is current mouse, p2 is moving
+                            else if self.selector.surfaces.len() == 0 {
+                                // create new surface, p1 is current mouse, p2 is moving
                                 self.selector.clear();
-                                self.selector.platforms.insert(PlatformSelection::P2(self.stage.platforms.len()));
+                                self.selector.surfaces.insert(SurfaceSelection::P2(self.stage.surfaces.len()));
                                 self.selector.moving = true;
-                                self.stage.platforms.push(Platform::new(m_x, m_y, m_x, m_y));
+                                self.stage.surfaces.push(Surface::new(m_x, m_y, m_x, m_y, os_input.held_shift(), os_input.held_alt(), os_input.held_control()));
                             }
                         }
                     }
@@ -665,21 +665,21 @@ impl Game {
                             }
                         }
                     }
-                    for (i, platform) in self.stage.platforms.iter().enumerate() {
-                        let distance1 = ((m_x - platform.x1).powi(2) + (m_y - platform.y1).powi(2)).sqrt();
-                        if distance1 < 3.0 { // TODO: check entire half of platform, not just the edge
+                    for (i, surface) in self.stage.surfaces.iter().enumerate() {
+                        let distance1 = ((m_x - surface.x1).powi(2) + (m_y - surface.y1).powi(2)).sqrt();
+                        if distance1 < 3.0 { // TODO: check entire half of surface, not just the edge
                             if os_input.held_alt() {
-                                self.selector.platforms.remove(&PlatformSelection::P1(i));
+                                self.selector.surfaces.remove(&SurfaceSelection::P1(i));
                             } else {
-                                self.selector.platforms.insert(PlatformSelection::P1(i));
+                                self.selector.surfaces.insert(SurfaceSelection::P1(i));
                             }
                         }
-                        let distance2 = ((m_x - platform.x2).powi(2) + (m_y - platform.y2).powi(2)).sqrt();
+                        let distance2 = ((m_x - surface.x2).powi(2) + (m_y - surface.y2).powi(2)).sqrt();
                         if distance2 < 3.0 {
                             if os_input.held_alt() {
-                                self.selector.platforms.remove(&PlatformSelection::P2(i));
+                                self.selector.surfaces.remove(&SurfaceSelection::P2(i));
                             } else {
-                                self.selector.platforms.insert(PlatformSelection::P2(i));
+                                self.selector.surfaces.insert(SurfaceSelection::P2(i));
                             }
                         }
                     }
@@ -689,7 +689,7 @@ impl Game {
                 if let Some(rect) = self.selector.step_multiple_selection(os_input, &self.camera) {
                     if self.debug_stage.spawn_points {
                         for (i, point) in self.stage.spawn_points.iter().enumerate() {
-                            if rect.contains_point(point.x, point.y) { // TODO: check entire half of platform, not just the edge
+                            if rect.contains_point(point.x, point.y) { // TODO: check entire half of surface, not just the edge
                                 if os_input.held_alt() {
                                     self.selector.spawn_points.remove(&i);
                                 } else {
@@ -709,19 +709,19 @@ impl Game {
                             }
                         }
                     }
-                    for (i, platform) in self.stage.platforms.iter().enumerate() {
-                        if rect.contains_point(platform.x1, platform.y1) {
+                    for (i, surface) in self.stage.surfaces.iter().enumerate() {
+                        if rect.contains_point(surface.x1, surface.y1) {
                             if os_input.held_alt() {
-                                self.selector.platforms.remove(&PlatformSelection::P1(i));
+                                self.selector.surfaces.remove(&SurfaceSelection::P1(i));
                             } else {
-                                self.selector.platforms.insert(PlatformSelection::P1(i));
+                                self.selector.surfaces.insert(SurfaceSelection::P1(i));
                             }
                         }
-                        if rect.contains_point(platform.x2, platform.y2) {
+                        if rect.contains_point(surface.x2, surface.y2) {
                             if os_input.held_alt() {
-                                self.selector.platforms.remove(&PlatformSelection::P2(i));
+                                self.selector.surfaces.remove(&SurfaceSelection::P2(i));
                             } else {
-                                self.selector.platforms.insert(PlatformSelection::P2(i));
+                                self.selector.surfaces.insert(SurfaceSelection::P2(i));
                             }
                         }
                     }
@@ -823,7 +823,7 @@ impl Game {
             for (i, player) in self.players.iter().enumerate() {
                 let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.action_hitlag_step(input, &self.players, &self.package.fighters, &self.stage.platforms, &mut rng);
+                player.action_hitlag_step(input, &self.players, &self.package.fighters, &self.stage.surfaces, &mut rng);
                 action_players.push(player);
             }
 
@@ -838,10 +838,10 @@ impl Game {
 
             // check for hits and run hit logic
             let mut collision_players: Vec<Player> = vec!();
-            let collision_results = collision_check(&physics_players, &self.package.fighters, &self.stage.platforms);
+            let collision_results = collision_check(&physics_players, &self.package.fighters, &self.stage.surfaces);
             for (i, player) in physics_players.iter().enumerate() {
                 let mut player = player.clone();
-                player.step_collision(&physics_players, &self.package.fighters, &self.stage.platforms, &collision_results[i]);
+                player.step_collision(&physics_players, &self.package.fighters, &self.stage.surfaces, &collision_results[i]);
                 collision_players.push(player);
             }
 
@@ -1012,13 +1012,13 @@ impl Game {
 
             let debug = self.debug_players[i].clone();
             if debug.cam_area {
-                let cam_area = player.cam_area(&self.stage.camera, &self.players, &self.package.fighters, &self.stage.platforms);
+                let cam_area = player.cam_area(&self.stage.camera, &self.players, &self.package.fighters, &self.stage.surfaces);
                 entities.push(RenderEntity::rect_outline(cam_area, 0.0, 0.0, 1.0));
             }
 
             let fighters = &self.package.fighters;
-            let platforms = &self.stage.platforms;
-            let player_render = player.render(selected_colboxes, fighter_selected, player_selected, debug, &self.players, fighters, platforms);
+            let surfaces = &self.stage.surfaces;
+            let player_render = player.render(selected_colboxes, fighter_selected, player_selected, debug, &self.players, fighters, surfaces);
             entities.push(RenderEntity::Player(player_render));
         }
 
@@ -1066,8 +1066,8 @@ impl Game {
 
         RenderGame {
             seed:               self.get_seed(),
-            platforms:          self.stage.platforms.to_vec(),
-            selected_platforms: self.selector.platforms.clone(),
+            surfaces:          self.stage.surfaces.to_vec(),
+            selected_surfaces: self.selector.surfaces.clone(),
             entities:           entities,
             state:              self.state.clone(),
             camera:             self.camera.clone(),
@@ -1146,7 +1146,7 @@ impl Default for Edit {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Node)]
 pub struct Selector {
     colboxes:       HashSet<usize>,
-    platforms:      HashSet<PlatformSelection>,
+    surfaces:      HashSet<SurfaceSelection>,
     spawn_points:   HashSet<usize>,
     respawn_points: HashSet<usize>,
     moving:         bool,
@@ -1159,22 +1159,22 @@ impl Selector {
         self.colboxes.iter().cloned().collect()
     }
 
-    fn platforms_vec(&self) -> Vec<usize> {
+    fn surfaces_vec(&self) -> Vec<usize> {
         let mut result = vec!();
         let mut prev_i: Option<usize> = None;
-        let mut platforms: Vec<usize> = self.platforms.iter().map(|x| x.index()).collect();
-        platforms.sort();
+        let mut surfaces: Vec<usize> = self.surfaces.iter().map(|x| x.index()).collect();
+        surfaces.sort();
 
-        for platform_i in platforms {
+        for surface_i in surfaces {
             if let Some(prev_i) = prev_i {
-                if prev_i != platform_i {
-                    result.push(platform_i)
+                if prev_i != surface_i {
+                    result.push(surface_i)
                 }
             }
             else {
-                result.push(platform_i)
+                result.push(surface_i)
             }
-            prev_i = Some(platform_i);
+            prev_i = Some(surface_i);
         }
         result
     }
@@ -1187,7 +1187,7 @@ impl Selector {
 
     fn clear(&mut self) {
         self.colboxes.clear();
-        self.platforms.clear();
+        self.surfaces.clear();
         self.spawn_points.clear();
         self.respawn_points.clear();
     }
@@ -1228,30 +1228,30 @@ impl Selector {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Node)]
-pub enum PlatformSelection {
+pub enum SurfaceSelection {
     P1 (usize),
     P2 (usize)
 }
 
-impl PlatformSelection {
+impl SurfaceSelection {
     fn index(&self) -> usize {
         match self {
-            &PlatformSelection::P1 (index) |
-            &PlatformSelection::P2 (index) => index
+            &SurfaceSelection::P1 (index) |
+            &SurfaceSelection::P2 (index) => index
         }
     }
 }
 
-impl Default for PlatformSelection {
-    fn default() -> PlatformSelection {
-        PlatformSelection::P1 (0)
+impl Default for SurfaceSelection {
+    fn default() -> SurfaceSelection {
+        SurfaceSelection::P1 (0)
     }
 }
 
 pub struct RenderGame {
     pub seed:               Vec<usize>,
-    pub platforms:          Vec<Platform>,
-    pub selected_platforms: HashSet<PlatformSelection>,
+    pub surfaces:          Vec<Surface>,
+    pub selected_surfaces: HashSet<SurfaceSelection>,
     pub entities:           Vec<RenderEntity>,
     pub state:              GameState,
     pub camera:             Camera,
