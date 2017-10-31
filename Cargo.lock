@@ -24,6 +24,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "arrayvec"
+version = "0.3.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "nodrop 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "odds 0.2.25 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "arrayvec"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -379,6 +388,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "euclid"
+version = "0.15.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "heapsize 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "flate2"
 version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -527,6 +547,14 @@ dependencies = [
 name = "half"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "heapsize"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "httparse"
@@ -684,6 +712,101 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "log"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "lyon"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "lyon_bezier 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_core 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_extra 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_builder 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_iterator 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_svg 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_tessellation 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lyon_bezier"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "arrayvec 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)",
+ "euclid 0.15.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lyon_core"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "euclid 0.15.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lyon_extra"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "lyon_core 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_builder 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_iterator 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lyon_path"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "lyon_bezier 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_core 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_builder 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_iterator 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lyon_path_builder"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "lyon_bezier 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_core 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lyon_path_iterator"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "lyon_bezier 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_core 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lyon_svg"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "lyon_core 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_builder 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "svgparser 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lyon_tessellation"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "lyon_bezier 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_core 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_builder 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon_path_iterator 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sid 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "magenta"
@@ -958,6 +1081,7 @@ dependencies = [
  "getopts 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "glium 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libusb 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lyon 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "matches 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1271,6 +1395,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sid"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "num-traits 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "siphasher"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1306,6 +1438,14 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "svgparser"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "phf 0.7.21 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1800,6 +1940,7 @@ dependencies = [
 "checksum advapi32-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e06588080cb19d0acb6739808aafa5f26bfb2ca015b2b6370028b44cf7cb8a9a"
 "checksum android_glue 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "000444226fcff248f2bc4c7625be32c63caccfecc2723a2b9f78a7487a49c407"
 "checksum approx 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "08abcc3b4e9339e33a3d0a5ed15d84a687350c05689d825e0f6655eef9e76a94"
+"checksum arrayvec 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)" = "699e63a93b79d717e8c3b5eb1b28b7780d0d6d9e59a72eb769291c83b0c8dc67"
 "checksum arrayvec 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "21d05247d0ce9c50156398593448df5c96616439217563a64d279a0489078427"
 "checksum backtrace 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "346d7644f0b5f9bc73082d3b2236b69a05fd35cce0cfa3724e184e6a5c9e2a2f"
 "checksum backtrace-sys 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "c63ea141ef8fdb10409d0f5daf30ac51f84ef43bff66f16627773d2a292cd189"
@@ -1845,6 +1986,7 @@ dependencies = [
 "checksum either 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cbee135e9245416869bf52bd6ccc9b59e2482651510784e089b874272f02a252"
 "checksum enum_traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "198d4a4c0bf72a63aca9da52b2d471108a1050c8e01a3586d2bc25cc325e50b3"
 "checksum enum_traits_macros 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9f0ce5d2d496fe3924419ee2561f2c030193a4c4c25df6d398fdb53c1c78e918"
+"checksum euclid 0.15.4 (registry+https://github.com/rust-lang/crates.io-index)" = "e2fe9b4a316b4a828569bb42d7530f1f6b5fbda351067c5bcab229e2f7a38f07"
 "checksum flate2 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)" = "e6234dd4468ae5d1e2dbb06fe2b058696fdc50a339c68a393aefbf00bc81e423"
 "checksum fnv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "6cc484842f1e2884faf56f529f960cc12ad8c71ce96cc7abba0a067c98fee344"
 "checksum foreign-types 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3e4056b9bd47f8ac5ba12be771f77a0dae796d1bbaaf5fd0b9c2d38b69b8a29d"
@@ -1862,6 +2004,7 @@ dependencies = [
 "checksum glsl-to-spirv 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "cbeef81ce74e3e299bc002799754a7c5c99833a05781b18863c5de7de8f804d5"
 "checksum glutin 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)" = "1f95cc9a8363627259b4a25db878eb5b1a159857bc41f525412302fa9de0f12b"
 "checksum half 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3e8c68f037ac990d590887da5c017491c5af2aa493c1036ce486b06330a6622d"
+"checksum heapsize 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "54fab2624374e5137ae4df13bf32b0b269cb804df42d13a51221bbd431d1a237"
 "checksum httparse 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "af2f2dd97457e8fb1ae7c5a420db346af389926e36f43768b96f101546b04a07"
 "checksum hyper 0.11.6 (registry+https://github.com/rust-lang/crates.io-index)" = "1b45eac8b696d59491b079bd04fcb0f3488c0f6ed62dcb36bcfea8a543e9cdc3"
 "checksum hyper-tls 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9c81fa95203e2a6087242c38691a0210f23e9f3f8f944350bd676522132e2985"
@@ -1881,6 +2024,15 @@ dependencies = [
 "checksum libusb-sys 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "4c53b6582563d64ad3e692f54ef95239c3ea8069e82c9eb70ca948869a7ad767"
 "checksum linked-hash-map 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2d2aab0478615bb586559b0114d94dd8eca4fdbb73b443adcb0d00b61692b4bf"
 "checksum log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "880f77541efa6e5cc74e76910c9884d9859683118839d6a1dc3b11e63512565b"
+"checksum lyon 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)" = "01cf0aa928c105bf8dae0dd1aceb29436cdfb945ef5b3ac40e9e8fc79b436f68"
+"checksum lyon_bezier 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)" = "4b4db23091eed865f4ac3ee42554cf4fd7e6f9fb05cb42b5119cd7b6f8206b95"
+"checksum lyon_core 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6feff097e9582904f170c17d074054c9a88bd65a1c8b0f9a14e80faffee9e9e4"
+"checksum lyon_extra 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4dde55b63548e3af092eacad9e55f72d36178b95abdc5622d50d0fb04a11acc1"
+"checksum lyon_path 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e613e130bc5d0cb0f43fcad3f6600179af67e6f1d3adc75922c0bc6fdb346986"
+"checksum lyon_path_builder 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1206a754015af7cc22a0727aae3ba7ee5564b3729f80c7feab5ee3957f1eafda"
+"checksum lyon_path_iterator 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8588ece2ba160d17329c076def8f988949a735bfda73e8d5ca03cec1db281898"
+"checksum lyon_svg 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "133859940c7aa01fe2d9da1f8892b8af71e80baf2c9e0ce5b4af1333c635c2e1"
+"checksum lyon_tessellation 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)" = "d4c0b75c30e8c83a8e2e0d047acd178b9137da5187b69b1a1e2b09a059167299"
 "checksum magenta 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4bf0336886480e671965f794bc9b6fce88503563013d1bfb7a502c81fe3ac527"
 "checksum magenta-sys 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "40d014c7011ac470ae28e2f76a02bfea4a8480f73e701353b49ad7a8d75f4699"
 "checksum malloc_buf 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
@@ -1943,6 +2095,7 @@ dependencies = [
 "checksum serde_urlencoded 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ce0fd303af908732989354c6f02e05e2e6d597152870f2c6990efb0577137480"
 "checksum shared_library 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "7822f9d0814224552cfd7e4ac72cd511740ccec0b811d1c0f9fa2a84c6509cee"
 "checksum shell32-sys 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "72f20b8f3c060374edb8046591ba28f62448c369ccbdc7b02075103fb3a9e38d"
+"checksum sid 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bf1345fb57b3bee666f25d45f85ba3a97f11b8cede5abe0d1212ba0324082faf"
 "checksum siphasher 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0df90a788073e8d0235a67e50441d47db7c8ad9debd91cbf43736a2a92d36537"
 "checksum slab 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "17b4fcaed89ab08ef143da37bc52adbcc04d4a69014f4c1208d6b51f0c47bc23"
 "checksum slab 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fdeff4cd9ecff59ec7e3744cbca73dfe5ac35c2aedb2cfba8a1c715a18912e9d"
@@ -1950,6 +2103,7 @@ dependencies = [
 "checksum smallvec 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4c8cbcd6df1e117c2210e13ab5109635ad68a929fcbb8964dc965b76cb5ee013"
 "checksum smallvec 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "ee4f357e8cd37bf8822e1b964e96fd39e2cb5a0424f8aaa284ccaccc2162411c"
 "checksum stb_truetype 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "21b5c3b588a493a477e0d99769ee091b3627625f9ba4bdd882e6b4b0b0958805"
+"checksum svgparser 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "9196afd1c4cb1c1118cdc2bc519fd3484e2c665e43a0fdb548d496181f409dd2"
 "checksum syn 0.10.8 (registry+https://github.com/rust-lang/crates.io-index)" = "58fd09df59565db3399efbba34ba8a2fec1307511ebd245d0061ff9d42691673"
 "checksum syn 0.11.11 (registry+https://github.com/rust-lang/crates.io-index)" = "d3b891b9015c88c576343b9b3e41c2c11a51c219ef067b264bd9c8aa9b441dad"
 "checksum synom 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a393066ed9010ebaed60b9eafa373d4b1baac186dd7e008555b0f702b51945b6"

@@ -10,6 +10,13 @@ use ::game::SurfaceSelection;
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
 
+use lyon::path::Path;
+use lyon::path_builder::FlatPathBuilder;
+use lyon::math::point;
+use lyon::tessellation::{VertexBuffers, FillVertex};
+use lyon::tessellation::{FillTessellator, FillOptions};
+use lyon::tessellation::geometry_builder::{VertexConstructor, BuffersBuilder};
+
 use std::collections::{HashSet, HashMap};
 use std::f32::consts;
 use std::sync::Arc;
@@ -20,7 +27,6 @@ pub struct Vertex {
     pub edge: f32,
     pub render_id: f32,
 }
-
 impl_vertex!(Vertex, position, edge, render_id);
 
 fn vertex(x: f32, y: f32) -> Vertex {
@@ -31,9 +37,39 @@ fn vertex(x: f32, y: f32) -> Vertex {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ColorVertex {
+    pub position:  [f32; 2],
+    pub color:     [f32; 4],
+}
+impl_vertex!(ColorVertex, position, color);
+
+fn colorvertex(x: f32, y: f32, color: [f32; 4]) -> ColorVertex {
+    ColorVertex {
+        position: [x, y],
+        color
+    }
+}
+
+struct StageVertexConstructor;
+impl VertexConstructor<FillVertex, ColorVertex> for StageVertexConstructor {
+    fn new_vertex(&mut self, vertex: FillVertex) -> ColorVertex {
+        ColorVertex {
+            position: vertex.position.to_array(),
+            color:    [0.3, 0.3, 0.3, 0.3]
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Buffers {
     pub vertex: Arc<CpuAccessibleBuffer<[Vertex]>>,
+    pub index:  Arc<CpuAccessibleBuffer<[u16]>>,
+}
+
+#[derive(Clone)]
+pub struct SurfaceBuffers {
+    pub vertex: Arc<CpuAccessibleBuffer<[ColorVertex]>>,
     pub index:  Arc<CpuAccessibleBuffer<[u16]>>,
 }
 
@@ -236,81 +272,205 @@ impl Buffers {
         }
     }
 
-    pub fn new_selected_surfaces(device: Arc<Device>, surfaces: &[Surface], selected_surfaces: &HashSet<SurfaceSelection>) -> Option<Buffers> {
+    pub fn new_selected_surfaces(device: Arc<Device>, surfaces: &[Surface], selected_surfaces: &HashSet<SurfaceSelection>) -> Option<SurfaceBuffers> {
         if surfaces.len() == 0 {
             return None;
         }
 
-        let mut vertices: Vec<Vertex> = vec!();
+        let mut vertices: Vec<ColorVertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
-        for (i, platform) in surfaces.iter().enumerate() {
-            let x_mid = (platform.x1 + platform.x2) / 2.0;
-            let y_mid = (platform.y1 + platform.y2) / 2.0;
+        let color = [0.0, 1.0, 0.0, 1.0];
+        for (i, surface) in surfaces.iter().enumerate() {
+            let x_mid = (surface.x1 + surface.x2) / 2.0;
+            let y_mid = (surface.y1 + surface.y2) / 2.0;
+
+            let angle = surface.render_angle() - 90f32.to_radians();
+            let d_x = angle.cos() / 4.0;
+            let d_y = angle.sin() / 4.0;
 
             if selected_surfaces.contains(&SurfaceSelection::P1(i)) {
-                vertices.push(vertex(platform.x1, platform.y1));
-                vertices.push(vertex(x_mid, y_mid));
-                vertices.push(vertex(platform.x1, platform.y1 - 0.5));
-                vertices.push(vertex(x_mid, y_mid - 0.5));
+                vertices.push(colorvertex(x_mid      + d_x, y_mid      + d_y, color));
+                vertices.push(colorvertex(surface.x1 + d_x, surface.y1 + d_y, color));
+                vertices.push(colorvertex(surface.x1 - d_x, surface.y1 - d_y, color));
+                vertices.push(colorvertex(x_mid      - d_x, y_mid      - d_y, color));
 
                 indices.push(indice_count + 0);
                 indices.push(indice_count + 1);
                 indices.push(indice_count + 2);
-                indices.push(indice_count + 1);
+                indices.push(indice_count + 0);
                 indices.push(indice_count + 2);
                 indices.push(indice_count + 3);
                 indice_count += 4;
             }
-
             if selected_surfaces.contains(&SurfaceSelection::P2(i)) {
-                vertices.push(vertex(platform.x2, platform.y2));
-                vertices.push(vertex(x_mid, y_mid));
-                vertices.push(vertex(platform.x2, platform.y2 - 0.5));
-                vertices.push(vertex(x_mid, y_mid - 0.5));
+                vertices.push(colorvertex(x_mid      + d_x, y_mid      + d_y, color));
+                vertices.push(colorvertex(surface.x2 + d_x, surface.y2 + d_y, color));
+                vertices.push(colorvertex(surface.x2 - d_x, surface.y2 - d_y, color));
+                vertices.push(colorvertex(x_mid      - d_x, y_mid      - d_y, color));
 
                 indices.push(indice_count + 0);
                 indices.push(indice_count + 1);
                 indices.push(indice_count + 2);
-                indices.push(indice_count + 1);
+                indices.push(indice_count + 0);
                 indices.push(indice_count + 2);
                 indices.push(indice_count + 3);
                 indice_count += 4;
             }
         }
 
-        Some(Buffers {
+        Some(SurfaceBuffers {
             vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
             index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
         })
     }
 
-    pub fn new_surfaces(device: Arc<Device>, surfaces: &[Surface]) -> Option<Buffers> {
+    pub fn new_surfaces(device: Arc<Device>, surfaces: &[Surface]) -> Option<SurfaceBuffers> {
         if surfaces.len() == 0 {
             return None;
         }
 
-        let mut vertices: Vec<Vertex> = vec!();
+        let mut vertices: Vec<ColorVertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut indice_count = 0;
-        for platform in surfaces {
-            vertices.push(vertex(platform.x1, platform.y1));
-            vertices.push(vertex(platform.x2, platform.y2));
-            vertices.push(vertex(platform.x1, platform.y1 - 0.5));
-            vertices.push(vertex(platform.x2, platform.y2 - 0.5));
+
+        for surface in surfaces {
+            let r = if surface.is_pass_through() { 0.4 } else if surface.floor.is_some() { 0.6 } else { 0.0 };
+            let g = if surface.ceiling { 0.5 } else { 0.0 };
+            let b = if surface.wall { 0.5 } else { 0.0 };
+            let color = [1.0 - g - b, 1.0 - r - b, 1.0 - r - g, 1.0];
+
+            let angle = surface.render_angle() - 90f32.to_radians();
+            let d_x = angle.cos() / 4.0;
+            let d_y = angle.sin() / 4.0;
+
+            vertices.push(colorvertex(surface.x1 + d_x, surface.y1 + d_y, color));
+            vertices.push(colorvertex(surface.x2 + d_x, surface.y2 + d_y, color));
+            vertices.push(colorvertex(surface.x2 - d_x, surface.y2 - d_y, color));
+            vertices.push(colorvertex(surface.x1 - d_x, surface.y1 - d_y, color));
 
             indices.push(indice_count + 0);
             indices.push(indice_count + 1);
             indices.push(indice_count + 2);
-            indices.push(indice_count + 1);
+            indices.push(indice_count + 0);
             indices.push(indice_count + 2);
             indices.push(indice_count + 3);
             indice_count += 4;
         }
 
-        Some(Buffers {
+        Some(SurfaceBuffers {
             vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
             index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+        })
+    }
+
+    // TODO: Combine new_surfaces(..) and new_surfaces_fill(..), waiting on: https://github.com/nical/lyon/issues/224
+    pub fn new_surfaces_fill(device: Arc<Device>, surfaces: &[Surface]) -> Option<SurfaceBuffers> {
+        if surfaces.len() == 0 {
+            return None;
+        }
+
+        let mut builder = Path::builder();
+        let mut used: Vec<usize> = vec!();
+        let mut cant_loop: Vec<usize> = vec!(); // optmization, so we dont have to keep rechecking surfaces that will never loop
+
+        for (i, surface) in surfaces.iter().enumerate() {
+            if used.contains(&i) {
+                continue;
+            }
+
+            let mut loop_elements: Vec<usize> = vec!(i);
+            let mut found_loop = false;
+            let mut prev_surface = surface;
+            if !cant_loop.contains(&i) {
+                'loop_search: loop {
+                    for (j, check_surface) in surfaces.iter().enumerate() {
+                        if  i != j && !loop_elements.contains(&j) && !used.contains(&j) &&
+                            (
+                                check_surface.x1 == prev_surface.x1 && check_surface.y1 == prev_surface.y1 ||
+                                check_surface.x1 == prev_surface.x2 && check_surface.y1 == prev_surface.y2 ||
+                                check_surface.x2 == prev_surface.x1 && check_surface.y2 == prev_surface.y1 ||
+                                check_surface.x2 == prev_surface.x2 && check_surface.y2 == prev_surface.y2
+                            )
+                        {
+                            loop_elements.push(j);
+                            if  loop_elements.len() > 2 &&
+                                (
+                                    check_surface.x1 == surface.x1 && check_surface.y1 == surface.y1 ||
+                                    check_surface.x1 == surface.x2 && check_surface.y1 == surface.y2 ||
+                                    check_surface.x2 == surface.x1 && check_surface.y2 == surface.y1 ||
+                                    check_surface.x2 == surface.x2 && check_surface.y2 == surface.y2
+                                )
+                            {
+                                found_loop = true;
+                                break 'loop_search // completed a loop
+                            }
+                            else {
+                                prev_surface = check_surface;
+                                continue 'loop_search; // found a loop element, start the loop_search again to find the next loop element.
+                            }
+                        }
+                    }
+                    break 'loop_search // loop search exhausted
+                }
+            }
+
+            if found_loop {
+                let mut loop_elements_iter = loop_elements.iter().cloned();
+                let first_surface_i = loop_elements_iter.next().unwrap();
+                used.push(first_surface_i);
+
+                let first_surface = &surfaces[first_surface_i];
+                let second_surface = &surfaces[loop_elements[1]];
+                let start_p1 = first_surface.x1 == second_surface.x1 && first_surface.y1 == second_surface.y1 ||
+                               first_surface.x1 == second_surface.x2 && first_surface.y1 == second_surface.y2;
+                let mut prev_x = if start_p1 { first_surface.x1 } else { first_surface.x2 };
+                let mut prev_y = if start_p1 { first_surface.y1 } else { first_surface.y2 };
+                builder.move_to(point(prev_x, prev_y));
+
+                for j in loop_elements_iter {
+                    let surface = &surfaces[j];
+                    if surface.x1 == prev_x && surface.y1 == prev_y {
+                        prev_x = surface.x2;
+                        prev_y = surface.y2;
+                    }
+                    else {
+                        prev_x = surface.x1;
+                        prev_y = surface.y1;
+                    }
+                    builder.line_to(point(prev_x, prev_y));
+                    used.push(j);
+                }
+                builder.close();
+            }
+            else {
+                let angle = surface.render_angle() - 90f32.to_radians();
+                let d_x = angle.cos() / 4.0;
+                let d_y = angle.sin() / 4.0;
+                builder.move_to(point(surface.x1 + d_x, surface.y1 + d_y));
+                builder.line_to(point(surface.x2 + d_x, surface.y2 + d_y));
+                builder.line_to(point(surface.x2 - d_x, surface.y2 - d_y));
+                builder.line_to(point(surface.x1 - d_x, surface.y1 - d_y));
+                builder.close();
+                for j in loop_elements {
+                    cant_loop.push(j);
+                }
+            }
+            used.push(i);
+        }
+
+        let path = builder.build();
+        let mut tessellator = FillTessellator::new();
+        let mut mesh = VertexBuffers::new();
+        tessellator.tessellate_path(
+            path.path_iter(),
+            &FillOptions::tolerance(0.01),
+            &mut BuffersBuilder::new(&mut mesh, StageVertexConstructor)
+        ).unwrap();
+
+        Some(SurfaceBuffers {
+            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), mesh.vertices.iter().cloned()).unwrap(),
+            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), mesh.indices.iter().cloned()).unwrap(),
         })
     }
 
@@ -462,17 +622,19 @@ impl Buffers {
 }
 
 pub struct PackageBuffers {
-    pub stages:   HashMap<String, Option<Buffers>>, // Only used in menu, ingame stages are recreated every frame
-    pub fighters: HashMap<String, Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
-    pub package:  Option<Package>,
+    pub stages:      HashMap<String, Option<SurfaceBuffers>>, // Only used in menu, ingame stages are recreated every frame
+    pub stages_fill: HashMap<String, Option<SurfaceBuffers>>, // Only used in menu, ingame stages are recreated every frame
+    pub fighters:    HashMap<String, Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
+    pub package:     Option<Package>,
 }
 
 impl PackageBuffers {
     pub fn new() -> PackageBuffers {
         PackageBuffers {
-            stages:   HashMap::new(),
-            fighters: HashMap::new(),
-            package:  None,
+            stages:      HashMap::new(),
+            stages_fill: HashMap::new(),
+            fighters:    HashMap::new(),
+            package:     None,
         }
     }
 
@@ -497,7 +659,8 @@ impl PackageBuffers {
                     }
 
                     for (key, stage) in package.stages.key_value_iter() {
-                        self.stages.insert(key.clone(), Buffers::new_surfaces(device.clone(), &stage.surfaces));
+                        self.stages     .insert(key.clone(), Buffers::new_surfaces     (device.clone(), &stage.surfaces));
+                        self.stages_fill.insert(key.clone(), Buffers::new_surfaces_fill(device.clone(), &stage.surfaces));
                     }
                     self.package = Some(package);
                 }
@@ -518,12 +681,14 @@ impl PackageBuffers {
                 }
                 PackageUpdate::DeleteStage { index, key } => {
                     self.stages.remove(&key);
+                    self.stages_fill.remove(&key);
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.stages.remove(index);
                     }
                 }
                 PackageUpdate::InsertStage { index, key, stage } => {
-                    self.stages.insert(key.clone(), Buffers::new_surfaces(device.clone(), &stage.surfaces));
+                    self.stages     .insert(key.clone(), Buffers::new_surfaces     (device.clone(), &stage.surfaces));
+                    self.stages_fill.insert(key.clone(), Buffers::new_surfaces_fill(device.clone(), &stage.surfaces));
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.stages.insert(index, key, stage);
                     }

@@ -188,7 +188,7 @@ impl Surface {
         }
     }
 
-    pub fn can_pass_through(&self) -> bool {
+    pub fn is_pass_through(&self) -> bool {
         if let &Some(ref floor) = &self.floor {
             floor.pass_through
         } else {
@@ -196,10 +196,22 @@ impl Surface {
         }
     }
 
-    pub fn angle(&self) -> f32 {
+    pub fn floor_angle(&self) -> Option<f32> {
         let (l_x, l_y) = self.left_ledge();
         let (r_x, r_y) = self.right_ledge();
-        (r_y-l_y).atan2(r_x-l_x)
+        let d_x = r_x - l_x;
+        let d_y = r_y - l_y;
+        if d_x == 0.0 && d_y == 0.0 {
+            None
+        } else {
+            Some(d_y.atan2(d_x))
+        }
+    }
+
+    pub fn render_angle(&self) -> f32 {
+        let d_x = self.x1 - self.x2;
+        let d_y = self.y1 - self.y2;
+        d_y.atan2(d_x)
     }
 
     pub fn plat_x_in_bounds(&self, plat_x: f32) -> bool {

@@ -5,6 +5,7 @@ extern crate crypto;
 extern crate enum_traits;
 extern crate getopts;
 extern crate libusb;
+extern crate lyon;
 extern crate rand;
 extern crate reqwest;
 extern crate serde;

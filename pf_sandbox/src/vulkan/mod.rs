@@ -1,6 +1,6 @@
 mod buffers;
 
-use self::buffers::{Vertex, Buffers, PackageBuffers};
+use self::buffers::{Vertex, ColorVertex, Buffers, SurfaceBuffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
 use ::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
 use ::graphics::{self, GraphicsMessage, Render, RenderType};
@@ -64,28 +64,48 @@ mod fs {
     struct Dummy;
 }
 
+mod surface_vs {
+    #[derive(VulkanoShader)]
+    #[ty = "vertex"]
+    #[path = "src/shaders/surface-vertex.glsl"]
+    #[allow(dead_code)]
+    struct Dummy;
+}
+
+mod surface_fs {
+    #[derive(VulkanoShader)]
+    #[ty = "fragment"]
+    #[path = "src/shaders/surface-fragment.glsl"]
+    #[allow(dead_code)]
+    struct Dummy;
+}
+
 pub struct VulkanGraphics<'a> {
-    package_buffers:     PackageBuffers,
-    window:              vulkano_win::Window,
-    events_loop:         EventsLoop,
-    device:              Arc<Device>,
-    future:              Box<GpuFuture>,
-    swapchain:           Arc<Swapchain>,
-    queue:               Arc<Queue>,
-    vs:                  vs::Shader,
-    fs:                  fs::Shader,
-    pipeline:            Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
-    pipeline_invert:     Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
-    render_pass:         Arc<RenderPassAbstract + Send + Sync>,
-    framebuffers:        Vec<Arc<FramebufferAbstract + Send + Sync>>,
-    uniform_buffer_pool: CpuBufferPool<vs::ty::Data>,
-    draw_text:           DrawText<'a>,
-    os_input_tx:         Sender<WindowEvent>,
-    render_rx:           Receiver<GraphicsMessage>,
-    frame_durations:     Vec<Duration>,
-    fps:                 String,
-    width:               u32,
-    height:              u32,
+    package_buffers:             PackageBuffers,
+    window:                      vulkano_win::Window,
+    events_loop:                 EventsLoop,
+    device:                      Arc<Device>,
+    future:                      Box<GpuFuture>,
+    swapchain:                   Arc<Swapchain>,
+    queue:                       Arc<Queue>,
+    vs:                          vs::Shader,
+    fs:                          fs::Shader,
+    surface_vs:                  surface_vs::Shader,
+    surface_fs:                  surface_fs::Shader,
+    pipeline:                    Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>,      Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+    pipeline_invert:             Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>,      Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+    pipeline_surface:            Arc<GraphicsPipeline<SingleBufferDefinition<ColorVertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+    render_pass:                 Arc<RenderPassAbstract + Send + Sync>,
+    framebuffers:                Vec<Arc<FramebufferAbstract + Send + Sync>>,
+    uniform_buffer_pool:         CpuBufferPool<vs::ty::Data>,
+    surface_uniform_buffer_pool: CpuBufferPool<surface_vs::ty::Data>,
+    draw_text:                   DrawText<'a>,
+    os_input_tx:                 Sender<WindowEvent>,
+    render_rx:                   Receiver<GraphicsMessage>,
+    frame_durations:             Vec<Duration>,
+    fps:                         String,
+    width:                       u32,
+    height:                      u32,
 }
 
 impl<'a> VulkanGraphics<'a> {
@@ -139,6 +159,8 @@ impl<'a> VulkanGraphics<'a> {
 
         let vs = vs::Shader::load(device.clone()).unwrap();
         let fs = fs::Shader::load(device.clone()).unwrap();
+        let surface_vs = surface_vs::Shader::load(device.clone()).unwrap();
+        let surface_fs = surface_fs::Shader::load(device.clone()).unwrap();
 
         let future = Box::new(vulkano::sync::now(device.clone())) as Box<GpuFuture>;
 
@@ -154,10 +176,11 @@ impl<'a> VulkanGraphics<'a> {
             ).unwrap()
         };
 
-        let (render_pass, pipeline, pipeline_invert, framebuffers) = VulkanGraphics::pipeline(&vs, &fs, device.clone(), swapchain.clone(), &images);
+        let (render_pass, pipeline, pipeline_invert, pipeline_surface, framebuffers) = VulkanGraphics::pipeline(&vs, &fs, &surface_vs, &surface_fs, device.clone(), swapchain.clone(), &images);
 
         let draw_text = DrawText::new(device.clone(), queue.clone(), swapchain.clone(), &images);
         let uniform_buffer_pool = CpuBufferPool::<vs::ty::Data>::new(device.clone(), BufferUsage::all());
+        let surface_uniform_buffer_pool = CpuBufferPool::<surface_vs::ty::Data>::new(device.clone(), BufferUsage::all());
 
         VulkanGraphics {
             window,
@@ -168,11 +191,15 @@ impl<'a> VulkanGraphics<'a> {
             queue,
             vs,
             fs,
+            surface_vs,
+            surface_fs,
             pipeline,
             pipeline_invert,
+            pipeline_surface,
             render_pass,
             framebuffers,
             uniform_buffer_pool,
+            surface_uniform_buffer_pool,
             draw_text,
             os_input_tx,
             render_rx,
@@ -187,13 +214,16 @@ impl<'a> VulkanGraphics<'a> {
     fn pipeline(
         vs: &vs::Shader,
         fs: &fs::Shader,
+        surface_vs: &surface_vs::Shader,
+        surface_fs: &surface_fs::Shader,
         device: Arc<Device>,
         swapchain: Arc<Swapchain>,
         images: &[Arc<SwapchainImage>]
     ) -> (
         Arc<RenderPassAbstract + Send + Sync>,
-        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
-        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>,      Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+        Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>,      Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+        Arc<GraphicsPipeline<SingleBufferDefinition<ColorVertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
         Vec<Arc<FramebufferAbstract + Send + Sync>>
     ) {
         let render_pass = Arc::new(single_pass_renderpass!(device.clone(),
@@ -231,8 +261,28 @@ impl<'a> VulkanGraphics<'a> {
         let dimensions = [dimensions[0] as f32, dimensions[1] as f32];
         let pipeline        = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, false);
         let pipeline_invert = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, true);
+        let builder = GraphicsPipeline::start()
+            .vertex_input_single_buffer()
+            .vertex_shader(surface_vs.main_entry_point(), ())
+            .triangle_list()
+            .viewports(iter::once(Viewport {
+                origin:      [0.0, 0.0],
+                depth_range: 0.0..1.0,
+                dimensions
+            }))
+            .fragment_shader(surface_fs.main_entry_point(), ())
+            .blend_alpha_blending()
+            .depth_stencil(DepthStencil {
+                depth_write:       true,
+                depth_compare:     Compare::LessOrEqual,
+                depth_bounds_test: DepthBounds::Disabled,
+                stencil_front:     Default::default(),
+                stencil_back:      Default::default(),
+            })
+            .render_pass(Subpass::from(render_pass.clone(), 0).unwrap());
+        let pipeline_surface = Arc::new(builder.build(device.clone()).unwrap());
 
-        (render_pass, pipeline, pipeline_invert, framebuffers)
+        (render_pass, pipeline, pipeline_invert, pipeline_surface, framebuffers)
     }
 
     fn pipeline_base(
@@ -264,7 +314,7 @@ impl<'a> VulkanGraphics<'a> {
             })
             .render_pass(Subpass::from(render_pass.clone(), 0).unwrap());
 
-        let builder = if invert{
+        let builder = if invert {
             builder.blend_logic_op(LogicOp::Invert)
         } else {
             builder
@@ -275,6 +325,15 @@ impl<'a> VulkanGraphics<'a> {
 
     fn new_uniform_set(&self, uniform: vs::ty::Data) -> Arc<DescriptorSet + Send + Sync> {
         let uniform_buffer = self.uniform_buffer_pool.next(uniform).unwrap();
+        Arc::new(
+            PersistentDescriptorSet::start(self.pipeline.clone(), 0)
+            .add_buffer(uniform_buffer).unwrap()
+            .build().unwrap()
+        )
+    }
+
+    fn new_surface_uniform_set(&self, uniform: surface_vs::ty::Data) -> Arc<DescriptorSet + Send + Sync> {
+        let uniform_buffer = self.surface_uniform_buffer_pool.next(uniform).unwrap();
         Arc::new(
             PersistentDescriptorSet::start(self.pipeline.clone(), 0)
             .add_buffer(uniform_buffer).unwrap()
@@ -342,10 +401,11 @@ impl<'a> VulkanGraphics<'a> {
                 self.height = height;
                 self.swapchain = new_swapchain.clone();
 
-                let (render_pass, pipeline, pipeline_invert, framebuffers) = VulkanGraphics::pipeline(&self.vs, &self.fs, self.device.clone(), new_swapchain, &new_images);
+                let (render_pass, pipeline, pipeline_invert, pipeline_surface, framebuffers) = VulkanGraphics::pipeline(&self.vs, &self.fs, &self.surface_vs, &self.surface_fs, self.device.clone(), new_swapchain, &new_images);
                 self.render_pass = render_pass;
                 self.pipeline = pipeline;
                 self.pipeline_invert = pipeline_invert;
+                self.pipeline_surface = pipeline_surface;
                 self.framebuffers = framebuffers;
 
                 self.draw_text = DrawText::new(self.device.clone(), self.queue.clone(), self.swapchain.clone(), &new_images);
@@ -496,6 +556,28 @@ impl<'a> VulkanGraphics<'a> {
         command_buffer.draw_indexed(pipeline, DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
     }
 
+    fn render_surface_buffers(
+        &self,
+        pipeline:       Arc<GraphicsPipeline<SingleBufferDefinition<ColorVertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+        command_buffer: AutoCommandBufferBuilder,
+        render:         &RenderGame,
+        buffers:        SurfaceBuffers,
+        entity:         &Matrix4<f32>,
+    ) -> AutoCommandBufferBuilder {
+        let zoom = render.camera.zoom.recip();
+        let aspect_ratio = self.aspect_ratio();
+        let camera = Matrix4::from_nonuniform_scale(zoom, zoom * aspect_ratio, 1.0);
+        let transformation = camera * entity;
+        let uniform = surface_vs::ty::Data { transformation: transformation.into() };
+        let uniform_buffer = self.surface_uniform_buffer_pool.next(uniform).unwrap();
+        let set = Arc::new(
+            PersistentDescriptorSet::start(pipeline.clone(), 0)
+            .add_buffer(uniform_buffer).unwrap()
+            .build().unwrap()
+        );
+        command_buffer.draw_indexed(pipeline, DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
+    }
+
     fn game_render(&mut self, render: RenderGame, mut command_buffer: AutoCommandBufferBuilder, command_output: &[String]) -> AutoCommandBufferBuilder {
         let mut rng = StdRng::from_seed(&render.seed);
         if command_output.len() == 0 {
@@ -508,7 +590,7 @@ impl<'a> VulkanGraphics<'a> {
             self.command_render(command_output);
         }
 
-        let pan  = render.camera.pan;
+        let pan = render.camera.pan;
 
         match render.state {
             GameState::Local  => { }
@@ -523,15 +605,18 @@ impl<'a> VulkanGraphics<'a> {
         }
 
         if let Some(buffers) = Buffers::new_surfaces(self.device.clone(), &render.surfaces) {
-            let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
-            let color = [1.0, 1.0, 1.0, 1.0];
-            command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, color, color);
+            let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6001));
+            command_buffer = self.render_surface_buffers(self.pipeline_surface.clone(), command_buffer, &render, buffers, &transformation);
+        }
+
+        if let Some(buffers) = Buffers::new_surfaces_fill(self.device.clone(), &render.surfaces) {
+            let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6002));
+            command_buffer = self.render_surface_buffers(self.pipeline_surface.clone(), command_buffer, &render, buffers, &transformation);
         }
 
         if let Some(buffers) = Buffers::new_selected_surfaces(self.device.clone(), &render.surfaces, &render.selected_surfaces) {
             let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.6));
-            let color = [0.0, 1.0, 0.0, 1.0];
-            command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers.clone(), &transformation, color, color);
+            command_buffer = self.render_surface_buffers(self.pipeline_surface.clone(), command_buffer, &render, buffers, &transformation);
         }
 
         for (i, entity) in render.entities.iter().enumerate() {
@@ -566,7 +651,7 @@ impl<'a> VulkanGraphics<'a> {
                             let color = if let RenderFighter::Debug = player.debug.fighter {
                                 [0.0, 0.0, 0.0, 0.0]
                             } else {
-                                [1.0, 1.0, 1.0, 1.0]
+                                [0.9, 0.9, 0.9, 1.0]
                             };
                             let edge_color = if player.fighter_selected {
                                 [0.0, 1.0, 0.0, 1.0]
@@ -789,7 +874,13 @@ impl<'a> VulkanGraphics<'a> {
                 MenuEntity::Stage (ref stage) => {
                     let stage: &str = stage.as_ref();
                     if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
-                        command_buffer = command_buffer.draw_indexed(self.pipeline.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        command_buffer = command_buffer.draw_indexed(self.pipeline_surface.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                    }
+                }
+                MenuEntity::StageFill (ref stage) => {
+                    let stage: &str = stage.as_ref();
+                    if let &Some(ref buffers) = &self.package_buffers.stages_fill[stage] {
+                        command_buffer = command_buffer.draw_indexed(self.pipeline_surface.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
                 MenuEntity::Rect (ref rect) => {
@@ -1008,7 +1099,7 @@ impl<'a> VulkanGraphics<'a> {
                             let transformation = camera * (position * dir);
                             let uniform = vs::ty::Data {
                                 edge_color:     graphics::get_team_color4(selection.team),
-                                color:          [1.0, 1.0, 1.0, 1.0],
+                                color:          [0.9, 0.9, 0.9, 1.0],
                                 transformation: transformation.into(),
                             };
                             let set = self.new_uniform_set(uniform);
@@ -1046,14 +1137,14 @@ impl<'a> VulkanGraphics<'a> {
                 let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
                 let position = Matrix4::from_translation(Vector3::new(1.0, y, 0.0));
                 let transformation = camera * position;
-                let uniform = vs::ty::Data {
-                    edge_color:      [1.0, 1.0, 1.0, 1.0],
-                    color:           [1.0, 1.0, 1.0, 1.0],
-                    transformation:  transformation.into(),
-                };
+                let uniform = surface_vs::ty::Data { transformation:  transformation.into() };
 
-                let set = self.new_uniform_set(uniform);
+                let set = self.new_surface_uniform_set(uniform);
                 let entity = MenuEntity::Stage(stage_key.clone());
+                entities.push(MenuEntityAndSet { set, entity });
+
+                let set = self.new_surface_uniform_set(uniform);
+                let entity = MenuEntity::StageFill(stage_key.clone());
                 entities.push(MenuEntityAndSet { set, entity });
             }
         }
@@ -1121,9 +1212,10 @@ impl<'a> VulkanGraphics<'a> {
 }
 
 enum MenuEntity {
-    Fighter { fighter: String, action: usize, frame: usize },
-    Stage   (String),
-    Rect    (Rect),
+    Fighter   { fighter: String, action: usize, frame: usize },
+    Stage     (String),
+    StageFill (String),
+    Rect      (Rect),
 }
 
 struct MenuEntityAndSet {

@@ -1323,7 +1323,7 @@ impl Player {
         if let Location::Surface { platform_i, .. } = self.location {
             if let Some(platform) = surfaces.get(platform_i) {
                 let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
-                if platform.can_pass_through() && self.frame == action_frames && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
+                if platform.is_pass_through() && self.frame == action_frames && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
                     self.set_action(Action::PassPlatform);
                     self.set_airbourne(players, fighters, surfaces);
                     return true;
@@ -1893,7 +1893,7 @@ impl Player {
                 }
                 Location::Surface { platform_i, mut x } => {
                     if let Some(platform) = stage.surfaces.get(platform_i) {
-                        x += x_vel * platform.angle().cos();
+                        x += x_vel * platform.floor_angle().unwrap_or_default().cos();
                         self.floor_move(input, players, fighters, stage, platform, platform_i, x);
                     }
                     else {
@@ -2019,10 +2019,12 @@ impl Player {
             return None;
         }
 
-        for (platform_i, platform) in stage.surfaces.iter().enumerate() {
-            if !self.pass_through_platform(fighter, platform, input) &&
-              geometry::segments_intersect(old_p, new_p, platform.p1(), platform.p2()) {
-                return Some(platform_i)
+        for (surface_i, surface) in stage.surfaces.iter().enumerate() {
+            if !self.pass_through_platform(fighter, surface, input) &&
+                surface.floor.is_some() &&
+                geometry::segments_intersect(old_p, new_p, surface.p1(), surface.p2())
+            {
+                return Some(surface_i)
             }
         }
         None
@@ -2030,7 +2032,7 @@ impl Player {
 
     pub fn pass_through_platform(&self, fighter: &Fighter, platform: &Surface, input: &PlayerInput) -> bool {
         let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
-        platform.can_pass_through() && fighter_frame.pass_through && input[0].stick_y <= -0.56
+        platform.is_pass_through() && fighter_frame.pass_through && input[0].stick_y <= -0.56
     }
 
     /// Returns the Rect surrounding the player that the camera must include
@@ -2367,7 +2369,7 @@ impl Player {
         let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
         match self.location {
             Location::Surface { platform_i, .. } if fighter_frame.use_platform_angle => {
-                surfaces.get(platform_i).map_or(0.0, |x| x.angle())
+                surfaces.get(platform_i).map_or(0.0, |x| x.floor_angle().unwrap_or_default())
             }
             _ => 0.0,
         }
