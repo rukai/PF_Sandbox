@@ -160,8 +160,9 @@ The following operations apply to all selected platforms and re/spawn points
 *   A - Move element
 *   D - Delete element
 *   F - Place platform
-*   G - place spawn point
-*   H - place respawn point
+*   Z - Place spawn point
+*   X - Place respawn point
+*   C - Connect/disconnect surfaces
 
 ## Command line
 

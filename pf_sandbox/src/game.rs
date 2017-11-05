@@ -601,7 +601,7 @@ impl Game {
 
                         self.update_frame();
                     }
-                    if os_input.key_pressed(VirtualKeyCode::F) { // TODODO
+                    if os_input.key_pressed(VirtualKeyCode::F) {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             if self.selector.surfaces.len() == 1 {
                                 // create new surface, p1 is selected surface, p2 is current mouse
@@ -635,6 +635,73 @@ impl Game {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             self.stage.respawn_points.push(SpawnPoint::new(m_x, m_y));
                             self.update_frame();
+                        }
+                    }
+                    if os_input.key_pressed(VirtualKeyCode::C) {
+                        let mut join = false;
+                        let mut points: Vec<(f32, f32)> = vec!();
+                        for selection in self.selector.surfaces.iter() {
+                            match selection {
+                                &SurfaceSelection::P1 (i) => {
+                                    let surface = &self.stage.surfaces[i];
+                                    if let Some((prev_x, prev_y)) = points.last().cloned() {
+                                        if surface.x1 != prev_x || surface.y1 != prev_y {
+                                            join = true;
+                                        }
+                                    }
+                                    points.push((surface.x1, surface.y1));
+                                }
+                                &SurfaceSelection::P2 (i) => {
+                                    let surface = &self.stage.surfaces[i];
+                                    if let Some((prev_x, prev_y)) = points.last().cloned() {
+                                        if surface.x2 != prev_x || surface.y2 != prev_y {
+                                            join = true;
+                                        }
+                                    }
+                                    points.push((surface.x2, surface.y2));
+                                }
+                            }
+                        }
+
+                        let mut average_x = 0.0;
+                        let mut average_y = 0.0;
+                        for (x, y) in points.iter().cloned() {
+                            average_x += x;
+                            average_y += y;
+                        }
+                        average_x /= points.len() as f32;
+                        average_y /= points.len() as f32;
+
+                        if join {
+                            for selection in self.selector.surfaces.iter() {
+                                match selection {
+                                    &SurfaceSelection::P1 (i) => {
+                                        let surface = &mut self.stage.surfaces[i];
+                                        surface.x1 = average_x;
+                                        surface.y1 = average_y;
+                                    }
+                                    &SurfaceSelection::P2 (i) => {
+                                        let surface = &mut self.stage.surfaces[i];
+                                        surface.x2 = average_x;
+                                        surface.y2 = average_y;
+                                    }
+                                }
+                            }
+                        } else { // split
+                            for selection in self.selector.surfaces.iter() {
+                                match selection {
+                                    &SurfaceSelection::P1 (i) => {
+                                        let surface = &mut self.stage.surfaces[i];
+                                        surface.x1 = average_x + (surface.x2 - average_x) / 5.0;
+                                        surface.y1 = average_y + (surface.y2 - average_y) / 5.0;
+                                    }
+                                    &SurfaceSelection::P2 (i) => {
+                                        let surface = &mut self.stage.surfaces[i];
+                                        surface.x2 = average_x + (surface.x1 - average_x) / 5.0;
+                                        surface.y2 = average_y + (surface.y1 - average_y) / 5.0;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
