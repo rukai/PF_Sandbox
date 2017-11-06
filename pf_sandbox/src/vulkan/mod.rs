@@ -1,11 +1,11 @@
 mod buffers;
 
-use self::buffers::{Vertex, ColorVertex, Buffers, SurfaceBuffers, PackageBuffers};
+use self::buffers::{Vertex, ColorVertex, Buffers, ColorBuffers, PackageBuffers};
 use ::game::{GameState, RenderEntity, RenderGame};
 use ::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
 use ::graphics::{self, GraphicsMessage, Render, RenderType};
 use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
-use ::fighter::{Action, ECB};
+use ::fighter::{Action, ECB, CollisionBoxRole, ActionFrame};
 use ::results::PlayerResult;
 use ::package::Verify;
 use ::particle::ParticleType;
@@ -561,7 +561,7 @@ impl<'a> VulkanGraphics<'a> {
         pipeline:       Arc<GraphicsPipeline<SingleBufferDefinition<ColorVertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
         command_buffer: AutoCommandBufferBuilder,
         render:         &RenderGame,
-        buffers:        SurfaceBuffers,
+        buffers:        ColorBuffers,
         entity:         &Matrix4<f32>,
     ) -> AutoCommandBufferBuilder {
         let zoom = render.camera.zoom.recip();
@@ -675,23 +675,45 @@ impl<'a> VulkanGraphics<'a> {
                         RenderFighter::None => { }
                     }
 
-                    // draw selected hitboxes
+                    // draw selected colboxes
                     if player.selected_colboxes.len() > 0 {
                         let color = [0.0, 1.0, 0.0, 1.0];
                         let transformation = position * rotate * dir;
-                        let buffers = self.package_buffers.fighter_frame_colboxes(self.device.clone(), &player.fighter, player.action, player.frame, &player.selected_colboxes);
+                        let buffers = self.package_buffers.new_fighter_frame_colboxes(self.device.clone(), &player.fighter, player.action, player.frame, &player.selected_colboxes);
                         command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, color, color);
+                    }
+
+                    let arrow_buffers = Buffers::new_arrow(self.device.clone());
+
+                    // draw hitbox debug arrows
+                    if player.debug.hitbox_vectors {
+                        let kbg_color = [1.0,  1.0,  1.0, 1.0];
+                        let bkb_color = [0.17, 0.17, 1.0, 1.0];
+                        for colbox in player.frame_data.colboxes.iter() {
+                            if let CollisionBoxRole::Hit(ref hitbox) = colbox.role {
+                                let kb_squish = 0.5;
+                                let squish_kbg = Matrix4::from_nonuniform_scale(0.6, hitbox.kbg * kb_squish, 1.0);
+                                let squish_bkb = Matrix4::from_nonuniform_scale(0.3, (hitbox.bkb / 100.0) * kb_squish, 1.0); // divide by 100 so the arrows are comparable if the hit fighter is on 100%
+                                let rotate = Matrix4::from_angle_z(Rad(hitbox.angle.to_radians() - f32::consts::PI / 2.0));
+                                let x = player.bps.0 + pan.0 + colbox.point.0;
+                                let y = player.bps.1 + pan.1 + colbox.point.1;
+                                let position = Matrix4::from_translation(Vector3::new(x, y, z_debug));
+                                let transformation_bkb = position * rotate * squish_bkb;
+                                let transformation_kbg = position * rotate * squish_kbg;
+                                command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, arrow_buffers.clone(), &transformation_kbg, kbg_color.clone(), kbg_color.clone());
+                                command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, arrow_buffers.clone(), &transformation_bkb, bkb_color.clone(), bkb_color.clone());
+                            }
+                        }
                     }
 
                     // draw debug vector arrows
                     let num_arrows = player.vector_arrows.len() as f32;
                     for (i, arrow) in player.vector_arrows.iter().enumerate() {
-                        let buffers = Buffers::new_arrow(self.device.clone());
                         let squish = Matrix4::from_nonuniform_scale((num_arrows - i as f32) / num_arrows, 1.0, 1.0); // consecutive arrows are drawn slightly thinner so we can see arrows behind
                         let rotate = Matrix4::from_angle_z(Rad(arrow.y.atan2(arrow.x) - f32::consts::PI / 2.0));
                         let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, z_debug));
                         let transformation = position * rotate * squish;
-                        command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, buffers, &transformation, arrow.color.clone(), arrow.color.clone())
+                        command_buffer = self.render_buffers(self.pipeline.clone(), command_buffer, &render, arrow_buffers.clone(), &transformation, arrow.color.clone(), arrow.color.clone());
                     }
 
                     // draw particles
@@ -1068,6 +1090,7 @@ impl<'a> VulkanGraphics<'a> {
                         bps:               (0.0, 0.0),
                         ecb:               ECB::default(),
                         frame:             0,
+                        frame_data:        ActionFrame::default(),
                         action:            Action::Idle as usize,
                         fighter:           fighter_key.clone(),
                         face_right:        start_x < 0.0,

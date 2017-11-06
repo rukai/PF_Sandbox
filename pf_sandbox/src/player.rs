@@ -2344,17 +2344,18 @@ impl Player {
         } else { None };
 
         RenderPlayer {
-            team:       self.team,
-            damage:     self.damage,
-            stocks:     self.stocks,
-            bps:        self.bps_xy(players, fighters, surfaces),
-            ecb:        self.ecb.clone(),
-            frame:      self.frame as usize,
-            action:     self.action as usize,
-            fighter:    self.fighter.clone(),
-            face_right: self.face_right,
-            particles:  self.particles.clone(),
-            angle:      self.angle(fighter, surfaces),
+            team:        self.team,
+            damage:      self.damage,
+            stocks:      self.stocks,
+            bps:         self.bps_xy(players, fighters, surfaces),
+            ecb:         self.ecb.clone(),
+            frame_data:  self.relative_frame(fighter, surfaces),
+            frame:       self.frame as usize,
+            action:      self.action as usize,
+            fighter:     self.fighter.clone(),
+            face_right:  self.face_right,
+            particles:   self.particles.clone(),
+            angle:       self.angle(fighter, surfaces),
             debug,
             fighter_color,
             fighter_selected,
@@ -2540,6 +2541,7 @@ pub struct RenderPlayer {
     pub bps:               (f32, f32),
     pub ecb:               ECB,
     pub frame:             usize,
+    pub frame_data:        ActionFrame,
     pub action:            usize,
     pub fighter:           String,
     pub face_right:        bool,
@@ -2589,6 +2591,7 @@ pub struct DebugPlayer {
     pub stick_vector:   bool,
     pub c_stick_vector: bool,
     pub di_vector:      bool,
+    pub hitbox_vectors: bool,
     pub ecb:            bool,
     pub fighter:        RenderFighter,
     pub cam_area:       bool,
@@ -2615,12 +2618,13 @@ impl DebugPlayer {
         }
         if os_input.key_pressed(VirtualKeyCode::F5) {
             self.stick_vector = !self.stick_vector;
-        }
-        if os_input.key_pressed(VirtualKeyCode::F6) {
             self.c_stick_vector = !self.c_stick_vector;
         }
-        if os_input.key_pressed(VirtualKeyCode::F7) {
+        if os_input.key_pressed(VirtualKeyCode::F6) {
             self.di_vector = !self.di_vector;
+        }
+        if os_input.key_pressed(VirtualKeyCode::F7) {
+            self.hitbox_vectors = !self.hitbox_vectors;
         }
         if os_input.key_pressed(VirtualKeyCode::F8) {
             self.ecb = !self.ecb;
@@ -2651,6 +2655,7 @@ impl DebugPlayer {
                 stick_vector:   true,
                 c_stick_vector: true,
                 di_vector:      true,
+                hitbox_vectors: true,
                 ecb:            true,
                 fighter:        RenderFighter::Debug,
                 cam_area:       true,

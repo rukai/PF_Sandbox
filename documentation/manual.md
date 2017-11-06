@@ -100,9 +100,9 @@ Use F1-F12 to toggle them.
 *   F2 + Shift - Input difference
 *   F3 - Current action
 *   F4 - Timers and Counters
-*   F5 - Main stick vector
-*   F6 - CStick vector
-*   F7 - DI vector
+*   F5 - Control stick (white) + C Stick vector (yellow)
+*   F6 - pre DI vector (red) + post DI vector (green)
+*   F7 - hitbox BKB vector (white) + hitbox KBG (blue)
 *   F8 - Display ECB and BPS
 *   F9 - Dont display fighter
 *   F10 - Display player camera area

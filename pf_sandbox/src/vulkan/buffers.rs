@@ -68,7 +68,7 @@ pub struct Buffers {
 }
 
 #[derive(Clone)]
-pub struct SurfaceBuffers {
+pub struct ColorBuffers {
     pub vertex: Arc<CpuAccessibleBuffer<[ColorVertex]>>,
     pub index:  Arc<CpuAccessibleBuffer<[u16]>>,
 }
@@ -272,7 +272,7 @@ impl Buffers {
         }
     }
 
-    pub fn new_selected_surfaces(device: Arc<Device>, surfaces: &[Surface], selected_surfaces: &HashSet<SurfaceSelection>) -> Option<SurfaceBuffers> {
+    pub fn new_selected_surfaces(device: Arc<Device>, surfaces: &[Surface], selected_surfaces: &HashSet<SurfaceSelection>) -> Option<ColorBuffers> {
         if surfaces.len() == 0 {
             return None;
         }
@@ -319,13 +319,13 @@ impl Buffers {
             }
         }
 
-        Some(SurfaceBuffers {
+        Some(ColorBuffers {
             vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
             index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
         })
     }
 
-    pub fn new_surfaces(device: Arc<Device>, surfaces: &[Surface]) -> Option<SurfaceBuffers> {
+    pub fn new_surfaces(device: Arc<Device>, surfaces: &[Surface]) -> Option<ColorBuffers> {
         if surfaces.len() == 0 {
             return None;
         }
@@ -358,14 +358,14 @@ impl Buffers {
             indice_count += 4;
         }
 
-        Some(SurfaceBuffers {
+        Some(ColorBuffers {
             vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
             index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
         })
     }
 
     // TODO: Combine new_surfaces(..) and new_surfaces_fill(..), waiting on: https://github.com/nical/lyon/issues/224
-    pub fn new_surfaces_fill(device: Arc<Device>, surfaces: &[Surface]) -> Option<SurfaceBuffers> {
+    pub fn new_surfaces_fill(device: Arc<Device>, surfaces: &[Surface]) -> Option<ColorBuffers> {
         if surfaces.len() == 0 {
             return None;
         }
@@ -468,7 +468,7 @@ impl Buffers {
             &mut BuffersBuilder::new(&mut mesh, StageVertexConstructor)
         ).unwrap();
 
-        Some(SurfaceBuffers {
+        Some(ColorBuffers {
             vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), mesh.vertices.iter().cloned()).unwrap(),
             index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), mesh.indices.iter().cloned()).unwrap(),
         })
@@ -622,8 +622,8 @@ impl Buffers {
 }
 
 pub struct PackageBuffers {
-    pub stages:      HashMap<String, Option<SurfaceBuffers>>, // Only used in menu, ingame stages are recreated every frame
-    pub stages_fill: HashMap<String, Option<SurfaceBuffers>>, // Only used in menu, ingame stages are recreated every frame
+    pub stages:      HashMap<String, Option<ColorBuffers>>, // Only used in menu, ingame stages are recreated every frame
+    pub stages_fill: HashMap<String, Option<ColorBuffers>>, // Only used in menu, ingame stages are recreated every frame
     pub fighters:    HashMap<String, Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
     pub package:     Option<Package>,
 }
@@ -697,7 +697,7 @@ impl PackageBuffers {
         }
     }
 
-    pub fn fighter_frame_colboxes(&self, device: Arc<Device>, fighter: &str, action: usize, frame: usize, selected: &HashSet<usize>) -> Buffers {
+    pub fn new_fighter_frame_colboxes(&self, device: Arc<Device>, fighter: &str, action: usize, frame: usize, selected: &HashSet<usize>) -> Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
         let mut index_count = 0;
@@ -716,5 +716,4 @@ impl PackageBuffers {
             vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
         }
     }
-
 }

@@ -688,14 +688,14 @@ impl Default for CollisionBox {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub enum CollisionBoxRole {
-    Hurt (HurtBox),   // a target
-    Hit  (HitBox),    // a launching attack
-    Grab,             // a grabbing attack
-    Intangible,       // cannot be interacted with rendered transparent with normal outline
-    IntangibleItem,   // cannot be interacted with rendered as a grey surface with no outline
-    Invincible,       // cannot receive damage or knockback.
-    Reflect,          // reflects projectiles
-    Absorb,           // absorb projectiles
+    Hurt (HurtBox), // a target
+    Hit  (HitBox),  // a launching attack
+    Grab,           // a grabbing attack
+    Intangible,     // cannot be interacted with rendered transparent with normal outline
+    IntangibleItem, // cannot be interacted with rendered as a grey surface with no outline
+    Invincible,     // cannot receive damage or knockback.
+    Reflect,        // reflects projectiles
+    Absorb,         // absorb projectiles
 }
 
 impl Default for CollisionBoxRole {
