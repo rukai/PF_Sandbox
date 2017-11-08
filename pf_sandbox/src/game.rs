@@ -475,6 +475,16 @@ impl Game {
                     if os_input.key_pressed(VirtualKeyCode::Period) {
                         self.package.fighter_colboxes_send_to_back(fighter, action, frame, &self.selector.colboxes)
                     }
+                    if os_input.key_pressed(VirtualKeyCode::Q) {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+                            let player = &self.players[player];
+                            let (p_x, p_y) = player.bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
+
+                            let x = player.relative_f(m_x - p_x);
+                            let y = m_y - p_y;
+                            self.package.point_hitbox_angles_to(fighter, action, frame, &self.selector.colboxes, x, y);
+                        }
+                    }
 
                     // handle single selection
                     if let Some((m_x, m_y)) = self.selector.step_single_selection(os_input, &self.camera) {

@@ -115,7 +115,7 @@ Use F1-F12 to toggle them.
 *   N - Delete frame
 *   M - Insert frame, copies from previous frame
 
-### Hitbox editing
+### Collision Box editing
 
 Most of these operations will apply to all selected colboxes:
 
@@ -129,6 +129,9 @@ Most of these operations will apply to all selected colboxes:
 *   Z - Meld link colboxes (TODO)
 *   X - Simple link colboxes (TODO)
 *   C - Unlink colboxes (TODO)
+*   , - Bring selected colboxes in front of the other colboxes
+*   . - Send selected colboxes behind the other colboxes
+*   Q - Set selected hitbox angles to point to the cursor
 
 Linking collision boxes allows them to be pivoted in pivot mode.
 Meld links combines collisionboxes into a single collisionbox.

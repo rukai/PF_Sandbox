@@ -14,7 +14,7 @@ use zip::ZipWriter;
 use zip::write::FileOptions;
 
 use ::files;
-use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxLink, LinkType, RenderOrder};
+use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxRole, CollisionBoxLink, LinkType, RenderOrder};
 use ::rules::Rules;
 use ::stage::Stage;
 use ::json_upgrade::{engine_version, upgrade_to_latest};
@@ -543,6 +543,17 @@ impl Package {
             frame_index: frame,
             frame:       fighter_frame.clone(),
         });
+    }
+
+    pub fn point_hitbox_angles_to(&mut self, fighter: &str, action: usize, frame: usize, set_hitboxes: &HashSet<usize>, x: f32, y: f32) {
+        let colboxes = &mut self.fighters[fighter].actions[action].frames[frame].colboxes;
+        for i in set_hitboxes {
+            let colbox = &mut colboxes[*i];
+            if let &mut CollisionBoxRole::Hit(ref mut hitbox) = &mut colbox.role {
+                let angle = (y - colbox.point.1).atan2(x - colbox.point.0);
+                hitbox.angle = angle.to_degrees();
+            }
+        }
     }
 
     pub fn resize_fighter_colboxes(&mut self, fighter: &str, action: usize, frame: usize, resized_colboxes: &HashSet<usize>, size_diff: f32) {
