@@ -8,6 +8,7 @@ use ::package::{Package, PackageMeta, Verify};
 use ::package;
 use ::results::{GameResults, PlayerResult};
 use ::replays;
+use ::network::{Netplay, NetplayState};
 
 use treeflection::{Node, NodeRunner, NodeToken};
 
@@ -77,7 +78,7 @@ impl Menu {
             prev_state:         None,
             fighter_selections: vec!(),
             stage_ticker:       None,
-            game_ticker:        MenuTicker::new(4),
+            game_ticker:        MenuTicker::new(3),
             current_frame:      0,
             back_counter_max:   90,
             game_setup:         None,
@@ -88,8 +89,14 @@ impl Menu {
         self.current_frame = 0;
         self.package = PackageHolder::new(Some(package), &config);
         self.config = config;
-        if let ResumeMenu::Results (results) = resume_menu {
-            self.prev_state = Some(mem::replace(&mut self.state, MenuState::game_results(results)));
+        match resume_menu {
+            ResumeMenu::NetplayDisconnect { reason: message } => {
+                self.state = MenuState::NetplayWait { message };
+            }
+            ResumeMenu::Results (results) => {
+                self.prev_state = Some(mem::replace(&mut self.state, MenuState::game_results(results)));
+            }
+            ResumeMenu::Unchanged => { }
         }
     }
 
@@ -110,8 +117,7 @@ impl Menu {
             self.state = match ticker.cursor {
                 0 => MenuState::character_select(),
                 1 => MenuState::GameSelect,
-                2 => MenuState::GameSelect,
-                3 => MenuState::replay_select(self.package.get()),
+                2 => MenuState::replay_select(self.package.get()),
                 _ => unreachable!()
             }
         }
@@ -186,7 +192,7 @@ impl Menu {
         // TODO: if extra inputs are added/removed then add/remove corresponding human fighter_selections (before any CPU players)
     }
 
-    fn step_fighter_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+    fn step_fighter_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input, netplay: &mut Netplay) {
         self.add_remove_fighter_selections(&player_inputs);
         let mut new_state: Option<MenuState> = None;
         if let &mut MenuState::CharacterSelect { ref mut back_counter } = &mut self.state {
@@ -413,6 +419,7 @@ impl Menu {
             }
             else if player_inputs.iter().any(|x| x[0].b) {
                 if *back_counter > self.back_counter_max {
+                    netplay.disconnect();
                     new_state = Some(MenuState::GameSelect);
                 }
                 else {
@@ -630,7 +637,38 @@ impl Menu {
         }
     }
 
-    pub fn step(&mut self, input: &mut Input) -> Option<GameSetup> {
+    fn step_netplay_wait(&mut self, player_inputs: &[PlayerInput], netplay: &mut Netplay) {
+        if player_inputs.iter().any(|x| x.b.press) {
+            self.state = MenuState::GameSelect;
+        }
+
+        let loading_characters = ["|", "/", "-", "\\"];
+        let load_character = loading_characters[(self.current_frame / 5) % loading_characters.len()];
+
+        match netplay.state() {
+            NetplayState::Offline => { }
+            NetplayState::ComparePackageHash {..} => {
+                self.state = MenuState::NetplayWait { message: format!("Connecting to peer {}", load_character) };
+            }
+            NetplayState::PingTest { .. } => {
+                self.state = MenuState::NetplayWait { message: format!("Testing ping {}", load_character) };
+            }
+            NetplayState::Disconnected { reason: message} => {
+                if player_inputs.iter().any(|x| x.a.press) {
+                    netplay.offline();
+                    self.state = MenuState::GameSelect;
+                } else {
+                    self.state = MenuState::NetplayWait { message };
+                }
+            }
+            NetplayState::CSS { .. } => {
+                self.state = MenuState::character_select();
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn step(&mut self, input: &mut Input, netplay: &mut Netplay) -> Option<GameSetup> {
         if let &PackageHolder::Package (ref package, _) = &self.package {
             if package.has_updates() {
                 self.fighter_selections = vec!();
@@ -642,18 +680,20 @@ impl Menu {
         input.game_update(self.current_frame);
         let player_inputs = input.players(self.current_frame);
 
+        if let NetplayState::Disconnected { reason } = netplay.state() {
+            self.state = MenuState::NetplayWait { message: reason };
+        }
+
         // In order to avoid hitting buttons still held down from the game, dont do anything on the first frame.
         if self.current_frame > 1 {
             match self.state {
-                MenuState::GameSelect             => { self.step_game_select   (&player_inputs, input) }
-                MenuState::ReplaySelect (_, _)    => { self.step_replay_select (&player_inputs, input) }
-                MenuState::PackageSelect (_, _,_) => { self.step_package_select(&player_inputs, input) }
-                MenuState::CharacterSelect {..}   => { self.step_fighter_select(&player_inputs, input) }
-                MenuState::StageSelect            => { self.step_stage_select  (&player_inputs, input) }
-                MenuState::GameResults {..}       => { self.step_results       (&player_inputs, input) }
-                MenuState::SetRules               => { }
-                MenuState::CreatePackage          => { }
-                MenuState::CreateFighter          => { }
+                MenuState::GameSelect             => self.step_game_select   (&player_inputs, input),
+                MenuState::ReplaySelect (_, _)    => self.step_replay_select (&player_inputs, input),
+                MenuState::PackageSelect (_, _,_) => self.step_package_select(&player_inputs, input),
+                MenuState::CharacterSelect {..}   => self.step_fighter_select(&player_inputs, input, netplay),
+                MenuState::StageSelect            => self.step_stage_select  (&player_inputs, input),
+                MenuState::GameResults {..}       => self.step_results       (&player_inputs, input),
+                MenuState::NetplayWait {..}       => self.step_netplay_wait  (&player_inputs, netplay),
             };
         }
 
@@ -663,15 +703,13 @@ impl Menu {
     pub fn render(&self) -> RenderMenu {
         RenderMenu {
             state: match self.state {
-                MenuState::PackageSelect (ref names, ref ticker, ref load) => { RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor, load.as_ref().map(|x| x.0.message()).unwrap_or_default() ) }
-                MenuState::GameResults {ref results, replay_saved, ..}     => { RenderMenuState::GameResults { results: results.player_results.clone(), replay_saved } }
-                MenuState::CharacterSelect { back_counter }                => { RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max) }
-                MenuState::ReplaySelect (ref replays, ref ticker)          => { RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor) }
-                MenuState::GameSelect     => { RenderMenuState::GameSelect (self.game_ticker.cursor) }
-                MenuState::StageSelect    => { RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor) }
-                MenuState::SetRules       => { RenderMenuState::SetRules }
-                MenuState::CreatePackage  => { RenderMenuState::CreatePackage }
-                MenuState::CreateFighter  => { RenderMenuState::CreateFighter }
+                MenuState::PackageSelect (ref names, ref ticker, ref load) => RenderMenuState::PackageSelect (names.iter().map(|x| x.1.title.clone()).collect(), ticker.cursor, load.as_ref().map(|x| x.0.message()).unwrap_or_default() ),
+                MenuState::GameResults {ref results, replay_saved, ..}     => RenderMenuState::GameResults { results: results.player_results.clone(), replay_saved },
+                MenuState::CharacterSelect { back_counter, .. }            => RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max),
+                MenuState::ReplaySelect (ref replays, ref ticker)          => RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor),
+                MenuState::NetplayWait { ref message }                     => RenderMenuState::GenericText (message.clone()),
+                MenuState::GameSelect     => RenderMenuState::GameSelect (self.game_ticker.cursor),
+                MenuState::StageSelect    => RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor),
             },
             package_verify: self.package.verify(),
         }
@@ -767,10 +805,8 @@ pub enum MenuState {
     CharacterSelect { back_counter: usize },
     StageSelect,
     GameResults { results: GameResults, replay_saved: bool },
-    SetRules,
     PackageSelect (Vec<(String, PackageMeta)>, MenuTicker, Option<(PackageLoadState, Receiver<PackageLoadState>)>),
-    CreatePackage,
-    CreateFighter,
+    NetplayWait { message: String },
 }
 
 pub enum PackageLoadState {
@@ -827,10 +863,8 @@ pub enum RenderMenuState {
     CharacterSelect (Vec<PlayerSelect>, usize, usize),
     StageSelect     (usize),
     GameResults     { results: Vec<PlayerResult>, replay_saved: bool },
-    SetRules,
     PackageSelect   (Vec<String>, usize, String),
-    CreatePackage,
-    CreateFighter,
+    GenericText     (String),
 }
 
 #[derive(Clone)]
@@ -1018,6 +1052,7 @@ pub struct RenderMenu {
 pub enum ResumeMenu {
     Results(GameResults),
     Unchanged,
+    NetplayDisconnect { reason: String },
 }
 
 impl Default for ResumeMenu {

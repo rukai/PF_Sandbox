@@ -41,7 +41,7 @@ impl CurrentInput {
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn step(&mut self) {
         self.mouse_actions    = vec!();
         self.key_actions      = vec!();
         self.scroll_diff      = 0.0;
@@ -133,9 +133,9 @@ impl OsInput {
     }
 
     /// Called every frame
-    pub fn update(&mut self) {
+    pub fn step(&mut self) {
         if let Some(ref mut current) = self.current {
-            current.update();
+            current.step();
         }
 
         // receive all waiting events from the graphics thread (does not block)

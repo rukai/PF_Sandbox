@@ -5,6 +5,8 @@ use std::f32;
 
 use treeflection::{Node, NodeRunner, NodeToken};
 
+use network::{Netplay, NetplayState};
+
 enum InputSource<'a> {
     GCAdapter { handle: DeviceHandle<'a>, deadzones: [Deadzone; 4] },
     #[allow(dead_code)]
@@ -131,7 +133,7 @@ impl<'a> Input<'a> {
     }
 
     /// Call this once every frame
-    pub fn update(&mut self, tas_inputs: &[ControllerInput], ai_inputs: &[ControllerInput], reset_deadzones: bool) {
+    pub fn step(&mut self, tas_inputs: &[ControllerInput], ai_inputs: &[ControllerInput], netplay: &mut Netplay, reset_deadzones: bool) {
         // clear deadzones so they will be set at next read
         if reset_deadzones {
             for source in &mut self.input_sources {
@@ -154,9 +156,17 @@ impl<'a> Input<'a> {
         // append AI inputs
         inputs.extend_from_slice(ai_inputs);
 
-        // replace tas inputs
-        for i in 0..tas_inputs.len().min(inputs.len()) {
-            inputs[i] = tas_inputs[i].clone();
+        if let NetplayState::InGame { inputs: netplay_inputs } = netplay.state() {
+            // replace netplay inputs
+            for _netplay_input in netplay_inputs {
+                // TODO: Insert/replace inputs with netplay_input.controller
+            }
+        }
+        else {
+            // replace tas inputs
+            for i in 0..tas_inputs.len().min(inputs.len()) {
+                inputs[i] = tas_inputs[i].clone();
+            }
         }
 
         self.prev_start     = self.current_inputs.iter().any(|x| x.start);

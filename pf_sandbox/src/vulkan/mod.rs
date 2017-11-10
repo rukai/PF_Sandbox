@@ -868,17 +868,11 @@ impl<'a> VulkanGraphics<'a> {
                     self.draw_text.queue_text(30.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], "Replay saved!");
                 }
             }
-            RenderMenuState::SetRules => {
-                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "set rules");
-            }
             RenderMenuState::PackageSelect (ref names, selection, ref message) => {
                 self.draw_package_selector(names, selection, message, command_output);
             }
-            RenderMenuState::CreatePackage => {
-                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "create package");
-            }
-            RenderMenuState::CreateFighter => {
-                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], "create fighter");
+            RenderMenuState::GenericText (ref text) => {
+                self.draw_text.queue_text(100.0, 50.0, 30.0, [1.0, 1.0, 1.0, 1.0], text);
             }
         }
 
@@ -1190,7 +1184,7 @@ impl<'a> VulkanGraphics<'a> {
     fn draw_game_selector(&mut self, selection: usize) {
         self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Game Mode");
 
-        let modes = vec!("Local", "Host Game", "Connect To Game |AddressInputBox|", "Replays");
+        let modes = vec!("Local", "Netplay", "Replays");
         for (mode_i, name) in modes.iter().enumerate() {
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos
             let x_offset = if mode_i == selection { 0.1 } else { 0.0 };

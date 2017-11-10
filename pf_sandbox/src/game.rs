@@ -251,6 +251,17 @@ impl Game {
     }
 
     fn step_netplay(&mut self, input: &mut Input) {
+        // perform rollback
+        //let current_frame = self.confirmed_frame;
+        //while input.confirmed_frame > self.confirmed_frame {
+        //    self.current_frame = self.confirmed_frame
+        //    self.players = self.player_history.get(frame).unwrap().clone();
+        //    self.confirmed_frame += 1;
+        //    self.step_game(input, player_inputs);
+        //    // TODO: Handle difference between reapplying guessed frames and confirmed frames
+        //}
+
+        // normal game flow
         self.player_history.push(self.players.clone());
         self.stage_history.push(self.stage.clone());
         self.current_frame += 1;

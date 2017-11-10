@@ -17,7 +17,7 @@ use ::config::Config;
 use ::game::{Game, GameState, GameSetup, PlayerSetup};
 use ::input::Input;
 use ::menu::{Menu, MenuState, ResumeMenu};
-use ::network::Network;
+use ::network::{NetCommandLine, Netplay, NetplayState};
 use ::os_input::OsInput;
 use ::package::Package;
 use ::package;
@@ -34,7 +34,8 @@ pub fn run(mut cli_results: CLIResults) {
     let mut input = Input::new(&mut context);
     #[cfg(any(feature = "vulkan", feature = "opengl"))]
     let mut graphics_tx: Option<Sender<GraphicsMessage>> = None;
-    let mut network = Network::new();
+    let mut net_command_line = NetCommandLine::new();
+    let mut netplay = Netplay::new();
 
     // CLI options
     let (mut menu, mut game, mut os_input) = {
@@ -125,7 +126,7 @@ pub fn run(mut cli_results: CLIResults) {
                 // fill players/controllers
                 let mut controllers: Vec<usize> = vec!();
                 let mut players: Vec<PlayerSetup> = vec!();
-                input.update(&[], &[], false); // run the first input step so that we can check for the number of controllers.
+                input.step(&[], &[], &mut netplay, false); // run the first input step so that we can check for the number of controllers.
                 let input_len = input.players(0).len();
                 for i in 0..input_len {
                     controllers.push(i);
@@ -178,7 +179,31 @@ pub fn run(mut cli_results: CLIResults) {
                     os_input
                 )
             }
-            _ => unreachable!()
+            ContinueFrom::Netplay => {
+                let package = if let Some(package_string) = package_string {
+                    if let Some(package) = Package::open_or_generate(&package_string) {
+                        package
+                    } else {
+                        println!("Could not load selected package");
+                        return;
+                    }
+                } else {
+                    println!("No package was selected.");
+                    println!("As a fallback we tried to use the last used package, but that wasnt available either.");
+                    println!("Please select a package.");
+                    return;
+                };
+
+                netplay.connect(cli_results.address.unwrap(), package.compute_hash());
+                let state = MenuState::NetplayWait { message: String::from("Loading!") };
+
+                (
+                    Menu::new(Some(package), config.clone(), state),
+                    None,
+                    os_input,
+                )
+            }
+            ContinueFrom::Close => unreachable!()
         }
     };
 
@@ -187,13 +212,19 @@ pub fn run(mut cli_results: CLIResults) {
     loop {
         let frame_start = Instant::now();
 
-        os_input.update();
+        os_input.step();
+        netplay.step();
 
         let mut resume_menu: Option<ResumeMenu> = None;
         if let Some(ref mut game) = game {
+            if let NetplayState::Disconnected { reason } = netplay.state() {
+                netplay.disconnect();
+                resume_menu = Some(ResumeMenu::NetplayDisconnect { reason });
+            }
             let ai_inputs = ai::gen_inputs(&game);
             let reset_deadzones = game.check_reset_deadzones();
-            input.update(&game.tas, &ai_inputs, reset_deadzones);
+            input.step(&game.tas, &ai_inputs, &mut netplay, reset_deadzones);
+
             if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block()) {
                 resume_menu = Some(resume_menu_inner)
             }
@@ -205,12 +236,12 @@ pub fn run(mut cli_results: CLIResults) {
                     }
                 }
             }
-            network.update(game);
+            net_command_line.step(game);
             command_line.step(&os_input, game);
         }
         else {
-            input.update(&[], &[], false);
-            if let Some(mut menu_game_setup) = menu.step(&mut input) {
+            input.step(&[], &[], &mut netplay, false);
+            if let Some(mut menu_game_setup) = menu.step(&mut input, &mut netplay) {
                 let (package, config) = menu.reclaim();
                 input.set_history(std::mem::replace(&mut menu_game_setup.input_history, vec!()));
                 game = Some(Game::new(package, config, menu_game_setup));
@@ -225,7 +256,7 @@ pub fn run(mut cli_results: CLIResults) {
                     }
                 }
             }
-            network.update(&mut menu);
+            net_command_line.step(&mut menu);
             command_line.step(&os_input, &mut menu);
         }
 
@@ -246,6 +277,7 @@ pub fn run(mut cli_results: CLIResults) {
         }
 
         if os_input.quit() {
+            netplay.disconnect_offline(); // tell peer we are quiting
             return;
         }
 

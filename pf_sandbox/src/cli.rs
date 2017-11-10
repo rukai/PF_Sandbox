@@ -1,6 +1,7 @@
 use ::package;
 use getopts::Options;
 use std::env;
+use std::net::IpAddr;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options] [package_dir]\nIf no arguments are given the GUI menu is used instead. (excluding -g)", program);
@@ -17,6 +18,7 @@ pub fn cli() -> CLIResults {
     opts.optopt("f",  "fighters",     "Use the fighters specified", "NAME1,NAME2,NAME3...");
     opts.optopt("h",  "humanplayers", "Number of human players in the game", "NUM_HUMAN_PLAYERS");
     opts.optopt("c",  "cpuplayers",   "Number of CPU players in the game", "NUM_CPU_PLAYERS");
+    opts.optopt("a",  "address",      "IP Address of other client to start netplay with", "IP_ADDRESS");
     opts.optopt("g",  "graphics",     "Graphics backend to use",
         if cfg!(features =  "vulkan") && cfg!(features = "opengl") {
             "[vulkan|opengl|none]"
@@ -92,6 +94,17 @@ pub fn cli() -> CLIResults {
         results.continue_from = ContinueFrom::Game;
     }
 
+    if let Some(address) = matches.opt_str("a") {
+        if let Ok(address) = address.parse() {
+            results.address = Some(address);
+            results.continue_from = ContinueFrom::Netplay;
+        } else {
+            print_usage(&program, opts);
+            results.continue_from = ContinueFrom::Close;
+            return results;
+        }
+    }
+
     if let Some(backend_string) = matches.opt_str("g") {
         results.graphics_backend = match backend_string.to_lowercase().as_ref() {
             #[cfg(feature = "vulkan")]
@@ -117,6 +130,7 @@ pub struct CLIResults {
     pub total_cpu_players: Option<usize>,
     pub fighter_names:     Vec<String>,
     pub stage_name:        Option<String>,
+    pub address:           Option<IpAddr>,
     pub continue_from:     ContinueFrom,
 }
 
@@ -129,6 +143,7 @@ impl CLIResults {
             total_cpu_players: None,
             fighter_names:     vec!(),
             stage_name:        None,
+            address:           None,
             continue_from:     ContinueFrom::Menu,
         }
     }
@@ -136,6 +151,7 @@ impl CLIResults {
 
 pub enum ContinueFrom {
     Menu,
+    Netplay,
     Game,
     Close
 }
