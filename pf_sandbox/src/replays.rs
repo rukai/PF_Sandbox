@@ -78,7 +78,7 @@ pub fn save_replay(replay: &Replay, package: &Package) {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Replay {
-    pub init_seed:            Vec<usize>,
+    pub init_seed:            u64,
     pub timestamp:            DateTime<Local>,
     pub input_history:        Vec<Vec<ControllerInput>>,
     pub player_history:       Vec<Vec<Player>>,

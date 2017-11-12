@@ -48,10 +48,12 @@ impl Deadzone {
 }
 
 pub struct Input<'a> {
-    input_sources:  Vec<InputSource<'a>>,
-    current_inputs: Vec<ControllerInput>,      // inputs for this frame
-    game_inputs:    Vec<Vec<ControllerInput>>, // game past and (potentially) future inputs, frame 0 has index 2
+    // game past and (potentially) future inputs, frame 0 has index 2
+    // structure: frames Vec<controllers Vec<ControllerInput>>
+    game_inputs:    Vec<Vec<ControllerInput>>,
+    current_inputs: Vec<ControllerInput>, // inputs for this frame
     prev_start:     bool,
+    input_sources:  Vec<InputSource<'a>>,
 }
 
 // In/Out is from perspective of computer
@@ -97,9 +99,9 @@ impl<'a> Input<'a> {
 
         Input {
             input_sources,
-            game_inputs:     vec!(),
-            current_inputs:  vec!(),
-            prev_start:      false,
+            game_inputs:              vec!(),
+            current_inputs:           vec!(),
+            prev_start:               false,
         }
     }
 
@@ -156,13 +158,9 @@ impl<'a> Input<'a> {
         // append AI inputs
         inputs.extend_from_slice(ai_inputs);
 
-        if let NetplayState::InGame { inputs: netplay_inputs } = netplay.state() {
-            // replace netplay inputs
-            for _netplay_input in netplay_inputs {
-                // TODO: Insert/replace inputs with netplay_input.controller
-            }
-        }
-        else {
+        netplay.send_controller_inputs(self.current_inputs.clone());
+
+        if let NetplayState::Offline = netplay.state() {
             // replace tas inputs
             for i in 0..tas_inputs.len().min(inputs.len()) {
                 inputs[i] = tas_inputs[i].clone();
@@ -189,66 +187,95 @@ impl<'a> Input<'a> {
         self.game_inputs.clone()
     }
 
-    /// Call this once from the game update logic only 
+    /// Call this once from the game/menu update logic only
     /// Throws out all future history that may exist
     pub fn game_update(&mut self, frame: usize) {
         for _ in frame..(self.game_inputs.len()+1) {
             self.game_inputs.pop();
         }
 
-		self.game_inputs.push(self.current_inputs.clone());
+        self.game_inputs.push(self.current_inputs.clone());
     }
 
-    /// Return game inputs at current index into history
-    pub fn players(&self, frame: usize) -> Vec<PlayerInput> {
+    /// Return game inputs at specified index into history
+    pub fn players(&self, frame: usize, netplay: &Netplay) -> Vec<PlayerInput> {
         let mut result_inputs: Vec<PlayerInput> = vec!();
 
-        for (i, _) in self.current_inputs.iter().enumerate() {
-            let inputs = self.get_player_inputs(i, frame as i64);
-            if inputs[0].plugged_in {
-                result_inputs.push(PlayerInput {
-                    plugged_in: true,
+        let local_index = netplay.local_index();
+        let mut peer_offset = 0;
+        let peers_inputs = &netplay.confirmed_inputs;
+        for i in 0..netplay.number_of_peers() {
+            if i == local_index {
+                peer_offset = 1;
 
-                    up:    Button { value: inputs[0].up,    press: inputs[0].up    && !inputs[1].up },
-                    down:  Button { value: inputs[0].down,  press: inputs[0].down  && !inputs[1].down },
-                    right: Button { value: inputs[0].right, press: inputs[0].right && !inputs[1].right },
-                    left:  Button { value: inputs[0].left,  press: inputs[0].left  && !inputs[1].left },
-                    y:     Button { value: inputs[0].y,     press: inputs[0].y     && !inputs[1].y },
-                    x:     Button { value: inputs[0].x,     press: inputs[0].x     && !inputs[1].x },
-                    b:     Button { value: inputs[0].b,     press: inputs[0].b     && !inputs[1].b },
-                    a:     Button { value: inputs[0].a,     press: inputs[0].a     && !inputs[1].a },
-                    l:     Button { value: inputs[0].l,     press: inputs[0].l     && !inputs[1].l },
-                    r:     Button { value: inputs[0].r,     press: inputs[0].r     && !inputs[1].r },
-                    z:     Button { value: inputs[0].z,     press: inputs[0].z     && !inputs[1].z },
-                    start: Button { value: inputs[0].start, press: inputs[0].start && !inputs[1].start },
-
-                    stick_x:   Stick { value: inputs[0].stick_x,   diff: inputs[0].stick_x   - inputs[1].stick_x },
-                    stick_y:   Stick { value: inputs[0].stick_y,   diff: inputs[0].stick_y   - inputs[1].stick_y },
-                    c_stick_x: Stick { value: inputs[0].c_stick_x, diff: inputs[0].c_stick_x - inputs[1].c_stick_x },
-                    c_stick_y: Stick { value: inputs[0].c_stick_y, diff: inputs[0].c_stick_y - inputs[1].c_stick_y },
-
-                    l_trigger:  Trigger { value: inputs[0].l_trigger, diff: inputs[0].l_trigger - inputs[1].l_trigger },
-                    r_trigger:  Trigger { value: inputs[0].r_trigger, diff: inputs[0].r_trigger - inputs[1].r_trigger },
-                    history: inputs,
-                });
+                for i in 0..self.current_inputs.len() {
+                    let inputs = self.get_8frames_of_input(&self.game_inputs, i, frame as i64);
+                    result_inputs.push(Input::controller_inputs_to_player_input(inputs));
+                }
             }
             else {
-                result_inputs.push(PlayerInput::empty());
+                let peer_inputs = &peers_inputs[i - peer_offset];
+                let num_inputs = peer_inputs.last().map_or(0, |x| x.len());
+                for i in 0..num_inputs {
+                    let inputs = self.get_8frames_of_input(&peer_inputs[..], i, frame as i64);
+                    result_inputs.push(Input::controller_inputs_to_player_input(inputs));
+                }
             }
         }
+
         result_inputs
     }
 
-    fn get_player_inputs(&self, player: usize, frame: i64) -> Vec<ControllerInput> {
-        let mut result: Vec<ControllerInput> = vec!();
+    fn controller_inputs_to_player_input(inputs: Vec<ControllerInput>) -> PlayerInput {
+        if inputs[0].plugged_in {
+            PlayerInput {
+                plugged_in: true,
 
-        for i in (frame-8..frame).rev() {
+                up:    Button { value: inputs[0].up,    press: inputs[0].up    && !inputs[1].up },
+                down:  Button { value: inputs[0].down,  press: inputs[0].down  && !inputs[1].down },
+                right: Button { value: inputs[0].right, press: inputs[0].right && !inputs[1].right },
+                left:  Button { value: inputs[0].left,  press: inputs[0].left  && !inputs[1].left },
+                y:     Button { value: inputs[0].y,     press: inputs[0].y     && !inputs[1].y },
+                x:     Button { value: inputs[0].x,     press: inputs[0].x     && !inputs[1].x },
+                b:     Button { value: inputs[0].b,     press: inputs[0].b     && !inputs[1].b },
+                a:     Button { value: inputs[0].a,     press: inputs[0].a     && !inputs[1].a },
+                l:     Button { value: inputs[0].l,     press: inputs[0].l     && !inputs[1].l },
+                r:     Button { value: inputs[0].r,     press: inputs[0].r     && !inputs[1].r },
+                z:     Button { value: inputs[0].z,     press: inputs[0].z     && !inputs[1].z },
+                start: Button { value: inputs[0].start, press: inputs[0].start && !inputs[1].start },
+
+                stick_x:   Stick { value: inputs[0].stick_x,   diff: inputs[0].stick_x   - inputs[1].stick_x },
+                stick_y:   Stick { value: inputs[0].stick_y,   diff: inputs[0].stick_y   - inputs[1].stick_y },
+                c_stick_x: Stick { value: inputs[0].c_stick_x, diff: inputs[0].c_stick_x - inputs[1].c_stick_x },
+                c_stick_y: Stick { value: inputs[0].c_stick_y, diff: inputs[0].c_stick_y - inputs[1].c_stick_y },
+
+                l_trigger:  Trigger { value: inputs[0].l_trigger, diff: inputs[0].l_trigger - inputs[1].l_trigger },
+                r_trigger:  Trigger { value: inputs[0].r_trigger, diff: inputs[0].r_trigger - inputs[1].r_trigger },
+                history: inputs,
+            }
+        }
+        else {
+            PlayerInput::empty()
+        }
+    }
+
+    /// converts frames Vec<controllers Vec<ControllerInput>> into frames Vec<ControllerInput> for the specified controller_i
+    /// Output must be 8 frames long, any missing frames due to either netplay lag or the game just starting are filled in
+    fn get_8frames_of_input(&self, game_inputs: &[Vec<ControllerInput>], controller_i: usize, frame: i64) -> Vec<ControllerInput> {
+        let mut result: Vec<ControllerInput> = vec!();
+        let empty_vec = vec!();
+
+        for frame_i in (frame-8..frame).rev() {
             result.push(
-                if i < 0 {
+                if frame_i < 0 {
                     ControllerInput::empty()
                 }
                 else {
-                    match self.game_inputs[i as usize].get(player) {
+                    let controllers = match game_inputs.get(frame_i as usize) {
+                        Some(controllers) => controllers,
+                        None              => game_inputs.last().unwrap_or(&empty_vec)
+                    };
+                    match controllers.get(controller_i) {
                         Some(value) => value.clone(),
                         None        => ControllerInput::empty()
                     }

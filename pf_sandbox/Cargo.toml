@@ -9,6 +9,7 @@ keywords = ["pf", "sandbox", "platform", "fighter"]
 
 [dependencies]
 rand = "0.3"
+bincode = "0.9"
 chrono = { version = "0.4", features = ["serde"] }
 enum_traits = "0.3"
 enum_traits_macros = "2.0"
@@ -25,6 +26,7 @@ rust-crypto = "0.2"
 zip = "0.2"
 reqwest = "0.7"
 winit = "0.7" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+byteorder = "1.1"
 
 vulkano = { version = "0.7", optional = true }
 vulkano-win = { version = "0.7", optional = true }

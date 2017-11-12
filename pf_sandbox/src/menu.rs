@@ -100,7 +100,7 @@ impl Menu {
         }
     }
 
-    pub fn step_game_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+    pub fn step_game_select(&mut self, player_inputs: &[PlayerInput]) {
         let ticker = &mut self.game_ticker;
 
         if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
@@ -113,7 +113,7 @@ impl Menu {
             ticker.reset();
         }
 
-        if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && self.package.get().stages.len() > 0 {
+        if (player_inputs.iter().any(|x| x.a.press || x.start.press)) && self.package.get().stages.len() > 0 {
             self.state = match ticker.cursor {
                 0 => MenuState::character_select(),
                 1 => MenuState::GameSelect,
@@ -126,7 +126,7 @@ impl Menu {
         }
     }
 
-    pub fn step_replay_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+    pub fn step_replay_select(&mut self, player_inputs: &[PlayerInput]) {
         let back = if let &mut MenuState::ReplaySelect (ref replays, ref mut ticker) = &mut self.state {
             if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
                 ticker.up();
@@ -138,7 +138,7 @@ impl Menu {
                 ticker.reset();
             }
 
-            if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && replays.len() > 0 {
+            if (player_inputs.iter().any(|x| x.start.press || x.a.press)) && replays.len() > 0 {
                 let name = &replays[ticker.cursor];
                 match replays::load_replay(name, self.package.get()) {
                     Ok(replay) => {
@@ -170,8 +170,13 @@ impl Menu {
         }
     }
 
+    /// If controllers are added or removed then the indexes
+    /// are going be out of whack so just reset the fighter selection state
+    /// If a controller is added on the same frame another is removed, then no reset occurs.
+    /// However this is rare and the problem is minor, so ¯\_(ツ)_/¯
     fn add_remove_fighter_selections(&mut self, player_inputs: &[PlayerInput]) {
-        if self.fighter_selections.len() == 0 {
+        if self.fighter_selections.iter().filter(|x| !x.ui.is_cpu()).count() != player_inputs.len() {
+            self.fighter_selections.clear();
             for (i, input) in player_inputs.iter().enumerate() {
                 let ui = if input.plugged_in {
                     PlayerSelectUi::human_fighter(self.package.get())
@@ -188,11 +193,9 @@ impl Menu {
                 });
             }
         }
-
-        // TODO: if extra inputs are added/removed then add/remove corresponding human fighter_selections (before any CPU players)
     }
 
-    fn step_fighter_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input, netplay: &mut Netplay) {
+    fn step_fighter_select(&mut self, player_inputs: &[PlayerInput], netplay: &mut Netplay) {
         self.add_remove_fighter_selections(&player_inputs);
         let mut new_state: Option<MenuState> = None;
         if let &mut MenuState::CharacterSelect { ref mut back_counter } = &mut self.state {
@@ -411,7 +414,7 @@ impl Menu {
                 }
             }
 
-            if input.start_pressed() && fighters.len() > 0 {
+            if player_inputs.iter().any(|x| x.start.press) && fighters.len() > 0 {
                 new_state = Some(MenuState::StageSelect);
                 if let None = self.stage_ticker {
                     self.stage_ticker = Some(MenuTicker::new(self.package.get().stages.len()));
@@ -444,7 +447,7 @@ impl Menu {
         team
     }
 
-    fn step_stage_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+    fn step_stage_select(&mut self, player_inputs: &[PlayerInput], netplay: &Netplay) {
         if let None = self.stage_ticker {
             self.stage_ticker = Some(MenuTicker::new(self.package.get().stages.len()));
         }
@@ -463,15 +466,15 @@ impl Menu {
             }
         }
 
-        if (input.start_pressed() || player_inputs.iter().any(|x| x.a.press)) && self.package.get().stages.len() > 0 {
-            self.game_setup();
+        if (player_inputs.iter().any(|x| x.start.press || x.a.press)) && self.package.get().stages.len() > 0 {
+            self.game_setup(netplay);
         }
         else if player_inputs.iter().any(|x| x.b.press) {
             self.state = MenuState::character_select();
         }
     }
 
-    pub fn game_setup(&mut self) {
+    pub fn game_setup(&mut self, netplay: &Netplay) {
         let mut players: Vec<PlayerSetup> = vec!();
         let mut controllers: Vec<usize> = vec!();
         let mut ais: Vec<usize> = vec!();
@@ -507,21 +510,23 @@ impl Menu {
         }
 
         let stage = self.package.get().stages.index_to_key(self.stage_ticker.as_ref().unwrap().cursor).unwrap();
+        let state = if netplay.number_of_peers() == 1 { GameState::Local } else { GameState::Netplay };
+        let init_seed = netplay.get_seed().unwrap_or(GameSetup::gen_seed());
 
         self.game_setup = Some(GameSetup {
-            init_seed:      GameSetup::gen_seed(),
             input_history:  vec!(),
             player_history: vec!(),
             stage_history:  vec!(),
-            controllers:    controllers,
-            ais:            ais,
-            players:        players,
-            stage:          stage,
-            state:          GameState::Local,
+            init_seed,
+            controllers,
+            ais,
+            players,
+            stage,
+            state,
         });
     }
 
-    pub fn step_package_select(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
+    pub fn step_package_select(&mut self, player_inputs: &[PlayerInput]) {
         let mut package = None;
         if let &mut MenuState::PackageSelect (ref package_metas, ref mut ticker, ref mut load) = &mut self.state {
             let update_selection = if let &mut Some((ref mut load_state, ref mut load_rx)) = load {
@@ -558,7 +563,7 @@ impl Menu {
             };
 
             if update_selection {
-                Menu::step_package_select_inner(player_inputs, input, package_metas, ticker, load);
+                Menu::step_package_select_inner(player_inputs, package_metas, ticker, load);
             }
         } else { unreachable!(); }
 
@@ -581,7 +586,6 @@ impl Menu {
 
     fn step_package_select_inner(
         player_inputs: &[PlayerInput],
-        input: &mut Input,
         package_metas: &[(String, PackageMeta)],
         ticker: &mut MenuTicker,
         load: &mut Option<(PackageLoadState, Receiver<PackageLoadState>)>
@@ -597,7 +601,7 @@ impl Menu {
         }
 
         if package_metas.len() > 0 {
-            if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
+            if player_inputs.iter().any(|x| x.start.press || x.a.press) {
                 let meta = package_metas[ticker.cursor].1.clone();
 
                 let (tx, rx) = channel();
@@ -622,8 +626,8 @@ impl Menu {
         };
     }
 
-    fn step_results(&mut self, player_inputs: &[PlayerInput], input: &mut Input) {
-        if input.start_pressed() || player_inputs.iter().any(|x| x.a.press) {
+    fn step_results(&mut self, player_inputs: &[PlayerInput]) {
+        if player_inputs.iter().any(|x| x.start.press || x.a.press) {
             self.state = self.prev_state.take().unwrap();
         }
 
@@ -647,7 +651,7 @@ impl Menu {
 
         match netplay.state() {
             NetplayState::Offline => { }
-            NetplayState::ComparePackageHash {..} => {
+            NetplayState::InitConnection {..} => {
                 self.state = MenuState::NetplayWait { message: format!("Connecting to peer {}", load_character) };
             }
             NetplayState::PingTest { .. } => {
@@ -661,10 +665,9 @@ impl Menu {
                     self.state = MenuState::NetplayWait { message };
                 }
             }
-            NetplayState::CSS { .. } => {
+            NetplayState::Running { .. } => {
                 self.state = MenuState::character_select();
             }
-            _ => unreachable!()
         }
     }
 
@@ -677,8 +680,10 @@ impl Menu {
         }
 
         self.current_frame += 1;
+        // TODO: HERE
+        // TODO: Package in Arc?!??!?
         input.game_update(self.current_frame);
-        let player_inputs = input.players(self.current_frame);
+        let player_inputs = input.players(self.current_frame, netplay);
 
         if let NetplayState::Disconnected { reason } = netplay.state() {
             self.state = MenuState::NetplayWait { message: reason };
@@ -687,12 +692,12 @@ impl Menu {
         // In order to avoid hitting buttons still held down from the game, dont do anything on the first frame.
         if self.current_frame > 1 {
             match self.state {
-                MenuState::GameSelect             => self.step_game_select   (&player_inputs, input),
-                MenuState::ReplaySelect (_, _)    => self.step_replay_select (&player_inputs, input),
-                MenuState::PackageSelect (_, _,_) => self.step_package_select(&player_inputs, input),
-                MenuState::CharacterSelect {..}   => self.step_fighter_select(&player_inputs, input, netplay),
-                MenuState::StageSelect            => self.step_stage_select  (&player_inputs, input),
-                MenuState::GameResults {..}       => self.step_results       (&player_inputs, input),
+                MenuState::GameSelect             => self.step_game_select   (&player_inputs),
+                MenuState::ReplaySelect (_, _)    => self.step_replay_select (&player_inputs),
+                MenuState::PackageSelect (_, _,_) => self.step_package_select(&player_inputs),
+                MenuState::CharacterSelect {..}   => self.step_fighter_select(&player_inputs, netplay),
+                MenuState::StageSelect            => self.step_stage_select  (&player_inputs, netplay),
+                MenuState::GameResults {..}       => self.step_results       (&player_inputs),
                 MenuState::NetplayWait {..}       => self.step_netplay_wait  (&player_inputs, netplay),
             };
         }
@@ -708,8 +713,8 @@ impl Menu {
                 MenuState::CharacterSelect { back_counter, .. }            => RenderMenuState::CharacterSelect (self.fighter_selections.clone(), back_counter, self.back_counter_max),
                 MenuState::ReplaySelect (ref replays, ref ticker)          => RenderMenuState::ReplaySelect (replays.clone(), ticker.cursor),
                 MenuState::NetplayWait { ref message }                     => RenderMenuState::GenericText (message.clone()),
-                MenuState::GameSelect     => RenderMenuState::GameSelect (self.game_ticker.cursor),
-                MenuState::StageSelect    => RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor),
+                MenuState::GameSelect  => RenderMenuState::GameSelect  (self.game_ticker.cursor),
+                MenuState::StageSelect => RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor),
             },
             package_verify: self.package.verify(),
         }
@@ -738,8 +743,8 @@ impl Menu {
 
     pub fn reclaim(&mut self) -> (Package, Config) {
         match mem::replace(&mut self.package, PackageHolder::None) {
-            PackageHolder::Package (package, _) => { (package, self.config.clone()) }
-            PackageHolder::None                 => { panic!("Attempted to access the package while there was none") }
+            PackageHolder::Package (package, _) => (package, self.config.clone()),
+            PackageHolder::None                 => panic!("Attempted to access the package while there was none")
         }
     }
 }

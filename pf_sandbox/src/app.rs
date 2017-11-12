@@ -127,7 +127,7 @@ pub fn run(mut cli_results: CLIResults) {
                 let mut controllers: Vec<usize> = vec!();
                 let mut players: Vec<PlayerSetup> = vec!();
                 input.step(&[], &[], &mut netplay, false); // run the first input step so that we can check for the number of controllers.
-                let input_len = input.players(0).len();
+                let input_len = input.players(0, &netplay).len();
                 for i in 0..input_len {
                     controllers.push(i);
                     players.push(PlayerSetup {
@@ -225,7 +225,7 @@ pub fn run(mut cli_results: CLIResults) {
             let reset_deadzones = game.check_reset_deadzones();
             input.step(&game.tas, &ai_inputs, &mut netplay, reset_deadzones);
 
-            if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block()) {
+            if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block(), &netplay) {
                 resume_menu = Some(resume_menu_inner)
             }
             #[cfg(any(feature = "vulkan", feature = "opengl"))]

@@ -1,4 +1,8 @@
 use treeflection::{NodeRunner, Node};
+use bincode;
+use byteorder::{ByteOrder, NetworkEndian};
+use rand::Rng;
+use rand;
 use std::net::{TcpListener, UdpSocket, IpAddr, SocketAddr};
 use std::io::Read;
 use std::io::Write;
@@ -55,64 +59,102 @@ impl NetCommandLine {
     }
 }
 
+/*  Message Formats:
+
+    Initiate Connection:
+        1 byte   - 0x01
+        64 bytes - package hash
+        8 bytes  - random number to determine client order
+
+    Ping Request:
+        1 byte - 0x02
+        1 byte - ping id
+
+    Ping Response:
+        1 byte - 0x03
+        1 byte - ping id
+
+    Controller Input Message
+        1 byte  - 0x04
+        n bytes - bincode serialized controller input data
+
+    Disconnect notification:
+        1 byte - 0xAA
+*/
+
 pub struct Netplay {
-    socket:             UdpSocket,
-    state:              NetplayState,
-    hash_msgs:          Vec<String>,
-    ping_msgs:          Vec<u8>,
-    css_msgs:           Vec<usize>,
-    start_request_msgs: Vec<usize>,
-    start_confirm_msgs: Vec<usize>,
-    in_game_msgs:       Vec<usize>,
+    // structure: peers Vec<frames Vec<controllers Vec<ControllerInput>>>
+    // frame 0 has index 2
+    pub confirmed_inputs: Vec<Vec<Vec<ControllerInput>>>,
+    seed:                 u64,
+    socket:               UdpSocket,
+    state:                NetplayState,
+    frame_confirmed:      usize, // TODO: Move to enum?!?!
+    prev_frame_confirmed: usize,
+    index:                usize,
+    init_msgs:            Vec<(String, u64)>,
+    ping_msgs:            Vec<u8>,
+    css_msgs:             Vec<usize>,
+    start_request_msgs:   Vec<usize>,
+    start_confirm_msgs:   Vec<usize>,
+    running_msgs:         Vec<InputConfirm>,
 }
 
-/* Message Codes:
- * 1   - package hash
- * 2   - ping request
- * 3   - ping response
- * 100 - quitting
-*/
 impl Netplay {
     pub fn new() -> Netplay {
         let socket = UdpSocket::bind("0.0.0.0:8413").unwrap();
         socket.set_nonblocking(true).unwrap();
         Netplay {
             socket,
-            state:              NetplayState::Offline,
-            hash_msgs:          vec!(),
-            ping_msgs:          vec!(),
-            css_msgs:           vec!(),
-            start_request_msgs: vec!(),
-            start_confirm_msgs: vec!(),
-            in_game_msgs:       vec!(),
+            state:                NetplayState::Offline,
+            confirmed_inputs:     vec!(),
+            frame_confirmed:      0,
+            prev_frame_confirmed: 0,
+            seed:                 0,
+            index:                0,
+            init_msgs:            vec!(),
+            ping_msgs:            vec!(),
+            css_msgs:             vec!(),
+            start_request_msgs:   vec!(),
+            start_confirm_msgs:   vec!(),
+            running_msgs:         vec!(),
         }
     }
 
     /// Call this once every frame
     pub fn step(&mut self) {
         // receive messages
-        {
+        loop {
             let mut buf = [0; 1024];
-            if let Ok(buf_max) = self.socket.recv(&mut buf) { // returns Err if there is no packet waiting
+            if let Ok(_) = self.socket.recv(&mut buf) { // returns Err if there is no packet waiting
                 match buf[0] {
-                    1 => {
-                        if let Ok(hash) = String::from_utf8(buf[1..buf_max].iter().cloned().collect()) {
-                            self.hash_msgs.push(hash);
+                    0x01 => {
+                        if let Ok(hash) = String::from_utf8(buf[1..65].iter().cloned().collect()) {
+                            let random_bytes = &buf[65..73];
+                            let random = NetworkEndian::read_u64(random_bytes);
+                            self.init_msgs.push((hash, random));
                         }
                     }
-                    2 => {
+                    0x02 => {
                         self.socket.send(&[3, buf[1]]).unwrap();
                     }
-                    3 => {
+                    0x03 => {
                         self.ping_msgs.push(buf[1]);
                     }
-                    100 => {
+                    0x04 => {
+                        let mut data = bincode::deserialize(&buf[1..]).unwrap();
+                        self.running_msgs.push(data);
+                    }
+                    0xAA => {
                         self.state = NetplayState::Disconnected { reason: String::from("Peer disconnected") };
                     }
                     _ => {
                         println!("Couldn't process netplay message starting with: {:?}", &buf[0..32]);
                     }
                 }
+            }
+            else {
+                break;
             }
         }
 
@@ -121,21 +163,32 @@ impl Netplay {
         match &mut self.state {
             &mut NetplayState::Disconnected { .. } => { }
             &mut NetplayState::Offline => { }
-            &mut NetplayState::ComparePackageHash { ref hash } => {
+            &mut NetplayState::InitConnection { ref hash, random } => {
                 // send hash
-                let mut buf = [1; 65];
+                let mut buf = [1; 73];
                 for (i, b) in hash.as_bytes().iter().enumerate() {
                     buf[i+1] = *b;
                 }
+                NetworkEndian::write_u64(&mut buf[65..73], random);
                 self.socket.send(&buf).unwrap();
 
                 // receive hash
-                for hash_msg in self.hash_msgs.iter() {
-                    if hash_msg == hash {
+                for (hash_msg, random_msg) in self.init_msgs.drain(..) {
+                    if &hash_msg == hash {
                         new_state = Some(NetplayState::PingTest { pings: [Ping::default(); 255] });
                     }
                     else {
                         new_state = Some(NetplayState::Disconnected { reason: String::from("Package hashes did not match, ensure you are both using the same package.") });
+                    }
+
+                    // TODO: handle multiple peers
+                    if random < random_msg {
+                        self.index = 0;
+                        self.seed = random;
+                    }
+                    else {
+                        self.index = 1;
+                        self.seed = random_msg;
                     }
                 }
             }
@@ -162,29 +215,24 @@ impl Netplay {
 
                     let ping_total = ping_total.as_secs() as f64 + ping_total.subsec_nanos() as f64 / 1_000_000_000.0;
                     let ping_avg = ping_total / 255.0;
-                    println!("netplay ping: {}", ping_avg);
                     let ping_max = 100.0; // TODO: Grab from config
                     if ping_avg > ping_max {
-                        // TODO: send disconnect notification to peer
-                        self.socket.send(&[100]).unwrap();
+                        self.socket.send(&[0xAA]).unwrap();
                         new_state = Some(NetplayState::Disconnected { reason: format!("The ping was '{}' which was above the limit of '{}'", ping_avg, ping_max) });
                     } else {
-                        new_state = Some(NetplayState::CSS { players: vec!() });
+                        new_state = Some(NetplayState::Running { frame: 0 });
+                        // TODO: Need to force input reset all history at this point
                     }
                 }
                 self.ping_msgs.clear();
             }
-            &mut NetplayState::CSS { ref mut players } => {
-                players.clear();
-                // TODO: read from socket into players
+            &mut NetplayState::Running { .. } => {
+                for msg in self.running_msgs.drain(..) {
+                    let peer = 0; // TODO: handle multiple peers
+                    self.confirmed_inputs[peer].push(msg.inputs);
+                }
+                self.running_msgs.clear();
             }
-            &mut NetplayState::StartRequested { .. } => { }
-            &mut NetplayState::StartConfirmed { .. } => { }
-            &mut NetplayState::InGame { ref mut inputs } => {
-                inputs.clear();
-                // TODO: read from socket into inputs
-            }
-            &mut NetplayState::Results => { }
         }
         if let Some(state) = new_state {
             self.state = state;
@@ -195,17 +243,40 @@ impl Netplay {
         self.state.clone()
     }
 
-    pub fn connect(&mut self, address: IpAddr, hash: String) {
-        self.socket.connect(SocketAddr::new(address, 8413)).unwrap();
-        self.state = NetplayState::ComparePackageHash { hash };
+    /// Returns the index of the local machine
+    pub fn local_index(&self) -> usize {
+        match &self.state {
+            &NetplayState::Running { .. } => self.index,
+            _ => 0
+        }
+    }
 
-        // clear messages
-        self.hash_msgs.clear();
-        self.ping_msgs.clear();
-        self.css_msgs.clear();
-        self.start_request_msgs.clear();
-        self.start_confirm_msgs.clear();
-        self.in_game_msgs.clear();
+    /// Returns the total number of peers including the local machine
+    pub fn number_of_peers(&self) -> usize {
+        match &self.state {
+            &NetplayState::Running { .. } => 2, // TODO: handle multiple peers
+            _ => 1
+        }
+    }
+
+    pub fn connect(&mut self, address: IpAddr, hash: String) {
+        if let Err(err) = self.socket.connect(SocketAddr::new(address, 8413)) {
+            self.state = NetplayState::Disconnected { reason: format!("Can't connect to network: {}", err) };
+        }
+        else {
+            let random = rand::thread_rng().gen::<u64>();
+            self.state = NetplayState::InitConnection { hash, random };
+            self.confirmed_inputs.clear();
+            self.confirmed_inputs.push(vec!()); // TODO: handle multiple peers
+
+            // clear messages
+            self.init_msgs.clear();
+            self.ping_msgs.clear();
+            self.css_msgs.clear();
+            self.start_request_msgs.clear();
+            self.start_confirm_msgs.clear();
+            self.running_msgs.clear();
+        }
     }
 
     pub fn disconnect(&mut self) {
@@ -213,7 +284,7 @@ impl Netplay {
             &NetplayState::Offline |
             &NetplayState::Disconnected { .. } => { }
             _ => {
-                self.socket.send(&[100]).unwrap();
+                self.socket.send(&[0xAA]).ok();
                 self.state = NetplayState::Disconnected { reason: String::from("Disconnect requested by self") };
             }
         }
@@ -224,7 +295,7 @@ impl Netplay {
             &NetplayState::Offline => { }
             &NetplayState::Disconnected { .. } => { }
             _ => {
-                self.socket.send(&[100]).unwrap();
+                self.socket.send(&[0xAA]).ok();
                 self.state = NetplayState::Offline;
             }
         }
@@ -234,41 +305,48 @@ impl Netplay {
         self.state = NetplayState::Offline;
     }
 
-    pub fn start_request(&mut self, players: Vec<NetplayPlayerSelect>) {
-        // TODO: self.socket.send_data();
-        self.state = NetplayState::StartRequested { players };
+    pub fn send_controller_inputs(&mut self, inputs: Vec<ControllerInput>) {
+        if let &NetplayState::Running { frame, .. } = &self.state {
+            let input_confirm = InputConfirm {
+                frame,
+                inputs
+            };
+            let mut data = bincode::serialize(&input_confirm, bincode::Infinite).unwrap();
+            data.insert(0, 0x04);
+            self.socket.send(&data).unwrap();
+        }
+        // TODO: Store InputConfirm so we can resend it later (maybe repeat it every step() for n steps, no idea how to best handle this sort of thing)
     }
 
-    pub fn send_css_state(&mut self, _css_states: &[NetplayPlayerSelect]) {
-        // TODO: self.socket.send_data();
-    }
-
-    pub fn send_controller_inputs(&mut self, _input_confirms: &[NetplayInputConfirm]) {
-        // TODO: self.socket.send_data();
+    // Use peer 0's random value to generate the game seed for all games in the current session.
+    // Repeating seeds like this shouldnt be noticeable
+    pub fn get_seed(&self) -> Option<u64> {
+        match &self.state {
+            &NetplayState::Running { .. } => {
+                Some(self.seed)
+            }
+            _ => None
+        }
     }
 }
 
 /// Possible state flow sequences:
-/// *   Offline -> ComparePackageHash -> Disconnected -> Offline
-/// *   Offline -> ComparePackageHash -> Ping Test -> Disconnected -> Offline
-/// *   Offline -> ComparePackageHash -> Ping Test -> CSS -> Disconnect -> Offline
-/// *   Offline -> ComparePackageHash -> Ping Test -> CSS -> Start Requested -> Disconnect -> Offline
-/// *   Offline -> ComparePackageHash -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> Disconnected -> Offline
-/// *   Offline -> ComparePackageHash -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Disconnected -> Offline
-/// *   Offline -> ComparePackageHash -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Results -> Disconnected -> Offline
-/// *   Offline -> ComparePackageHash -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Results -> CSS -> ... -> Disconnected -> Offline
+/// *   Offline -> InitConnection -> Disconnected -> Offline
+/// *   Offline -> InitConnection -> Ping Test -> Disconnected -> Offline
+/// *   Offline -> InitConnection -> Ping Test -> CSS -> Disconnect -> Offline
+/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> Disconnect -> Offline
+/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> Disconnected -> Offline
+/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Disconnected -> Offline
+/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Results -> Disconnected -> Offline
+/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Results -> CSS -> ... -> Disconnected -> Offline
 /// Disconnected can occur due to self request, peer request, or timeout.
 #[derive(Clone)]
 pub enum NetplayState {
     Offline,
-    Disconnected       { reason:  String },
-    ComparePackageHash { hash:    String },
-    PingTest           { pings:   [Ping; 255] },
-    CSS                { players: Vec<NetplayPlayerSelect> },
-    StartRequested     { players: Vec<NetplayPlayerSelect> },
-    StartConfirmed     { players: Vec<NetplayPlayerSelect> },
-    InGame             { inputs:  Vec<NetplayInputConfirm> },
-    Results
+    Disconnected       { reason: String },
+    InitConnection     { hash:   String, random: u64 },
+    PingTest           { pings:  [Ping; 255] },
+    Running            { frame:  usize },
 }
 
 #[derive(Clone, Default, Copy)]
@@ -277,16 +355,8 @@ pub struct Ping {
     time_received: Option<Instant>,
 }
 
-#[derive(Clone)]
-pub struct NetplayInputConfirm {
-    controller: ControllerInput,
-    player:     usize,
-    frame:      usize,
-}
-
-#[derive(Clone)]
-pub struct NetplayPlayerSelect {
-    player: usize,
-    figher: Option<usize>,
-    team:   usize,
+#[derive(Clone, Serialize, Deserialize)]
+struct InputConfirm {
+    inputs: Vec<ControllerInput>,
+    frame:  usize,
 }

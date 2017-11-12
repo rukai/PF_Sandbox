@@ -7,6 +7,7 @@ use ::geometry::Rect;
 use ::graphics::{GraphicsMessage, Render, RenderType};
 use ::input::{Input, PlayerInput, ControllerInput};
 use ::menu::ResumeMenu;
+use ::network::Netplay;
 use ::os_input::OsInput;
 use ::package::Package;
 use ::player::{Player, RenderPlayer, DebugPlayer};
@@ -37,7 +38,7 @@ use treeflection::{Node, NodeRunner, NodeToken};
 pub struct Game {
     pub package:                Package,
     pub config:                 Config,
-    pub init_seed:              Vec<usize>,
+    pub init_seed:              u64,
     pub state:                  GameState,
     pub player_history:         Vec<Vec<Player>>,
     pub stage_history:          Vec<Stage>,
@@ -112,7 +113,7 @@ impl Game {
         }
     }
 
-    pub fn step(&mut self, input: &mut Input, os_input: &OsInput, os_input_blocked: bool) -> GameState {
+    pub fn step(&mut self, input: &mut Input, os_input: &OsInput, os_input_blocked: bool, netplay: &Netplay) -> GameState {
         if self.save_replay {
             replays::save_replay(&Replay::new(self, input), &self.package);
             self.save_replay = false;
@@ -121,12 +122,12 @@ impl Game {
         {
             let state = self.state.clone();
             match state {
-                GameState::Local                 => { self.step_local(input); }
-                GameState::Netplay               => { self.step_netplay(input); }
-                GameState::ReplayForwards        => { self.step_replay_forwards(input); }
+                GameState::Local                 => { self.step_local(input, netplay); }
+                GameState::Netplay               => { self.step_netplay(input, netplay); }
+                GameState::ReplayForwards        => { self.step_replay_forwards(input, netplay); }
                 GameState::ReplayBackwards       => { self.step_replay_backwards(input); }
-                GameState::StepThenPause         => { self.step_local(input); self.state = GameState::Paused; }
-                GameState::StepForwardThenPause  => { self.step_replay_forwards(input); self.state = GameState::Paused; }
+                GameState::StepThenPause         => { self.step_local(input, netplay); self.state = GameState::Paused; }
+                GameState::StepForwardThenPause  => { self.step_replay_forwards(input, netplay); self.state = GameState::Paused; }
                 GameState::StepBackwardThenPause => { self.step_replay_backwards(input); self.state = GameState::Paused; }
                 GameState::Paused                => { self.step_pause(input); }
                 GameState::Quit (_)              => { unreachable!(); }
@@ -137,7 +138,7 @@ impl Game {
                     GameState::Local           => { self.step_local_os_input(os_input); }
                     GameState::ReplayForwards  => { self.step_replay_forwards_os_input(os_input); }
                     GameState::ReplayBackwards => { self.step_replay_backwards_os_input(os_input); }
-                    GameState::Paused          => { self.step_pause_os_input(input, os_input); }
+                    GameState::Paused          => { self.step_pause_os_input(input, os_input, netplay); }
                     GameState::Quit (_)        => { unreachable!(); }
 
                     GameState::Netplay              | GameState::StepThenPause |
@@ -147,7 +148,7 @@ impl Game {
             }
             self.camera.update(os_input, &self.players, &self.package.fighters, &self.stage);
 
-            self.generate_debug(input);
+            self.generate_debug(input, netplay);
         }
 
         self.set_context();
@@ -220,7 +221,7 @@ impl Game {
         }
     }
 
-    fn step_local(&mut self, input: &mut Input) {
+    fn step_local(&mut self, input: &mut Input, netplay: &Netplay) {
         self.player_history.push(self.players.clone());
         self.stage_history .push(self.stage.clone());
         self.current_frame += 1;
@@ -235,7 +236,7 @@ impl Game {
 
         // run game loop
         input.game_update(self.current_frame);
-        let player_inputs = &input.players(self.current_frame);
+        let player_inputs = &input.players(self.current_frame, netplay);
         self.step_game(input, player_inputs);
 
         // pause game
@@ -250,7 +251,7 @@ impl Game {
         }
     }
 
-    fn step_netplay(&mut self, input: &mut Input) {
+    fn step_netplay(&mut self, input: &mut Input, netplay: &Netplay) {
         // perform rollback
         //let current_frame = self.confirmed_frame;
         //while input.confirmed_frame > self.confirmed_frame {
@@ -267,7 +268,7 @@ impl Game {
         self.current_frame += 1;
 
         input.game_update(self.current_frame);
-        let player_inputs = &input.players(self.current_frame);
+        let player_inputs = &input.players(self.current_frame, netplay);
         self.step_game(input, player_inputs);
     }
 
@@ -280,7 +281,7 @@ impl Game {
         }
     }
 
-    fn step_pause_os_input(&mut self, input: &mut Input, os_input: &OsInput) {
+    fn step_pause_os_input(&mut self, input: &mut Input, os_input: &OsInput, netplay: &Netplay) {
         let players_len = self.players.len();
 
         // set current edit state
@@ -329,7 +330,7 @@ impl Game {
             self.step_replay_backwards(input);
         }
         else if os_input.key_pressed(VirtualKeyCode::K) {
-            self.step_replay_forwards(input);
+            self.step_replay_forwards(input, netplay);
         }
         else if os_input.key_pressed(VirtualKeyCode::H) {
             self.state = GameState::ReplayBackwards;
@@ -338,7 +339,7 @@ impl Game {
             self.state = GameState::ReplayForwards;
         }
         else if os_input.key_pressed(VirtualKeyCode::Space) {
-            self.step_local(input);
+            self.step_local(input, netplay);
         }
         else if os_input.key_pressed(VirtualKeyCode::U) {
             self.saved_frame = self.current_frame;
@@ -405,7 +406,7 @@ impl Game {
                         }
                         // We want to step just the players current frame to simplify the animation work flow
                         // However we need to do a proper full step so that the history doesn't get mucked up.
-                        self.step_local(input);
+                        self.step_local(input, netplay);
                     }
                     // delete frame
                     if os_input.key_pressed(VirtualKeyCode::N) {
@@ -822,10 +823,10 @@ impl Game {
 
     /// next frame is advanced by using the input history on the current frame
     // TODO: Activate by shift+K/L
-    fn step_replay_forwards(&mut self, input: &mut Input) { // TODO: rename: step_replay_forwards_from_input
+    fn step_replay_forwards(&mut self, input: &mut Input, netplay: &Netplay) { // TODO: rename: step_replay_forwards_from_input
         if self.current_frame <= input.last_frame() {
             self.current_frame += 1;
-            let player_inputs = &input.players(self.current_frame);
+            let player_inputs = &input.players(self.current_frame, netplay);
             self.step_game(input, player_inputs);
 
             self.update_frame();
@@ -893,10 +894,9 @@ impl Game {
     //    }
     //}
 
-    fn get_seed(&self) -> Vec<usize> {
-        let mut seed = self.init_seed.clone();
-        seed.push(self.current_frame);
-        seed
+    /// TODO: Weird that StdRng takes usize, I thought usize was only for indexing.
+    fn get_seed(&self) -> [usize; 2] {
+        [self.init_seed as usize, self.current_frame as usize]
     }
 
     fn step_game(&mut self, input: &Input, player_input: &Vec<PlayerInput>) {
@@ -1046,10 +1046,9 @@ impl Game {
         )
     }
 
-    fn generate_debug(&mut self, input: &Input) {
+    fn generate_debug(&mut self, input: &Input, netplay: &Netplay) {
         let frame = self.current_frame;
-        let player_inputs = &input.players(frame);
-
+        let player_inputs = &input.players(frame, netplay);
 
         self.debug_lines = vec!(format!("Frame: {}    state: {}", frame, self.state));
         for (i, player) in self.players.iter().enumerate() {
@@ -1153,14 +1152,14 @@ impl Game {
         };
 
         RenderGame {
-            seed:               self.get_seed(),
+            seed:              self.get_seed(),
             surfaces:          self.stage.surfaces.to_vec(),
             selected_surfaces: self.selector.surfaces.clone(),
-            entities:           entities,
-            state:              self.state.clone(),
-            camera:             self.camera.clone(),
-            debug_lines:        self.debug_lines.clone(),
-            timer:              timer,
+            entities:          entities,
+            state:             self.state.clone(),
+            camera:            self.camera.clone(),
+            debug_lines:       self.debug_lines.clone(),
+            timer:             timer,
         }
     }
 
@@ -1337,14 +1336,14 @@ impl Default for SurfaceSelection {
 }
 
 pub struct RenderGame {
-    pub seed:               Vec<usize>,
+    pub seed:              [usize; 2],
     pub surfaces:          Vec<Surface>,
     pub selected_surfaces: HashSet<SurfaceSelection>,
-    pub entities:           Vec<RenderEntity>,
-    pub state:              GameState,
-    pub camera:             Camera,
-    pub debug_lines:        Vec<String>,
-    pub timer:              Option<Duration>,
+    pub entities:          Vec<RenderEntity>,
+    pub state:             GameState,
+    pub camera:            Camera,
+    pub debug_lines:       Vec<String>,
+    pub timer:             Option<Duration>,
 }
 
 pub enum RenderEntity {
@@ -1384,7 +1383,7 @@ pub struct RenderSpawnPoint {
 
 #[derive(Clone)]
 pub struct GameSetup {
-    pub init_seed:      Vec<usize>,
+    pub init_seed:      u64,
     pub input_history:  Vec<Vec<ControllerInput>>,
     pub player_history: Vec<Vec<Player>>,
     pub stage_history:  Vec<Stage>,
@@ -1395,14 +1394,14 @@ pub struct GameSetup {
     pub state:          GameState,
 }
 
+impl GameSetup {
+    pub fn gen_seed() -> u64 {
+        Local::now().timestamp() as u64
+    }
+}
+
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct PlayerSetup {
     pub fighter: String,
     pub team:    usize,
-}
-
-impl GameSetup {
-    pub fn gen_seed() -> Vec<usize> {
-        vec!(Local::now().timestamp() as usize)
-    }
 }
