@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use serde_json::{Value, Number};
 
+pub fn build_version() -> String { String::from(env!("BUILD_VERSION")) }
+
 pub fn engine_version() -> u64 { 9 }
 
 pub fn engine_version_json() -> Value {

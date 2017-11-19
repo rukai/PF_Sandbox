@@ -1,7 +1,6 @@
 #![feature(ord_max_min)]
 
 extern crate bincode;
-extern crate byteorder;
 extern crate chrono;
 extern crate crypto;
 extern crate enum_traits;

@@ -1,8 +1,9 @@
 use treeflection::{NodeRunner, Node};
 use bincode;
-use byteorder::{ByteOrder, NetworkEndian};
 use rand::Rng;
 use rand;
+use json_upgrade;
+
 use std::net::{TcpListener, UdpSocket, IpAddr, SocketAddr};
 use std::io::Read;
 use std::io::Write;
@@ -92,7 +93,7 @@ pub struct Netplay {
     frame_confirmed:      usize, // TODO: Move to enum?!?!
     prev_frame_confirmed: usize,
     index:                usize,
-    init_msgs:            Vec<(String, u64)>,
+    init_msgs:            Vec<InitConnection>,
     ping_msgs:            Vec<u8>,
     css_msgs:             Vec<usize>,
     start_request_msgs:   Vec<usize>,
@@ -129,10 +130,8 @@ impl Netplay {
             if let Ok(_) = self.socket.recv(&mut buf) { // returns Err if there is no packet waiting
                 match buf[0] {
                     0x01 => {
-                        if let Ok(hash) = String::from_utf8(buf[1..65].iter().cloned().collect()) {
-                            let random_bytes = &buf[65..73];
-                            let random = NetworkEndian::read_u64(random_bytes);
-                            self.init_msgs.push((hash, random));
+                        if let Ok(data) = bincode::deserialize(&buf[1..]) {
+                            self.init_msgs.push(data);
                         }
                     }
                     0x02 => {
@@ -142,8 +141,9 @@ impl Netplay {
                         self.ping_msgs.push(buf[1]);
                     }
                     0x04 => {
-                        let mut data = bincode::deserialize(&buf[1..]).unwrap();
-                        self.running_msgs.push(data);
+                        if let Ok(data) = bincode::deserialize(&buf[1..]) {
+                            self.running_msgs.push(data);
+                        }
                     }
                     0xAA => {
                         self.state = NetplayState::Disconnected { reason: String::from("Peer disconnected") };
@@ -163,32 +163,32 @@ impl Netplay {
         match &mut self.state {
             &mut NetplayState::Disconnected { .. } => { }
             &mut NetplayState::Offline => { }
-            &mut NetplayState::InitConnection { ref hash, random } => {
-                // send hash
-                let mut buf = [1; 73];
-                for (i, b) in hash.as_bytes().iter().enumerate() {
-                    buf[i+1] = *b;
-                }
-                NetworkEndian::write_u64(&mut buf[65..73], random);
-                self.socket.send(&buf).unwrap();
+            &mut NetplayState::InitConnection (ref local) => {
+                // send init
+                let mut data = bincode::serialize(&local, bincode::Infinite).unwrap();
+                data.insert(0, 0x01);
+                self.socket.send(&data).unwrap();
 
-                // receive hash
-                for (hash_msg, random_msg) in self.init_msgs.drain(..) {
-                    if &hash_msg == hash {
-                        new_state = Some(NetplayState::PingTest { pings: [Ping::default(); 255] });
+                // receive init
+                for peer in self.init_msgs.drain(..) {
+                    if peer.hash != local.hash {
+                        new_state = Some(NetplayState::Disconnected { reason: String::from("Package hashes did not match, ensure everyone is using the same package.") });
+                    }
+                    else if peer.build_version != local.build_version {
+                        new_state = Some(NetplayState::Disconnected { reason: String::from("Build versions did not match, ensure everyone is using the same PF Sandbox build.") });
                     }
                     else {
-                        new_state = Some(NetplayState::Disconnected { reason: String::from("Package hashes did not match, ensure you are both using the same package.") });
+                        new_state = Some(NetplayState::PingTest { pings: [Ping::default(); 255] });
                     }
 
                     // TODO: handle multiple peers
-                    if random < random_msg {
+                    if local.random < peer.random {
                         self.index = 0;
-                        self.seed = random;
+                        self.seed = local.random;
                     }
                     else {
                         self.index = 1;
-                        self.seed = random_msg;
+                        self.seed = peer.random;
                     }
                 }
             }
@@ -264,8 +264,11 @@ impl Netplay {
             self.state = NetplayState::Disconnected { reason: format!("Can't connect to network: {}", err) };
         }
         else {
-            let random = rand::thread_rng().gen::<u64>();
-            self.state = NetplayState::InitConnection { hash, random };
+            self.state = NetplayState::InitConnection (InitConnection {
+                random:        rand::thread_rng().gen::<u64>(),
+                build_version: json_upgrade::build_version(),
+                hash
+            });
             self.confirmed_inputs.clear();
             self.confirmed_inputs.push(vec!()); // TODO: handle multiple peers
 
@@ -343,10 +346,17 @@ impl Netplay {
 #[derive(Clone)]
 pub enum NetplayState {
     Offline,
-    Disconnected       { reason: String },
-    InitConnection     { hash:   String, random: u64 },
-    PingTest           { pings:  [Ping; 255] },
-    Running            { frame:  usize },
+    InitConnection (InitConnection),
+    Disconnected { reason: String },
+    PingTest     { pings:  [Ping; 255] },
+    Running      { frame:  usize },
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct InitConnection {
+    build_version:  String,
+    hash:           String,
+    random:         u64
 }
 
 #[derive(Clone, Default, Copy)]

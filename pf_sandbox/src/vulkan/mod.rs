@@ -1,15 +1,16 @@
 mod buffers;
 
 use self::buffers::{Vertex, ColorVertex, Buffers, ColorBuffers, PackageBuffers};
-use ::game::{GameState, RenderEntity, RenderGame};
-use ::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
-use ::graphics::{self, GraphicsMessage, Render, RenderType};
-use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
 use ::fighter::{Action, ECB, CollisionBoxRole, ActionFrame};
-use ::results::PlayerResult;
+use ::game::{GameState, RenderEntity, RenderGame};
+use ::geometry::Rect;
+use ::graphics::{self, GraphicsMessage, Render, RenderType};
+use ::json_upgrade;
+use ::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
 use ::package::Verify;
 use ::particle::ParticleType;
-use ::geometry::Rect;
+use ::player::{RenderFighter, RenderPlayer, DebugPlayer};
+use ::results::PlayerResult;
 
 use enum_traits::FromIndex;
 use cgmath::prelude::*;
@@ -1168,8 +1169,10 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn draw_package_selector(&mut self, package_names: &[String], selection: usize, message: &str, command_output: &[String]) {
-        self.draw_text.queue_text(100.0, 50.0, 50.0, [1.0, 1.0, 1.0, 1.0], "Select Package");
-        self.draw_text.queue_text(100.0, self.height as f32 - 30.0, 30.0, [1.0, 1.0, 1.0, 1.0], message);
+        let color: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
+        self.draw_text.queue_text(100.0, 50.0, 50.0, color, "Select Package");
+        self.draw_text.queue_text(100.0, self.height as f32 - 30.0, 30.0, color, message);
+        self.draw_text.queue_text(self.width as f32 - 380.0, self.height as f32 - 30.0, 30.0, color, json_upgrade::build_version().as_str());
 
         for (package_i, name) in package_names.iter().enumerate() {
             let size = 26.0; // TODO: determine from width/height of screen and start/end pos
