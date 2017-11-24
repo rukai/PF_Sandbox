@@ -92,7 +92,6 @@ pub fn load_bin_from_url(url: Url) -> Option<Vec<u8>> {
     None
 }
 
-
 /// deletes all files in the passed directory
 /// if the directory does not exist it is created
 pub fn nuke_dir(path: &Path) {
@@ -105,24 +104,58 @@ pub fn nuke_dir(path: &Path) {
 pub fn extract_zip(zip: &[u8], destination: &Path) {
     nuke_dir(destination);
 
-    let mut zip = ZipArchive::new(Cursor::new(zip)).unwrap();
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).unwrap();
-        let mut path = PathBuf::from(destination);
-        path.push(file.name());
+    if let Ok(mut zip) = ZipArchive::new(Cursor::new(zip)) {
+        for i in 0..zip.len() {
+            let mut file = zip.by_index(i).unwrap();
+            let mut path = PathBuf::from(destination);
+            path.push(file.name());
 
-        if file.name().ends_with("/") { // TODO: Is this cross platform?
-            fs::create_dir_all(path).unwrap();
-        }
-        else {
-            let mut buf = Vec::<u8>::new();
-            file.read_to_end(&mut buf).unwrap();
-            File::create(path).unwrap().write_all(&buf).unwrap();
+            if file.name().ends_with("/") { // TODO: Is this cross platform?
+                fs::create_dir_all(path).unwrap();
+            }
+            else {
+                let mut buf = Vec::<u8>::new();
+                file.read_to_end(&mut buf).unwrap();
+                File::create(path).unwrap().write_all(&buf).unwrap();
+            }
         }
     }
 }
 
+/// Delete contents of destination directory
+/// Extract contents of zip into destination
+pub fn extract_zip_fs(source: &Path, destination: &Path) {
+    if let Ok(source_file) = File::open(source) {
+        nuke_dir(destination);
+        if let Ok(mut zip) = ZipArchive::new(source_file) {
+            for i in 0..zip.len() {
+                let mut file = zip.by_index(i).unwrap();
+                let mut path = PathBuf::from(destination);
+                path.push(file.name());
 
+                if file.name().ends_with("/") { // TODO: Is this cross platform?
+                    fs::create_dir_all(path).unwrap();
+                }
+                else {
+                    let mut buf = Vec::<u8>::new();
+                    file.read_to_end(&mut buf).unwrap();
+                    File::create(path).unwrap().write_all(&buf).unwrap();
+                }
+            }
+        }
+    }
+}
+
+pub fn has_ext(path: &PathBuf, check_ext: &str) -> bool {
+    if let Some(ext) = path.extension() {
+        if let Some(ext) = ext.to_str() {
+            if ext.to_lowercase().as_str() == check_ext {
+                return true
+            }
+        }
+    }
+    false
+}
 
 pub fn get_path() -> PathBuf {
     match env::home_dir() {

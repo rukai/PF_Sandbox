@@ -241,7 +241,7 @@ pub fn run(mut cli_results: CLIResults) {
         }
         else {
             input.step(&[], &[], &mut netplay, false);
-            if let Some(mut menu_game_setup) = menu.step(&mut input, &mut netplay) {
+            if let Some(mut menu_game_setup) = menu.step(&mut input, &os_input, &mut netplay) {
                 let (package, config) = menu.reclaim();
                 input.set_history(std::mem::replace(&mut menu_game_setup.input_history, vec!()));
                 game = Some(Game::new(package, config, menu_game_setup));

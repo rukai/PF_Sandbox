@@ -48,6 +48,17 @@ pub fn generate_example_stub() {
     }
 }
 
+/// Extract the contents of a saved zip into a package
+pub fn extract_from_path(source_path: PathBuf) {
+    if files::has_ext(&source_path, "zip") {
+        if let Some(file_name) = source_path.file_stem() {
+            let mut dest_path = get_packages_path();
+            dest_path.push(file_name);
+            files::extract_zip_fs(&source_path, &dest_path);
+        }
+    }
+}
+
 pub fn print_list() {
     for (path, _) in get_package_metas() {
         println!("{}", path);

@@ -2,7 +2,9 @@ use camera::Camera;
 
 use winit::ElementState::{Pressed, Released};
 use winit::{WindowEvent, MouseScrollDelta, MouseButton, VirtualKeyCode};
+
 use std::sync::mpsc::{Sender, Receiver, channel};
+use std::path::PathBuf;
 
 struct CurrentInput {
     pub mouse_actions:    Vec<MouseAction>,
@@ -116,24 +118,27 @@ impl CurrentInput {
 }
 
 pub struct OsInput {
-    current: Option<CurrentInput>,
-    quit:    bool,
-    rx:      Receiver<WindowEvent>,
+    current:      Option<CurrentInput>,
+    dropped_file: Option<PathBuf>,
+    quit:         bool,
+    rx:           Receiver<WindowEvent>,
 }
 
 impl OsInput {
     pub fn new() -> (OsInput, Sender<WindowEvent>) {
         let (tx, rx) = channel();
         let os_input = OsInput {
-            current: Some(CurrentInput::new()),
-            quit:    false,
-            rx:      rx,
+            current:      Some(CurrentInput::new()),
+            dropped_file: None,
+            quit:         false,
+            rx:           rx,
         };
         (os_input, tx)
     }
 
     /// Called every frame
     pub fn step(&mut self) {
+        self.dropped_file = None;
         if let Some(ref mut current) = self.current {
             current.step();
         }
@@ -141,9 +146,10 @@ impl OsInput {
         // receive all waiting events from the graphics thread (does not block)
         while let Ok(event) = self.rx.try_recv() {
             match event {
-                WindowEvent::Closed         => { self.quit = true; },
-                WindowEvent::Focused(false) => { self.current = None; },
-                WindowEvent::Focused(true)  => { self.current = Some(CurrentInput::new()); },
+                WindowEvent::Closed                 => { self.quit = true }
+                WindowEvent::Focused(false)         => { self.current = None }
+                WindowEvent::Focused(true)          => { self.current = Some(CurrentInput::new()) }
+                WindowEvent::DroppedFile (ref path) => { self.dropped_file = Some(path.clone()) }
                 _ => { },
             }
             if let Some(ref mut current) = self.current {
@@ -295,6 +301,10 @@ impl OsInput {
             Some(ref current) => current.text.clone(),
             None              => vec!()
         }
+    }
+
+    pub fn dropped_file(&self) -> Option<PathBuf> {
+        self.dropped_file.clone()
     }
 
     pub fn quit(&self) -> bool {

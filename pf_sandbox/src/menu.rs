@@ -4,11 +4,12 @@ use ::game::{GameSetup, GameState, PlayerSetup};
 use ::graphics::{GraphicsMessage, Render, RenderType};
 use ::graphics;
 use ::input::{Input, PlayerInput};
+use ::network::{Netplay, NetplayState};
+use ::os_input::OsInput;
 use ::package::{Package, PackageMeta, Verify};
 use ::package;
-use ::results::{GameResults, PlayerResult};
 use ::replays;
-use ::network::{Netplay, NetplayState};
+use ::results::{GameResults, PlayerResult};
 
 use treeflection::{Node, NodeRunner, NodeToken};
 
@@ -671,7 +672,7 @@ impl Menu {
         }
     }
 
-    pub fn step(&mut self, input: &mut Input, netplay: &mut Netplay) -> Option<GameSetup> {
+    pub fn step(&mut self, input: &mut Input, os_input: &OsInput, netplay: &mut Netplay) -> Option<GameSetup> {
         if let &PackageHolder::Package (ref package, _) = &self.package {
             if package.has_updates() {
                 self.fighter_selections = vec!();
@@ -680,10 +681,14 @@ impl Menu {
         }
 
         self.current_frame += 1;
-        // TODO: HERE
-        // TODO: Package in Arc?!??!?
+        // TODO: Netplay here
+        // TODO: Should package be moved to Arc
         input.game_update(self.current_frame);
         let player_inputs = input.players(self.current_frame, netplay);
+        if let Some(path) = os_input.dropped_file() {
+            package::extract_from_path(path);
+            self.state = MenuState::package_select();
+        }
 
         if let NetplayState::Disconnected { reason } = netplay.state() {
             self.state = MenuState::NetplayWait { message: reason };

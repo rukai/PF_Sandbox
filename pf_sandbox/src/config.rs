@@ -14,7 +14,7 @@ pub struct Config {
 }
 
 impl Config {
-    fn get_path() -> PathBuf{
+    fn get_path() -> PathBuf {
         let mut path = files::get_path();
         path.push("config.json");
         path

@@ -11,6 +11,7 @@ A platform fighter sandbox featuring a character editor tightly integrated with 
 *   [PF Sandbox Manual](documentation/manual.md)
 *   [TAS Manual](documentation/pf_tas.md)
 *   [Discord](https://discord.gg/KyjBs4x)
+*   [Infrastructure Repository](https://github.com/rukai/pf_sandbox_infra)
 
 [![Youtube Video](https://img.youtube.com/vi/CTrwvg56VQs/0.jpg)](https://www.youtube.com/watch?v=CTrwvg56VQs)
 
