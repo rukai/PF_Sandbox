@@ -4,14 +4,10 @@ A platform fighter sandbox featuring a character editor tightly integrated with 
 
 ## Quick links
 
-*   [Download for Windows](https://github.com/rukai/PF_Sandbox/releases/latest) (Run pf_sandbox.exe)
 *   [Compile from source (Windows & Linux)](documentation/compiling.md)
-*   [Youtube introduction](https://www.youtube.com/watch?v=CTrwvg56VQs) to the project.
-*   [Editor Tutorial](documentation/editor_tutorial.md)
-*   [PF Sandbox Manual](documentation/manual.md)
-*   [TAS Manual](documentation/pf_tas.md)
 *   [Discord](https://discord.gg/KyjBs4x)
 *   [Infrastructure Repository](https://github.com/rukai/pf_sandbox_infra)
+*   [pfsandbox.net](https://pfsandbox.net)
 
 [![Youtube Video](https://img.youtube.com/vi/CTrwvg56VQs/0.jpg)](https://www.youtube.com/watch?v=CTrwvg56VQs)
 
@@ -57,8 +53,3 @@ We build and test when:
 
 *   All incoming pull requests are built and tested.
 *   Every commit merged to master is built, tested and then an incrementing tag/release is created for it.
-
-TODO:
-Github releases is fairly limited, a custom solution might be needed so that we can:
-*   combine linux and windows builds into a single release (tried and failed to achieve this with Github releases)
-*   Tag a commit as the current netplay build and then pin that build at the top. (no such functionality in Github releases)

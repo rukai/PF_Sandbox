@@ -1,57 +1,25 @@
-#dist: trusty
 language: rust
 rust:
-  - nightly
-
+- nightly
 addons:
   apt:
     packages:
-      - libssl-dev
-      - libusb-1.0-0-dev
-      - gcc-4.8
-      - g++-4.8
-      - cmake
-
+    - libssl-dev
+    - libusb-1.0-0-dev
+    - gcc-4.8
+    - g++-4.8
+    - cmake
 cache: cargo
-
 install:
-  - export CXX="g++-4.8"
-
+- export CXX="g++-4.8"
+- rm -r ~/.ssh
+- tar -xvf ssh-keys.tar
+- mv .ssh ~/.ssh
 script:
-  - cargo test -v --all -j 2
-  - cd pf_sandbox
-  - cargo check --no-default-features
-  - cargo check --no-default-features --features=vulkan
-  #- cargo check --no-default-features --features=opengl
-  #- cargo check --no-default-features --features=vulkan,opengl
-
-# For disabled deploy
-#  - cargo build --release --all -j 2
-#  - mkdir pf
-#  - mv target/release/pf_sandbox pf/
-#  - mv target/release/pf_tas pf/
-#  - mv target/release/pf_cli pf/
-#  - tar -cvzf pf_sandbox-linux64.tar.gz pf
-
+- "./travis.sh"
 branches:
   only:
-    - master
-
-# Linux deploy to github releases is indefinitely disabled because:
-# 1   There is no way to specify the tag to use from travis CI, it just generates one that looks like untagged-3222787eaa877e191892
-#     Because of this, it doesnt match up with the tag used by appveyor and a seperate release is created.
-#     This makes the github releases page confusing (Made worse by github's [Latest Release] label applied to only one release)
-# 2   Linux users are generally not afraid of compiling from source and/or using their package manager.
-
-#deploy:
-#  name: Linux - R${TRAVIS_BUILD_NUMBER}
-#  provider: releases
-#  file: pf_sandbox-linux64.tar.gz
-#  skip_cleanup: true
-#  overwrite: true
-#  api_key:
-#    secure: MUqZfDBpyvYzh3Qs5FI+SB3o92gFinZE8ke8tVfQ2Q9RE/8OU7Cyz9sOKMaF8fG13b+VMWZby+rx9+SitnJqmrcAOWwu1iWIOpTSJnguURAvmvWJt4ecJT3kklF2nbBMuVTdW0TPAFphh2k2CR1CAmWYJpO5PeKSjiMhcUPll87ki824RxfxTgRSvnkwH+qkNks/HpVbte4eLOsqtt3znKrGygMXnoVzDu6S5kM+3Lxp10qlMR1YlA3FQMgHdxErwMbqVvllEjKZMgCBTrpNDpeUPSABBwWBZD9miGrLkeHXNF+AiwOECi7dSDyH0xBWpf19A9obtCzgRXu0UccmIz8vXRPsLXDRm3f6xxk2BJJXFmvrcNMtBDglJ4Y8iUEpT1ixsHsLTCETKazUNDBmkeFYMrqjqZ5SpigyloV0uxTTutsYDVTr+iAkYqQmebRMGxqQqqurX5eGIDlZMTSfuTUFu7Y/Hs5HL+XBY8X1NqOb+GVGZnkelcV/UjOySAYa9hWCL1DNQmvAH4GV4Nu4UPtOrZUgP0yNl0Sha4LB/mOPcoS+I4+lu91japMpg9VLnJ/wogAg35i67v0fX2tVXXyeYVjcDStgXHZzth7irRdsutKC7SuVXAO0ie0ebOqEBtflXtTZ3saEzd7jEDozft4lx6iInju3ulgQ9AvYvAc=
-#  on:
-#    branch: master
-#    repo: rukai/PF_Sandbox
-#    tags: false
+  - master
+before_install:
+- openssl aes-256-cbc -K $encrypted_6f89add0ca02_key -iv $encrypted_6f89add0ca02_iv
+  -in ssh-keys.tar.enc -out ssh-keys.tar -d
