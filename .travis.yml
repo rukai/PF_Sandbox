@@ -10,16 +10,16 @@ addons:
     - g++-4.8
     - cmake
 cache: cargo
+before_install:
+- openssl aes-256-cbc -K $encrypted_6f89add0ca02_key -iv $encrypted_6f89add0ca02_iv
+  -in ssh-keys-travis.tar.enc -out ssh-keys-travis.tar -d
 install:
 - export CXX="g++-4.8"
 - rm -r ~/.ssh
-- tar -xvf ssh-keys.tar
+- tar -xvf ssh-keys-travis.tar
 - mv .ssh ~/.ssh
 script:
 - "./travis.sh"
 branches:
   only:
   - master
-before_install:
-- openssl aes-256-cbc -K $encrypted_6f89add0ca02_key -iv $encrypted_6f89add0ca02_iv
-  -in ssh-keys.tar.enc -out ssh-keys.tar -d

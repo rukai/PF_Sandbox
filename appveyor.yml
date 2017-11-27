@@ -7,6 +7,12 @@ environment:
 image: Visual Studio 2015
 
 install:
+    # setup ssh keys
+  - nuget install secure-file -ExcludeVersion
+  - secure-file\tools\secure-file -decrypt ssh-keys-appveyor.zip.enc -secret %ssh-keys-secret%
+  - 7z x ssh-keys-appveyor.zip
+  - rm -r C:/Users/appveyor/.ssh
+  - mv .ssh C:/Users/appveyor/
     # setup rust
   - curl -sSf -o rustup-init.exe https://win.rustup.rs/
   - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
@@ -32,27 +38,11 @@ test_script:
   - move documentation\editor_tutorial.md pf
   - move documentation\pf_tas.md pf\pf_tas.md
   - copy C:\msys64\mingw64\bin\libusb-1.0.dll pf
-  - 7z a pf_sandbox-windows64.zip pf
-
-artifacts:
-  - path: pf_sandbox-windows64.zip
-    name: executables
-
-deploy:
-  tag: R$(appveyor_build_version)
-  release: Windows - R$(appveyor_build_version)
-  artifact: executables
-  provider: GitHub
-  force_update: true
-  auth_token:
-    secure: B3egtCu3I4VuEeAJkjWCLu02W49rdzAT2uwEoIms3chmk79cwJRJcs7vYEDIVCqC
-  on:
-    branch: master
+  - 7z a pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip pf
+  - echo put pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip /home/rubic/PF_Sandbox_Website/builds/ | sftp rubic@pfsandbox.net
 
 skip_tags: true
-
 cache:
   - C:\Users\appveyor\.cargo\registry
-
 # Building is done in the test phase, so we disable Appveyor's build phase.
 build: false
