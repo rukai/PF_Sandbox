@@ -1,8 +1,8 @@
 use treeflection::KeyedContextVec;
 
-use ::player::Player;
-use ::fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole, PowerShield};
-use ::stage::Surface;
+use player::Player;
+use fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole, PowerShield};
+use stage::Surface;
 
 // def - player who was attacked
 // atk - player who attacked

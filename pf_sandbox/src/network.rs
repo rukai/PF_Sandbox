@@ -10,7 +10,7 @@ use std::io::Write;
 use std::str;
 use std::time::{Instant, Duration};
 
-use ::input::ControllerInput;
+use input::ControllerInput;
 
 pub struct NetCommandLine {
     listener: TcpListener

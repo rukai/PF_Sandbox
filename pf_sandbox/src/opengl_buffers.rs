@@ -1,9 +1,9 @@
-use ::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
-use ::graphics;
-use ::graphics::RenderRect;
-use ::package::{Package, PackageUpdate};
-use ::player::RenderPlayer;
-use ::stage::Stage;
+use fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
+use graphics;
+use graphics::RenderRect;
+use package::{Package, PackageUpdate};
+use player::RenderPlayer;
+use stage::Stage;
 
 use std::collections::HashMap;
 

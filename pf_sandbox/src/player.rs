@@ -1,15 +1,15 @@
-use ::collision::CollisionResult;
-use ::fighter::*;
-use ::geometry::Rect;
-use ::geometry;
-use ::graphics;
-use ::input::{PlayerInput};
-use ::package::Package;
-use ::particle::{Particle, ParticleType};
-use ::results::{RawPlayerResult, DeathRecord};
-use ::rules::Goal;
-use ::stage::{Stage, Surface, SpawnPoint};
-use ::os_input::OsInput;
+use collision::CollisionResult;
+use fighter::*;
+use geometry::Rect;
+use geometry;
+use graphics;
+use input::{PlayerInput};
+use package::Package;
+use particle::{Particle, ParticleType};
+use results::{RawPlayerResult, DeathRecord};
+use rules::Goal;
+use stage::{Stage, Surface, SpawnPoint};
+use os_input::OsInput;
 
 use std::f32;
 use std::f32::consts::PI;

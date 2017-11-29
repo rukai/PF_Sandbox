@@ -10,49 +10,85 @@ pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
 }
 
-fn get_meta_engine_version(meta: &Option<Value>) -> u64 {
-    if let &Some (ref meta) = meta {
-        if let &Value::Object (ref object) = meta {
-            if let Some (engine_version) = object.get("engine_version") {
-                if let Some (value) = engine_version.as_u64() {
-                    return value
-                }
+fn get_engine_version(object: &Value) -> u64 {
+    if let &Value::Object (ref object) = object {
+        if let Some (engine_version) = object.get("engine_version") {
+            if let Some (value) = engine_version.as_u64() {
+                return value
             }
         }
     }
     engine_version()
 }
 
-fn upgrade_meta_engine_version(meta: &mut Option<Value>) {
-    if let &mut Some (ref mut meta) = meta {
-        if let &mut Value::Object (ref mut object) = meta {
-            object.insert(String::from("engine_version"), engine_version_json());
+fn upgrade_engine_version(meta: &mut Value) {
+    if let &mut Value::Object (ref mut object) = meta {
+        object.insert(String::from("engine_version"), engine_version_json());
+    }
+}
+
+pub fn upgrade_to_latest_fighters(fighters: &mut HashMap<String, Value>) {
+    for (key, fighter) in fighters.iter_mut() {
+        let meta_engine_version = get_engine_version(fighter);
+        if meta_engine_version > engine_version() {
+            println!("Fighter: {} is newer than this version of PF Sandbox. Please upgrade to the latest version.", key);
+            // TODO: Display warning in window
+        }
+        else if meta_engine_version < engine_version() {
+            for upgrade_from in meta_engine_version..engine_version() {
+                match upgrade_from {
+                    8 => { upgrade_fighter8(fighter) }
+                    7 => { upgrade_fighter7(fighter) }
+                    6 => { upgrade_fighter6(fighter) }
+                    5 => { upgrade_fighter5(fighter) }
+                    4 => { upgrade_fighter4(fighter) }
+                    3 => { upgrade_fighter3(fighter) }
+                    2 => { upgrade_fighter2(fighter) }
+                    1 => { upgrade_fighter1(fighter) }
+                    0 => { upgrade_fighter0(fighter) }
+                    _ => { }
+                }
+            }
+            upgrade_engine_version(fighter);
         }
     }
 }
 
-#[allow(unused_variables)]
-pub fn upgrade_to_latest(meta: &mut Option<Value>, rules: &mut Option<Value>, fighters: &mut HashMap<String, Value>, stages: &mut HashMap<String, Value>) {
-    let meta_engine_version = get_meta_engine_version(meta);
+pub fn upgrade_to_latest_stages(stages: &mut HashMap<String, Value>) {
+    for (key, stage) in stages.iter_mut() {
+        let meta_engine_version = get_engine_version(stage);
+        if meta_engine_version > engine_version() {
+            println!("Stage: {} is newer than this version of PF Sandbox. Please upgrade to the latest version.", key);
+            // TODO: Display warning in window
+        }
+        else if meta_engine_version < engine_version() {
+            // TODO: Handle upgrades here
+            upgrade_engine_version(stage);
+        }
+    }
+}
+
+pub fn upgrade_to_latest_rules(rules: &mut Value) {
+    let meta_engine_version = get_engine_version(rules);
     if meta_engine_version > engine_version() {
-        panic!("Package is newer then this version of PF Sandbox. Please upgrade to the latest version.");
+        println!("rules.json is newer than this version of PF Sandbox. Please upgrade to the latest version.");
+        // TODO: Display warning in window
     }
     else if meta_engine_version < engine_version() {
-        for upgrade_from in meta_engine_version..engine_version() {
-            match upgrade_from {
-                8 => { upgrade8(fighters) }
-                7 => { upgrade7(fighters) }
-                6 => { upgrade6(fighters) }
-                5 => { upgrade5(fighters) }
-                4 => { upgrade4(fighters) }
-                3 => { upgrade3(fighters) }
-                2 => { upgrade2(fighters) }
-                1 => { upgrade1(fighters) }
-                0 => { upgrade0(fighters) }
-                _ => { }
-            }
-        }
-        upgrade_meta_engine_version(meta);
+        // TODO: Handle upgrades here
+        upgrade_engine_version(rules);
+    }
+}
+
+pub fn upgrade_to_latest_meta(meta: &mut Value) {
+    let meta_engine_version = get_engine_version(meta);
+    if meta_engine_version > engine_version() {
+        println!("meta.json is newer than this version of PF Sandbox. Please upgrade to the latest version.");
+        // TODO: Display warning in window
+    }
+    else if meta_engine_version < engine_version() {
+        // TODO: Handle upgrades here
+        upgrade_engine_version(meta);
     }
 }
 
@@ -71,15 +107,13 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
 
 /// Add use_platform_angle to ActionFrame
-fn upgrade8(fighters: &mut HashMap<String, Value>) {
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action in actions {
-                if let Some (frames) = get_vec(action, "frames") {
-                    for frame in frames {
-                        if let &mut Value::Object (ref mut frame) = frame {
-                            frame.insert(String::from("use_platform_angle"), Value::Bool(false));
-                        }
+fn upgrade_fighter8(fighter: &mut Value) {
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let &mut Value::Object (ref mut frame) = frame {
+                        frame.insert(String::from("use_platform_angle"), Value::Bool(false));
                     }
                 }
             }
@@ -88,7 +122,7 @@ fn upgrade8(fighters: &mut HashMap<String, Value>) {
 }
 
 /// Add MissedTech states
-fn upgrade7(fighters: &mut HashMap<String, Value>) {
+fn upgrade_fighter7(fighter: &mut Value) {
     let action_indexes: Vec<usize> = vec!(7, 46, 47, 48, 54, 69);
     let action = json!({
       "frames": [
@@ -120,17 +154,15 @@ fn upgrade7(fighters: &mut HashMap<String, Value>) {
       "iasa": 0
     });
 
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action_index in &action_indexes {
-                actions.insert(*action_index, action.clone());
-            }
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action_index in &action_indexes {
+            actions.insert(*action_index, action.clone());
         }
     }
 }
 
 /// Add power shield state
-fn upgrade6(fighters: &mut HashMap<String, Value>) {
+fn upgrade_fighter6(fighter: &mut Value) {
     let action_indexes: Vec<usize> = vec!(31, 47, 48, 49);
     let action = json!({
       "frames": [
@@ -162,26 +194,22 @@ fn upgrade6(fighters: &mut HashMap<String, Value>) {
       "iasa": 0
     });
 
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action_index in &action_indexes {
-                actions.insert(*action_index, action.clone());
-            }
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action_index in &action_indexes {
+            actions.insert(*action_index, action.clone());
         }
     }
 }
 
 /// teeter + ledge cancel
-fn upgrade5(fighters: &mut HashMap<String, Value>) {
+fn upgrade_fighter5(fighter: &mut Value) {
     //ledge_cancel to ActionFrame
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action in actions {
-                if let Some (frames) = get_vec(action, "frames") {
-                    for frame in frames {
-                        if let &mut Value::Object (ref mut frame) = frame {
-                            frame.insert(String::from("ledge_cancel"), Value::Bool(true));
-                        }
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let &mut Value::Object (ref mut frame) = frame {
+                        frame.insert(String::from("ledge_cancel"), Value::Bool(true));
                     }
                 }
             }
@@ -220,17 +248,15 @@ fn upgrade5(fighters: &mut HashMap<String, Value>) {
       "iasa": 0
     });
 
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action_index in &action_indexes {
-                actions.insert(*action_index, action.clone());
-            }
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action_index in &action_indexes {
+            actions.insert(*action_index, action.clone());
         }
     }
 }
 
 /// add ledge actions
-fn upgrade4(fighters: &mut HashMap<String, Value>) {
+fn upgrade_fighter4(fighter: &mut Value) {
     let action_indexes: Vec<usize> = vec!(4, 24, 25, 26, 27, 28, 41, 42, 55, 56);
     let action = json!({
       "frames": [
@@ -261,25 +287,21 @@ fn upgrade4(fighters: &mut HashMap<String, Value>) {
       "iasa": 0
     });
 
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action_index in &action_indexes {
-                actions.insert(*action_index, action.clone());
-            }
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action_index in &action_indexes {
+            actions.insert(*action_index, action.clone());
         }
     }
 }
 
 /// add pass_through to ActionFrame
-fn upgrade3(fighters: &mut HashMap<String, Value>) {
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action in actions {
-                if let Some (frames) = get_vec(action, "frames") {
-                    for frame in frames {
-                        if let &mut Value::Object (ref mut frame) = frame {
-                            frame.insert(String::from("pass_through"), Value::Bool(true));
-                        }
+fn upgrade_fighter3(fighter: &mut Value) {
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let &mut Value::Object (ref mut frame) = frame {
+                        frame.insert(String::from("pass_through"), Value::Bool(true));
                     }
                 }
             }
@@ -288,15 +310,13 @@ fn upgrade3(fighters: &mut HashMap<String, Value>) {
 }
 
 /// add force_hitlist_reset to ActionFrame
-fn upgrade2(fighters: &mut HashMap<String, Value>) {
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action in actions {
-                if let Some (frames) = get_vec(action, "frames") {
-                    for frame in frames {
-                        if let &mut Value::Object (ref mut frame) = frame {
-                            frame.insert(String::from("force_hitlist_reset"), Value::Bool(false));
-                        }
+fn upgrade_fighter2(fighter: &mut Value) {
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let &mut Value::Object (ref mut frame) = frame {
+                        frame.insert(String::from("force_hitlist_reset"), Value::Bool(false));
                     }
                 }
             }
@@ -305,22 +325,20 @@ fn upgrade2(fighters: &mut HashMap<String, Value>) {
 }
 
 /// add hitstun enum to hitboxes
-fn upgrade1(fighters: &mut HashMap<String, Value>) {
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action in actions {
-                if let Some (frames) = get_vec(action, "frames") {
-                    for frame in frames {
-                        if let Some (colboxes) = get_vec(frame, "colboxes") {
-                            for colbox in colboxes {
-                                if let &mut Value::Object (ref mut colbox) = colbox {
-                                    if let Some (role) = colbox.get_mut("role") {
-                                        if let &mut Value::Object (ref mut role) = role {
-                                            if let Some (hitbox) = role.get_mut("Hit") {
-                                                if let &mut Value::Object (ref mut hitbox) = hitbox {
-                                                    let hitstun = json!({"FramesTimesKnockback": 0.5});
-                                                    hitbox.insert(String::from("hitstun"), hitstun);
-                                                }
+fn upgrade_fighter1(fighter: &mut Value) {
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let Some (colboxes) = get_vec(frame, "colboxes") {
+                        for colbox in colboxes {
+                            if let &mut Value::Object (ref mut colbox) = colbox {
+                                if let Some (role) = colbox.get_mut("role") {
+                                    if let &mut Value::Object (ref mut role) = role {
+                                        if let Some (hitbox) = role.get_mut("Hit") {
+                                            if let &mut Value::Object (ref mut hitbox) = hitbox {
+                                                let hitstun = json!({"FramesTimesKnockback": 0.5});
+                                                hitbox.insert(String::from("hitstun"), hitstun);
                                             }
                                         }
                                     }
@@ -336,30 +354,28 @@ fn upgrade1(fighters: &mut HashMap<String, Value>) {
 
 /// Add order vec to frame
 /// Change Meld into MeldFirst
-fn upgrade0(fighters: &mut HashMap<String, Value>) {
-    for fighter in fighters.values_mut() {
-        if let Some (actions) = get_vec(fighter, "actions") {
-            for action in actions {
-                if let Some (frames) = get_vec(action, "frames") {
-                    for frame in frames {
-                        if let &mut Value::Object (ref mut frame) = frame {
-                            frame.insert(String::from("render_order"), Value::Array(vec!()));
-                        }
+fn upgrade_fighter0(fighter: &mut Value) {
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let &mut Value::Object (ref mut frame) = frame {
+                        frame.insert(String::from("render_order"), Value::Array(vec!()));
+                    }
 
-                        if let Some (colbox_links) = get_vec(frame, "colbox_links") {
-                            for colbox_link in colbox_links {
-                                if let &mut Value::Object (ref mut colbox_link) = colbox_link {
-                                    let mut old_value = false;
-                                    if let Some (link_type) = colbox_link.get_mut("link_type") {
-                                        if let &mut Value::String (ref mut link_type_string) = link_type {
-                                            if link_type_string.as_str() == "Meld" {
-                                                old_value = true;
-                                            }
+                    if let Some (colbox_links) = get_vec(frame, "colbox_links") {
+                        for colbox_link in colbox_links {
+                            if let &mut Value::Object (ref mut colbox_link) = colbox_link {
+                                let mut old_value = false;
+                                if let Some (link_type) = colbox_link.get_mut("link_type") {
+                                    if let &mut Value::String (ref mut link_type_string) = link_type {
+                                        if link_type_string.as_str() == "Meld" {
+                                            old_value = true;
                                         }
                                     }
-                                    if old_value {
-                                        colbox_link.insert(String::from("link_type"), Value::String(String::from("MeldFirst")));
-                                    }
+                                }
+                                if old_value {
+                                    colbox_link.insert(String::from("link_type"), Value::String(String::from("MeldFirst")));
                                 }
                             }
                         }

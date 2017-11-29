@@ -1,7 +1,10 @@
 use treeflection::{Node, NodeRunner, NodeToken};
 
+use json_upgrade::engine_version;
+
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Rules {
+    pub engine_version:     u64,
     pub title:              String,
     pub goal:               Goal,
     pub stock_count:        Option<u64>,
@@ -16,6 +19,7 @@ pub struct Rules {
 impl Default for Rules {
     fn default() -> Self {
         Rules {
+            engine_version:     engine_version(),
             title:              "Base Game Mode".to_string(),
             goal:               Goal::default(),
             stock_count:        Some(4),

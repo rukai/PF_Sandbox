@@ -1,4 +1,4 @@
-use ::os_input::{OsInput, TextChar};
+use os_input::{OsInput, TextChar};
 
 use std::collections::VecDeque;
 

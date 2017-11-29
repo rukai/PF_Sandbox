@@ -1,8 +1,8 @@
-use ::graphics::{Render, GraphicsMessage};
-use ::opengl_buffers::{Buffers, PackageBuffers};
-use ::game::{GameState, RenderEntity, RenderGame};
-use ::menu::RenderMenu;
-use ::player::RenderFighter;
+use graphics::{Render, GraphicsMessage};
+use opengl_buffers::{Buffers, PackageBuffers};
+use game::{GameState, RenderEntity, RenderGame};
+use menu::RenderMenu;
+use player::RenderFighter;
 
 use glium::{DisplayBuild, Surface, self};
 use glium::glutin::Event;

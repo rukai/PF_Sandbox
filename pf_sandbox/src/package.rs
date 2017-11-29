@@ -13,11 +13,12 @@ use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use zip::ZipWriter;
 use zip::write::FileOptions;
 
-use ::files;
-use ::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxRole, CollisionBoxLink, LinkType, RenderOrder};
-use ::rules::Rules;
-use ::stage::Stage;
-use ::json_upgrade::{engine_version, upgrade_to_latest};
+use fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxRole, CollisionBoxLink, LinkType, RenderOrder};
+use files;
+use json_upgrade::engine_version;
+use json_upgrade;
+use rules::Rules;
+use stage::Stage;
 
 fn get_packages_path() -> PathBuf {
     let mut path = files::get_path();
@@ -289,7 +290,14 @@ impl Package {
         // some nice side effects:
         // *    the package cannot be saved if it wont load
         // *    the user can choose to not save, if they find issues with the upgrade
-        upgrade_to_latest(&mut meta, &mut rules, &mut fighters, &mut stages);
+        json_upgrade::upgrade_to_latest_fighters(&mut fighters);
+        json_upgrade::upgrade_to_latest_stages(&mut stages);
+        if let &mut Some(ref mut rules) = &mut rules {
+            json_upgrade::upgrade_to_latest_rules(rules);
+        }
+        if let &mut Some(ref mut meta) = &mut meta {
+            json_upgrade::upgrade_to_latest_rules(meta);
+        }
         self.json_into_structs(meta, rules, fighters, stages);
         self.meta.path = path;
 

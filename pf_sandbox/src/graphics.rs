@@ -1,7 +1,7 @@
-use ::menu::RenderMenu;
-use ::package::PackageUpdate;
-use ::game::RenderGame;
-use ::fighter::CollisionBoxRole;
+use menu::RenderMenu;
+use package::PackageUpdate;
+use game::RenderGame;
+use fighter::CollisionBoxRole;
 
 pub struct GraphicsMessage {
     pub render: Render,

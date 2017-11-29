@@ -1,6 +1,8 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 use enum_traits::{Index, Iterable};
 
+use json_upgrade::engine_version;
+
 impl Default for Fighter {
     fn default() -> Fighter {
         let action_def = ActionDef {
@@ -37,6 +39,8 @@ impl Default for Fighter {
         }
 
         Fighter {
+            engine_version: engine_version(),
+
             // css render
             name:       "Base Fighter".to_string(),
             name_short: "BF".to_string(),
@@ -89,6 +93,8 @@ impl Default for Fighter {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Fighter {
+    pub engine_version: u64,
+
     // css render
     pub name:       String,
     pub name_short: String,

@@ -1,15 +1,15 @@
-use ::command_line::CommandLine;
-use ::config::Config;
-use ::game::{GameSetup, GameState, PlayerSetup};
-use ::graphics::{GraphicsMessage, Render, RenderType};
-use ::graphics;
-use ::input::{Input, PlayerInput};
-use ::network::{Netplay, NetplayState};
-use ::os_input::OsInput;
-use ::package::{Package, PackageMeta, Verify};
-use ::package;
-use ::replays;
-use ::results::{GameResults, PlayerResult};
+use command_line::CommandLine;
+use config::Config;
+use game::{GameSetup, GameState, PlayerSetup};
+use graphics::{GraphicsMessage, Render, RenderType};
+use graphics;
+use input::{Input, PlayerInput};
+use network::{Netplay, NetplayState};
+use os_input::OsInput;
+use package::{Package, PackageMeta, Verify};
+use package;
+use replays;
+use results::{GameResults, PlayerResult};
 
 use treeflection::{Node, NodeRunner, NodeToken};
 

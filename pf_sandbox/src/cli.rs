@@ -1,4 +1,4 @@
-use ::package;
+use package;
 use getopts::Options;
 use std::env;
 use std::net::IpAddr;

@@ -1,11 +1,13 @@
-use ::geometry::Rect;
-use ::os_input::OsInput;
+use geometry::Rect;
+use os_input::OsInput;
+use json_upgrade::engine_version;
 
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 use winit::VirtualKeyCode;
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Stage {
+    pub engine_version: u64,
     pub name:           String,
     pub surfaces:       ContextVec<Surface>,
     pub blast:          Rect,
@@ -84,6 +86,7 @@ impl Default for Stage {
         ));
 
         Stage {
+            engine_version: engine_version(),
             name:           "Base Stage".to_string(),
             surfaces:       ContextVec::from_vec(vec!(main_platform, second_platform)),
             blast:          blast,

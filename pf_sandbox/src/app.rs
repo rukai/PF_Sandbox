@@ -10,17 +10,17 @@ use ::graphics::GraphicsMessage;
 use std::sync::mpsc::Sender;
 use std;
 
-use ::ai;
-use ::cli::{CLIResults, ContinueFrom};
-use ::command_line::CommandLine;
-use ::config::Config;
-use ::game::{Game, GameState, GameSetup, PlayerSetup};
-use ::input::Input;
-use ::menu::{Menu, MenuState, ResumeMenu};
-use ::network::{NetCommandLine, Netplay, NetplayState};
-use ::os_input::OsInput;
-use ::package::Package;
-use ::package;
+use ai;
+use cli::{CLIResults, ContinueFrom};
+use command_line::CommandLine;
+use config::Config;
+use game::{Game, GameState, GameSetup, PlayerSetup};
+use input::Input;
+use menu::{Menu, MenuState, ResumeMenu};
+use network::{NetCommandLine, Netplay, NetplayState};
+use os_input::OsInput;
+use package::Package;
+use package;
 
 use libusb::Context;
 use std::time::{Duration, Instant};

@@ -1,11 +1,11 @@
-use ::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
-use ::player::RenderShield;
-use ::geometry::Rect;
-use ::graphics;
-use ::package::{Package, PackageUpdate};
-use ::player::RenderPlayer;
-use ::stage::Surface;
-use ::game::SurfaceSelection;
+use fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
+use player::RenderShield;
+use geometry::Rect;
+use graphics;
+use package::{Package, PackageUpdate};
+use player::RenderPlayer;
+use stage::Surface;
+use game::SurfaceSelection;
 
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
