@@ -17,8 +17,12 @@ pub fn send(state: &mut State) {
     }
 }
 
+pub fn quit() {
+    send_string(format!(r#"Ctas:reset"#));
+}
+
 fn send_string(string: String) {
-    println!("STRING: {}", string);
+    println!("sent: {}", string);
     let mut stream = match TcpStream::connect("127.0.0.1:1613") {
         Ok(stream)  => { stream }
         Err(e)      => { println!("Could not connect to PF Sandbox host: {}", e); return }
@@ -28,7 +32,7 @@ fn send_string(string: String) {
 
     let mut result = String::new();
     if let Ok(_) = stream.read_to_string(&mut result) {
-        println!("{}", result);
+        println!("received: {}", result);
     }
 }
 

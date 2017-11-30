@@ -34,7 +34,8 @@ fn main() {
         graphics.draw(&state);
 
         if input.quit() {
-            return;
+            connection::quit();
+            return; // TODO: Despite hitting this return, my laptop does not close the program o.0 Attach a debugger I guess.
         }
 
         let frame_duration = Duration::from_secs(1) / 60;
