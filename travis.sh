@@ -1,6 +1,19 @@
 #!/bin/bash
 
+# use -j2 as travis VM's have 2 cores https://docs.travis-ci.com/user/reference/overview/
+
 set -ev
+
+# prevent timeouts
+# this is not ideal... but we have looooong compile times.
+# and travis_wait doesnt work in bash
+(
+    while :
+    do
+        sleep 5m
+        echo "☃"
+    done
+) &
 
 # test
 cargo test -v --all -j 2
