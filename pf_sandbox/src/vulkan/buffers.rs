@@ -25,7 +25,7 @@ use std::sync::Arc;
 pub struct Vertex {
     pub position: [f32; 2],
     pub edge: f32,
-    pub render_id: f32,
+    pub render_id: u32,
 }
 impl_vertex!(Vertex, position, edge, render_id);
 
@@ -33,7 +33,7 @@ fn vertex(x: f32, y: f32) -> Vertex {
     Vertex {
         position: [x, y],
         edge: 1.0,
-        render_id: 0.0,
+        render_id: 0,
     }
 }
 
@@ -81,11 +81,11 @@ impl Buffers {
 
         let iterations = 40;
 
-        vertices.push(Vertex { position: [0.0, 0.0], edge: 0.0, render_id: 0.0});
+        vertices.push(Vertex { position: [0.0, 0.0], edge: 0.0, render_id: 0});
         for i in 0..iterations {
             let angle = i as f32 * 2.0 * consts::PI / (iterations as f32);
             let (sin, cos) = angle.sin_cos();
-            vertices.push(Vertex { position: [cos, sin], edge: 1.0, render_id: 0.0});
+            vertices.push(Vertex { position: [cos, sin], edge: 1.0, render_id: 0});
             indices.push(0);
             indices.push((i + 1));
             indices.push((i + 1) % iterations + 1);
@@ -101,9 +101,9 @@ impl Buffers {
     pub fn new_triangle(device: Arc<Device>) -> Buffers {
         let h = ((3.0/4.0) as f32).sqrt();
         let vertices = [
-            Vertex { position: [0.0,    h  ], edge: 0.0, render_id: 0.0 },
-            Vertex { position: [h/-2.0, 0.0], edge: 0.0, render_id: 0.0 },
-            Vertex { position: [h/2.0,  0.0], edge: 0.0, render_id: 0.0 }
+            Vertex { position: [0.0,    h  ], edge: 0.0, render_id: 0 },
+            Vertex { position: [h/-2.0, 0.0], edge: 0.0, render_id: 0 },
+            Vertex { position: [h/2.0,  0.0], edge: 0.0, render_id: 0 }
         ];
 
         let indices = [0, 1, 2];
@@ -128,13 +128,13 @@ impl Buffers {
         };
 
         // triangles are drawn meeting at the centre, forming a circle
-        vertices.push(Vertex { position: [0.0, 0.0], edge: 0.0, render_id: 0.0});
+        vertices.push(Vertex { position: [0.0, 0.0], edge: 0.0, render_id: 0});
         for i in 0..triangles {
             let angle = i as f32 * 2.0 * consts::PI / (triangles as f32);
             let (sin, cos) = angle.sin_cos();
             let x = cos * shield.radius;
             let y = sin * shield.radius;
-            vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: 0.0});
+            vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: 0});
             indices.push(0);
             indices.push((i + 1));
             indices.push((i + 1) % triangles + 1);
@@ -507,18 +507,18 @@ impl Buffers {
         })
     }
 
-    pub fn gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16, render_id: f32) {
+    pub fn gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16, render_id: u32) {
         // TODO: maybe bake damage into an extra field on vertex and use to change hitbox render
         let triangles = 25;
         // triangles are drawn meeting at the centre, forming a circle
         let point = &colbox.point;
-        vertices.push(Vertex { position: [point.0, point.1], edge: 0.0, render_id: render_id});
+        vertices.push(Vertex { position: [point.0, point.1], edge: 0.0, render_id});
         for i in 0..triangles {
             let angle = i as f32 * 2.0 * consts::PI / (triangles as f32);
             let (sin, cos) = angle.sin_cos();
             let x = point.0 + cos * colbox.radius;
             let y = point.1 + sin * colbox.radius;
-            vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id});
+            vertices.push(Vertex { position: [x, y], edge: 1.0, render_id });
             indices.push(*index_count);
             indices.push(*index_count + i + 1);
             indices.push(*index_count + (i + 1) % triangles + 1);
@@ -526,7 +526,7 @@ impl Buffers {
         *index_count += triangles + 1;
     }
 
-    pub fn gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16, render_id: f32) {
+    pub fn gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16, render_id: u32) {
         match link.link_type {
             LinkType::MeldFirst | LinkType::MeldSecond => {
                 // draw a rectangle connecting two colboxes
@@ -556,12 +556,12 @@ impl Buffers {
                 let link_y6 = y2;
 
                 // rectangle into buffers
-                vertices.push(Vertex { position: [link_x1, link_y1], edge: 1.0, render_id: render_id});
-                vertices.push(Vertex { position: [link_x2, link_y2], edge: 1.0, render_id: render_id});
-                vertices.push(Vertex { position: [link_x3, link_y3], edge: 1.0, render_id: render_id});
-                vertices.push(Vertex { position: [link_x4, link_y4], edge: 1.0, render_id: render_id});
-                vertices.push(Vertex { position: [link_x5, link_y5], edge: 0.0, render_id: render_id});
-                vertices.push(Vertex { position: [link_x6, link_y6], edge: 0.0, render_id: render_id});
+                vertices.push(Vertex { position: [link_x1, link_y1], edge: 1.0, render_id});
+                vertices.push(Vertex { position: [link_x2, link_y2], edge: 1.0, render_id});
+                vertices.push(Vertex { position: [link_x3, link_y3], edge: 1.0, render_id});
+                vertices.push(Vertex { position: [link_x4, link_y4], edge: 1.0, render_id});
+                vertices.push(Vertex { position: [link_x5, link_y5], edge: 0.0, render_id});
+                vertices.push(Vertex { position: [link_x6, link_y6], edge: 0.0, render_id});
 
                 indices.push(*index_count);
                 indices.push(*index_count + 4);
@@ -706,7 +706,7 @@ impl PackageBuffers {
             let colboxes = &package.fighters[fighter].actions[action].frames[frame].colboxes;
             for (i, colbox) in colboxes.iter().enumerate() {
                 if selected.contains(&i) {
-                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, 0.0);
+                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, 0);
                 }
             }
         }

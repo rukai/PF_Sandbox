@@ -40,14 +40,14 @@ use vulkano::sync::{GpuFuture, FlushError};
 use vulkano_text::{DrawText, DrawTextTrait};
 use winit::{Event, WindowEvent, WindowBuilder, EventsLoop};
 
+use std::collections::HashSet;
+use std::f32;
+use std::iter;
 use std::mem;
 use std::sync::Arc;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread;
 use std::time::{Duration, Instant};
-use std::collections::HashSet;
-use std::iter;
-use std::f32;
 
 mod vs {
     #[derive(VulkanoShader)]
@@ -427,7 +427,7 @@ impl<'a> VulkanGraphics<'a> {
             Err(err) => { panic!("{:?}", err) }
         };
 
-        let command_buffer = AutoCommandBufferBuilder::new(self.device.clone(), self.queue.family()).unwrap()
+        let command_buffer = AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.queue.family()).unwrap()
         .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), 1f32.into()]).unwrap();
 
         let final_command_buffer = match render.render_type {

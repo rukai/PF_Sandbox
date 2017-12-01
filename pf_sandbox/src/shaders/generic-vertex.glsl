@@ -2,9 +2,9 @@
 
 layout(location = 0) in vec2 position;
 layout(location = 1) in float edge;
-layout(location = 2) in float render_id;
+layout(location = 2) in uint render_id;
 layout(location = 0) out float v_edge;
-layout(location = 1) out float v_render_id;
+layout(location = 1) out uint v_render_id;
 
 layout(set = 0, binding = 0) uniform Data {
     vec4  edge_color;

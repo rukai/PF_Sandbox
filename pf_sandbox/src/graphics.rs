@@ -18,16 +18,16 @@ pub enum RenderType {
     Menu (RenderMenu),
 }
 
-pub fn get_render_id(role: &CollisionBoxRole) -> f32 {
+pub fn get_render_id(role: &CollisionBoxRole) -> u32 {
     match role {
-        &CollisionBoxRole::Hurt (_)       => { 1.0 }
-        &CollisionBoxRole::Hit (_)        => { 2.0 }
-        &CollisionBoxRole::Grab           => { 3.0 }
-        &CollisionBoxRole::Intangible     => { 4.0 }
-        &CollisionBoxRole::IntangibleItem => { 5.0 }
-        &CollisionBoxRole::Invincible     => { 6.0 }
-        &CollisionBoxRole::Reflect        => { 7.0 }
-        &CollisionBoxRole::Absorb         => { 8.0 }
+        &CollisionBoxRole::Hurt (_)       => { 1 }
+        &CollisionBoxRole::Hit (_)        => { 2 }
+        &CollisionBoxRole::Grab           => { 3 }
+        &CollisionBoxRole::Intangible     => { 4 }
+        &CollisionBoxRole::IntangibleItem => { 5 }
+        &CollisionBoxRole::Invincible     => { 6 }
+        &CollisionBoxRole::Reflect        => { 7 }
+        &CollisionBoxRole::Absorb         => { 8 }
     }
 }
 
