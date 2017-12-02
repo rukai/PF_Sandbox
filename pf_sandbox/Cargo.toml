@@ -25,14 +25,17 @@ treeflection_derive = "0.1"
 rust-crypto = "0.2"
 zip = "0.2"
 reqwest = "0.7"
-winit = "0.7" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+winit = "0.9" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 
 vulkano = { version = "0.7", optional = true }
-vulkano-win = { version = "0.7", optional = true }
+vulkano-win = { version = "0.8", optional = true }
 vulkano-shader-derive = { version = "0.7", optional = true }
 vulkano_text = { version = "0.6", optional = true }
 cgmath = { version = "0.15.0", optional = true }
 glium = { version = "0.16", optional = true }
+
+[patch.crates-io]
+vulkano-win = { git = "https://github.com/rukai/vulkano/vulkano-win" }
 
 [features]
 default = ["vulkan"]
