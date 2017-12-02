@@ -75,7 +75,7 @@ impl CurrentInput {
                     self.text.push(TextChar::Char(c));
                 }
             }
-            WindowEvent::MouseMoved { position, .. } => {
+            WindowEvent::CursorMoved { position, .. } => {
                 self.mouse_point = Some((position.0 as f32, position.1 as f32));
             },
             WindowEvent::MouseInput { state: Pressed, button, .. } => {

@@ -4,3 +4,8 @@ members = [
     "pf_tas",
     "pf_cli"
 ]
+
+[patch.crates-io]
+vulkano = { git = "https://github.com/rukai/vulkano" }
+vulkano-win = { git = "https://github.com/rukai/vulkano" }
+vulkano-shader-derive = { git = "https://github.com/rukai/vulkano" }

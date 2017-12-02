@@ -358,7 +358,7 @@ impl<'a> VulkanGraphics<'a> {
                 }
 
                 // MS Windows removes the window immediately on close before the process ends
-                if let Some((new_width, new_height)) = self.window.window().get_inner_size_pixels() {
+                if let Some((new_width, new_height)) = self.window.window().get_inner_size() {
                     self.window_resize(new_width, new_height);
                 }
                 else {
@@ -1215,7 +1215,7 @@ impl<'a> VulkanGraphics<'a> {
         let window = self.window.window();
 
         // MS Windows removes the window immediately on close before the process ends
-        if let Some((res_x, res_y)) = window.get_inner_size_pixels() {
+        if let Some((res_x, res_y)) = window.get_inner_size() {
             self.os_input_tx.send(WindowEvent::Resized(res_x, res_y)).unwrap();
         } else {
             return false;
