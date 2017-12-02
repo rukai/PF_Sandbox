@@ -417,6 +417,17 @@ impl<'a> VulkanGraphics<'a> {
     }
 
     fn render(&mut self, render: Render) {
+        #[cfg(unix)] // remove when winit implements set_fullscreen and get_current_monitor for windows
+        {
+            if render.fullscreen {
+                let monitor = self.window.window().get_current_monitor();
+                self.window.window().set_fullscreen(Some(monitor));
+            }
+            else {
+                self.window.window().set_fullscreen(None);
+            }
+        }
+
         self.future.cleanup_finished();
         let (image_num, new_future) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
             Ok(result) => { result }

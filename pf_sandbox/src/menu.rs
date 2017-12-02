@@ -12,6 +12,7 @@ use replays;
 use results::{GameResults, PlayerResult};
 
 use treeflection::{Node, NodeRunner, NodeToken};
+use winit::VirtualKeyCode;
 
 use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
 use std::thread;
@@ -673,6 +674,11 @@ impl Menu {
     }
 
     pub fn step(&mut self, input: &mut Input, os_input: &OsInput, netplay: &mut Netplay) -> Option<GameSetup> {
+        if os_input.held_alt() && os_input.key_pressed(VirtualKeyCode::Return) {
+            self.config.fullscreen = !self.config.fullscreen;
+            self.config.save();
+        }
+
         if let &PackageHolder::Package (ref package, _) = &self.package {
             if package.has_updates() {
                 self.fighter_selections = vec!();
@@ -738,6 +744,7 @@ impl Menu {
         let render = Render {
             command_output:  command_line.output(),
             render_type:     RenderType::Menu (self.render()),
+            fullscreen:      self.config.fullscreen
         };
 
         GraphicsMessage {

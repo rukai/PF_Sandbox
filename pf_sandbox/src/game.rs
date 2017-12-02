@@ -25,8 +25,8 @@ use std::time::Duration;
 use chrono::Local;
 use enum_traits::{FromIndex, ToIndex};
 
-use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken};
+use winit::VirtualKeyCode;
 
 #[NodeActions(
     NodeAction(function="save_replay", return_string),
@@ -114,6 +114,11 @@ impl Game {
     }
 
     pub fn step(&mut self, input: &mut Input, os_input: &OsInput, os_input_blocked: bool, netplay: &Netplay) -> GameState {
+        if os_input.held_alt() && os_input.key_pressed(VirtualKeyCode::Return) {
+            self.config.fullscreen = !self.config.fullscreen;
+            self.config.save();
+        }
+
         if self.save_replay {
             replays::save_replay(&Replay::new(self, input), &self.package);
             self.save_replay = false;
@@ -1167,6 +1172,7 @@ impl Game {
         let render = Render {
             command_output: command_line.output(),
             render_type:    RenderType::Game(self.render()),
+            fullscreen:     self.config.fullscreen
         };
 
         GraphicsMessage {

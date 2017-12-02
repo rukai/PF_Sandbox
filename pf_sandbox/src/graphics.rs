@@ -4,13 +4,14 @@ use game::RenderGame;
 use fighter::CollisionBoxRole;
 
 pub struct GraphicsMessage {
-    pub render: Render,
+    pub render:          Render,
     pub package_updates: Vec<PackageUpdate>,
 }
 
 pub struct Render {
     pub command_output: Vec<String>,
     pub render_type:    RenderType,
+    pub fullscreen:     bool,
 }
 
 pub enum RenderType {
