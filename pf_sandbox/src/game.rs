@@ -257,24 +257,29 @@ impl Game {
     }
 
     fn step_netplay(&mut self, input: &mut Input, netplay: &Netplay) {
-        // perform rollback
-        //let current_frame = self.confirmed_frame;
-        //while input.confirmed_frame > self.confirmed_frame {
-        //    self.current_frame = self.confirmed_frame
-        //    self.players = self.player_history.get(frame).unwrap().clone();
-        //    self.confirmed_frame += 1;
-        //    self.step_game(input, player_inputs);
-        //    // TODO: Handle difference between reapplying guessed frames and confirmed frames
-        //}
+        if !netplay.skip_frame() {
+            self.current_frame += 1;
 
-        // normal game flow
-        self.player_history.push(self.players.clone());
-        self.stage_history.push(self.stage.clone());
-        self.current_frame += 1;
+            let start = self.current_frame - netplay.frames_to_step();
+            let end = self.current_frame;
 
-        input.game_update(self.current_frame);
-        let player_inputs = &input.players(self.current_frame, netplay);
-        self.step_game(input, player_inputs);
+            self.player_history.truncate(start);
+            self.stage_history.truncate(start);
+            if start != 0 {
+                self.players = self.player_history.get(start-1).unwrap().clone();
+                self.stage   = self.stage_history.get(start-1).unwrap().clone();
+            }
+
+            input.netplay_update();
+
+            for frame in start..end {
+                let player_inputs = &input.players(frame, netplay);
+                self.step_game(input, player_inputs);
+
+                self.player_history.push(self.players.clone());
+                self.stage_history.push(self.stage.clone());
+            }
+        }
     }
 
     fn step_pause(&mut self, input: &mut Input) {

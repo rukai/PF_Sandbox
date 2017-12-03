@@ -99,9 +99,9 @@ impl<'a> Input<'a> {
 
         Input {
             input_sources,
-            game_inputs:              vec!(),
-            current_inputs:           vec!(),
-            prev_start:               false,
+            game_inputs:    vec!(),
+            current_inputs: vec!(),
+            prev_start:     false,
         }
     }
 
@@ -155,10 +155,17 @@ impl<'a> Input<'a> {
             }
         }
 
+        if netplay.skip_frame() {
+            // TODO: Special case this by:
+            // * averaging float values
+            // * detect dropped presses and include the presss
+        }
+        else {
+            netplay.send_controller_inputs(inputs.clone());
+        }
+
         // append AI inputs
         inputs.extend_from_slice(ai_inputs);
-
-        netplay.send_controller_inputs(self.current_inputs.clone());
 
         if let NetplayState::Offline = netplay.state() {
             // replace tas inputs
@@ -187,13 +194,18 @@ impl<'a> Input<'a> {
         self.game_inputs.clone()
     }
 
-    /// Call this once from the game/menu update logic only
+    /// Call this once from the game update logic only
     /// Throws out all future history that may exist
     pub fn game_update(&mut self, frame: usize) {
         for _ in frame..(self.game_inputs.len()+1) {
             self.game_inputs.pop();
         }
 
+        self.game_inputs.push(self.current_inputs.clone());
+    }
+
+    /// Call this once from netplay game/menu update logic only (instead of game_update)
+    pub fn netplay_update(&mut self) {
         self.game_inputs.push(self.current_inputs.clone());
     }
 
@@ -217,7 +229,7 @@ impl<'a> Input<'a> {
                 let peer_inputs = &peers_inputs[i - peer_offset];
                 let num_inputs = peer_inputs.last().map_or(0, |x| x.len());
                 for i in 0..num_inputs {
-                    let inputs = self.get_8frames_of_input(&peer_inputs[..], i, frame as i64);
+                    let inputs = self.get_8frames_of_input(&peer_inputs[..], i, netplay.frame() as i64);
                     result_inputs.push(Input::controller_inputs_to_player_input(inputs));
                 }
             }

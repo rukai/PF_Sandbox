@@ -220,24 +220,27 @@ pub fn run(mut cli_results: CLIResults) {
             if let NetplayState::Disconnected { reason } = netplay.state() {
                 netplay.disconnect();
                 resume_menu = Some(ResumeMenu::NetplayDisconnect { reason });
-            }
-            let ai_inputs = ai::gen_inputs(&game);
-            let reset_deadzones = game.check_reset_deadzones();
-            input.step(&game.tas, &ai_inputs, &mut netplay, reset_deadzones);
+            } else {
+                let ai_inputs = ai::gen_inputs(&game);
+                let reset_deadzones = game.check_reset_deadzones();
+                input.step(&game.tas, &ai_inputs, &mut netplay, reset_deadzones);
 
-            if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block(), &netplay) {
-                resume_menu = Some(resume_menu_inner)
-            }
-            #[cfg(any(feature = "vulkan", feature = "opengl"))]
-            {
-                if let Some(ref tx) = graphics_tx {
-                    if let Err(_) = tx.send(game.graphics_message(&command_line)) {
-                        return;
+                if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block(), &netplay) {
+                    resume_menu = Some(resume_menu_inner)
+                }
+                #[cfg(any(feature = "vulkan", feature = "opengl"))]
+                {
+                    if let Some(ref tx) = graphics_tx {
+                        if let Err(_) = tx.send(game.graphics_message(&command_line)) {
+                            return;
+                        }
                     }
                 }
+                if let NetplayState::Offline = netplay.state() {
+                    net_command_line.step(game);
+                    command_line.step(&os_input, game);
+                }
             }
-            net_command_line.step(game);
-            command_line.step(&os_input, game);
         }
         else {
             input.step(&[], &[], &mut netplay, false);
@@ -256,8 +259,10 @@ pub fn run(mut cli_results: CLIResults) {
                     }
                 }
             }
-            net_command_line.step(&mut menu);
-            command_line.step(&os_input, &mut menu);
+            if let NetplayState::Offline = netplay.state() {
+                net_command_line.step(&mut menu);
+                command_line.step(&os_input, &mut menu);
+            }
         }
 
         if let Some(resume_menu) = resume_menu {

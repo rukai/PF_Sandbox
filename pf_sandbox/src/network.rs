@@ -90,8 +90,6 @@ pub struct Netplay {
     seed:                 u64,
     socket:               UdpSocket,
     state:                NetplayState,
-    frame_confirmed:      usize, // TODO: Move to enum?!?!
-    prev_frame_confirmed: usize,
     index:                usize,
     init_msgs:            Vec<InitConnection>,
     ping_msgs:            Vec<u8>,
@@ -109,8 +107,6 @@ impl Netplay {
             socket,
             state:                NetplayState::Offline,
             confirmed_inputs:     vec!(),
-            frame_confirmed:      0,
-            prev_frame_confirmed: 0,
             seed:                 0,
             index:                0,
             init_msgs:            vec!(),
@@ -157,6 +153,8 @@ impl Netplay {
                 break;
             }
         }
+
+        let skip_frame = self.skip_frame();
 
         // process messages
         let mut new_state: Option<NetplayState> = None;
@@ -226,12 +224,31 @@ impl Netplay {
                 }
                 self.ping_msgs.clear();
             }
-            &mut NetplayState::Running { .. } => {
-                for msg in self.running_msgs.drain(..) {
-                    let peer = 0; // TODO: handle multiple peers
-                    self.confirmed_inputs[peer].push(msg.inputs);
+            &mut NetplayState::Running { ref mut frame } => {
+                if !skip_frame {
+                    *frame += 1;
                 }
-                self.running_msgs.clear();
+
+                let peer = 0; // TODO: handle multiple peers
+                let mut found_msg = true;
+                let mut to_delete = vec!();
+                while found_msg {
+                    found_msg = false;
+                    for (i, msg) in self.running_msgs.iter().enumerate() {
+                        let inputs_len = self.confirmed_inputs[peer].len();
+                        if msg.frame == inputs_len {
+                            self.confirmed_inputs[peer].push(msg.inputs.clone());
+                            found_msg = true;
+                            to_delete.push(i)
+                        }
+                    }
+
+                    to_delete.reverse();
+                    for i in to_delete.iter() {
+                        self.running_msgs.remove(*i);
+                    }
+                    to_delete.clear();
+                }
             }
         }
         if let Some(state) = new_state {
@@ -256,6 +273,40 @@ impl Netplay {
         match &self.state {
             &NetplayState::Running { .. } => 2, // TODO: handle multiple peers
             _ => 1
+        }
+    }
+
+    // TODO: Optimize by only starting from a frame where the inputs differ
+    /// Returns the number of frames that need to be stepped/restepped including the current frame
+    pub fn frames_to_step(&self) -> usize {
+        let input_frames = self.confirmed_inputs.iter().map(|x| x.len()).min().unwrap_or(1);
+        match &self.state { // TODO: DELETE THIS
+            &NetplayState::Running { frame }
+              => println!("frames_to_step: {} {}", frame, input_frames),
+            _ => { }
+        };
+
+        match &self.state {
+            &NetplayState::Running { frame }
+              => frame.saturating_sub(input_frames).max(1),
+            _ => 1
+        }
+    }
+
+    pub fn frame(&self) -> usize {
+        match &self.state {
+            &NetplayState::Running { frame } => frame,
+            _ => unreachable!()
+        }
+    }
+
+    // TODO: take ping into account
+    /// returns true if the local machine should do nothing for a frame so that peers can catch up.
+    pub fn skip_frame(&self) -> bool {
+        let input_frames = self.confirmed_inputs.iter().map(|x| x.len()).min().unwrap_or(1);
+        match &self.state {
+            &NetplayState::Running { frame } => frame > input_frames + 1,
+            _ => false
         }
     }
 
@@ -309,7 +360,7 @@ impl Netplay {
     }
 
     pub fn send_controller_inputs(&mut self, inputs: Vec<ControllerInput>) {
-        if let &NetplayState::Running { frame, .. } = &self.state {
+        if let &NetplayState::Running { frame } = &self.state {
             let input_confirm = InputConfirm {
                 frame,
                 inputs
