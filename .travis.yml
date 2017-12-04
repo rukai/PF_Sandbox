@@ -9,6 +9,7 @@ addons:
     - gcc-4.8
     - g++-4.8
     - cmake
+    - libudev-dev
 cache: cargo
 before_install:
 - openssl aes-256-cbc -K $encrypted_6f89add0ca02_key -iv $encrypted_6f89add0ca02_iv

@@ -1063,7 +1063,7 @@ impl Game {
         self.debug_lines = vec!(format!("Frame: {}    state: {}", frame, self.state));
         for (i, player) in self.players.iter().enumerate() {
             let fighter = &self.package.fighters[self.players[i].fighter.as_ref()];
-            let player_input = &player_inputs[i];
+            let player_input = &player_inputs[self.selected_controllers[i]];
             let debug_player = &self.debug_players[i];
             self.debug_lines.extend(player.debug_print(fighter, player_input, debug_player, i));
         }

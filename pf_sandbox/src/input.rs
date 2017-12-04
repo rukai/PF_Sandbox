@@ -1,16 +1,17 @@
-use libusb::{Context, Device, DeviceHandle, Error};
 use std::ops::Index;
 use std::time::Duration;
 use std::f32;
 
+use gilrs::{Gilrs, Gamepad};
+use gilrs;
+use libusb::{Context, Device, DeviceHandle, Error};
 use treeflection::{Node, NodeRunner, NodeToken};
 
 use network::{Netplay, NetplayState};
 
 enum InputSource<'a> {
     GCAdapter { handle: DeviceHandle<'a>, deadzones: [Deadzone; 4] },
-    #[allow(dead_code)]
-    GenericController { handle: usize, deadzone: Deadzone }
+    GenericController { index: usize, deadzone: Deadzone }
 }
 
 /// Stores the first value returned from an input source
@@ -54,6 +55,7 @@ pub struct Input<'a> {
     current_inputs: Vec<ControllerInput>, // inputs for this frame
     prev_start:     bool,
     input_sources:  Vec<InputSource<'a>>,
+    gilrs:          Gilrs,
 }
 
 // In/Out is from perspective of computer
@@ -97,11 +99,14 @@ impl<'a> Input<'a> {
             input_sources.push(InputSource::GCAdapter { handle, deadzones: Deadzone::empty4() });
         }
 
+        let gilrs = Gilrs::new();
+
         Input {
-            input_sources,
             game_inputs:    vec!(),
             current_inputs: vec!(),
             prev_start:     false,
+            input_sources,
+            gilrs,
         }
     }
 
@@ -146,19 +151,43 @@ impl<'a> Input<'a> {
             }
         }
 
+        while let Some(ev) = self.gilrs.next_event() {
+            self.gilrs.update(&ev);
+        }
+
+        // find new generic controllers
+        for (index, _) in self.gilrs.gamepads() {
+            let mut exists = false;
+            for source in &self.input_sources {
+                if let &InputSource::GenericController { index: check_index, .. } = source {
+                    if index == check_index {
+                        exists = true;
+                    }
+                }
+            }
+
+            // Force users to use native GC->Wii U input
+            if !exists && self.gilrs.gamepad(index).name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
+                self.input_sources.push(InputSource::GenericController { index, deadzone: Deadzone::empty() });
+            }
+        }
+
         // read input from controllers
         let mut inputs: Vec<ControllerInput> = Vec::new();
         for source in &mut self.input_sources {
             match source {
-                &mut InputSource::GCAdapter { ref mut handle, ref mut deadzones } => read_gc_adapter(handle, deadzones, &mut inputs),
-                &mut InputSource::GenericController { .. }                        => unimplemented!()
+                &mut InputSource::GCAdapter { ref mut handle, ref mut deadzones }
+                    => read_gc_adapter(handle, deadzones, &mut inputs),
+
+                &mut InputSource::GenericController { index, ref mut deadzone }
+                    => inputs.push(read_generic(self.gilrs.gamepad(index), deadzone)),
             }
         }
 
         if netplay.skip_frame() {
-            // TODO: Special case this by:
-            // * averaging float values
-            // * detect dropped presses and include the presss
+            // TODO: combine the skipped frames input with the next frame:
+            // * average float values
+            // * detect dropped presses and include the press
         }
         else {
             netplay.send_controller_inputs(inputs.clone());
@@ -408,65 +437,128 @@ impl PlayerInput {
 /// Add 4 GC adapter controllers to inputs
 fn read_gc_adapter(handle: &mut DeviceHandle, deadzones: &mut [Deadzone], inputs: &mut Vec<ControllerInput>) {
     let mut data: [u8; 37] = [0; 37];
-    handle.read_interrupt(0x81, &mut data, Duration::new(1, 0)).unwrap();
+    if let Ok(_) = handle.read_interrupt(0x81, &mut data, Duration::new(1, 0)) {
+        for port in 0..4 {
+            let plugged_in    = data[9*port+1] == 20 || data[9*port+1] == 16;
+            let raw_stick_x   = data[9*port+4];
+            let raw_stick_y   = data[9*port+5];
+            let raw_c_stick_x = data[9*port+6];
+            let raw_c_stick_y = data[9*port+7];
+            let raw_l_trigger = data[9*port+8];
+            let raw_r_trigger = data[9*port+9];
 
-    for port in 0..4 {
-        let plugged_in    = data[9*port+1] == 20 || data[9*port+1] == 16;
-        let raw_stick_x   = data[9*port+4];
-        let raw_stick_y   = data[9*port+5];
-        let raw_c_stick_x = data[9*port+6];
-        let raw_c_stick_y = data[9*port+7];
-        let raw_l_trigger = data[9*port+8];
-        let raw_r_trigger = data[9*port+9];
+            if plugged_in && !deadzones[port].plugged_in // Only reset deadzone if controller was just plugged in
+                && raw_stick_x != 0 // first response seems to give garbage data
+            {
+                deadzones[port] = Deadzone {
+                    plugged_in: true,
+                    stick_x:    raw_stick_x,
+                    stick_y:    raw_stick_y,
+                    c_stick_x:  raw_c_stick_x,
+                    c_stick_y:  raw_c_stick_y,
+                    l_trigger:  raw_l_trigger,
+                    r_trigger:  raw_r_trigger,
+                };
+            }
+            if !plugged_in {
+                deadzones[port] = Deadzone::empty();
+            }
 
-        if plugged_in && !deadzones[port].plugged_in // Only reset deadzone if a controller was just plugged in
-            && raw_stick_x != 0 // first response seems to give garbage data
-        {
-            deadzones[port] = Deadzone {
-                plugged_in: true,
-                stick_x:    raw_stick_x,
-                stick_y:    raw_stick_y,
-                c_stick_x:  raw_c_stick_x,
-                c_stick_y:  raw_c_stick_y,
-                l_trigger:  raw_l_trigger,
-                r_trigger:  raw_r_trigger,
-            };
+            let deadzone = &deadzones[port];
+            let (stick_x, stick_y)     = stick_filter(stick_deadzone(raw_stick_x,   deadzone.stick_x),   stick_deadzone(raw_stick_y,   deadzone.stick_y));
+            let (c_stick_x, c_stick_y) = stick_filter(stick_deadzone(raw_c_stick_x, deadzone.c_stick_x), stick_deadzone(raw_c_stick_y, deadzone.c_stick_y));
+            let l_trigger = trigger_filter(raw_l_trigger.saturating_sub(deadzone.l_trigger));
+            let r_trigger = trigger_filter(raw_r_trigger.saturating_sub(deadzone.r_trigger));
+
+            inputs.push(ControllerInput {
+                up:    data[9*port+2] & 0b10000000 != 0,
+                down:  data[9*port+2] & 0b01000000 != 0,
+                right: data[9*port+2] & 0b00100000 != 0,
+                left:  data[9*port+2] & 0b00010000 != 0,
+                y:     data[9*port+2] & 0b00001000 != 0,
+                x:     data[9*port+2] & 0b00000100 != 0,
+                b:     data[9*port+2] & 0b00000010 != 0,
+                a:     data[9*port+2] & 0b00000001 != 0,
+                l:     data[9*port+3] & 0b00001000 != 0,
+                r:     data[9*port+3] & 0b00000100 != 0,
+                z:     data[9*port+3] & 0b00000010 != 0,
+                start: data[9*port+3] & 0b00000001 != 0,
+                stick_x,
+                stick_y,
+                c_stick_x,
+                c_stick_y,
+                l_trigger,
+                r_trigger,
+                plugged_in,
+            });
         }
-
-        if !plugged_in {
-            deadzones[port] = Deadzone::empty();
-        }
-
-        let deadzone = &deadzones[port];
-        let (stick_x, stick_y)     = stick_filter(stick_deadzone(raw_stick_x,   deadzone.stick_x),   stick_deadzone(raw_stick_y,   deadzone.stick_y));
-        let (c_stick_x, c_stick_y) = stick_filter(stick_deadzone(raw_c_stick_x, deadzone.c_stick_x), stick_deadzone(raw_c_stick_y, deadzone.c_stick_y));
-
-        inputs.push(ControllerInput {
-            plugged_in,
-            up   : data[9*port+2] & 0b10000000 != 0,
-            down : data[9*port+2] & 0b01000000 != 0,
-            right: data[9*port+2] & 0b00100000 != 0,
-            left : data[9*port+2] & 0b00010000 != 0,
-            y    : data[9*port+2] & 0b00001000 != 0,
-            x    : data[9*port+2] & 0b00000100 != 0,
-            b    : data[9*port+2] & 0b00000010 != 0,
-            a    : data[9*port+2] & 0b00000001 != 0,
-            l    : data[9*port+3] & 0b00001000 != 0,
-            r    : data[9*port+3] & 0b00000100 != 0,
-            z    : data[9*port+3] & 0b00000010 != 0,
-            start: data[9*port+3] & 0b00000001 != 0,
-
-            l_trigger: trigger_filter(raw_l_trigger.saturating_sub(deadzone.l_trigger)),
-            r_trigger: trigger_filter(raw_r_trigger.saturating_sub(deadzone.r_trigger)),
-
-            stick_x:   stick_x,
-            stick_y:   stick_y,
-            c_stick_x: c_stick_x,
-            c_stick_y: c_stick_y,
-        });
+    }
+    else {
+        inputs.push(ControllerInput::empty());
+        inputs.push(ControllerInput::empty());
+        inputs.push(ControllerInput::empty());
+        inputs.push(ControllerInput::empty());
     }
 }
 
+/// Add a single controller to inputs, reading from the passed gamepad
+fn read_generic(gamepad: &Gamepad, deadzone: &mut Deadzone) -> ControllerInput {
+    let plugged_in = gamepad.is_connected();
+    let raw_stick_x   = generic_to_byte(gamepad.value(gilrs::Axis::LeftStickX));
+    let raw_stick_y   = generic_to_byte(gamepad.value(gilrs::Axis::LeftStickY));
+    let raw_c_stick_x = generic_to_byte(gamepad.value(gilrs::Axis::RightStickX));
+    let raw_c_stick_y = generic_to_byte(gamepad.value(gilrs::Axis::RightStickY));
+
+    if plugged_in && !deadzone.plugged_in { // Only reset deadzone if controller was just plugged in
+        *deadzone = Deadzone {
+            plugged_in: true,
+            stick_x:    raw_stick_x,
+            stick_y:    raw_stick_y,
+            c_stick_x:  raw_c_stick_x,
+            c_stick_y:  raw_c_stick_y,
+            l_trigger:  0, // gilrs doesnt give sensible values until the trigger has been used so just use a dummy value here
+            r_trigger:  0,
+        };
+    }
+    if !plugged_in {
+        *deadzone = Deadzone::empty();
+    }
+
+    let (stick_x, stick_y)     = stick_filter(stick_deadzone(raw_stick_x,   deadzone.stick_x),   stick_deadzone(raw_stick_y,   deadzone.stick_y));
+    let (c_stick_x, c_stick_y) = stick_filter(stick_deadzone(raw_c_stick_x, deadzone.c_stick_x), stick_deadzone(raw_c_stick_y, deadzone.c_stick_y));
+    let l_trigger = generic_trigger_bounds(gamepad.value(gilrs::Axis::LeftTrigger2));
+    let r_trigger = generic_trigger_bounds(gamepad.value(gilrs::Axis::RightTrigger2));
+
+    ControllerInput {
+        up:    gamepad.is_pressed(gilrs::Button::DPadUp),
+        down:  gamepad.is_pressed(gilrs::Button::DPadDown),
+        right: gamepad.is_pressed(gilrs::Button::DPadLeft),
+        left:  gamepad.is_pressed(gilrs::Button::DPadRight),
+        y:     gamepad.is_pressed(gilrs::Button::North),
+        x:     gamepad.is_pressed(gilrs::Button::East),
+        b:     gamepad.is_pressed(gilrs::Button::West),
+        a:     gamepad.is_pressed(gilrs::Button::South),
+        z:     gamepad.is_pressed(gilrs::Button::LeftTrigger) || gamepad.is_pressed(gilrs::Button::RightTrigger),
+        start: gamepad.is_pressed(gilrs::Button::Start),
+        l:     l_trigger > 0.9,
+        r:     r_trigger > 0.9,
+        stick_x,
+        stick_y,
+        c_stick_x,
+        c_stick_y,
+        l_trigger,
+        r_trigger,
+        plugged_in,
+    }
+}
+
+fn generic_to_byte(value: f32) -> u8 {
+    (value.min(1.0).max(-1.0) * 127.0 + 127.0) as u8
+}
+
+fn generic_trigger_bounds(value: f32) -> f32 {
+    (value.min(1.0).max(-1.0) + 1.0) / 2.0
+}
 
 /// use the first received stick value to reposition the current stick value around 128
 pub fn stick_deadzone(current: u8, first: u8) -> u8 {

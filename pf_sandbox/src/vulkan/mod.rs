@@ -1227,7 +1227,9 @@ impl<'a> VulkanGraphics<'a> {
 
         // MS Windows removes the window immediately on close before the process ends
         if let Some((res_x, res_y)) = window.get_inner_size() {
-            self.os_input_tx.send(WindowEvent::Resized(res_x, res_y)).unwrap();
+            if let Err(_) = self.os_input_tx.send(WindowEvent::Resized(res_x, res_y)) {
+                return false;
+            }
         } else {
             return false;
         }
@@ -1235,7 +1237,7 @@ impl<'a> VulkanGraphics<'a> {
         let os_input_tx = self.os_input_tx.clone();
         self.events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
-                os_input_tx.send(event).unwrap();
+                os_input_tx.send(event).ok();
             };
         });
         true

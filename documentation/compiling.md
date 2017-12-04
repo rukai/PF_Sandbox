@@ -28,7 +28,7 @@ TODO
 Install rust via https://www.rustup.rs/
 Do a custom install and select nightly all other settings default.
 
-sudo apt-get install libssl-dev libusb-1.0-0-dev cmake libvulkan-dev vulkan-utils
+sudo apt-get install libssl-dev libusb-1.0-0-dev cmake libvulkan-dev vulkan-utils libudev-dev
 
 You will also need vulkan drivers:
 *   Intel: sudo apt-get install mesa-vulkan-drivers
@@ -46,7 +46,8 @@ EndSection
 ```
 
 # Setup for Arch
-deps: gcc, libusb, cmake
+
+sudo pacman -Syu gcc libusb cmake
 
 need vulkan drivers: vulkan-icd-loader
 *   Intel: vulkan-intel
@@ -55,7 +56,9 @@ need vulkan drivers: vulkan-icd-loader
 
 # Compile and run
 
-To run pf sandbox: run `CARGO_INCREMENTAL=1 cargo run --release` in the pf_sandbox directory.
+To run PF Sandbox: run `CARGO_INCREMENTAL=1 cargo run --release` in the pf_sandbox directory.
+
+To run PF TAS: run `CARGO_INCREMENTAL=1 cargo run --release` in the pf_tas directory.
 
 # Setup CLI Tool
 

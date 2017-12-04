@@ -85,7 +85,7 @@ impl Default for Fighter {
             shield:                   None,
             power_shield:             None,
             tech:                     None,
-            missed_tech_forced_getup: None,
+            missed_tech_forced_getup: Some(200),
             actions:                  actions,
         }
     }
