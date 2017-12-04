@@ -194,8 +194,8 @@ pub fn run(mut cli_results: CLIResults) {
                     return;
                 };
 
-                netplay.connect(cli_results.address.unwrap(), package.compute_hash());
-                let state = MenuState::NetplayWait { message: String::from("Loading!") };
+                netplay.direct_connect(cli_results.address.unwrap(), package.compute_hash());
+                let state = MenuState::NetplayWait { message: String::from("") };
 
                 (
                     Menu::new(Some(package), config.clone(), state),

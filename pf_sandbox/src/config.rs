@@ -9,6 +9,7 @@ use package;
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Config {
     pub current_package:       Option<String>,
+    pub netplay_region:        Option<String>,
     pub auto_save_replay:      bool,
     pub verify_package_hashes: bool,
     pub fullscreen:            bool,
@@ -45,6 +46,7 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             current_package:       None,
+            netplay_region:        None,
             auto_save_replay:      false,
             verify_package_hashes: true,
             fullscreen:            false,

@@ -24,7 +24,7 @@ use std::mem;
 /// Because it should be refreshed (sourced from filesystem)
 ///     or is no longer valid (e.g. back_counter) some data is thrown away when moving between menus.
 ///     or takes up too much space when copied for netplay e.g. game_results
-/// This data is is kept in the MenuState variants.
+/// This data is kept in the MenuState variants.
 
 pub struct Menu {
     pub package:        PackageHolder,
@@ -118,7 +118,7 @@ impl Menu {
         }
     }
 
-    pub fn step_game_select(&mut self, player_inputs: &[PlayerInput]) {
+    pub fn step_game_select(&mut self, player_inputs: &[PlayerInput], netplay: &mut Netplay) {
         let ticker = &mut self.game_ticker;
 
         if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
@@ -132,10 +132,21 @@ impl Menu {
         }
 
         if (player_inputs.iter().any(|x| x.a.press || x.start.press)) && self.package.get().stages.len() > 0 {
-            self.state = match ticker.cursor {
-                0 => MenuState::character_select(),
-                1 => MenuState::GameSelect,
-                2 => MenuState::replay_select(self.package.get()),
+            match ticker.cursor {
+                0 => {
+                    self.state = MenuState::character_select()
+                }
+                1 => {
+                    netplay.connect_match_making(
+                        self.config.netplay_region.clone().unwrap_or(String::from("AU")), // TODO: set region screen if region.is_none()
+                        2,
+                        self.package.get().compute_hash()
+                    );
+                    self.state = MenuState::NetplayWait { message: String::from("") };
+                }
+                2 => {
+                    self.state = MenuState::replay_select(self.package.get());
+                }
                 _ => unreachable!()
             }
         }
@@ -678,18 +689,31 @@ impl Menu {
 
         match netplay.state() {
             NetplayState::Offline => { }
+            NetplayState::MatchMaking { request, .. } => {
+                self.state = MenuState::NetplayWait { message: format!("Searching for online match in {} {}", request.region, load_character) };
+                if player_inputs.iter().any(|x| x.b.press) {
+                    netplay.disconnect_offline();
+                    self.state = MenuState::GameSelect;
+                }
+            }
             NetplayState::InitConnection {..} => {
                 self.state = MenuState::NetplayWait { message: format!("Connecting to peer {}", load_character) };
+                if player_inputs.iter().any(|x| x.b.press) {
+                    netplay.disconnect_offline();
+                    self.state = MenuState::GameSelect;
+                }
             }
             NetplayState::PingTest { .. } => {
                 self.state = MenuState::NetplayWait { message: format!("Testing ping {}", load_character) };
+                if player_inputs.iter().any(|x| x.b.press) {
+                    netplay.disconnect_offline();
+                    self.state = MenuState::GameSelect;
+                }
             }
-            NetplayState::Disconnected { reason: message} => {
-                if player_inputs.iter().any(|x| x.a.press) {
+            NetplayState::Disconnected { .. } => {
+                if player_inputs.iter().any(|x| x.a.press || x.b.press) {
                     netplay.offline();
                     self.state = MenuState::GameSelect;
-                } else {
-                    self.state = MenuState::NetplayWait { message };
                 }
             }
             NetplayState::Running { .. } => {
@@ -747,7 +771,7 @@ impl Menu {
                 // In order to avoid hitting buttons still held down from the game, dont do anything on the first frame.
                 if frame > 1 {
                     match self.state {
-                        MenuState::GameSelect           => self.step_game_select   (&player_inputs),
+                        MenuState::GameSelect           => self.step_game_select   (&player_inputs, netplay),
                         MenuState::ReplaySelect (_, _)  => self.step_replay_select (&player_inputs),
                         MenuState::PackageSelect (_, _) => self.step_package_select(&player_inputs),
                         MenuState::CharacterSelect {..} => self.step_fighter_select(&player_inputs, netplay),
