@@ -203,6 +203,34 @@ pub fn run(mut cli_results: CLIResults) {
                     os_input,
                 )
             }
+            ContinueFrom::MatchMaking => {
+                let package = if let Some(package_string) = package_string {
+                    if let Some(package) = Package::open_or_generate(&package_string) {
+                        package
+                    } else {
+                        println!("Could not load selected package");
+                        return;
+                    }
+                } else {
+                    println!("No package was selected.");
+                    println!("As a fallback we tried to use the last used package, but that wasnt available either.");
+                    println!("Please select a package.");
+                    return;
+                };
+
+                netplay.connect_match_making(
+                    cli_results.netplay_region.unwrap_or(config.netplay_region.clone().unwrap_or(String::from("AU"))),
+                    cli_results.netplay_players.unwrap_or(2),
+                    package.compute_hash()
+                );
+                let state = MenuState::NetplayWait { message: String::from("") };
+
+                (
+                    Menu::new(Some(package), config.clone(), state),
+                    None,
+                    os_input,
+                )
+            }
             ContinueFrom::Close => unreachable!()
         }
     };

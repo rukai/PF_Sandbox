@@ -13,13 +13,15 @@ pub fn cli() -> CLIResults {
     let program = args[0].clone();
 
     let mut opts = Options::new();
-    opts.optflag("l", "list",         "List available packages and close");
-    opts.optopt("s",  "stage",        "Use the stage specified", "NAME");
-    opts.optopt("f",  "fighters",     "Use the fighters specified", "NAME1,NAME2,NAME3...");
-    opts.optopt("h",  "humanplayers", "Number of human players in the game", "NUM_HUMAN_PLAYERS");
-    opts.optopt("c",  "cpuplayers",   "Number of CPU players in the game", "NUM_CPU_PLAYERS");
-    opts.optopt("a",  "address",      "IP Address of other client to start netplay with", "IP_ADDRESS");
-    opts.optopt("g",  "graphics",     "Graphics backend to use",
+    opts.optflag("l", "list",            "List available packages and close");
+    opts.optopt("s",  "stage",           "Use the stage specified", "NAME");
+    opts.optopt("f",  "fighters",        "Use the fighters specified", "NAME1,NAME2,NAME3...");
+    opts.optopt("h",  "humanplayers",    "Number of human players in the game", "NUM_HUMAN_PLAYERS");
+    opts.optopt("c",  "cpuplayers",      "Number of CPU players in the game", "NUM_CPU_PLAYERS");
+    opts.optopt("a",  "address",         "IP Address of other client to start netplay with", "IP_ADDRESS");
+    opts.optopt("n",  "netplayplayers",  "Search for a netplay game with the specified number of players", "NUM_PLAYERS");
+    opts.optopt("r",  "netplayregion",   "Search for a netplay game with the specified region", "REGION");
+    opts.optopt("g",  "graphics",        "Graphics backend to use",
         if cfg!(features =  "vulkan") && cfg!(features = "opengl") {
             "[vulkan|opengl|none]"
         } else if cfg!(features =  "vulkan") {
@@ -98,7 +100,8 @@ pub fn cli() -> CLIResults {
         if let Ok(address) = address.parse() {
             results.address = Some(address);
             results.continue_from = ContinueFrom::Netplay;
-        } else {
+        }
+        else {
             print_usage(&program, opts);
             results.continue_from = ContinueFrom::Close;
             return results;
@@ -120,6 +123,22 @@ pub fn cli() -> CLIResults {
         };
     }
 
+    if let Some(players) = matches.opt_str("n") {
+        if let Ok(players) = players.parse() {
+            results.netplay_players = Some(players);
+            results.continue_from = ContinueFrom::MatchMaking;
+        } else {
+            print_usage(&program, opts);
+            results.continue_from = ContinueFrom::Close;
+            return results;
+        }
+    }
+
+    if let Some(region) = matches.opt_str("r") {
+        results.netplay_region = Some(region);
+        results.continue_from = ContinueFrom::MatchMaking;
+    }
+
     results
 }
 
@@ -132,6 +151,8 @@ pub struct CLIResults {
     pub stage_name:        Option<String>,
     pub address:           Option<IpAddr>,
     pub continue_from:     ContinueFrom,
+    pub netplay_players:   Option<u8>,
+    pub netplay_region:    Option<String>,
 }
 
 impl CLIResults {
@@ -145,6 +166,8 @@ impl CLIResults {
             stage_name:        None,
             address:           None,
             continue_from:     ContinueFrom::Menu,
+            netplay_players:   None,
+            netplay_region:    None,
         }
     }
 }
@@ -152,6 +175,7 @@ impl CLIResults {
 pub enum ContinueFrom {
     Menu,
     Netplay,
+    MatchMaking,
     Game,
     Close
 }

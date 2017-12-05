@@ -181,7 +181,7 @@ impl Netplay {
             &mut NetplayState::Offline => { }
             &mut NetplayState::Disconnected { .. } => { }
             &mut NetplayState::MatchMaking { ref request, ref mut timer } => {
-                if *timer % 1800 == 0 {
+                if *timer % 600 == 0 { // Send a request every 10 seconds
                     let mut data = bincode::serialize(&request, bincode::Infinite).unwrap();
                     data.insert(0, 0x00);
                     self.socket.send_to(&data, "matchmaking.pfsandbox.net:8413").unwrap();
