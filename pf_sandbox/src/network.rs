@@ -184,12 +184,15 @@ impl Netplay {
                 if *timer % 600 == 0 { // Send a request every 10 seconds
                     let mut data = bincode::serialize(&request, bincode::Infinite).unwrap();
                     data.insert(0, 0x00);
-                    self.socket.send_to(&data, "matchmaking.pfsandbox.net:8413").unwrap();
+                    if let Err(_) = self.socket.send_to(&data, "matchmaking.pfsandbox.net:8413") {
+                        new_state = Some(NetplayState::Disconnected { reason: String::from("Network inaccessible") });
+                    }
                 }
                 if let &Some(ref response) = &self.match_making_response {
                     for peer in response.addresses.iter() {
                         if !self.peers.contains(peer) {
                             self.peers.push(peer.clone());
+                            self.confirmed_inputs.push(vec!());
                         }
                     }
                     if self.peers.len() as u8 + 1 == request.num_players {
@@ -207,7 +210,9 @@ impl Netplay {
                 let mut data = bincode::serialize(&local, bincode::Infinite).unwrap();
                 data.insert(0, 0x01);
                 for peer in self.peers.iter() {
-                    self.socket.send_to(&data, peer).unwrap();
+                    if let Err(_) = self.socket.send_to(&data, peer) {
+                        new_state = Some(NetplayState::Disconnected { reason: String::from("Network inaccessible") });
+                    }
                 }
 
                 // receive init
@@ -237,7 +242,9 @@ impl Netplay {
                 // request a ping from peer and record the time_sent
                 if let Some(next_ping) = pings.iter().enumerate().find(|x| x.1.time_sent.is_none()).map(|x| x.0) {
                     for peer in self.peers.iter() {
-                        self.socket.send_to(&[2, next_ping as u8], peer).unwrap();
+                        if let Err(_) = self.socket.send_to(&[2, next_ping as u8], peer) {
+                            new_state = Some(NetplayState::Disconnected { reason: String::from("Network inaccessible") });
+                        }
                     }
                     pings[next_ping].time_sent = Some(Instant::now());
 
@@ -261,7 +268,7 @@ impl Netplay {
                     let ping_max = 100.0; // TODO: Grab from config
                     if ping_avg > ping_max {
                         for peer in self.peers.iter() {
-                            self.socket.send_to(&[0xAA], peer).unwrap();
+                            self.socket.send_to(&[0xAA], peer).ok();
                         }
                         new_state = Some(NetplayState::Disconnected { reason: format!("The ping was '{}' which was above the limit of '{}'", ping_avg, ping_max) });
                     } else {
@@ -357,38 +364,37 @@ impl Netplay {
         }
     }
 
-    fn connect(&mut self, hash: String) {
-        self.state = NetplayState::InitConnection (InitConnection {
-            random:        rand::thread_rng().gen::<u64>(),
-            build_version: json_upgrade::build_version(),
-            hash
-        });
-        self.confirmed_inputs.clear();
-        self.confirmed_inputs.push(vec!()); // TODO: handle multiple peers
-
-        // clear messages
+    pub fn clear(&mut self) {
         self.init_msgs.clear();
         self.ping_msgs.clear();
         self.css_msgs.clear();
         self.start_request_msgs.clear();
         self.start_confirm_msgs.clear();
         self.running_msgs.clear();
+        self.confirmed_inputs.clear();
+        self.peers.clear();
+        self.match_making_response = None;
     }
 
     pub fn direct_connect(&mut self, address: IpAddr, hash: String) {
-        self.peers = vec!(SocketAddr::new(address, 8413));
-        self.connect(hash);
+        self.clear();
+        self.peers.push(SocketAddr::new(address, 8413));
+        self.confirmed_inputs.push(vec!());
+        self.state = NetplayState::InitConnection (InitConnection {
+            random:        rand::thread_rng().gen::<u64>(),
+            build_version: json_upgrade::build_version(),
+            hash
+        });
     }
 
     pub fn connect_match_making(&mut self, region: String, num_players: u8, package_hash: String) {
+        self.clear();
         let request = MatchMakingRequest {
             build_version: json_upgrade::build_version(),
             region,
             num_players,
             package_hash,
         };
-        self.match_making_response = None;
-        self.peers.clear();
         self.state = NetplayState::MatchMaking { request, timer: 0 };
     }
 
@@ -431,7 +437,9 @@ impl Netplay {
             let mut data = bincode::serialize(&input_confirm, bincode::Infinite).unwrap();
             data.insert(0, 0x04);
             for peer in self.peers.iter() {
-                self.socket.send_to(&data, peer).unwrap();
+                if let Err(_) = self.socket.send_to(&data, peer) {
+                    self.state = NetplayState::Disconnected { reason: String::from("Network inaccessible") };
+                }
             }
         }
         // TODO: Store InputConfirm so we can resend it later (maybe repeat it every step() for n steps, no idea how to best handle this sort of thing)
@@ -449,16 +457,8 @@ impl Netplay {
     }
 }
 
-/// Possible state flow sequences:
-/// *   Offline -> InitConnection -> Disconnected -> Offline
-/// *   Offline -> InitConnection -> Ping Test -> Disconnected -> Offline
-/// *   Offline -> InitConnection -> Ping Test -> CSS -> Disconnect -> Offline
-/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> Disconnect -> Offline
-/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> Disconnected -> Offline
-/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Disconnected -> Offline
-/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Results -> Disconnected -> Offline
-/// *   Offline -> InitConnection -> Ping Test -> CSS -> Start Requested -> StartConfirmed -> InGame -> Results -> CSS -> ... -> Disconnected -> Offline
-/// Disconnected can occur due to self request, peer request, or timeout.
+/// State flow sequence:
+///     Offline -> MatchMaking -> InitConnection -> Ping Test -> Running -> Disconnected -> Offline
 #[derive(Clone)]
 pub enum NetplayState {
     Offline,

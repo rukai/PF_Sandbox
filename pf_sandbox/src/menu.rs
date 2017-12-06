@@ -452,7 +452,7 @@ impl Menu {
             }
             else if player_inputs.iter().any(|x| x[0].b) {
                 if *back_counter > self.back_counter_max {
-                    netplay.disconnect();
+                    netplay.disconnect_offline();
                     new_state = Some(MenuState::GameSelect);
                 }
                 else {
