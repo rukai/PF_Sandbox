@@ -238,6 +238,7 @@ pub fn run(mut cli_results: CLIResults) {
     let mut command_line = CommandLine::new();
 
     loop {
+        debug!("\n\nAPP LOOP START");
         let frame_start = Instant::now();
 
         os_input.step();

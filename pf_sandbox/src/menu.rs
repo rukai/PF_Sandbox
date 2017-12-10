@@ -789,6 +789,7 @@ impl Menu {
             }
         }
 
+        debug!("current_frame: {}", self.current_frame);
         self.game_setup.take()
     }
 

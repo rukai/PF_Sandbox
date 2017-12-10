@@ -157,6 +157,8 @@ impl Game {
         }
 
         self.set_context();
+
+        debug!("current_frame: {}", self.current_frame);
         self.state.clone()
     }
 
@@ -1058,7 +1060,7 @@ impl Game {
 
     fn generate_debug(&mut self, input: &Input, netplay: &Netplay) {
         let frame = self.current_frame;
-        let player_inputs = &input.players(frame, netplay);
+        let player_inputs = &input.players_no_log(frame, netplay);
 
         self.debug_lines = vec!(format!("Frame: {}    state: {}", frame, self.state));
         for (i, player) in self.players.iter().enumerate() {
@@ -1070,9 +1072,8 @@ impl Game {
 
         if self.debug_output_this_step {
             self.debug_output_this_step = false;
-            println!("\n-------------------------------------------");
-            for line in self.debug_lines.iter() {
-                println!("{}", line);
+            for i in 1..self.debug_lines.len() {
+                debug!("{}", self.debug_lines[i]);
             }
         }
     }

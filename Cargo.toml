@@ -9,3 +9,4 @@ members = [
 vulkano = { git = "https://github.com/rukai/vulkano" }
 vulkano-win = { git = "https://github.com/rukai/vulkano" }
 vulkano-shader-derive = { git = "https://github.com/rukai/vulkano" }
+env_logger = { git = "https://github.com/rukai/env_logger" }

@@ -205,6 +205,8 @@ impl<'a> Input<'a> {
 
         self.prev_start     = self.current_inputs.iter().any(|x| x.start);
         self.current_inputs = inputs;
+
+        debug!("step");
     }
 
     /// Reset the game input history
@@ -239,7 +241,7 @@ impl<'a> Input<'a> {
     }
 
     /// Return game inputs at specified index into history
-    pub fn players(&self, frame: usize, netplay: &Netplay) -> Vec<PlayerInput> {
+    pub fn players_no_log(&self, frame: usize, netplay: &Netplay) -> Vec<PlayerInput> {
         let mut result_inputs: Vec<PlayerInput> = vec!();
 
         let local_index = netplay.local_index();
@@ -256,24 +258,24 @@ impl<'a> Input<'a> {
             }
             else {
                 let peer_inputs = &peers_inputs[i - peer_offset];
-                let num_inputs = peer_inputs.last().map_or(0, |x| x.len());
-                for i in 0..num_inputs {
+                let num_controllers = peer_inputs.last().map_or(0, |x| x.len());
+                for i in 0..num_controllers {
                     let inputs = self.get_8frames_of_input(&peer_inputs[..], i, netplay.frame() as i64);
                     result_inputs.push(Input::controller_inputs_to_player_input(inputs));
                 }
             }
         }
 
-        // netplay input logging
-        println!("");
-        println!("netplay.number_of_peers: {}", netplay.number_of_peers());
-        println!("netplay.local_index: {}",  netplay.local_index());
-        println!("netplay.frame: {}", netplay.frame());
-        println!("netplay.frames_to_step: {}", netplay.frames_to_step());
-        println!("netplay.skip_frame : {}", netplay.skip_frame());
-        println!("game/menu.current_frame: {}", frame);
+        result_inputs
+    }
+
+    /// Return game inputs at specified index into history
+    pub fn players(&self, frame: usize, netplay: &Netplay) -> Vec<PlayerInput> {
+        let result_inputs = self.players_no_log(frame, netplay);
+
+        debug!("players()");
         for (i, input) in result_inputs.iter().enumerate() {
-            println!("#{} a: {} b: {} input.stick_x: {} input.stick_y: {}", i, input.a.value, input.b.value, input.stick_x.value, input.stick_y.value);
+            debug!("    #{} a: {} b: {} input.stick_x: {} input.stick_y: {}", i, input.a.value, input.b.value, input.stick_x.value, input.stick_y.value);
         }
 
         result_inputs

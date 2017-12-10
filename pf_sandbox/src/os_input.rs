@@ -156,6 +156,7 @@ impl OsInput {
                 current.handle_event(event);
             }
         }
+        debug!("step");
     }
 
     /// off->on

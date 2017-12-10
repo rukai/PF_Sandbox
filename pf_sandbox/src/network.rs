@@ -307,6 +307,12 @@ impl Netplay {
                 }
             }
         }
+        debug!("state: {}", self.state.to_string());
+        debug!("number_of_peers: {}", self.number_of_peers());
+        debug!("local_index: {}",  self.local_index());
+        debug!("frame: {}", self.frame());
+        debug!("frames_to_step: {}", self.frames_to_step());
+        debug!("skip_frame: {}", self.skip_frame());
     }
 
     pub fn state(&self) -> NetplayState {
@@ -336,7 +342,7 @@ impl Netplay {
         }
     }
 
-    pub fn frame(&self) -> usize { // TODO: Keep match?!?!
+    pub fn frame(&self) -> usize {
         match &self.state {
             &NetplayState::Running => self.state_frame,
             _ => 0
@@ -436,7 +442,6 @@ impl Netplay {
     pub fn set_offline(&mut self) {
         match &self.state {
             &NetplayState::Offline => { }
-            &NetplayState::Disconnected { .. } => { }
             _ => {
                 for peer in self.peers.iter() {
                     self.socket.send_to(&[0xAA], peer).ok();
@@ -471,6 +476,19 @@ pub enum NetplayState {
     MatchMaking    { request: MatchMakingRequest },
     Disconnected   { reason: String },
     PingTest       { local_init: InitConnection, pings:  [Ping; 255] },
+}
+
+impl NetplayState {
+    pub fn to_string(&self) -> String {
+        match self {
+            &NetplayState::Offline               => String::from("Offline"),
+            &NetplayState::Running               => String::from("Running"),
+            &NetplayState::InitConnection (_)    => String::from("InitConnection"),
+            &NetplayState::MatchMaking    { .. } => String::from("MatchMaking"),
+            &NetplayState::Disconnected   { .. } => String::from("Disconnected"),
+            &NetplayState::PingTest       { .. } => String::from("PingTest"),
+        }
+    }
 }
 
 #[derive(Clone, Serialize)]
