@@ -452,7 +452,7 @@ impl Menu {
             }
             else if player_inputs.iter().any(|x| x[0].b) {
                 if *back_counter > self.back_counter_max {
-                    netplay.disconnect_offline();
+                    netplay.set_offline();
                     new_state = Some(MenuState::GameSelect);
                 }
                 else {
@@ -692,27 +692,27 @@ impl Menu {
             NetplayState::MatchMaking { request, .. } => {
                 self.state = MenuState::NetplayWait { message: format!("Searching for online match in {} {}", request.region, load_character) };
                 if player_inputs.iter().any(|x| x.b.press) {
-                    netplay.disconnect_offline();
+                    netplay.set_offline();
                     self.state = MenuState::GameSelect;
                 }
             }
             NetplayState::InitConnection {..} => {
                 self.state = MenuState::NetplayWait { message: format!("Connecting to peer {}", load_character) };
                 if player_inputs.iter().any(|x| x.b.press) {
-                    netplay.disconnect_offline();
+                    netplay.set_offline();
                     self.state = MenuState::GameSelect;
                 }
             }
             NetplayState::PingTest { .. } => {
                 self.state = MenuState::NetplayWait { message: format!("Testing ping {}", load_character) };
                 if player_inputs.iter().any(|x| x.b.press) {
-                    netplay.disconnect_offline();
+                    netplay.set_offline();
                     self.state = MenuState::GameSelect;
                 }
             }
             NetplayState::Disconnected { .. } => {
                 if player_inputs.iter().any(|x| x.a.press || x.b.press) {
-                    netplay.offline();
+                    netplay.set_offline();
                     self.state = MenuState::GameSelect;
                 }
             }
@@ -739,14 +739,13 @@ impl Menu {
             package::extract_from_path(path);
             self.package_loader = None;
             self.state = MenuState::package_select();
-            netplay.offline();
+            netplay.set_offline();
         }
 
         // skip a frame so the other clients can catch up.
         if !netplay.skip_frame() {
             self.current_frame += 1;
 
-            println!("{} {}", self.current_frame, netplay.frames_to_step());
             let start = self.current_frame - netplay.frames_to_step();
             let end = self.current_frame;
 

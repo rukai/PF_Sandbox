@@ -94,10 +94,11 @@ pub struct Netplay {
     seed:                  u64,
     socket:                UdpSocket,
     state:                 NetplayState,
+    state_frame:           usize,
+    last_received_frame:   usize,
     index:                 usize,
     init_msgs:             Vec<InitConnection>,
     ping_msgs:             Vec<u8>,
-    css_msgs:              Vec<usize>,
     start_request_msgs:    Vec<usize>,
     start_confirm_msgs:    Vec<usize>,
     running_msgs:          Vec<InputConfirm>,
@@ -109,6 +110,8 @@ impl Netplay {
         socket.set_nonblocking(true).unwrap();
         Netplay {
             state:                 NetplayState::Offline,
+            state_frame:           0,
+            last_received_frame:   0,
             confirmed_inputs:      vec!(),
             match_making_response: None,
             peers:                 vec!(),
@@ -116,7 +119,6 @@ impl Netplay {
             index:                 0,
             init_msgs:             vec!(),
             ping_msgs:             vec!(),
-            css_msgs:              vec!(),
             start_request_msgs:    vec!(),
             start_confirm_msgs:    vec!(),
             running_msgs:          vec!(),
@@ -126,6 +128,10 @@ impl Netplay {
 
     /// Call this once every frame
     pub fn step(&mut self) {
+        if !self.skip_frame() {
+            self.state_frame += 1;
+        }
+
         // receive messages
         loop {
             let mut buf = [0; 1024];
@@ -161,31 +167,33 @@ impl Netplay {
                         }
                     }
                     0xAA => {
-                        self.state = NetplayState::Disconnected { reason: String::from("Peer disconnected") };
+                        self.disconnect_with_reason("Peer disconnected");
                     }
                     _ => {
                         println!("Couldn't process netplay message starting with: {:?}", &buf[0..32]);
                     }
                 }
+                self.last_received_frame = self.state_frame;
             }
             else {
                 break;
             }
         }
 
-        let skip_frame = self.skip_frame();
+        if self.peers.len() > 0 && self.state_frame - self.last_received_frame > 600 {
+            self.disconnect_with_reason("Connection timed out: no packets received in the last 10 seconds");
+        }
 
         // process messages
-        let mut new_state: Option<NetplayState> = None;
-        match &mut self.state {
-            &mut NetplayState::Offline => { }
-            &mut NetplayState::Disconnected { .. } => { }
-            &mut NetplayState::MatchMaking { ref request, ref mut timer } => {
-                if *timer % 600 == 0 { // Send a request every 10 seconds
+        match self.state.clone() {
+            NetplayState::Offline => { }
+            NetplayState::Disconnected { .. } => { }
+            NetplayState::MatchMaking { request, } => {
+                if self.state_frame % 600 == 1 { // Send a request every 10 seconds
                     let mut data = bincode::serialize(&request, bincode::Infinite).unwrap();
                     data.insert(0, 0x00);
                     if let Err(_) = self.socket.send_to(&data, "matchmaking.pfsandbox.net:8413") {
-                        new_state = Some(NetplayState::Disconnected { reason: String::from("Network inaccessible") });
+                        self.disconnect_with_reason("matchmaking.pfsandbox.net:8413 is inaccessible");
                     }
                 }
                 if let &Some(ref response) = &self.match_making_response {
@@ -195,63 +203,64 @@ impl Netplay {
                             self.confirmed_inputs.push(vec!());
                         }
                     }
-                    if self.peers.len() as u8 + 1 == request.num_players {
-                        new_state = Some(NetplayState::InitConnection (InitConnection {
-                            random:        rand::thread_rng().gen::<u64>(),
-                            build_version: request.build_version.clone(),
-                            hash:          request.package_hash.clone()
-                        }));
-                    }
                 }
-                *timer += 1;
+                if self.peers.len() as u8 + 1 == request.num_players {
+                    self.set_state(NetplayState::InitConnection (InitConnection {
+                        random:        rand::thread_rng().gen::<u64>(),
+                        build_version: request.build_version.clone(),
+                        hash:          request.package_hash.clone()
+                    }));
+                }
             }
-            &mut NetplayState::InitConnection (ref local) => {
+            NetplayState::InitConnection (local) => {
                 // send init
                 let mut data = bincode::serialize(&local, bincode::Infinite).unwrap();
                 data.insert(0, 0x01);
-                for peer in self.peers.iter() {
-                    if let Err(_) = self.socket.send_to(&data, peer) {
-                        new_state = Some(NetplayState::Disconnected { reason: String::from("Network inaccessible") });
-                    }
-                }
+                self.broadcast(&data, "init");
 
                 // receive init
-                for peer in self.init_msgs.drain(..) {
-                    if peer.hash != local.hash {
-                        new_state = Some(NetplayState::Disconnected { reason: String::from("Package hashes did not match, ensure everyone is using the same package.") });
+                if let Some(init) = self.init_msgs.pop() {
+                    if init.hash != local.hash {
+                        self.disconnect_with_reason("Package hashes did not match, ensure everyone is using the same package.");
                     }
-                    else if peer.build_version != local.build_version {
-                        new_state = Some(NetplayState::Disconnected { reason: String::from("Build versions did not match, ensure everyone is using the same PF Sandbox build.") });
+                    else if init.build_version != local.build_version {
+                        self.disconnect_with_reason("Build versions did not match, ensure everyone is using the same PF Sandbox build.");
                     }
                     else {
-                        new_state = Some(NetplayState::PingTest { pings: [Ping::default(); 255] });
+                        self.set_state(NetplayState::PingTest { local_init: local.clone(), pings: [Ping::default(); 255] });
                     }
 
+                    // Use peer 0's random value to generate the game seed for all games in the current session.
+                    // Repeating seeds like this shouldnt be noticeable
                     // TODO: handle multiple peers
-                    if local.random < peer.random {
+                    if local.random < init.random {
                         self.index = 0;
                         self.seed = local.random;
                     }
                     else {
                         self.index = 1;
-                        self.seed = peer.random;
+                        self.seed = init.random;
                     }
                 }
             }
-            &mut NetplayState::PingTest { ref mut pings } => {
+            NetplayState::PingTest { local_init, mut pings } => {
+                // if we havnt received a ping yet then resend init message
+                if pings.iter().all(|x| x.time_received.is_none()) {
+                    let mut data = bincode::serialize(&local_init, bincode::Infinite).unwrap();
+                    data.insert(0, 0x01);
+                    self.broadcast(&data, "init2");
+                }
+
                 // request a ping from peer and record the time_sent
                 if let Some(next_ping) = pings.iter().enumerate().find(|x| x.1.time_sent.is_none()).map(|x| x.0) {
-                    for peer in self.peers.iter() {
-                        if let Err(_) = self.socket.send_to(&[2, next_ping as u8], peer) {
-                            new_state = Some(NetplayState::Disconnected { reason: String::from("Network inaccessible") });
-                        }
-                    }
+                    self.broadcast(&[2, next_ping as u8], "ping");
                     pings[next_ping].time_sent = Some(Instant::now());
 
                     // record the time_received of received pings
                     for ping_msg in self.ping_msgs.iter() {
                         pings[*ping_msg as usize].time_received = Some(Instant::now());
                     }
+                    self.state = NetplayState::PingTest { local_init, pings };
                 }
                 else {
                     let mut ping_total = Duration::from_secs(0);
@@ -267,22 +276,14 @@ impl Netplay {
                     let ping_avg = ping_total / 255.0;
                     let ping_max = 100.0; // TODO: Grab from config
                     if ping_avg > ping_max {
-                        for peer in self.peers.iter() {
-                            self.socket.send_to(&[0xAA], peer).ok();
-                        }
-                        new_state = Some(NetplayState::Disconnected { reason: format!("The ping was '{}' which was above the limit of '{}'", ping_avg, ping_max) });
+                        self.disconnect_with_reason(format!("The ping was '{}' which was above the limit of '{}'", ping_avg, ping_max).as_ref());
                     } else {
-                        new_state = Some(NetplayState::Running { frame: 0 });
+                        self.set_state(NetplayState::Running);
                         // TODO: Need to force input reset all history at this point
                     }
                 }
-                self.ping_msgs.clear();
             }
-            &mut NetplayState::Running { ref mut frame } => {
-                if !skip_frame {
-                    *frame += 1;
-                }
-
+            NetplayState::Running => {
                 let peer = 0; // TODO: handle multiple peers
                 let mut found_msg = true;
                 let mut to_delete = vec!();
@@ -290,7 +291,8 @@ impl Netplay {
                     found_msg = false;
                     for (i, msg) in self.running_msgs.iter().enumerate() {
                         let inputs_len = self.confirmed_inputs[peer].len();
-                        if msg.frame == inputs_len {
+                        // msg.frame starts at 1 because its taken from the peers state_frame which is incremented before any logic is run
+                        if msg.frame == inputs_len + 1 {
                             self.confirmed_inputs[peer].push(msg.inputs.clone());
                             found_msg = true;
                             to_delete.push(i)
@@ -304,9 +306,6 @@ impl Netplay {
                     to_delete.clear();
                 }
             }
-        }
-        if let Some(state) = new_state {
-            self.state = state;
         }
     }
 
@@ -324,67 +323,83 @@ impl Netplay {
 
     /// Returns the total number of peers including the local machine
     pub fn number_of_peers(&self) -> usize {
-        match &self.state {
-            &NetplayState::Running { .. } => self.peers.len(),
-            _ => 1
-        }
+        self.peers.len() + 1
     }
 
     // TODO: Optimize by only starting from a frame where the inputs differ
     /// Returns the number of frames that need to be stepped/restepped including the current frame
     pub fn frames_to_step(&self) -> usize {
         let input_frames = self.confirmed_inputs.iter().map(|x| x.len()).min().unwrap_or(1);
-        match &self.state { // TODO: DELETE THIS
-            &NetplayState::Running { frame }
-              => println!("frames_to_step: {} {}", frame, input_frames),
-            _ => { }
-        };
-
         match &self.state {
-            &NetplayState::Running { frame }
-              => frame.saturating_sub(input_frames).max(1),
+            &NetplayState::Running => self.state_frame.saturating_sub(input_frames).max(1),
             _ => 1
         }
     }
 
-    pub fn frame(&self) -> usize {
+    pub fn frame(&self) -> usize { // TODO: Keep match?!?!
         match &self.state {
-            &NetplayState::Running { frame } => frame,
-            _ => unreachable!()
+            &NetplayState::Running => self.state_frame,
+            _ => 0
         }
     }
 
     // TODO: take ping into account
-    /// returns true if the local machine should do nothing for a frame so that peers can catch up.
+    /// Returns true if the local machine should do nothing for a frame so that peers can catch up.
     pub fn skip_frame(&self) -> bool {
         let input_frames = self.confirmed_inputs.iter().map(|x| x.len()).min().unwrap_or(1);
         match &self.state {
-            &NetplayState::Running { frame } => frame > input_frames + 1,
+            &NetplayState::Running => self.state_frame > input_frames + 1,
             _ => false
         }
     }
 
-    pub fn clear(&mut self) {
-        self.init_msgs.clear();
-        self.ping_msgs.clear();
-        self.css_msgs.clear();
-        self.start_request_msgs.clear();
-        self.start_confirm_msgs.clear();
-        self.running_msgs.clear();
+    /// Return the seed used for this netplay session
+    pub fn get_seed(&self) -> Option<u64> {
+        match &self.state {
+            &NetplayState::Running { .. } => {
+                Some(self.seed)
+            }
+            _ => None
+        }
+    }
+
+    fn broadcast(&mut self, message: &[u8], message_name: &str) {
+        let mut fail = false;
+        for peer in self.peers.iter() {
+            if let Err(_) = self.socket.send_to(message, peer) {
+                fail = true;
+                break;
+            }
+        }
+        if fail {
+            self.disconnect_with_reason(format!("Peer is inaccessible: failed to send {}", message_name).as_ref());
+        }
+    }
+
+    fn clear(&mut self) {
         self.confirmed_inputs.clear();
-        self.peers.clear();
+        self.index = 0;
+        self.init_msgs.clear();
+        self.last_received_frame = 0;
         self.match_making_response = None;
+        self.peers.clear();
+        self.ping_msgs.clear();
+        self.running_msgs.clear();
+        self.seed = 0;
+        self.start_confirm_msgs.clear();
+        self.start_request_msgs.clear();
+        self.state_frame = 0;
     }
 
     pub fn direct_connect(&mut self, address: IpAddr, hash: String) {
         self.clear();
         self.peers.push(SocketAddr::new(address, 8413));
         self.confirmed_inputs.push(vec!());
-        self.state = NetplayState::InitConnection (InitConnection {
+        self.set_state(NetplayState::InitConnection (InitConnection {
             random:        rand::thread_rng().gen::<u64>(),
             build_version: json_upgrade::build_version(),
             hash
-        });
+        }));
     }
 
     pub fn connect_match_making(&mut self, region: String, num_players: u8, package_hash: String) {
@@ -395,10 +410,16 @@ impl Netplay {
             num_players,
             package_hash,
         };
-        self.state = NetplayState::MatchMaking { request, timer: 0 };
+        self.set_state(NetplayState::MatchMaking { request });
     }
 
-    pub fn disconnect(&mut self) {
+    fn set_state(&mut self, state: NetplayState) {
+        self.state = state;
+        self.state_frame = 0;
+        self.last_received_frame = 0;
+    }
+
+    fn disconnect_with_reason(&mut self, reason: &str) {
         match &self.state {
             &NetplayState::Offline |
             &NetplayState::Disconnected { .. } => { }
@@ -406,12 +427,13 @@ impl Netplay {
                 for peer in self.peers.iter() {
                     self.socket.send_to(&[0xAA], peer).ok();
                 }
-                self.state = NetplayState::Disconnected { reason: String::from("Disconnect requested by self") };
+                self.set_state(NetplayState::Disconnected { reason: String::from(reason) });
+                self.clear();
             }
         }
     }
 
-    pub fn disconnect_offline(&mut self) {
+    pub fn set_offline(&mut self) {
         match &self.state {
             &NetplayState::Offline => { }
             &NetplayState::Disconnected { .. } => { }
@@ -419,41 +441,23 @@ impl Netplay {
                 for peer in self.peers.iter() {
                     self.socket.send_to(&[0xAA], peer).ok();
                 }
-                self.state = NetplayState::Offline;
+                self.set_state(NetplayState::Offline);
+                self.clear();
             }
         }
     }
 
-    pub fn offline(&mut self) {
-        self.state = NetplayState::Offline;
-    }
-
     pub fn send_controller_inputs(&mut self, inputs: Vec<ControllerInput>) {
-        if let &NetplayState::Running { frame } = &self.state {
+        if let &NetplayState::Running = &self.state {
             let input_confirm = InputConfirm {
-                frame,
+                frame: self.state_frame,
                 inputs
             };
             let mut data = bincode::serialize(&input_confirm, bincode::Infinite).unwrap();
             data.insert(0, 0x04);
-            for peer in self.peers.iter() {
-                if let Err(_) = self.socket.send_to(&data, peer) {
-                    self.state = NetplayState::Disconnected { reason: String::from("Network inaccessible") };
-                }
-            }
+            self.broadcast(&data, "controller input");
         }
         // TODO: Store InputConfirm so we can resend it later (maybe repeat it every step() for n steps, no idea how to best handle this sort of thing)
-    }
-
-    // Use peer 0's random value to generate the game seed for all games in the current session.
-    // Repeating seeds like this shouldnt be noticeable
-    pub fn get_seed(&self) -> Option<u64> {
-        match &self.state {
-            &NetplayState::Running { .. } => {
-                Some(self.seed)
-            }
-            _ => None
-        }
     }
 }
 
@@ -462,11 +466,11 @@ impl Netplay {
 #[derive(Clone)]
 pub enum NetplayState {
     Offline,
+    Running,
     InitConnection (InitConnection),
-    MatchMaking    { request: MatchMakingRequest, timer: u64 },
+    MatchMaking    { request: MatchMakingRequest },
     Disconnected   { reason: String },
-    PingTest       { pings:  [Ping; 255] },
-    Running        { frame:  usize },
+    PingTest       { local_init: InitConnection, pings:  [Ping; 255] },
 }
 
 #[derive(Clone, Serialize)]

@@ -28,7 +28,7 @@ TODO
 Install rust via https://www.rustup.rs/
 Do a custom install and select nightly all other settings default.
 
-sudo apt-get install libssl-dev libusb-1.0-0-dev cmake libvulkan-dev vulkan-utils libudev-dev
+sudo apt-get install libssl-dev libusb-1.0-0-dev pkg-config cmake libvulkan-dev vulkan-utils libudev-dev
 
 You will also need vulkan drivers:
 *   Intel: sudo apt-get install mesa-vulkan-drivers

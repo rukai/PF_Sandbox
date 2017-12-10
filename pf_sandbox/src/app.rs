@@ -246,7 +246,6 @@ pub fn run(mut cli_results: CLIResults) {
         let mut resume_menu: Option<ResumeMenu> = None;
         if let Some(ref mut game) = game {
             if let NetplayState::Disconnected { reason } = netplay.state() {
-                netplay.disconnect();
                 resume_menu = Some(ResumeMenu::NetplayDisconnect { reason });
             } else {
                 let ai_inputs = ai::gen_inputs(&game);
@@ -310,7 +309,7 @@ pub fn run(mut cli_results: CLIResults) {
         }
 
         if os_input.quit() {
-            netplay.disconnect_offline(); // tell peer we are quiting
+            netplay.set_offline(); // tell peer we are quiting
             return;
         }
 

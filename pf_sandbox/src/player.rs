@@ -766,7 +766,7 @@ impl Player {
     }
 
     fn missed_tech_start_action(&mut self, fighter: &Fighter) {
-        if self.frame == 0 {
+        if self.frame == 1 {
             self.apply_friction(fighter);
         } else {
             self.x_vel = 0.0;
@@ -895,7 +895,7 @@ impl Player {
     }
 
     fn turn_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if self.frame == 0 && self.dash_input(input) {
+        if self.frame == 1 && self.dash_input(input) {
             self.set_action(Action::Dash);
         }
         if self.check_jump(input) { }

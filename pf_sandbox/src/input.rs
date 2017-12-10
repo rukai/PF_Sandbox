@@ -264,6 +264,18 @@ impl<'a> Input<'a> {
             }
         }
 
+        // netplay input logging
+        println!("");
+        println!("netplay.number_of_peers: {}", netplay.number_of_peers());
+        println!("netplay.local_index: {}",  netplay.local_index());
+        println!("netplay.frame: {}", netplay.frame());
+        println!("netplay.frames_to_step: {}", netplay.frames_to_step());
+        println!("netplay.skip_frame : {}", netplay.skip_frame());
+        println!("game/menu.current_frame: {}", frame);
+        for (i, input) in result_inputs.iter().enumerate() {
+            println!("#{} a: {} b: {} input.stick_x: {} input.stick_y: {}", i, input.a.value, input.b.value, input.stick_x.value, input.stick_y.value);
+        }
+
         result_inputs
     }
 
