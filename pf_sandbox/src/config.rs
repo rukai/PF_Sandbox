@@ -1,10 +1,10 @@
+use files;
+use package;
+
 use std::path::PathBuf;
 
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken};
-
-use files;
-use package;
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Config {
@@ -34,6 +34,7 @@ impl Config {
                 return config;
             }
         }
+        warn!("{:?} is invalid or does not exist, loading default values", Config::get_path());
         Config::default()
     }
 

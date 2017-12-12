@@ -1,12 +1,15 @@
+pub mod maps;
+
 use std::ops::Index;
 use std::time::Duration;
 use std::f32;
 
-use gilrs::{Gilrs, Gamepad};
+use gilrs::{Gilrs, Gamepad, Event};
 use gilrs;
 use libusb::{Context, Device, DeviceHandle, Error};
 use treeflection::{Node, NodeRunner, NodeToken};
 
+use self::maps::ControllerMaps;
 use network::{Netplay, NetplayState};
 
 enum InputSource<'a> {
@@ -56,6 +59,8 @@ pub struct Input<'a> {
     prev_start:     bool,
     input_sources:  Vec<InputSource<'a>>,
     gilrs:          Gilrs,
+    input_maps:     ControllerMaps,
+    pub events:     Vec<Event>,
 }
 
 // In/Out is from perspective of computer
@@ -101,12 +106,16 @@ impl<'a> Input<'a> {
 
         let gilrs = Gilrs::new();
 
+        let input_maps = ControllerMaps::load();
+
         Input {
             game_inputs:    vec!(),
             current_inputs: vec!(),
+            events:         vec!(),
             prev_start:     false,
             input_sources,
             gilrs,
+            input_maps,
         }
     }
 
@@ -151,8 +160,10 @@ impl<'a> Input<'a> {
             }
         }
 
+        self.events.clear();
         while let Some(ev) = self.gilrs.next_event() {
             self.gilrs.update(&ev);
+            self.events.push(ev);
         }
 
         // find new generic controllers
