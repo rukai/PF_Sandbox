@@ -25,7 +25,7 @@ install:
   - echo %PATH%
   - pacman --noconfirm -Syu
   - pacman --noconfirm -Syu
-  - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc
+  - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3
 
 test_script:
   - cargo test --release --all
@@ -34,6 +34,7 @@ test_script:
   - move target\release\pf_sandbox.exe pf
   - move target\release\pf_tas.exe pf
   - move target\release\pf_cli.exe pf
+  - move target\release\pf_map_controllers.exe pf
   - move documentation\manual.md pf
   - move documentation\editor_tutorial.md pf
   - move documentation\pf_tas.md pf\pf_tas.md

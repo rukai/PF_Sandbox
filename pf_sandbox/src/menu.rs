@@ -13,7 +13,6 @@ use results::{GameResults, PlayerResult};
 
 use treeflection::{Node, NodeRunner, NodeToken};
 use winit::VirtualKeyCode;
-use gilrs::EventType;
 
 use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
 use std::thread;
@@ -723,44 +722,6 @@ impl Menu {
         }
     }
 
-    pub fn step_map_controller(&mut self, input: &Input, os_input: &OsInput) {
-        // TODO: We cant create an adequate UI for this with the current UI system.
-        // All of this should be thrown away and replaced with something similar to dolphins input mapping UI
-        // Need a way to include multiple controller inputs per GC input
-        // Need a way to choose between analog/digital for each input
-        // Need a way to select advanced setttings e.g. analog flip
-        // Needs to use mouse to select things because obviously we cant rely on having a working controller yet
-        // Maybe we could solve all this by having a seperate tool using a proper gui library (gtk/qt?)
-        // or maybe with html/css/js embedded browser or a webserver + launch users browser
-
-        if let MenuState::MapControllers { map_index, state } = self.state.clone() {
-            if state.is_digital() {
-                for ev in input.events.iter() {
-                    if let &EventType::ButtonPressed (_, native_ev) = &ev.event {
-                        if state.is_first() {
-                            // TODO: create new mapping
-                        }
-
-                        self.state = MenuState::MapControllers { map_index, state: MapControllersState::B };
-                        break
-                    }
-                }
-            }
-            else {
-                for ev in input.events.iter() {
-                    if let &EventType::AxisChanged (_, value, native_ev) = &ev.event {
-                        self.state = MenuState::MapControllers { map_index, state: MapControllersState::B };
-
-                        if state.is_last() {
-                            self.state = MenuState::package_select();
-                        }
-                        break
-                    }
-                }
-            }
-        }
-    }
-
     pub fn step(&mut self, input: &mut Input, os_input: &OsInput, netplay: &mut Netplay) -> Option<GameSetup> {
         if os_input.held_alt() && os_input.key_pressed(VirtualKeyCode::Return) {
             self.config.fullscreen = !self.config.fullscreen;
@@ -816,7 +777,6 @@ impl Menu {
                         MenuState::StageSelect          => self.step_stage_select  (&player_inputs, netplay),
                         MenuState::GameResults {..}     => self.step_results       (&player_inputs),
                         MenuState::NetplayWait {..}     => self.step_netplay_wait  (&player_inputs, netplay),
-                        MenuState::MapControllers {..}  => self.step_map_controller(&input, os_input),
                     };
                 }
 
@@ -849,7 +809,6 @@ impl Menu {
                 MenuState::NetplayWait { ref message } => RenderMenuState::GenericText (message.clone()),
                 MenuState::GameSelect  => RenderMenuState::GameSelect  (self.game_ticker.cursor),
                 MenuState::StageSelect => RenderMenuState::StageSelect (self.stage_ticker.as_ref().unwrap().cursor),
-                MenuState::MapControllers { ref state, .. } => RenderMenuState::GenericText (state.to_string()),
             },
             package_verify: self.package.verify(),
         }
@@ -907,7 +866,6 @@ Menu Help
 Commands:
 *   help               - display this help
 *   open_package $name - loads the package with the given folder name, if it doesnt exist it is created.
-*   map_controller    - open the controller mapping screen.
 
 Accessors:
 *   .package - Package"#)
@@ -930,13 +888,6 @@ Accessors:
                             format!("Didn't specify a package")
                         }
                     }
-                    "map_controller" => {
-                        self.state = MenuState::map_controllers();
-                        if let Some(ref mut last) = self.netplay_history.last_mut() {
-                            last.state = self.state.clone();
-                        }
-                        format!("Opened controller mapper")
-                    }
                     _ => {
                         format!("Menu cannot '{}'", action)
                     }
@@ -957,7 +908,6 @@ pub enum MenuState {
     GameResults { replay_saved: bool },
     PackageSelect (Vec<(String, PackageMeta)>, MenuTicker),
     NetplayWait { message: String },
-    MapControllers { map_index: usize, state: MapControllersState }
 }
 
 impl MenuState {
@@ -979,105 +929,6 @@ impl MenuState {
 
     pub fn game_results() -> MenuState {
         MenuState::GameResults { replay_saved: false }
-    }
-
-    pub fn map_controllers() -> MenuState {
-        MenuState::MapControllers { map_index: 0, state: MapControllersState::A }
-    }
-}
-
-#[derive(Clone)]
-pub enum MapControllersState {
-    A,
-    B,
-    X,
-    Y,
-    Left,
-    Right,
-    Down,
-    Up,
-    Start,
-    Z,
-    L,
-    R,
-    StickX,
-    StickY,
-    CStickX,
-    CStickY,
-    LTrigger,
-    RTrigger,
-}
-
-impl MapControllersState {
-
-    fn is_first(&self) -> bool {
-        match self {
-            &MapControllersState::A => true,
-            _ => false
-        }
-    }
-
-    fn is_last(&self) -> bool {
-        match self {
-            &MapControllersState::RTrigger => true,
-            _ => false
-        }
-    }
-
-    fn is_digital(&self) -> bool {
-        match self {
-            &MapControllersState::StickX | &MapControllersState::StickY |
-            &MapControllersState::CStickX | &MapControllersState::CStickY |
-            &MapControllersState::LTrigger | &MapControllersState::RTrigger
-                => false,
-            _ => true,
-        }
-    }
-
-    fn next_state(&self) -> Option<MapControllersState> {
-        match self {
-            &MapControllersState::A        => Some(MapControllersState::B),
-            &MapControllersState::B        => Some(MapControllersState::X),
-            &MapControllersState::X        => Some(MapControllersState::Y),
-            &MapControllersState::Y        => Some(MapControllersState::Left),
-            &MapControllersState::Left     => Some(MapControllersState::Right),
-            &MapControllersState::Right    => Some(MapControllersState::Down),
-            &MapControllersState::Down     => Some(MapControllersState::Up),
-            &MapControllersState::Up       => Some(MapControllersState::Start),
-            &MapControllersState::Start    => Some(MapControllersState::Z),
-            &MapControllersState::Z        => Some(MapControllersState::L),
-            &MapControllersState::L        => Some(MapControllersState::R),
-            &MapControllersState::R        => Some(MapControllersState::StickX),
-            &MapControllersState::StickX   => Some(MapControllersState::StickY),
-            &MapControllersState::StickY   => Some(MapControllersState::CStickX),
-            &MapControllersState::CStickX  => Some(MapControllersState::CStickY),
-            &MapControllersState::CStickY  => Some(MapControllersState::LTrigger),
-            &MapControllersState::LTrigger => Some(MapControllersState::RTrigger),
-            &MapControllersState::RTrigger => None
-        }
-    }
-
-    fn to_string(&self) -> String {
-        String::from(match self {
-            &MapControllersState::A        => "Press the A button",
-            &MapControllersState::B        => "Press the B button",
-            &MapControllersState::X        => "Press the X button",
-            &MapControllersState::Y        => "Press the Y button",
-            &MapControllersState::Start    => "Press the Start button",
-            &MapControllersState::Z        => "Press the Z button",
-            &MapControllersState::L        => "Press the L button",
-            &MapControllersState::R        => "Press the R button",
-            &MapControllersState::Left     => "Press the Left DPAD",
-            &MapControllersState::Right    => "Press the Right DPAD",
-            &MapControllersState::Down     => "Press the Down DPAD",
-            &MapControllersState::Up       => "Press the Up DPAD",
-            &MapControllersState::StickX   => "Move the main stick horizontally to its full extent, both ways, then press space on keyboard",
-            &MapControllersState::StickY   => "Move the main stick vertically to its full extent, both ways, then press space on keyboard",
-            &MapControllersState::CStickX  => "Move the C stick horizontally to its full extent, both ways, then press space on keyboard",
-            &MapControllersState::CStickY  => "Move the C stick vertically to its full extent, both ways, then press space on keyboard",
-            &MapControllersState::LTrigger => "Move the L trigger to its full extent, both ways, then press space on keyboard",
-            &MapControllersState::RTrigger => "Move the R trigger to its full extent, both ways, then press space on keyboard",
-        })
     }
 }
 

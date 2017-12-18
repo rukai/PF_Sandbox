@@ -167,7 +167,7 @@ impl<'a> Input<'a> {
         }
 
         // find new generic controllers
-        for (index, _) in self.gilrs.gamepads() {
+        for (index, gamepad) in self.gilrs.gamepads() {
             let mut exists = false;
             for source in &self.input_sources {
                 if let &InputSource::GenericController { index: check_index, .. } = source {
@@ -178,7 +178,7 @@ impl<'a> Input<'a> {
             }
 
             // Force users to use native GC->Wii U input
-            if !exists && self.gilrs.gamepad(index).name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
+            if !exists && gamepad.name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
                 self.input_sources.push(InputSource::GenericController { index, deadzone: Deadzone::empty() });
             }
         }

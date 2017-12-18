@@ -2,7 +2,8 @@
 members = [
     "pf_sandbox",
     "pf_tas",
-    "pf_cli"
+    "pf_cli",
+    "map_controllers"
 ]
 
 [patch.crates-io]
