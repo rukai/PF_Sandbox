@@ -75,7 +75,7 @@ impl ControllerMap {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum OS {
     Windows,
     Linux,

@@ -1,4 +1,236 @@
 {
   "engine_version": 9,
-  "maps": []
+  "maps": [
+    {
+      "os": "Linux",
+      "id": 0,
+      "name": "Microsoft X-Box One pad",
+      "analog_maps": [
+        {
+          "source": 0,
+          "dest": "StickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 1,
+          "dest": "StickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 3,
+          "dest": "CStickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 4,
+          "dest": "CStickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 2,
+          "dest": "LTrigger",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 5,
+          "dest": "RTrigger",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        }
+      ],
+      "digital_maps": [
+        {
+          "source": 304,
+          "dest": "A",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 307,
+          "dest": "B",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 305,
+          "dest": "X",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 308,
+          "dest": "Y",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 310,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 311,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 315,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 314,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 316,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 16,
+          "dest": "Left",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 16,
+          "dest": "Right",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 17,
+          "dest": "Up",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 17,
+          "dest": "Down",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "os": "Linux",
+      "id": 0,
+      "name": "USB,2-axis 8-button gamepad  ",
+      "analog_maps": [
+        {
+          "source": 0,
+          "dest": "StickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 1,
+          "dest": "StickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        }
+      ],
+      "digital_maps": [
+        {
+          "source": 291,
+          "dest": "B",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 289,
+          "dest": "A",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 288,
+          "dest": "X",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 292,
+          "dest": "L",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 293,
+          "dest": "R",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 290,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 295,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 294,
+          "dest": "Up",
+          "filter": "FromDigital"
+        }
+      ]
+    }
+  ]
 }

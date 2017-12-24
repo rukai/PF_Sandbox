@@ -5,7 +5,7 @@ extern crate serde_json;
 extern crate pf_sandbox;
 extern crate uuid;
 
-use std::collections::HashMap;
+mod state;
 
 use uuid::Uuid;
 use gtk::prelude::*;
@@ -25,19 +25,19 @@ use gtk::{
     Window,
     WindowType,
 };
-use gilrs::Gilrs;
+use gilrs::EventType;
 
 use pf_sandbox::input::maps::{
-    ControllerMaps,
-    ControllerMap,
-    OS,
     AnalogDest,
     DigitalDest,
     AnalogMap,
     DigitalMap,
     AnalogFilter,
     DigitalFilter,
+    OS
 };
+
+use state::{State, Code, AnalogHistory};
 
 use std::rc::Rc;
 use std::sync::RwLock;
@@ -60,83 +60,40 @@ macro_rules! clone {
     );
 }
 
-struct State {
-    gilrs:             Gilrs,
-    controller_maps:   ControllerMaps,
-    controller:        Option<usize>,
-    ui_to_analog_map:  HashMap<Uuid, usize>,
-    ui_to_digital_map: HashMap<Uuid, usize>,
-}
-
-impl State {
-    pub fn new() -> State {
-        State {
-            gilrs:             Gilrs::new(),
-            controller_maps:   ControllerMaps::load(),
-            controller:        None,
-            ui_to_analog_map:  HashMap::new(),
-            ui_to_digital_map: HashMap::new(),
-        }
-    }
-}
-
 fn main() {
-    let mut state = State::new();
-    //while let Some(ev) = gilrs.next_event() {
-    //    gilrs.update(&ev);
-    //}
-
-    for (_, gamepad) in state.gilrs.gamepads() {
-        let name = gamepad.name().to_string();
-
-        let mut new = true;
-        for controller_map in state.controller_maps.maps.iter() {
-            if controller_map.name == name {
-                new = false;
-            }
-        }
-
-        if new {
-            state.controller_maps.maps.push(ControllerMap {
-                os:           OS::get_current(),
-                id:           0,
-                analog_maps:  vec!(),
-                digital_maps: vec!(),
-                name
-            });
-        }
-    }
-
     // Need to be careful with the rw lock.
     // It is easy to accidentally create a deadlock by accidentally triggering
     // a write locking callback, while we have a read lock, or vice versa.
-    let state = Rc::new(RwLock::new(state));
+    let state = Rc::new(RwLock::new(State::new()));
 
     gtk::init().unwrap();
 
     let window = Window::new(WindowType::Toplevel);
+    window.set_property_default_height(800);
     window.set_title("PFS Controller Mapper");
-
-    let scrolled_window = ScrolledWindow::new(None, None);
-    scrolled_window.set_property_hscrollbar_policy(PolicyType::Never);
-    scrolled_window.set_min_content_height(800);
-    window.add(&scrolled_window);
 
     let vbox = Box::new(Orientation::Vertical, 5);
     vbox.set_margin_start(10);
     vbox.set_margin_top(10);
-    vbox.set_margin_bottom(10);
-    vbox.set_margin_right(10);
-    scrolled_window.add_with_viewport(&vbox);
+    vbox.add(&save_copy_hbox(state.clone()));
+    window.add(&vbox);
 
-    let inputs_vbox = Box::new(Orientation::Vertical, 0);
+    let scrolled_window = ScrolledWindow::new(None, None);
+    scrolled_window.set_property_hscrollbar_policy(PolicyType::Never);
+
+    let inputs_vbox = Box::new(Orientation::Vertical, 20);
+    inputs_vbox.set_margin_top(10);
+    inputs_vbox.set_margin_bottom(10);
+    inputs_vbox.set_margin_right(10);
+    scrolled_window.add_with_viewport(&inputs_vbox);
 
     let controller_select = controller_select_hbox(state.clone(), inputs_vbox.clone());
+    controller_select.set_margin_right(10);
     vbox.add(&controller_select);
 
-    vbox.add(&inputs_vbox);
+    vbox.add(&input_management_hbox(state.clone()));
 
-    vbox.add(&save_copy_hbox(state.clone()));
+    vbox.pack_end(&scrolled_window, true, true, 0);
 
     window.show_all();
     window.connect_delete_event(|_, _| {
@@ -145,6 +102,29 @@ fn main() {
     });
 
     gtk::main();
+}
+
+fn save_copy_hbox(state: Rc<RwLock<State>>) -> Box {
+    let hbox = Box::new(Orientation::Horizontal, 5);
+
+    let save = Button::new_with_label("Save");
+    save.connect_clicked(clone!(state => move |_| {
+        let state = state.read().unwrap();
+        state.controller_maps.save();
+    }));
+    hbox.add(&save);
+
+    let copy = Button::new_with_label("Copy JSON to clipboard");
+    copy.connect_clicked(clone!(state => move |_| {
+        let state = state.read().unwrap();
+        if let Some(controller_map) = state.controller {
+            let json = serde_json::to_string_pretty(&state.controller_maps.maps[controller_map]).unwrap();
+            Clipboard::get(&Atom::from("CLIPBOARD")).set_text(json.as_ref());
+        }
+    }));
+    hbox.add(&copy);
+
+    hbox
 }
 
 fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
@@ -156,7 +136,7 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
         if let Some(text) = combo_box.get_active_text() {
             let mut state = state.write().unwrap();
             for (i, controller_map) in state.controller_maps.maps.iter().enumerate() {
-                if controller_map.name == text {
+                if controller_map.name == text && controller_map.os == OS::get_current() {
                     controller = Some(i);
                 }
             }
@@ -176,7 +156,7 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
             for map in state.controller_maps.maps.iter() {
                 let mut add = false;
                 for (_, gamepad) in state.gilrs.gamepads() {
-                    if gamepad.name() == map.name {
+                    if gamepad.name() == map.name && OS::get_current() == map.os {
                         add = true;
                     }
                 }
@@ -188,12 +168,78 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
         else {
             combo_box.remove_all();
             for map in state.controller_maps.maps.iter() {
-                combo_box.append_text(map.name.as_ref());
+                if OS::get_current() == map.os {
+                    combo_box.append_text(map.name.as_ref());
+                }
             }
         }
     }));
     only_plugged_in.set_active(true);
     hbox.add(&only_plugged_in);
+
+    hbox
+}
+
+fn input_management_hbox(state: Rc<RwLock<State>>) -> Box {
+    let hbox = Box::new(Orientation::Horizontal, 5);
+    hbox.add(&Label::new(Some("Last Input")));
+
+    let label = Label::new(Some(""));
+
+    let refresh_button = Button::new_with_label("Clear");
+    refresh_button.connect_clicked(clone!(state, label => move |_| {
+        let mut state = state.write().unwrap();
+        state.last_code = Code::None;
+        state.analog_history.clear();
+        label.set_label("");
+    }));
+    hbox.add(&refresh_button);
+
+    hbox.add(&label);
+
+    gtk::timeout_add(16, move || {
+        let mut state = state.write().unwrap();
+        while let Some(ev) = state.gilrs.next_event() {
+            match ev.event {
+                EventType::ButtonPressed (_, code) => {
+                    state.last_code = Code::Digital(code as usize);
+                    label.set_text(format!("Digital: {}", code).as_ref());
+                }
+                EventType::AxisChanged (_, value, code) => {
+                    let code = code as usize;
+                    let new_history = match state.analog_history.get(&code).cloned() {
+                        Some(mut history) => {
+                            if value > history.max {
+                                history.max = value;
+                            }
+                            if value < history.min {
+                                history.min = value;
+                            }
+                            history.last_value = value;
+                            history
+                        }
+                        None => {
+                            AnalogHistory::new(value)
+                        }
+                    };
+                    state.analog_history.insert(code, new_history.clone());
+
+                    let mut update = true;
+                    for history in state.analog_history.values() {
+                        if value > history.min && value < history.max {
+                            update = false;
+                        }
+                    }
+                    if update {
+                        state.last_code = Code::Analog(code, new_history);
+                        label.set_text(format!("Analog: {} Value: {}", code, value).as_ref());
+                    }
+                }
+                _ => { }
+            }
+        }
+        Continue(true)
+    });
 
     hbox
 }
@@ -249,13 +295,34 @@ fn digital_input_vbox(state: Rc<RwLock<State>>, input_text: String, dest: Digita
 
 fn digital_input_gc_hbox(state: Rc<RwLock<State>>, vbox: Box, input_text: String, dest: DigitalDest) -> Box {
     let hbox = Box::new(Orientation::Horizontal, 5);
-    hbox.set_margin_top(20);
 
     let input_label = Label::new(Some(input_text.as_str()));
     input_label.set_property_xalign(0.0);
     hbox.add(&input_label);
 
-    let detect_button = Button::new_with_label("Detect input");
+    let detect_button = Button::new_with_label("Add from last input");
+    detect_button.connect_clicked(clone!(state, vbox, dest => move |_| {
+        let last_code = state.read().unwrap().last_code.clone();
+        match last_code {
+            Code::Analog (code, history) => {
+                let map = DigitalMap {
+                    dest:   dest.clone(),
+                    filter: DigitalFilter::FromAnalog { min: history.last_value, max: history.last_value },
+                    source: code,
+                };
+                new_input_digital_map(state.clone(), vbox.clone(), map);
+            }
+            Code::Digital (code) => {
+                let map = DigitalMap {
+                    dest:   dest.clone(),
+                    filter: DigitalFilter::FromDigital,
+                    source: code,
+                };
+                new_input_digital_map(state.clone(), vbox.clone(), map);
+            }
+            Code::None => { }
+        }
+    }));
     hbox.add(&detect_button);
 
     let add_digital_button = Button::new_with_label("Add empty Digital");
@@ -265,17 +332,7 @@ fn digital_input_gc_hbox(state: Rc<RwLock<State>>, vbox: Box, input_text: String
             dest:   dest.clone(),
             filter: DigitalFilter::default_digital(),
         };
-
-        let push_index = {
-            let mut state = state.write().unwrap();
-            let i = state.controller.unwrap();
-            state.controller_maps.maps[i].digital_maps.push(map.clone());
-            state.controller_maps.maps[i].digital_maps.len() - 1
-        };
-
-        let input_map = input_digital_map_hbox(state.clone(), map, push_index);
-        vbox.add(&input_map);
-        vbox.show_all();
+        new_input_digital_map(state.clone(), vbox.clone(), map);
     }));
     hbox.add(&add_digital_button);
 
@@ -284,23 +341,26 @@ fn digital_input_gc_hbox(state: Rc<RwLock<State>>, vbox: Box, input_text: String
         let map = DigitalMap {
             source: 0,
             dest:   dest.clone(),
-            filter: DigitalFilter::default_analog(),
+            filter: DigitalFilter::default_analog()
         };
-
-        let push_index = {
-            let mut state = state.write().unwrap();
-            let i = state.controller.unwrap();
-            state.controller_maps.maps[i].digital_maps.push(map.clone());
-            state.controller_maps.maps[i].digital_maps.len() - 1
-        };
-
-        let input_map = input_digital_map_hbox(state.clone(), map, push_index);
-        vbox.add(&input_map);
-        vbox.show_all();
+        new_input_digital_map(state.clone(), vbox.clone(), map);
     });
     hbox.add(&add_analog_button);
 
     hbox
+}
+
+fn new_input_digital_map(state: Rc<RwLock<State>>, vbox: Box, map: DigitalMap) {
+    let push_index = {
+        let mut state = state.write().unwrap();
+        let i = state.controller.unwrap();
+        state.controller_maps.maps[i].digital_maps.push(map.clone());
+        state.controller_maps.maps[i].digital_maps.len() - 1
+    };
+
+    let input_map = input_digital_map_hbox(state.clone(), map, push_index);
+    vbox.add(&input_map);
+    vbox.show_all();
 }
 
 fn input_digital_map_hbox(state: Rc<RwLock<State>>, digital_map: DigitalMap, index: usize) -> Box {
@@ -401,13 +461,34 @@ fn analog_input_vbox(state: Rc<RwLock<State>>, input_text: String, dest: AnalogD
 
 fn analog_input_gc_hbox(state: Rc<RwLock<State>>, vbox: Box, input_text: String, dest: AnalogDest) -> Box {
     let hbox = Box::new(Orientation::Horizontal, 5);
-    hbox.set_margin_top(20);
 
     let input_label = Label::new(Some(input_text.as_str()));
     input_label.set_property_xalign(0.0);
     hbox.add(&input_label);
 
-    let detect_button = Button::new_with_label("Detect input");
+    let detect_button = Button::new_with_label("Add from last input");
+    detect_button.connect_clicked(clone!(state, vbox, dest => move |_| {
+        let last_code = state.read().unwrap().last_code.clone();
+        match last_code {
+            Code::Analog (code, history) => {
+                let map = AnalogMap {
+                    dest:   dest.clone(),
+                    filter: AnalogFilter::FromAnalog { min: history.min, max: history.max, flip: false },
+                    source: code,
+                };
+                new_input_analog_map(state.clone(), vbox.clone(), map);
+            }
+            Code::Digital (code) => {
+                let map = AnalogMap {
+                    dest:   dest.clone(),
+                    filter: AnalogFilter::default_digital(),
+                    source: code,
+                };
+                new_input_analog_map(state.clone(), vbox.clone(), map);
+            }
+            Code::None => { }
+        }
+    }));
     hbox.add(&detect_button);
 
     let add_digital_button = Button::new_with_label("Add empty Digital");
@@ -417,17 +498,7 @@ fn analog_input_gc_hbox(state: Rc<RwLock<State>>, vbox: Box, input_text: String,
             dest:   dest.clone(),
             filter: AnalogFilter::default_digital(),
         };
-
-        let push_index = {
-            let mut state = state.write().unwrap();
-            let i = state.controller.unwrap();
-            state.controller_maps.maps[i].analog_maps.push(map.clone());
-            state.controller_maps.maps[i].analog_maps.len() - 1
-        };
-
-        let input_map = input_analog_map_hbox(state.clone(), map, push_index);
-        vbox.add(&input_map);
-        vbox.show_all();
+        new_input_analog_map(state.clone(), vbox.clone(), map);
     }));
     hbox.add(&add_digital_button);
 
@@ -438,21 +509,24 @@ fn analog_input_gc_hbox(state: Rc<RwLock<State>>, vbox: Box, input_text: String,
             dest:   dest.clone(),
             filter: AnalogFilter::default_analog(),
         };
-
-        let push_index = {
-            let mut state = state.write().unwrap();
-            let i = state.controller.unwrap();
-            state.controller_maps.maps[i].analog_maps.push(map.clone());
-            state.controller_maps.maps[i].analog_maps.len() - 1
-        };
-
-        let input_map = input_analog_map_hbox(state.clone(), map, push_index);
-        vbox.add(&input_map);
-        vbox.show_all();
+        new_input_analog_map(state.clone(), vbox.clone(), map);
     });
     hbox.add(&add_analog_button);
 
     hbox
+}
+
+fn new_input_analog_map(state: Rc<RwLock<State>>, vbox: Box, map: AnalogMap) {
+    let push_index = {
+        let mut state = state.write().unwrap();
+        let i = state.controller.unwrap();
+        state.controller_maps.maps[i].analog_maps.push(map.clone());
+        state.controller_maps.maps[i].analog_maps.len() - 1
+    };
+
+    let input_map = input_analog_map_hbox(state.clone(), map, push_index);
+    vbox.add(&input_map);
+    vbox.show_all();
 }
 
 fn input_analog_map_hbox(state: Rc<RwLock<State>>, analog_map: AnalogMap, index: usize) -> Box {
@@ -551,29 +625,6 @@ fn input_analog_map_hbox(state: Rc<RwLock<State>>, analog_map: AnalogMap, index:
         }
     }));
     hbox.add(&button);
-
-    hbox
-}
-
-fn save_copy_hbox(state: Rc<RwLock<State>>) -> Box {
-    let hbox = Box::new(Orientation::Horizontal, 5);
-
-    let save = Button::new_with_label("Save");
-    save.connect_clicked(clone!(state => move |_| {
-        let state = state.read().unwrap();
-        state.controller_maps.save();
-    }));
-    hbox.add(&save);
-
-    let copy = Button::new_with_label("Copy JSON to clipboard");
-    copy.connect_clicked(clone!(state => move |_| {
-        let state = state.read().unwrap();
-        if let Some(controller_map) = state.controller {
-            let json = serde_json::to_string_pretty(&state.controller_maps.maps[controller_map]).unwrap();
-            Clipboard::get(&Atom::from("CLIPBOARD")).set_text(json.as_ref());
-        }
-    }));
-    hbox.add(&copy);
 
     hbox
 }
