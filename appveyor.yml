@@ -30,15 +30,16 @@ install:
 test_script:
   - cargo test --release --all
   - cargo build --release --all
-  - mkdir pf
+  - mkdir pf\tools
   - move target\release\pf_sandbox.exe pf
-  - move target\release\pf_tas.exe pf
-  - move target\release\pf_cli.exe pf
-  - move target\release\pf_map_controllers.exe pf
-  - move documentation\manual.md pf
-  - move documentation\editor_tutorial.md pf
-  - move documentation\pf_tas.md pf\pf_tas.md
+  - move target\release\pf_tas.exe pf\tools
+  - move target\release\pf_cli.exe pf\tools
+  - move target\release\pf_map_controllers.exe pf\tools
   - copy C:\msys64\mingw64\bin\libusb-1.0.dll pf
+  - copy C:\msys64\mingw64\bin\libglib-2.0-0.dll pf\tools
+  - copy C:\msys64\mingw64\bin\libcairo-2.dll pf\tools
+  - copy C:\msys64\mingw64\bin\libgdk-3-0.dll pf\tools
+  - copy C:\msys64\mingw64\bin\libgobject-2.0-0.dll pf\tools
   - 7z a pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip pf
   - echo put pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip /home/rubic/PF_Sandbox_Website/builds/ | sftp rubic@pfsandbox.net
 
