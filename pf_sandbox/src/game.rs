@@ -499,6 +499,7 @@ impl Game {
                     if os_input.key_pressed(VirtualKeyCode::Period) {
                         self.package.fighter_colboxes_send_to_back(fighter, action, frame, &self.selector.colboxes)
                     }
+                    // set hitbox angle
                     if os_input.key_pressed(VirtualKeyCode::Q) {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             let player = &self.players[player];

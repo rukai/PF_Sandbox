@@ -3,7 +3,7 @@
   "maps": [
     {
       "os": "Linux",
-      "id": 0,
+      "uuid": "03000000-5e04-0000-d102-000001010000",
       "name": "Microsoft X-Box One pad",
       "analog_maps": [
         {
@@ -163,7 +163,7 @@
     },
     {
       "os": "Linux",
-      "id": 0,
+      "uuid": "03000000-8305-0000-6020-000010010000",
       "name": "USB,2-axis 8-button gamepad  ",
       "analog_maps": [
         {

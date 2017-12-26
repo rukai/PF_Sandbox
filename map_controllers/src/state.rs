@@ -58,7 +58,7 @@ impl State {
             if new {
                 controller_maps.maps.push(ControllerMap {
                     os:           OS::get_current(),
-                    id:           0,
+                    uuid:         gamepad.uuid(),
                     analog_maps:  vec!(),
                     digital_maps: vec!(),
                     name

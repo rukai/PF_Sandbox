@@ -136,7 +136,7 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
         if let Some(text) = combo_box.get_active_text() {
             let mut state = state.write().unwrap();
             for (i, controller_map) in state.controller_maps.maps.iter().enumerate() {
-                if controller_map.name == text && controller_map.os == OS::get_current() {
+                if controller_map.get_fullname() == text && controller_map.os == OS::get_current() {
                     controller = Some(i);
                 }
             }
@@ -161,7 +161,7 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
                     }
                 }
                 if add {
-                    combo_box.append_text(map.name.as_ref());
+                    combo_box.append_text(map.get_fullname().as_ref());
                 }
             }
         }
@@ -169,7 +169,7 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
             combo_box.remove_all();
             for map in state.controller_maps.maps.iter() {
                 if OS::get_current() == map.os {
-                    combo_box.append_text(map.name.as_ref());
+                    combo_box.append_text(map.get_fullname().as_ref());
                 }
             }
         }

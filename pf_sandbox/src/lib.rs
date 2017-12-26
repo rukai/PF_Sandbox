@@ -14,6 +14,7 @@ extern crate reqwest;
 extern crate serde;
 extern crate termcolor;
 extern crate treeflection;
+extern crate uuid;
 extern crate winit;
 extern crate zip;
 #[macro_use] extern crate enum_traits_macros;

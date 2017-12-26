@@ -4,6 +4,7 @@ use files;
 use std::path::PathBuf;
 
 use serde_json;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
 pub struct ControllerMaps {
@@ -47,7 +48,7 @@ impl Default for ControllerMaps {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ControllerMap {
     pub os:           OS,
-    pub id:           usize,
+    pub uuid:         Uuid,
     pub name:         String,
     pub analog_maps:  Vec<AnalogMap>,
     pub digital_maps: Vec<DigitalMap>,
@@ -72,6 +73,10 @@ impl ControllerMap {
             }
         }
         result
+    }
+
+    pub fn get_fullname(&self) -> String {
+        format!("{} - {}", self.name, self.uuid.to_string())
     }
 }
 
