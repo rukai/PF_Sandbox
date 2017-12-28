@@ -8,7 +8,7 @@ repository = "https://github.com/rukai/pf_sandbox"
 keywords = ["pf", "sandbox", "TAS"]
 
 [dependencies]
-winit = "0.9"
+winit = "0.10"
 vulkano = "0.7"
 vulkano-shader-derive = "0.7"
 vulkano-win = "0.8"

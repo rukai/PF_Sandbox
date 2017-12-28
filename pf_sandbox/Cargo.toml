@@ -16,7 +16,7 @@ env_logger = "0.5.0-rc.1"
 getopts = "0.2"
 gilrs = "0.5"
 libusb = "0.3"
-log = "0.4.0-rc.1"
+log = "0.4.0"
 lyon = "0.8"
 matches = "0.1.4"
 rand = "0.3"
@@ -29,7 +29,7 @@ termcolor = "0.3"
 treeflection = "0.1"
 treeflection_derive = "0.1"
 uuid = { version = "0.5", features = ["v4", "serde"] }
-winit = "0.9" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+winit = "0.10" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 zip = "0.2"
 
 vulkano = { version = "0.7", optional = true }
