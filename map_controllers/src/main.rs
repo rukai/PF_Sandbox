@@ -156,7 +156,7 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
             for map in state.controller_maps.maps.iter() {
                 let mut add = false;
                 for (_, gamepad) in state.gilrs.gamepads() {
-                    if gamepad.name() == map.name && OS::get_current() == map.os {
+                    if gamepad.name() == map.name && gamepad.uuid() == map.uuid && OS::get_current() == map.os {
                         add = true;
                     }
                 }

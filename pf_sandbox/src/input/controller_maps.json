@@ -68,7 +68,7 @@
             "FromAnalog": {
               "min": -1.0,
               "max": 1.0,
-              "flip": false
+              "flip": true
             }
           }
         }
@@ -158,6 +158,26 @@
               "max": 1.0
             }
           }
+        },
+        {
+          "source": 2,
+          "dest": "L",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.97,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 5,
+          "dest": "R",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": -0.97
+            }
+          }
         }
       ]
     },
@@ -229,6 +249,161 @@
           "source": 294,
           "dest": "Up",
           "filter": "FromDigital"
+        }
+      ]
+    },
+    {
+      "os": "Linux",
+      "uuid": "03000000-5e04-0000-8e02-000014010000",
+      "name": "Microsoft X-Box 360 pad",
+      "analog_maps": [
+        {
+          "source": 0,
+          "dest": "StickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 1,
+          "dest": "StickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 3,
+          "dest": "CStickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 4,
+          "dest": "CStickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 2,
+          "dest": "LTrigger",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 5,
+          "dest": "RTrigger",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        }
+      ],
+      "digital_maps": [
+        {
+          "source": 304,
+          "dest": "A",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 307,
+          "dest": "B",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 305,
+          "dest": "X",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 308,
+          "dest": "Y",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 315,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 314,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 546,
+          "dest": "Left",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 547,
+          "dest": "Right",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 544,
+          "dest": "Up",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 545,
+          "dest": "Down",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 310,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 311,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 5,
+          "dest": "R",
+          "filter": {
+            "FromAnalog": {
+              "min": -0.97,
+              "max": -1.0
+            }
+          }
+        },
+        {
+          "source": 2,
+          "dest": "L",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.97,
+              "max": 1.0
+            }
+          }
         }
       ]
     }

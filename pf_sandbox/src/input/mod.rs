@@ -4,17 +4,16 @@ use std::ops::Index;
 use std::time::Duration;
 use std::f32;
 
-use gilrs::{Gilrs, Gamepad, Event};
-use gilrs;
+use gilrs::{Gilrs, Gamepad, Event, EventType};
 use libusb::{Context, Device, DeviceHandle, Error};
 use treeflection::{Node, NodeRunner, NodeToken};
 
-use self::maps::ControllerMaps;
+use self::maps::{ControllerMaps, ControllerMap, AnalogFilter, AnalogDest, DigitalFilter, DigitalDest};
 use network::{Netplay, NetplayState};
 
 enum InputSource<'a> {
     GCAdapter { handle: DeviceHandle<'a>, deadzones: [Deadzone; 4] },
-    GenericController { index: usize, deadzone: Deadzone }
+    GenericController { index: usize, state: ControllerInput, deadzone: Deadzone }
 }
 
 /// Stores the first value returned from an input source
@@ -54,13 +53,13 @@ impl Deadzone {
 pub struct Input<'a> {
     // game past and (potentially) future inputs, frame 0 has index 2
     // structure: frames Vec<controllers Vec<ControllerInput>>
-    game_inputs:    Vec<Vec<ControllerInput>>,
-    current_inputs: Vec<ControllerInput>, // inputs for this frame
-    prev_start:     bool,
-    input_sources:  Vec<InputSource<'a>>,
-    gilrs:          Gilrs,
-    input_maps:     ControllerMaps,
-    pub events:     Vec<Event>,
+    game_inputs:     Vec<Vec<ControllerInput>>,
+    current_inputs:  Vec<ControllerInput>, // inputs for this frame
+    prev_start:      bool,
+    input_sources:   Vec<InputSource<'a>>,
+    gilrs:           Gilrs,
+    controller_maps: ControllerMaps,
+    pub events:      Vec<Event>,
 }
 
 // In/Out is from perspective of computer
@@ -106,7 +105,7 @@ impl<'a> Input<'a> {
 
         let gilrs = Gilrs::new();
 
-        let input_maps = ControllerMaps::load();
+        let controller_maps = ControllerMaps::load();
 
         Input {
             game_inputs:    vec!(),
@@ -115,7 +114,7 @@ impl<'a> Input<'a> {
             prev_start:     false,
             input_sources,
             gilrs,
-            input_maps,
+            controller_maps,
         }
     }
 
@@ -162,7 +161,6 @@ impl<'a> Input<'a> {
 
         self.events.clear();
         while let Some(ev) = self.gilrs.next_event() {
-            self.gilrs.update(&ev);
             self.events.push(ev);
         }
 
@@ -179,7 +177,7 @@ impl<'a> Input<'a> {
 
             // Force users to use native GC->Wii U input
             if !exists && gamepad.name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
-                self.input_sources.push(InputSource::GenericController { index, deadzone: Deadzone::empty() });
+                self.input_sources.push(InputSource::GenericController { index, state: ControllerInput::default(), deadzone: Deadzone::empty() });
             }
         }
 
@@ -190,8 +188,12 @@ impl<'a> Input<'a> {
                 &mut InputSource::GCAdapter { ref mut handle, ref mut deadzones }
                     => read_gc_adapter(handle, deadzones, &mut inputs),
 
-                &mut InputSource::GenericController { index, ref mut deadzone }
-                    => inputs.push(read_generic(self.gilrs.gamepad(index), deadzone)),
+                &mut InputSource::GenericController { index, ref mut state, ref mut deadzone } => {
+                    let events = self.events.iter().filter(|x| x.id == index).map(|x| &x.event).cloned().collect();
+                    let gamepad = self.gilrs.gamepad(index);
+                    let maps = &self.controller_maps.maps;
+                    inputs.push(read_generic(maps, state, events, gamepad, deadzone));
+                }
             }
         }
 
@@ -527,62 +529,145 @@ fn read_gc_adapter(handle: &mut DeviceHandle, deadzones: &mut [Deadzone], inputs
 }
 
 /// Add a single controller to inputs, reading from the passed gamepad
-fn read_generic(gamepad: &Gamepad, deadzone: &mut Deadzone) -> ControllerInput {
-    let plugged_in = gamepad.is_connected();
-    let raw_stick_x   = generic_to_byte(gamepad.value(gilrs::Axis::LeftStickX));
-    let raw_stick_y   = generic_to_byte(gamepad.value(gilrs::Axis::LeftStickY));
-    let raw_c_stick_x = generic_to_byte(gamepad.value(gilrs::Axis::RightStickX));
-    let raw_c_stick_y = generic_to_byte(gamepad.value(gilrs::Axis::RightStickY));
-
-    if plugged_in && !deadzone.plugged_in { // Only reset deadzone if controller was just plugged in
-        *deadzone = Deadzone {
-            plugged_in: true,
-            stick_x:    raw_stick_x,
-            stick_y:    raw_stick_y,
-            c_stick_x:  raw_c_stick_x,
-            c_stick_y:  raw_c_stick_y,
-            l_trigger:  0, // gilrs doesnt give sensible values until the trigger has been used so just use a dummy value here
-            r_trigger:  0,
-        };
-    }
-    if !plugged_in {
-        *deadzone = Deadzone::empty();
+fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, events: Vec<EventType>, gamepad: &Gamepad, deadzone: &mut Deadzone) -> ControllerInput {
+    let mut controller_map_use = None;
+    for controller_map in controller_maps {
+        if controller_map.name == gamepad.name() && controller_map.uuid == gamepad.uuid() {
+            controller_map_use = Some(controller_map);
+        }
     }
 
-    let (stick_x, stick_y)     = stick_filter(stick_deadzone(raw_stick_x,   deadzone.stick_x),   stick_deadzone(raw_stick_y,   deadzone.stick_y));
-    let (c_stick_x, c_stick_y) = stick_filter(stick_deadzone(raw_c_stick_x, deadzone.c_stick_x), stick_deadzone(raw_c_stick_y, deadzone.c_stick_y));
-    let l_trigger = generic_trigger_bounds(gamepad.value(gilrs::Axis::LeftTrigger2));
-    let r_trigger = generic_trigger_bounds(gamepad.value(gilrs::Axis::RightTrigger2));
+    if let Some(controller_map) = controller_map_use {
+        // update internal state
+        for event in events {
+            match event {
+                // TODO: better handle multiple sources pointing to the same destination
+                // maybe keep a unique ControllerInput state for each source input
+                EventType::ButtonPressed (_, code) => {
+                    for map in &controller_map.analog_maps {
+                        if let AnalogFilter::FromDigital { value } = map.filter {
+                            if map.source == code as usize {
+                                state.set_analog_dest(map.dest.clone(), value);
+                            }
+                        }
+                    }
 
-    ControllerInput {
-        up:    gamepad.is_pressed(gilrs::Button::DPadUp),
-        down:  gamepad.is_pressed(gilrs::Button::DPadDown),
-        right: gamepad.is_pressed(gilrs::Button::DPadLeft),
-        left:  gamepad.is_pressed(gilrs::Button::DPadRight),
-        y:     gamepad.is_pressed(gilrs::Button::North),
-        x:     gamepad.is_pressed(gilrs::Button::East),
-        b:     gamepad.is_pressed(gilrs::Button::West),
-        a:     gamepad.is_pressed(gilrs::Button::South),
-        z:     gamepad.is_pressed(gilrs::Button::LeftTrigger) || gamepad.is_pressed(gilrs::Button::RightTrigger),
-        start: gamepad.is_pressed(gilrs::Button::Start),
-        l:     l_trigger > 0.9,
-        r:     r_trigger > 0.9,
-        stick_x,
-        stick_y,
-        c_stick_x,
-        c_stick_y,
-        l_trigger,
-        r_trigger,
-        plugged_in,
+                    for map in &controller_map.digital_maps {
+                        if let DigitalFilter::FromDigital = map.filter {
+                            if map.source == code as usize {
+                                state.set_digital_dest(map.dest.clone(), true);
+                            }
+                        };
+                    }
+                }
+                EventType::ButtonReleased (_, code) => {
+                    for map in &controller_map.analog_maps {
+                        if let AnalogFilter::FromDigital { .. } = map.filter {
+                            if map.source == code as usize {
+                                state.set_analog_dest(map.dest.clone(), 0.0);
+                            }
+                        }
+                    }
+
+                    for map in &controller_map.digital_maps {
+                        if let DigitalFilter::FromDigital = map.filter {
+                            if map.source == code as usize {
+                                state.set_digital_dest(map.dest.clone(), false);
+                            }
+                        };
+                    }
+                }
+                EventType::AxisChanged (_, value, code) => {
+                    for map in &controller_map.analog_maps {
+                        if let AnalogFilter::FromAnalog { min, max, flip } = map.filter {
+                            let mut new_value = value;
+
+                            // Implemented as per https://stackoverflow.com/questions/345187/math-mapping-numbers
+                            new_value = (new_value-min)/(max-min) * 2.0 - 1.0;
+
+                            new_value *= if flip { -1.0 } else { 1.0 };
+
+                            match &map.dest {
+                                &AnalogDest::LTrigger | &AnalogDest::RTrigger => {
+                                    new_value = (new_value + 1.0) / 2.0;
+                                }
+                                _ => { }
+                            }
+
+                            if map.source == code as usize {
+                                state.set_analog_dest(map.dest.clone(), new_value);
+                            }
+                        };
+                    }
+
+                    for map in &controller_map.digital_maps {
+                        if let DigitalFilter::FromAnalog { min, max } = map.filter {
+                            let value = value >= min && value <= max;
+
+                            if map.source == code as usize {
+                                state.set_digital_dest(map.dest.clone(), value);
+                            }
+                        };
+                    }
+                }
+                EventType::Connected => {
+                    state.plugged_in = true;
+                }
+                EventType::Disconnected => {
+                    state.plugged_in = false;
+                }
+                _ => { }
+            }
+        }
+
+        // convert state floats to bytes
+        let raw_stick_x   = generic_to_byte(state.stick_x);
+        let raw_stick_y   = generic_to_byte(state.stick_y);
+        let raw_c_stick_x = generic_to_byte(state.c_stick_x);
+        let raw_c_stick_y = generic_to_byte(state.c_stick_y);
+
+        let raw_l_trigger = generic_to_byte(state.l_trigger);
+        let raw_r_trigger = generic_to_byte(state.r_trigger);
+
+        // update deadzones
+        if state.plugged_in && !deadzone.plugged_in { // Only reset deadzone if controller was just plugged in
+            *deadzone = Deadzone {
+                plugged_in: true,
+                stick_x:    raw_stick_x,
+                stick_y:    raw_stick_y,
+                c_stick_x:  raw_c_stick_x,
+                c_stick_y:  raw_c_stick_y,
+                l_trigger:  raw_l_trigger,
+                r_trigger:  raw_r_trigger,
+            };
+        }
+        if !state.plugged_in {
+            *deadzone = Deadzone::empty();
+        }
+
+        // convert bytes to result floats
+        let (stick_x, stick_y)     = stick_filter(stick_deadzone(raw_stick_x,   deadzone.stick_x),   stick_deadzone(raw_stick_y,   deadzone.stick_y));
+        let (c_stick_x, c_stick_y) = stick_filter(stick_deadzone(raw_c_stick_x, deadzone.c_stick_x), stick_deadzone(raw_c_stick_y, deadzone.c_stick_y));
+
+        let l_trigger = trigger_filter(raw_l_trigger.saturating_sub(deadzone.l_trigger));
+        let r_trigger = trigger_filter(raw_r_trigger.saturating_sub(deadzone.r_trigger));
+
+        ControllerInput {
+            stick_x,
+            stick_y,
+            c_stick_x,
+            c_stick_y,
+            l_trigger,
+            r_trigger,
+            ..state.clone()
+        }
+    } else {
+        ControllerInput::default()
     }
 }
 
 fn generic_to_byte(value: f32) -> u8 {
     (value.min(1.0).max(-1.0) * 127.0 + 127.0) as u8
-}
-
-fn generic_trigger_bounds(value: f32) -> f32 {
-    (value.min(1.0).max(-1.0) + 1.0) / 2.0
 }
 
 /// use the first received stick value to reposition the current stick value around 128
@@ -658,6 +743,36 @@ pub struct ControllerInput {
     pub l_trigger: f32,
 }
 
+impl ControllerInput {
+    fn set_analog_dest(&mut self, analog_dest: AnalogDest, value: f32) {
+        match analog_dest {
+            AnalogDest::StickX   => { self.stick_x = value }
+            AnalogDest::StickY   => { self.stick_y = value }
+            AnalogDest::CStickX  => { self.c_stick_x = value }
+            AnalogDest::CStickY  => { self.c_stick_y = value }
+            AnalogDest::RTrigger => { self.l_trigger = value }
+            AnalogDest::LTrigger => { self.r_trigger = value }
+        }
+    }
+
+    fn set_digital_dest(&mut self, analog_dest: DigitalDest, value: bool) {
+        match analog_dest {
+            DigitalDest::A     => { self.a = value }
+            DigitalDest::B     => { self.b = value }
+            DigitalDest::X     => { self.x = value }
+            DigitalDest::Y     => { self.y = value }
+            DigitalDest::Left  => { self.left = value }
+            DigitalDest::Right => { self.right = value }
+            DigitalDest::Down  => { self.down = value }
+            DigitalDest::Up    => { self.up = value }
+            DigitalDest::Start => { self.start = value }
+            DigitalDest::Z     => { self.z = value }
+            DigitalDest::R     => { self.r = value }
+            DigitalDest::L     => { self.l = value }
+        }
+    }
+}
+
 /// External data access
 pub struct PlayerInput {
     pub plugged_in: bool,
@@ -692,7 +807,7 @@ impl Index<usize> for PlayerInput {
     }
 }
 
-// TODO: now we that we have history we could remove the value from these, turning them into primitive values
+// TODO: now that we have history we could remove the value from these, turning them into primitive values
 
 pub struct Button {
     pub value: bool, // on

@@ -47,21 +47,23 @@ impl State {
         // add gamepads that dont have an existing mapping
         for (_, gamepad) in gilrs.gamepads() {
             let name = gamepad.name().to_string();
+            let uuid = gamepad.uuid();
+            let os = OS::get_current();
 
             let mut new = true;
             for controller_map in controller_maps.maps.iter() {
-                if controller_map.name == name && controller_map.os == OS::get_current() {
+                if controller_map.name == name && controller_map.uuid == uuid && controller_map.os == os {
                     new = false;
                 }
             }
 
             if new {
                 controller_maps.maps.push(ControllerMap {
-                    os:           OS::get_current(),
-                    uuid:         gamepad.uuid(),
                     analog_maps:  vec!(),
                     digital_maps: vec!(),
-                    name
+                    os,
+                    name,
+                    uuid
                 });
             }
         }
