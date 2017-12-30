@@ -7,6 +7,7 @@ members = [
 ]
 
 [patch.crates-io]
+gilrs = { git = "https://gitlab.com/rukai/gilrs" }
 vulkano = { git = "https://github.com/rukai/vulkano" }
 vulkano-win = { git = "https://github.com/rukai/vulkano" }
 vulkano-shader-derive = { git = "https://github.com/rukai/vulkano" }

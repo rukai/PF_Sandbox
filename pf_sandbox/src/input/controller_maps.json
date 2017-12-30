@@ -55,7 +55,7 @@
           "dest": "LTrigger",
           "filter": {
             "FromAnalog": {
-              "min": -1.0,
+              "min": 0.0019550342,
               "max": 1.0,
               "flip": false
             }
@@ -66,9 +66,9 @@
           "dest": "RTrigger",
           "filter": {
             "FromAnalog": {
-              "min": -1.0,
+              "min": 0.0019550342,
               "max": 1.0,
-              "flip": true
+              "flip": false
             }
           }
         }
@@ -174,8 +174,8 @@
           "dest": "R",
           "filter": {
             "FromAnalog": {
-              "min": -1.0,
-              "max": -0.97
+              "min": 0.97,
+              "max": 1.0
             }
           }
         }
@@ -306,7 +306,7 @@
           "dest": "LTrigger",
           "filter": {
             "FromAnalog": {
-              "min": -1.0,
+              "min": 0.003921569,
               "max": 1.0,
               "flip": false
             }
@@ -317,7 +317,7 @@
           "dest": "RTrigger",
           "filter": {
             "FromAnalog": {
-              "min": -1.0,
+              "min": 0.003921569,
               "max": 1.0,
               "flip": false
             }
@@ -386,17 +386,17 @@
           "filter": "FromDigital"
         },
         {
-          "source": 5,
+          "source": 2,
           "dest": "R",
           "filter": {
             "FromAnalog": {
-              "min": -0.97,
-              "max": -1.0
+              "min": 0.97,
+              "max": 1.0
             }
           }
         },
         {
-          "source": 2,
+          "source": 5,
           "dest": "L",
           "filter": {
             "FromAnalog": {

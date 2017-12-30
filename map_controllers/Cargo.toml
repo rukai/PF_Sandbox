@@ -5,7 +5,7 @@ authors = ["Rukai <rubickent@gmail.com>"]
 
 [dependencies]
 gdk = "0.7"
-gilrs = "0.5"
+gilrs = "0.6"
 serde_json = "1.0"
 gtk = { version = "0.3", features = ["v3_12"] }
 uuid = { version = "0.5", features = ["v4", "serde"] }

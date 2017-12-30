@@ -4,7 +4,7 @@ use std::ops::Index;
 use std::time::Duration;
 use std::f32;
 
-use gilrs::{Gilrs, Gamepad, Event, EventType};
+use gilrs::{Gilrs, GilrsBuilder, Gamepad, Event, EventType};
 use libusb::{Context, Device, DeviceHandle, Error};
 use treeflection::{Node, NodeRunner, NodeToken};
 
@@ -103,7 +103,7 @@ impl<'a> Input<'a> {
             input_sources.push(InputSource::GCAdapter { handle, deadzones: Deadzone::empty4() });
         }
 
-        let gilrs = Gilrs::new();
+        let gilrs = GilrsBuilder::new().build();
 
         let controller_maps = ControllerMaps::load();
 
@@ -161,8 +161,10 @@ impl<'a> Input<'a> {
 
         self.events.clear();
         while let Some(ev) = self.gilrs.next_event() {
+            self.gilrs.update(&ev); // TODO: If we dont call this then we dont get a 0.0 value on the triggers, investigate
             self.events.push(ev);
         }
+        self.events.sort_by_key(|x| x.time);
 
         // find new generic controllers
         for (index, gamepad) in self.gilrs.gamepads() {
@@ -176,7 +178,7 @@ impl<'a> Input<'a> {
             }
 
             // Force users to use native GC->Wii U input
-            if !exists && gamepad.name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
+            if !exists && gamepad.os_name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
                 self.input_sources.push(InputSource::GenericController { index, state: ControllerInput::default(), deadzone: Deadzone::empty() });
             }
         }
@@ -532,7 +534,7 @@ fn read_gc_adapter(handle: &mut DeviceHandle, deadzones: &mut [Deadzone], inputs
 fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, events: Vec<EventType>, gamepad: &Gamepad, deadzone: &mut Deadzone) -> ControllerInput {
     let mut controller_map_use = None;
     for controller_map in controller_maps {
-        if controller_map.name == gamepad.name() && controller_map.uuid == gamepad.uuid() {
+        if controller_map.name == gamepad.os_name() && controller_map.uuid == gamepad.uuid() {
             controller_map_use = Some(controller_map);
         }
     }
