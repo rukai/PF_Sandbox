@@ -229,32 +229,49 @@ impl<'a> VulkanGraphics<'a> {
     ) {
         let render_pass = Arc::new(single_pass_renderpass!(device.clone(),
             attachments: {
-                color: {
+                multisampled_color: {
                     load:    Clear,
+                    store:   DontCare,
+                    format:  swapchain.format(),
+                    samples: 4,
+                },
+                resolve_color: {
+                    load:    DontCare,
                     store:   Store,
                     format:  swapchain.format(),
                     samples: 1,
                 },
-                depth: {
+                multisampled_depth: {
                     load:    Clear,
                     store:   DontCare,
+                    format:  Format::D16Unorm,
+                    samples: 4,
+                },
+                resolve_depth: {
+                    load:    DontCare,
+                    store:   Store,
                     format:  Format::D16Unorm,
                     samples: 1,
                 }
             },
             pass: {
-                color: [color],
-                depth_stencil: {depth}
+                color: [multisampled_color],
+                depth_stencil: {multisampled_depth},
+                resolve: [resolve_color]
             }
         ).unwrap()) as Arc<RenderPassAbstract + Send + Sync>;
 
         let dimensions = images[0].dimensions();
-        let depthbuffer = AttachmentImage::transient(device.clone(), dimensions, Format::D16Unorm).unwrap();
+        let depth = AttachmentImage::transient(device.clone(), dimensions, Format::D16Unorm).unwrap();
+        let multisampled_depth = AttachmentImage::transient_multisampled(device.clone(), dimensions, 4, Format::D16Unorm).unwrap();
         let framebuffers = images.iter().map(|image| {
+            let multisampled_image = AttachmentImage::transient_multisampled(device.clone(), dimensions, 4, swapchain.format()).unwrap(); // TODO: Can I put this in the outer scope?
             Arc::new(
                 Framebuffer::start(render_pass.clone())
+                .add(multisampled_image).unwrap()
                 .add(image.clone()).unwrap()
-                .add(depthbuffer.clone()).unwrap()
+                .add(multisampled_depth.clone()).unwrap()
+                .add(depth.clone()).unwrap()
                 .build().unwrap()
             ) as Arc<FramebufferAbstract + Send + Sync>
         }).collect::<Vec<_>>();
@@ -439,7 +456,7 @@ impl<'a> VulkanGraphics<'a> {
         };
 
         let command_buffer = AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.queue.family()).unwrap()
-        .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), 1f32.into()]).unwrap();
+        .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), [0.0, 0.0, 0.0, 1.0].into(), 1f32.into(), 1f32.into()]).unwrap();
 
         let final_command_buffer = match render.render_type {
             RenderType::Game(game) => { self.game_render(game, command_buffer, &render.command_output) },
