@@ -15,12 +15,9 @@ void main() {
         f_color = uniforms.color;
     }
     else if (v_render_id == 1) {
-        if (v_edge > 0.8) {
-            f_color = uniforms.edge_color;
-        }
-        else {
-            f_color = uniforms.color;
-        }
+        float e = fwidth(v_edge);
+        float value = smoothstep(0.8 - e, 0.8 + e, v_edge);
+        f_color = mix(uniforms.color, uniforms.edge_color, value);
     }
     else if (v_render_id == 2) {
         f_color = vec4(1.0, 0.0, 0.0, 1.0);

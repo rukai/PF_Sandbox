@@ -7,6 +7,7 @@ Install [msys2](http://www.msys2.org/), following ALL of the instructions.
 
 Then in the msys2 terminal run:
 `pacman -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc`
+`pacman -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3`
 
 Add the msys2 mingw64 binary path to the PATH environment variable.
 In my case this was `C:\msys64\mingw64\bin`
