@@ -12,7 +12,6 @@ extern crate lyon;
 extern crate rand;
 extern crate reqwest;
 extern crate serde;
-extern crate termcolor;
 extern crate treeflection;
 extern crate uuid;
 extern crate winit;
