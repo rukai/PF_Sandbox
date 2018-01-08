@@ -7,9 +7,9 @@ members = [
 ]
 
 [patch.crates-io]
-gilrs = { git = "https://gitlab.com/rukai/gilrs" }
+gilrs = { git = "https://gitlab.com/rukai/gilrs", branch = "pf_sandbox" }
 vulkano_text = { git = "https://github.com/rukai/vulkano-text", branch = "pf_sandbox" }
-vulkano = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox"}
+vulkano = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox" }
 vulkano-win = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox" }
 vulkano-shader-derive = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox" }
 env_logger = { git = "https://github.com/sebasmagri/env_logger" }

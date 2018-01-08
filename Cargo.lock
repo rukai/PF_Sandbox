@@ -460,8 +460,8 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.5.0-rc.1"
-source = "git+https://github.com/sebasmagri/env_logger#0cb3860135319e6d1d01a7bdbf5828693ff7887a"
+version = "0.5.0-rc.2"
+source = "git+https://github.com/sebasmagri/env_logger#30527aa901c985f9a40a361e20499de7cd12cf43"
 dependencies = [
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -626,7 +626,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "gilrs"
 version = "0.6.0"
-source = "git+https://gitlab.com/rukai/gilrs#19f8faf348398d98b9206e8985f944bd3b414f57"
+source = "git+https://gitlab.com/rukai/gilrs?branch=pf_sandbox#85d12ec97ca89a8dcde2c52718432cb060b60dc9"
 dependencies = [
  "libc 0.2.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "libudev-sys 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1428,7 +1428,7 @@ name = "pf_map_controllers"
 version = "0.1.0"
 dependencies = [
  "gdk 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "gilrs 0.6.0 (git+https://gitlab.com/rukai/gilrs)",
+ "gilrs 0.6.0 (git+https://gitlab.com/rukai/gilrs?branch=pf_sandbox)",
  "gtk 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pf_sandbox 0.1.1",
  "serde_json 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1444,9 +1444,9 @@ dependencies = [
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_traits_macros 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "env_logger 0.5.0-rc.1 (git+https://github.com/sebasmagri/env_logger)",
+ "env_logger 0.5.0-rc.2 (git+https://github.com/sebasmagri/env_logger)",
  "getopts 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
- "gilrs 0.6.0 (git+https://gitlab.com/rukai/gilrs)",
+ "gilrs 0.6.0 (git+https://gitlab.com/rukai/gilrs?branch=pf_sandbox)",
  "glium 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libusb 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2473,7 +2473,7 @@ dependencies = [
 "checksum either 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "740178ddf48b1a9e878e6d6509a1442a2d42fd2928aae8e7a6f8a36fb01981b3"
 "checksum enum_traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "198d4a4c0bf72a63aca9da52b2d471108a1050c8e01a3586d2bc25cc325e50b3"
 "checksum enum_traits_macros 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9f0ce5d2d496fe3924419ee2561f2c030193a4c4c25df6d398fdb53c1c78e918"
-"checksum env_logger 0.5.0-rc.1 (git+https://github.com/sebasmagri/env_logger)" = "<none>"
+"checksum env_logger 0.5.0-rc.2 (git+https://github.com/sebasmagri/env_logger)" = "<none>"
 "checksum euclid 0.15.6 (registry+https://github.com/rust-lang/crates.io-index)" = "e7ad12f270c15bb2728fd73e6f3954dda165268c10328e553932e156a27886c1"
 "checksum flate2 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9fac2277e84e5e858483756647a9d0aa8d9a2b7cba517fd84325a0aaa69a0909"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
@@ -2491,7 +2491,7 @@ dependencies = [
 "checksum gdk-pixbuf-sys 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "798f97101eea8180da363d0e80e07ec7ec6d1809306601c0100c1de5bc8b4f52"
 "checksum gdk-sys 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d4ee916f5f25c5f4b21bd9dcb12a216ae697406940ff9476358c308a8ececada"
 "checksum getopts 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)" = "65922871abd2f101a2eb0eaebadc66668e54a87ad9c3dd82520b5f86ede5eff9"
-"checksum gilrs 0.6.0 (git+https://gitlab.com/rukai/gilrs)" = "<none>"
+"checksum gilrs 0.6.0 (git+https://gitlab.com/rukai/gilrs?branch=pf_sandbox)" = "<none>"
 "checksum gio 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "84ba5a2beb559059a0c9c2bd3681743cdede8d9a36c775840bca800333b22867"
 "checksum gio-sys 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a303bbf7a5e75ab3b627117ff10e495d1b9e97e1d68966285ac2b1f6270091bc"
 "checksum gl_generator 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)" = "e7acbf2ba3d52e9e1ad96a84362129e9c1aa0af55ebfc86a91004e1b83eca61c"

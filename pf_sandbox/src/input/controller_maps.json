@@ -1,6 +1,156 @@
 {
   "engine_version": 9,
   "maps": [
+      {
+      "os": "Windows",
+      "uuid": "00000000-0000-0000-0000-000000000000",
+      "name": "Xbox Controller",
+      "analog_maps": [
+        {
+          "source": 0,
+          "dest": "StickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 1,
+          "dest": "StickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 3,
+          "dest": "CStickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 4,
+          "dest": "CStickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 10,
+          "dest": "RTrigger",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.004444444,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 11,
+          "dest": "LTrigger",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.004444444,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        }
+      ],
+      "digital_maps": [
+        {
+          "source": 0,
+          "dest": "A",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 4,
+          "dest": "B",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 1,
+          "dest": "X",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 3,
+          "dest": "Y",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 15,
+          "dest": "Up",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 16,
+          "dest": "Down",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 17,
+          "dest": "Left",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 18,
+          "dest": "Right",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 11,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 6,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 7,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 11,
+          "dest": "L",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.97,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 10,
+          "dest": "R",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.97,
+              "max": 1.0
+            }
+          }
+        }
+      ]
+    },
     {
       "os": "Linux",
       "uuid": "03000000-5e04-0000-d102-000001010000",
