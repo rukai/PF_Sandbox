@@ -6,21 +6,12 @@ Do a custom install and select nightly and GNU compatible rust version. (instead
 Install [msys2](http://www.msys2.org/), following ALL of the instructions.
 
 Then in the msys2 terminal run:
-`pacman -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc`
 `pacman -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3`
 
 Add the msys2 mingw64 binary path to the PATH environment variable.
 In my case this was `C:\msys64\mingw64\bin`
 
-## Breakdown of crates -> msys2 package dependencies
-### Libusb:
-*   mingw64/mingw-w64-x86_64-pkg-config
-*   mingw64/mingw-w64-x86_64-libusb
-
-### zip->(flate->miniz-sys & bzip2) & rust-crypto
-*   mingw-w64-x86_64-gcc
-
-## Setup GDB on Windows
+## Setup GDB on Windows (Optional)
 
 TODO
 
@@ -55,13 +46,18 @@ need vulkan drivers: vulkan-icd-loader
 *   Nvida: No extra drivers required
 *   AMD:   vulkan-radeon
 
-# Compile and run
+# Compile and run PF Sandbox
 
-To run PF Sandbox: run `CARGO_INCREMENTAL=1 cargo run --release` in the pf_sandbox directory.
+run `cargo run --release` in the pf_sandbox directory.
 
-To run PF TAS: run `CARGO_INCREMENTAL=1 cargo run --release` in the pf_tas directory.
+# Compile and run PF TAS
 
-# Setup CLI Tool
+run `cargo run --release` in the pf_tas directory.
 
-To build the CLI tool run `cargo build` in the cli directory, the resulting binary is stored at `cli/target/debug/pf_cli`.
-Copy `pf_cli` to somewhere in your PATH and rename it `pf`.
+# Compile and run PF Controller Mapper
+
+run `cargo run --release` in the map_controllers directory.
+
+# Setup PF CLI
+To build the CLI tool run `cargo build` in the pf_cli directory, the resulting binary is stored at `target/debug/pf_cli`.
+Copy `pf_cli` to somewhere in your PATH and rename it to `pf`.
