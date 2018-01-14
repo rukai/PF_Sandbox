@@ -12,4 +12,3 @@ vulkano_text = { git = "https://github.com/rukai/vulkano-text", branch = "pf_san
 vulkano = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox" }
 vulkano-win = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox" }
 vulkano-shader-derive = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox" }
-env_logger = { git = "https://github.com/sebasmagri/env_logger" }

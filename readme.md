@@ -1,20 +1,21 @@
 # PF Sandbox [![Build Status](https://travis-ci.org/rukai/PF_Sandbox.svg?branch=master)](https://travis-ci.org/rukai/PF_Sandbox) [![Build status](https://ci.appveyor.com/api/projects/status/89drle66lde9pq35?svg=true)](https://ci.appveyor.com/project/rukai/pf-sandbox)
 
-A platform fighter sandbox featuring a character editor tightly integrated with gameplay.
+A platform fighter featuring a character editor tightly integrated with gameplay.
 
 ## Quick links
 
-*   [Compile from source (Windows & Linux)](documentation/compiling.md)
+*   [pfsandbox.net](https://pfsandbox.net)
+*   [Compile from source (Windows & Linux)](compiling.md)
 *   [Discord](https://discord.gg/KyjBs4x)
 *   [Infrastructure Repository](https://github.com/rukai/pf_sandbox_infra)
-*   [pfsandbox.net](https://pfsandbox.net)
 
-[![Youtube Video](https://img.youtube.com/vi/CTrwvg56VQs/0.jpg)](https://www.youtube.com/watch?v=CTrwvg56VQs)
+## OS/Controller requirements
 
-## Controller requirements
+*   Windows: Xbox controllers + native GC adapter
+*   Linux: All controllers + native GC adapter
+*   Mac OS: Unsupported
 
-Controller support is currently hardcoded to the GC adapter for Wii U (Nintendo or Mayflash in Wii U mode)
-Follow the steps for your OS, found under Installation at this [Dolphin Wiki page](https://wiki.dolphin-emu.org/index.php?title=How_to_use_the_Official_GameCube_Controller_Adapter_for_Wii_U_in_Dolphin)
+You cannot use a keyboard to play, you must use a controller.
 
 ## Goals/Features
 

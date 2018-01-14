@@ -162,22 +162,22 @@ impl Game {
         self.state.clone()
     }
 
-    fn save_replay(&mut self) -> String {
+    pub fn save_replay(&mut self) -> String {
         self.save_replay = true;
         String::from("Save replay completed")
     }
 
-    fn reset_deadzones(&mut self) -> String {
+    pub fn reset_deadzones(&mut self) -> String {
         self.reset_deadzones = true;
         String::from("Deadzones reset")
     }
 
-    fn copy_stage_to_package(&mut self) -> String {
+    pub fn copy_stage_to_package(&mut self) -> String {
         self.package.stages[self.selected_stage.as_ref()] = self.stage.clone();
         String::from("Current stage state copied to package")
     }
 
-    fn copy_package_to_stage(&mut self) -> String {
+    pub fn copy_package_to_stage(&mut self) -> String {
         self.stage = self.package.stages[self.selected_stage.as_ref()].clone();
         String::from("Package copied to current stage state")
     }
