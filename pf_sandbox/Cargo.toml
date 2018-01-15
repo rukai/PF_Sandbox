@@ -34,7 +34,8 @@ zip = "0.2"
 vulkano = { version = "0.7", optional = true }
 vulkano-win = { version = "0.8", optional = true }
 vulkano-shader-derive = { version = "0.7", optional = true }
-vulkano_text = { version = "0.6", optional = true }
+#vulkano_text = { version = "0.6", optional = true }
+vulkano_text = { version = "0.6", optional = true, git = "https://github.com/rukai/vulkano-text", branch = "pf_sandbox" } # temp while waiting on next vulkano release
 cgmath = { version = "0.15.0", optional = true }
 glium = { version = "0.16", optional = true }
 

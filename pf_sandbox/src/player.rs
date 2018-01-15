@@ -112,7 +112,8 @@ impl Hitlag {
 pub struct Player {
     pub fighter:            String,
     pub team:               usize,
-    pub action:             u64, // always change through self.set_action
+    pub action:             u64, // always change through next_action
+    pub next_action:        Option<u64>,
     pub frame:              u64,
     pub frame_norestart:    u64, // Used to keep track of total frames passed on states that loop
     pub stocks:             Option<u64>,
@@ -130,7 +131,6 @@ pub struct Player {
     pub fastfalled:         bool,
     pub air_jumps_left:     u64,
     pub jumpsquat_button:   bool,
-    pub turn_dash_buffer:   bool,
     pub shield_hp:          f32,
     pub shield_analog:      f32,
     pub shield_offset_x:    f32,
@@ -162,6 +162,7 @@ impl Player {
     pub fn new(fighter: String, team: usize, spawn: SpawnPoint, package: &Package) -> Player {
         Player {
             action:             Action::DummyFramePreStart.index(),
+            next_action:        None,
             team:               team,
             frame:              0,
             frame_norestart:    0,
@@ -180,7 +181,6 @@ impl Player {
             fastfalled:         false,
             air_jumps_left:     0,
             jumpsquat_button:   false,
-            turn_dash_buffer:   false,
             shield_hp:          package.fighters[fighter.as_ref()].shield.as_ref().map_or(60.0, |x| x.hp_max),
             shield_analog:      0.0,
             shield_offset_x:    0.0,
@@ -317,15 +317,8 @@ impl Player {
         self.location = Location::Airbourne { x, y };
     }
 
-    // always change self.action through this method
     fn set_action(&mut self, action: Action) {
-        let action = action as u64;
-        if self.action != action {
-            self.frame_norestart = 0;
-            self.action = action;
-        }
-        self.frame = 0;
-        self.hitlist.clear();
+        self.next_action = Some(action as u64);
     }
 
     fn interruptible(&self, fighter: &Fighter) -> bool {
@@ -545,15 +538,9 @@ impl Player {
     }
 
     fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], rng: &mut StdRng) {
+        self.next_action = None;
+
         let fighter = &fighters[self.fighter.as_ref()];
-        let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
-
-        self.frame += 1; // Action::DummyFramePreStart is used so that this doesnt skip a real frame when the game starts
-        self.frame_norestart += 1;
-        if self.frame >= action_frames {
-            self.action_expired(input, players, fighters, surfaces);
-        }
-
         let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
         let action = Action::from_index(self.action);
 
@@ -610,7 +597,10 @@ impl Player {
                 Action::Walk             => self.walk_action(input, fighter),
                 Action::Dash             => self.dash_action(input, rng, players, fighters, surfaces),
                 Action::Run              => self.run_action(input, fighter),
-                Action::Turn             => self.turn_action(input, fighter),
+                Action::RunEnd           => self.run_end_action(input, fighter),
+                Action::TiltTurn         => self.tilt_turn_action(input, fighter),
+                Action::SmashTurn        => self.smash_turn_action(input, fighter),
+                Action::RunTurn          => self.run_turn_action(input, fighter),
                 Action::LedgeIdle        => self.ledge_idle_action(input, players, fighters, surfaces),
                 Action::ShieldOn         => self.shield_on_action(input, players, fighters, surfaces),
                 Action::PowerShield      => self.power_shield_action(input, players, fighters, surfaces),
@@ -705,6 +695,29 @@ impl Player {
         else {
             self.c_stick = Some((input[0].c_stick_x, input[0].c_stick_y));
         }
+
+        self.frame += 1;
+        self.frame_norestart += 1;
+        if self.next_action.is_none() {
+            let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
+            // Because frames can be added/removed in the in game editor, we need to be ready to handle the frame index going out of bounds for any action automatically.
+            if self.frame >= action_frames {
+                self.action_expired(input, players, fighters, surfaces);
+            }
+        }
+
+        self.next_action_into_action();
+    }
+
+    fn next_action_into_action(&mut self) {
+        if let Some(action) = self.next_action {
+            if self.action != action {
+                self.frame_norestart = 0;
+                self.action = action;
+            }
+            self.frame = 0;
+            self.hitlist.clear();
+        }
     }
 
     fn ledge_idle_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
@@ -766,7 +779,7 @@ impl Player {
     }
 
     fn missed_tech_start_action(&mut self, fighter: &Fighter) {
-        if self.frame == 1 {
+        if self.frame == 0 {
             self.apply_friction(fighter);
         } else {
             self.x_vel = 0.0;
@@ -894,16 +907,57 @@ impl Player {
         }
     }
 
-    fn turn_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if self.frame == 1 && self.dash_input(input) {
+    fn tilt_turn_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
+        if self.frame == fighter.run_turn_flip_dir_frame ||
+            (fighter.tilt_turn_flip_dir_frame > last_action_frame && self.frame == last_action_frame) // ensure turn still occurs if run_turn_flip_dir_frame is invalid
+        {
+            self.face_right = !self.face_right;
+        }
+
+        if fighter.tilt_turn_into_dash_iasa >= self.frame && self.relative_f(input[0].stick_x) > 0.79 {
+            if fighter.tilt_turn_flip_dir_frame > fighter.tilt_turn_into_dash_iasa { // ensure turn still occurs even if tilt_turn_flip_dir_frame is invalid
+                self.face_right = !self.face_right
+            }
             self.set_action(Action::Dash);
         }
-        if self.check_jump(input) { }
+        else if self.check_jump(input) { }
         else if self.check_shield(input, fighter) { }
         else if self.check_special(input) { } // TODO: No neutral special
         else if self.check_smash(input) { }
         else if self.check_attacks(input) { }
         else if self.check_taunt(input) { }
+        else {
+            self.apply_friction(fighter);
+        }
+    }
+
+    fn smash_turn_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if self.frame == 0 {
+        }
+        if self.frame == 0 && self.relative_f(input[0].stick_x) > 0.79 {
+            self.set_action(Action::Dash);
+        }
+        else if self.check_jump(input) { }
+        else if self.check_shield(input, fighter) { }
+        else if self.check_special(input) { } // TODO: No neutral special
+        else if self.check_smash(input) { }
+        else if self.check_attacks(input) { }
+        else if self.check_taunt(input) { }
+        else {
+            self.apply_friction(fighter);
+        }
+    }
+
+    fn run_turn_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
+        if self.frame == fighter.run_turn_flip_dir_frame ||
+            (fighter.run_turn_flip_dir_frame > last_action_frame && self.frame == last_action_frame) // ensure turn still occurs if run_turn_flip_dir_frame is invalid
+        {
+            self.face_right = !self.face_right;
+        }
+
+        if self.check_jump(input) { }
         else {
             self.apply_friction(fighter);
         }
@@ -933,7 +987,8 @@ impl Player {
             else if self.check_attacks(input) { }
             else if self.check_taunt(input) { }
             else if self.check_dash(input, fighter) { }
-            else if self.check_turn(input) { }
+            else if self.check_smash_turn(input) { }
+            else if self.check_tilt_turn(input) { }
         }
         self.apply_friction(fighter);
     }
@@ -947,7 +1002,8 @@ impl Player {
             else if self.check_smash(input) { }
             else if self.check_attacks(input) { }
             else if self.check_dash(input, fighter) { }
-            else if self.check_turn(input) { }
+            else if self.check_smash_turn(input) { }
+            else if self.check_tilt_turn(input) { }
             else if self.check_walk(input, fighter) { }
             else if self.check_taunt(input) { }
         }
@@ -964,15 +1020,16 @@ impl Player {
             else if self.check_taunt(input) { }
             else if self.check_crouch(input) { }
             else if self.check_dash(input, fighter) { }
-            else if self.check_turn(input) { }
+            else if self.check_smash_turn(input) { }
+            else if self.check_tilt_turn(input) { }
             else if self.check_walk(input, fighter) { }
         }
     }
 
     fn attack_land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
-        let action_last_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
-        self.frame = action_last_frame.min(self.frame + self.land_frame_skip as u64);
+        let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
+        self.frame = last_action_frame.min(self.frame + self.land_frame_skip as u64);
         self.land_particles(rng, players, fighters, surfaces);
         self.apply_friction(fighter);
 
@@ -984,7 +1041,8 @@ impl Player {
             else if self.check_attacks(input) { }
             else if self.check_taunt(input) { }
             else if self.check_dash(input, fighter) { }
-            else if self.check_turn(input) { }
+            else if self.check_smash_turn(input) { }
+            else if self.check_tilt_turn(input) { }
             else if self.check_walk(input, fighter) { }
             else if self.first_interruptible(fighter) && input[0].stick_y < -0.5 {
                 self.set_action(Action::Crouch);
@@ -1005,7 +1063,8 @@ impl Player {
             else if self.check_attacks(input) { }
             else if self.check_taunt(input) { }
             else if self.check_dash(input, fighter) { }
-            else if self.check_turn(input) { }
+            else if self.check_smash_turn(input) { }
+            else if self.check_tilt_turn(input) { }
             else if self.check_walk(input, fighter) { }
             else if self.first_interruptible(fighter) && input[0].stick_y < -0.5 {
                 self.set_action(Action::Crouch);
@@ -1024,7 +1083,8 @@ impl Player {
             else if self.check_taunt(input) { }
             else if self.check_crouch(input) { }
             else if self.check_dash(input, fighter) { }
-            else if self.check_turn(input) { }
+            else if self.check_smash_turn(input) { }
+            else if self.check_tilt_turn(input) { }
             else if self.check_walk_teeter(input, fighter) { }
         }
     }
@@ -1040,7 +1100,8 @@ impl Player {
         else if self.check_attacks(input) { }
         else if self.check_crouch(input) { }
         else if self.check_dash(input, fighter) { }
-        else if self.check_turn(input) { }
+        else if self.check_smash_turn(input) { }
+        else if self.check_tilt_turn(input) { }
         else if self.check_taunt(input) { }
         else {
             let vel_max = fighter.walk_max_vel * input[0].stick_x;
@@ -1061,14 +1122,14 @@ impl Player {
     fn dash_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         self.dash_particles(rng, players, fighters, surfaces);
-        if self.frame == 2 {
+        if self.frame == 1 {
             self.x_vel = self.relative_f(fighter.dash_init_vel);
             if self.x_vel.abs() > fighter.dash_run_term_vel {
                 self.x_vel = self.relative_f(fighter.dash_run_term_vel);
             }
         }
 
-        if self.frame > 1 {
+        if self.frame > 0 {
             if input[0].stick_x.abs() < 0.3 {
                 self.apply_friction(fighter);
             }
@@ -1094,8 +1155,8 @@ impl Player {
         if self.check_shield(input, fighter) {
             self.x_vel *= 0.25;
         }
-        else if self.relative_f(input.stick_x.value) < -0.35 { // TODO: refine
-            self.turn();
+        else if self.check_smash_turn(input) {
+            self.x_vel *= 0.25
         }
         else if input.a.press {
             self.set_action(Action::DashAttack);
@@ -1110,7 +1171,7 @@ impl Player {
         if self.check_jump(input) { }
         else if self.check_shield(input, fighter) { }
         else if self.relative_f(input.stick_x.value) <= -0.3 {
-            self.set_action(Action::TurnRun);
+            self.set_action(Action::RunTurn);
         }
         else if self.relative_f(input.stick_x.value) < 0.62 {
             self.set_action(Action::RunEnd);
@@ -1131,6 +1192,17 @@ impl Player {
             if self.relative_f(self.x_vel) > self.relative_f(vel_max) {
                 self.x_vel = vel_max;
             }
+        }
+    }
+
+    fn run_end_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
+        if self.check_jump(input) { }
+        else if self.frame > 1 && self.check_crouch(input) { }
+        else if self.relative_f(input.stick_x.value) <= -0.3 {
+            self.set_action(Action::RunTurn);
+        }
+        else {
+            self.apply_friction(fighter);
         }
     }
 
@@ -1169,7 +1241,7 @@ impl Player {
 
         if !lock && self.check_jump(input) { }
         else if !lock && self.check_pass_platform(input, players, fighters, surfaces) { }
-        else if fighter.power_shield.is_some() && self.frame == 1 && (input.l.press || input.r.press) {
+        else if fighter.power_shield.is_some() && self.frame == 0 && (input.l.press || input.r.press) {
             // allow the first frame to transition to power shield so that powershield input is more consistent
             self.action = Action::PowerShield as u64;
             self.frame = if power_shield_len >= 2 { 1 } else { 0 }; // change self.frame so that a powershield isnt laggier than a normal shield
@@ -1322,8 +1394,8 @@ impl Player {
         let fighter = &fighters[self.fighter.as_ref()];
         if let Location::Surface { platform_i, .. } = self.location {
             if let Some(platform) = surfaces.get(platform_i) {
-                let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
-                if platform.is_pass_through() && self.frame == action_frames && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
+                let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
+                if platform.is_pass_through() && self.frame == last_action_frame && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
                     self.set_action(Action::PassPlatform);
                     self.set_airbourne(players, fighters, surfaces);
                     return true;
@@ -1354,14 +1426,8 @@ impl Player {
     }
 
     fn check_dash(&mut self, input: &PlayerInput, fighter: &Fighter) -> bool {
-        if self.dash_input(input) {
-            let stick_face_right = input.stick_x.value > 0.0;
-            if stick_face_right == self.face_right {
-                self.dash(fighter);
-            }
-            else {
-                self.turn_dash();
-            }
+        if self.relative_f(input[0].stick_x) > 0.79 && self.relative_f(input[2].stick_x) < 0.3 {
+            self.dash(fighter);
             true
         }
         else {
@@ -1369,12 +1435,20 @@ impl Player {
         }
     }
 
-    fn check_turn(&mut self, input: &PlayerInput) -> bool {
+    fn check_tilt_turn(&mut self, input: &PlayerInput) -> bool {
         let turn = self.relative_f(input[0].stick_x) < -0.3;
         if turn {
-            self.turn();
+            self.set_action(Action::TiltTurn);
         }
-        self.turn_dash_buffer = self.relative_f(input[1].stick_x) > -0.3;
+        turn
+    }
+
+    fn check_smash_turn(&mut self, input: &PlayerInput) -> bool {
+        let turn = self.relative_f(input[0].stick_x) < -0.79 && self.relative_f(input[2].stick_x) > -0.3;
+        if turn {
+            self.set_action(Action::SmashTurn);
+            self.face_right = !self.face_right;
+        }
         turn
     }
 
@@ -1592,10 +1666,6 @@ impl Player {
         }
     }
 
-    fn dash_input(&self, input: &PlayerInput) -> bool {
-        input[0].stick_x.abs() > 0.79 && input[2].stick_x.abs() < 0.3
-    }
-
     fn action_expired(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
         match Action::from_index(self.action) {
@@ -1623,8 +1693,16 @@ impl Player {
             Some(Action::JumpB)          => self.set_action(Action::Fall),
             Some(Action::JumpAerialF)    => self.set_action(Action::AerialFall),
             Some(Action::JumpAerialB)    => self.set_action(Action::AerialFall),
-            Some(Action::TurnDash)       => self.set_action(Action::Dash),
-            Some(Action::TurnRun)        => self.set_action(Action::Idle),
+            Some(Action::SmashTurn)      => self.set_action(Action::Idle),
+            Some(Action::RunTurn)        => {
+                if self.relative_f(input[0].stick_x) > 0.6 {
+                    self.set_action(Action::Run);
+                }
+                else {
+                    self.set_action(Action::Idle);
+                }
+            }
+            Some(Action::TiltTurn)       => self.set_action(Action::Idle),
             Some(Action::Dash)           => self.set_action(Action::Run),
             Some(Action::Run)            => self.set_action(Action::Run),
             Some(Action::RunEnd)         => self.set_action(Action::Idle),
@@ -1640,15 +1718,6 @@ impl Player {
             Some(Action::LedgeGrab) => {
                 self.set_action(Action::LedgeIdle);
                 self.ledge_idle_timer = 0;
-            },
-            Some(Action::Turn) => {
-                let new_action = if self.relative_f(input[0].stick_x) > 0.79 && self.turn_dash_buffer {
-                    Action::Dash
-                }
-                else {
-                    Action::Idle
-                };
-                self.set_action(new_action);
             },
             Some(Action::JumpSquat) => {
                 self.set_airbourne(players, fighters, surfaces);
@@ -1919,6 +1988,8 @@ impl Player {
                     self.check_ledge_grab(players, &fighter, &ledge_grab_box, &stage.surfaces);
                 }
             }
+
+            self.next_action_into_action();
         }
     }
 
@@ -2147,16 +2218,6 @@ impl Player {
         self.set_action(Action::Dash);
     }
 
-    fn turn(&mut self) {
-        self.face_right = !self.face_right;
-        self.set_action(Action::Turn);
-    }
-
-    fn turn_dash(&mut self) {
-        self.face_right = !self.face_right;
-        self.set_action(Action::TurnDash);
-    }
-
     fn die(&mut self, player_i: usize, fighter: &Fighter, stage: &Stage, game_frame: usize, goal: Goal) {
         if stage.respawn_points.len() == 0 {
             self.location = Location::Airbourne { x: 0.0, y: 0.0 };
@@ -2277,11 +2338,11 @@ impl Player {
 
         if debug.action {
             let action = Action::from_index(self.action).unwrap();
-            let action_frames = fighter.actions[self.action as usize].frames.len() as u64 - 1;
+            let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
             let iasa = fighter.actions[self.action as usize].iasa;
 
             lines.push(format!("Player: {}    action: {:?}    frame: {}/{}    frame no restart: {}    IASA: {}",
-                index, action, self.frame, action_frames, self.frame_norestart, iasa));
+                index, action, self.frame, last_action_frame, self.frame_norestart, iasa));
         }
 
         if debug.frame {

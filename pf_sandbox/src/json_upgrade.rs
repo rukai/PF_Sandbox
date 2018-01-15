@@ -4,7 +4,7 @@ use serde_json::{Value, Number};
 
 pub fn build_version() -> String { String::from(env!("BUILD_VERSION")) }
 
-pub fn engine_version() -> u64 { 9 }
+pub fn engine_version() -> u64 { 10 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
@@ -37,6 +37,7 @@ pub fn upgrade_to_latest_fighters(fighters: &mut HashMap<String, Value>) {
         else if meta_engine_version < engine_version() {
             for upgrade_from in meta_engine_version..engine_version() {
                 match upgrade_from {
+                    9 => { upgrade_fighter9(fighter) }
                     8 => { upgrade_fighter8(fighter) }
                     7 => { upgrade_fighter7(fighter) }
                     6 => { upgrade_fighter6(fighter) }
@@ -105,6 +106,15 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
+
+/// Add turn properties to fighter
+fn upgrade_fighter9(fighter: &mut Value) {
+    if let &mut Value::Object (ref mut fighter) = fighter {
+        fighter.insert(String::from("run_turn_flip_dir_frame"), Value::Number(Number::from(30)));
+        fighter.insert(String::from("tilt_turn_flip_dir_frame"), Value::Number(Number::from(5)));
+        fighter.insert(String::from("tilt_turn_into_dash_iasa"), Value::Number(Number::from(5)));
+    }
+}
 
 /// Add use_platform_angle to ActionFrame
 fn upgrade_fighter8(fighter: &mut Value) {

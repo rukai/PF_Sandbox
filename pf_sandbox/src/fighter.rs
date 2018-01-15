@@ -86,6 +86,9 @@ impl Default for Fighter {
             power_shield:             None,
             tech:                     None,
             missed_tech_forced_getup: Some(200),
+            run_turn_flip_dir_frame:  30,
+            tilt_turn_flip_dir_frame: 5,
+            tilt_turn_into_dash_iasa: 5,
             actions:                  actions,
         }
     }
@@ -140,6 +143,9 @@ pub struct Fighter {
     pub power_shield:             Option<PowerShield>,
     pub tech:                     Option<Tech>,
     pub missed_tech_forced_getup: Option<u64>,
+    pub run_turn_flip_dir_frame:  u64,
+    pub tilt_turn_flip_dir_frame: u64,
+    pub tilt_turn_into_dash_iasa: u64,
     pub actions:                  ContextVec<ActionDef>,
 }
 
@@ -177,31 +183,31 @@ impl Default for LCancel {
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Shield {
-    pub stick_lock:  bool,
+    pub stick_lock: bool,
     pub stick_mult: f32,
-    pub offset_x:    f32,
-    pub offset_y:    f32,
-    pub break_vel:   f32,
-    pub scaling:     f32,
-    pub hp_scaling:  f32,
-    pub hp_max:      f32,
-    pub hp_regen:    f32,
-    pub hp_cost:     f32,
+    pub offset_x:   f32,
+    pub offset_y:   f32,
+    pub break_vel:  f32,
+    pub scaling:    f32,
+    pub hp_scaling: f32,
+    pub hp_max:     f32,
+    pub hp_regen:   f32,
+    pub hp_cost:    f32,
 }
 
 impl Default for Shield {
     fn default() -> Self {
         Shield {
-            stick_lock:  false,
-            stick_mult:  3.0,
-            offset_x:    0.0,
-            offset_y:    10.0,
-            break_vel:   3.0,
-            scaling:     10.0,
-            hp_scaling:  1.0,
-            hp_max:      60.0,
-            hp_regen:    0.1,
-            hp_cost:     0.3,
+            stick_lock: false,
+            stick_mult: 3.0,
+            offset_x:   0.0,
+            offset_y:   10.0,
+            break_vel:  3.0,
+            scaling:    10.0,
+            hp_scaling: 1.0,
+            hp_max:     60.0,
+            hp_regen:   0.1,
+            hp_cost:    0.3,
         }
     }
 }
@@ -531,9 +537,9 @@ pub enum Action {
     JumpB,
     JumpAerialF,
     JumpAerialB,
-    Turn,
-    TurnRun,
-    TurnDash,
+    TiltTurn,
+    RunTurn,
+    SmashTurn,
     Dash,
     Run,
     RunEnd,

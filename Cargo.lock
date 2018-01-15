@@ -1464,7 +1464,7 @@ dependencies = [
  "vulkano-shader-derive 0.7.2 (git+https://github.com/rukai/vulkano?branch=pf_sandbox)",
  "vulkano-shaders 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "vulkano-win 0.8.0 (git+https://github.com/rukai/vulkano?branch=pf_sandbox)",
- "vulkano_text 0.6.1 (git+https://github.com/rukai/vulkano-text?branch=pf_sandbox)",
+ "vulkano_text 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "winit 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2156,6 +2156,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vulkano_text"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "rusttype 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vulkano 0.7.2 (git+https://github.com/rukai/vulkano?branch=pf_sandbox)",
+ "vulkano-shader-derive 0.7.2 (git+https://github.com/rukai/vulkano?branch=pf_sandbox)",
+]
+
+[[package]]
 name = "wayland-client"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2655,6 +2665,7 @@ dependencies = [
 "checksum vulkano-shaders 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4b44dcbadf2809151510347fdb3f0fdab7240e241a193d479e0834743cd9f5d0"
 "checksum vulkano-win 0.8.0 (git+https://github.com/rukai/vulkano?branch=pf_sandbox)" = "<none>"
 "checksum vulkano_text 0.6.1 (git+https://github.com/rukai/vulkano-text?branch=pf_sandbox)" = "<none>"
+"checksum vulkano_text 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b834539ea18551686ffc55e4d38c8ef02ff5edb44366bed329cff5a20cd3a22e"
 "checksum wayland-client 0.12.5 (registry+https://github.com/rust-lang/crates.io-index)" = "2b90adf943117ee4930d7944fe103dcb6f36ba05421f46521cb5adbf6bf0fbc8"
 "checksum wayland-client 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)" = "a4b2b9876c6c97ece4f1ac699b5172550df443f36942fdcdcc27768c8f1437b4"
 "checksum wayland-kbd 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4fe0fb1c9917da9529d781659e456d84a693d74fe873d1658109758444616f76"
