@@ -933,7 +933,7 @@ impl Game {
             for (i, player) in action_players.iter().enumerate() {
                 let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.physics_step(input, &action_players, i, &self.package.fighters, &self.stage, self.current_frame, self.package.rules.goal.clone());
+                player.physics_step(input, &action_players, i, &self.package.fighters, &self.stage, self.current_frame, self.package.rules.goal.clone(), &mut rng);
                 physics_players.push(player);
             }
 

@@ -114,8 +114,13 @@ pub struct Player {
     pub team:               usize,
     pub action:             u64, // always change through next_action
     pub next_action:        Option<u64>,
-    pub frame:              u64,
-    pub frame_norestart:    u64, // Used to keep track of total frames passed on states that loop
+
+    // frame count values:
+    // == -1 doesnt correspond to a frame in the fighter data, used for the action logic triggered directly after action state transition, must never be in this state after action_step()
+    // >=  0  corresponds to a frame in the fighter data, used for the regular action logic step on each game frame
+    pub frame:              i64,
+    pub frame_norestart:    i64, // Used to keep track of total frames passed on states that loop
+
     pub stocks:             Option<u64>,
     pub damage:             f32,
     pub location:           Location,
@@ -322,11 +327,15 @@ impl Player {
     }
 
     fn interruptible(&self, fighter: &Fighter) -> bool {
-        self.frame >= fighter.actions[self.action as usize].iasa
+        self.frame >= fighter.actions[self.action as usize].iasa as i64 // TODO
     }
 
     fn first_interruptible(&self, fighter: &Fighter) -> bool {
-        self.frame == fighter.actions[self.action as usize].iasa
+        self.frame == fighter.actions[self.action as usize].iasa as i64
+    }
+
+    fn last_frame(&self, fighter: &Fighter) -> bool {
+        self.frame == fighter.actions[self.action as usize].frames.len() as i64 - 1
     }
 
     pub fn platform_deleted(&mut self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], deleted_platform_i: usize) {
@@ -426,7 +435,7 @@ impl Player {
                     self.hitlist.push(player_def_i);
                     if let &Some(ref power_shield) = power_shield {
                         if let (Some(Action::PowerShield), &Some(ref stun)) = (Action::from_index(self.action), &power_shield.enemy_stun) {
-                            if stun.window > players[player_def_i].frame {
+                            if stun.window > players[player_def_i].frame as u64 {
                                 self.stun_timer = stun.duration;
                             }
                         }
@@ -442,7 +451,7 @@ impl Player {
                 &CollisionResult::HitShieldDef { ref hitbox, ref power_shield, player_atk_i } => {
                     if let &Some(ref power_shield) = power_shield {
                         if let (Some(Action::PowerShield), &Some(ref parry)) = (Action::from_index(self.action), &power_shield.parry) {
-                            if parry.window > self.frame {
+                            if parry.window > self.frame as u64 {
                                 self.parry_timer = parry.duration;
                             }
                         }
@@ -538,80 +547,7 @@ impl Player {
     }
 
     fn action_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], rng: &mut StdRng) {
-        self.next_action = None;
-
         let fighter = &fighters[self.fighter.as_ref()];
-        let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
-        let action = Action::from_index(self.action);
-
-        // update ecb
-        let prev_bot_y = self.ecb.bot_y;
-        self.ecb = fighter_frame.ecb.clone();
-        match action {
-            Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.frame < 10
-                => { self.ecb.bot_y = prev_bot_y }
-            _   => { }
-        }
-
-        if fighter_frame.force_hitlist_reset {
-            self.hitlist.clear();
-        }
-
-        if let Some(action) = action {
-            match action {
-                Action::SpawnIdle  | Action::Fall |
-                Action::AerialFall | Action::JumpAerialF |
-                Action::JumpF      | Action::JumpB |
-                Action::Fair       | Action::Bair |
-                Action::Dair       | Action::Uair |
-                Action::Nair       | Action::JumpAerialB
-                => self.aerial_action(input, players, fighters, surfaces),
-
-                Action::Jab       | Action::Jab2 |
-                Action::Jab3      | Action::Utilt |
-                Action::Ftilt     | Action::DashAttack |
-                Action::Dsmash    | Action::Fsmash |
-                Action::Usmash    | Action::Idle |
-                Action::Grab      | Action::DashGrab |
-                Action::CrouchEnd
-                => self.ground_idle_action(input, fighter),
-
-                Action::FairLand | Action::BairLand |
-                Action::UairLand | Action::DairLand |
-                Action::NairLand | Action::SpecialLand
-                => self.attack_land_action(input, rng, players, fighters, surfaces),
-
-                Action::Teeter |
-                Action::TeeterIdle       => self.teeter_action(input, fighter),
-                Action::Land             => self.land_action(input, rng, players, fighters, surfaces),
-                Action::DamageFly        => self.damage_fly_action(fighter),
-                Action::DamageFall       => self.damage_fall_action(input, players, fighters, surfaces),
-                Action::Damage           => self.damage_action(fighter),
-                Action::MissedTechIdle   => self.missed_tech_action(input, fighter),
-                Action::MissedTechStart  => self.missed_tech_start_action(fighter),
-                Action::AerialDodge      => self.aerialdodge_action(input, fighter),
-                Action::SpecialFall      => self.specialfall_action(input, fighter),
-                Action::Dtilt            => self.dtilt_action(input, fighter),
-                Action::CrouchStart      => self.crouch_start_action(input, players, fighters, surfaces),
-                Action::Crouch           => self.crouch_action(input, fighter),
-                Action::Walk             => self.walk_action(input, fighter),
-                Action::Dash             => self.dash_action(input, rng, players, fighters, surfaces),
-                Action::Run              => self.run_action(input, fighter),
-                Action::RunEnd           => self.run_end_action(input, fighter),
-                Action::TiltTurn         => self.tilt_turn_action(input, fighter),
-                Action::SmashTurn        => self.smash_turn_action(input, fighter),
-                Action::RunTurn          => self.run_turn_action(input, fighter),
-                Action::LedgeIdle        => self.ledge_idle_action(input, players, fighters, surfaces),
-                Action::ShieldOn         => self.shield_on_action(input, players, fighters, surfaces),
-                Action::PowerShield      => self.power_shield_action(input, players, fighters, surfaces),
-                Action::Shield           => self.shield_action(input, players, fighters, surfaces),
-                Action::ShieldOff        => self.shield_off_action(input, players, fighters, surfaces),
-                Action::ShieldBreakFall  => self.shield_break_fall_action(fighter),
-                Action::ShieldBreakGetup => self.shield_break_getup_action(),
-                Action::Stun             => self.stun_action(fighter),
-                _ => { },
-            }
-        }
 
         self.knockback_particles(rng, players, fighters, surfaces);
 
@@ -696,27 +632,114 @@ impl Player {
             self.c_stick = Some((input[0].c_stick_x, input[0].c_stick_y));
         }
 
+        let fighter = &fighters[self.fighter.as_ref()];
+        let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
+
+        // update ecb
+        let prev_bot_y = self.ecb.bot_y;
+        self.ecb = fighter_frame.ecb.clone();
+        match Action::from_index(self.action) {
+            Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.frame < 10
+                => { self.ecb.bot_y = prev_bot_y }
+            _   => { }
+        }
+
+        if fighter_frame.force_hitlist_reset {
+            self.hitlist.clear();
+        }
+
+        self.frame_step(input, players, fighters, surfaces, rng);
+
         self.frame += 1;
         self.frame_norestart += 1;
         if self.next_action.is_none() {
             let action_frames = fighter.actions[self.action as usize].frames.len() as u64;
             // Because frames can be added/removed in the in game editor, we need to be ready to handle the frame index going out of bounds for any action automatically.
-            if self.frame >= action_frames {
+            if self.frame as u64 >= action_frames {
                 self.action_expired(input, players, fighters, surfaces);
             }
         }
 
-        self.next_action_into_action();
+        self.next_action_into_action(input, players, fighters, surfaces, rng); // TODO: I want to move into frame_step but I am Concerned how two calls will work now?
     }
 
-    fn next_action_into_action(&mut self) {
-        if let Some(action) = self.next_action {
-            if self.action != action {
-                self.frame_norestart = 0;
-                self.action = action;
+    fn frame_step(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], rng: &mut StdRng) {
+        self.next_action = None;
+
+        let fighter = &fighters[self.fighter.as_ref()];
+
+        if let Some(action) = Action::from_index(self.action) {
+            match action {
+                Action::SpawnIdle  | Action::Fall |
+                Action::AerialFall | Action::JumpAerialF |
+                Action::JumpF      | Action::JumpB |
+                Action::Fair       | Action::Bair |
+                Action::Dair       | Action::Uair |
+                Action::Nair       | Action::JumpAerialB
+                => self.aerial_action(input, players, fighters, surfaces),
+
+                Action::Jab       | Action::Jab2 |
+                Action::Jab3      | Action::Utilt |
+                Action::Ftilt     | Action::DashAttack |
+                Action::Dsmash    | Action::Fsmash |
+                Action::Usmash    | Action::Idle |
+                Action::Grab      | Action::DashGrab |
+                Action::CrouchEnd
+                => self.ground_idle_action(input, fighter),
+
+                Action::FairLand | Action::BairLand |
+                Action::UairLand | Action::DairLand |
+                Action::NairLand | Action::SpecialLand
+                => self.attack_land_action(input, rng, players, fighters, surfaces),
+
+                Action::Teeter |
+                Action::TeeterIdle       => self.teeter_action(input, fighter),
+                Action::Land             => self.land_action(input, rng, players, fighters, surfaces),
+                Action::DamageFly        => self.damage_fly_action(fighter),
+                Action::DamageFall       => self.damage_fall_action(input, players, fighters, surfaces),
+                Action::Damage           => self.damage_action(fighter),
+                Action::MissedTechIdle   => self.missed_tech_action(input, fighter),
+                Action::MissedTechStart  => self.missed_tech_start_action(fighter),
+                Action::AerialDodge      => self.aerialdodge_action(input, fighter),
+                Action::SpecialFall      => self.specialfall_action(input, fighter),
+                Action::Dtilt            => self.dtilt_action(input, fighter),
+                Action::CrouchStart      => self.crouch_start_action(input, players, fighters, surfaces),
+                Action::Crouch           => self.crouch_action(input, fighter),
+                Action::Walk             => self.walk_action(input, fighter),
+                Action::Dash             => self.dash_action(input, rng, players, fighters, surfaces),
+                Action::Run              => self.run_action(input, fighter),
+                Action::RunEnd           => self.run_end_action(input, fighter),
+                Action::TiltTurn         => self.tilt_turn_action(input, fighter),
+                Action::SmashTurn        => self.smash_turn_action(input, fighter),
+                Action::RunTurn          => self.run_turn_action(input, fighter),
+                Action::LedgeIdle        => self.ledge_idle_action(input, players, fighters, surfaces),
+                Action::ShieldOn         => self.shield_on_action(input, players, fighters, surfaces),
+                Action::PowerShield      => self.power_shield_action(input, players, fighters, surfaces),
+                Action::Shield           => self.shield_action(input, players, fighters, surfaces),
+                Action::ShieldOff        => self.shield_off_action(input, players, fighters, surfaces),
+                Action::ShieldBreakFall  => self.shield_break_fall_action(fighter),
+                Action::ShieldBreakGetup => self.shield_break_getup_action(),
+                Action::Stun             => self.stun_action(fighter),
+                _ => { },
             }
+        }
+    }
+
+    fn next_action_into_action(&mut self, input: &PlayerInput, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface], rng: &mut StdRng) {
+        if let Some(action) = self.next_action {
             self.frame = 0;
             self.hitlist.clear();
+
+            if self.action != action {
+                self.frame = -1;
+                self.frame_norestart = -1;
+                self.action = action;
+
+                self.frame_step(input, players, fighters, surfaces, rng);
+
+                self.frame += 1;
+                self.frame_norestart += 1;
+            }
         }
     }
 
@@ -801,7 +824,7 @@ impl Player {
         }
         else {
             if let Some(getup_frame) = fighter.missed_tech_forced_getup {
-                if self.frame_norestart > getup_frame {
+                if self.frame_norestart > getup_frame as i64 {
                     self.set_action(Action::MissedTechGetupN);
                 }
             }
@@ -909,13 +932,13 @@ impl Player {
 
     fn tilt_turn_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
-        if self.frame == fighter.run_turn_flip_dir_frame ||
-            (fighter.tilt_turn_flip_dir_frame > last_action_frame && self.frame == last_action_frame) // ensure turn still occurs if run_turn_flip_dir_frame is invalid
+        if self.frame == fighter.run_turn_flip_dir_frame as i64 ||
+            (fighter.tilt_turn_flip_dir_frame > last_action_frame && self.last_frame(fighter)) // ensure turn still occurs if run_turn_flip_dir_frame is invalid
         {
             self.face_right = !self.face_right;
         }
 
-        if fighter.tilt_turn_into_dash_iasa >= self.frame && self.relative_f(input[0].stick_x) > 0.79 {
+        if fighter.tilt_turn_into_dash_iasa as i64 >= self.frame && self.relative_f(input[0].stick_x) > 0.79 {
             if fighter.tilt_turn_flip_dir_frame > fighter.tilt_turn_into_dash_iasa { // ensure turn still occurs even if tilt_turn_flip_dir_frame is invalid
                 self.face_right = !self.face_right
             }
@@ -951,8 +974,8 @@ impl Player {
 
     fn run_turn_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
         let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
-        if self.frame == fighter.run_turn_flip_dir_frame ||
-            (fighter.run_turn_flip_dir_frame > last_action_frame && self.frame == last_action_frame) // ensure turn still occurs if run_turn_flip_dir_frame is invalid
+        if self.frame == fighter.run_turn_flip_dir_frame as i64 ||
+            (fighter.run_turn_flip_dir_frame > last_action_frame && self.last_frame(fighter)) // ensure turn still occurs if run_turn_flip_dir_frame is invalid
         {
             self.face_right = !self.face_right;
         }
@@ -1028,8 +1051,8 @@ impl Player {
 
     fn attack_land_action(&mut self, input: &PlayerInput, rng: &mut StdRng, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) {
         let fighter = &fighters[self.fighter.as_ref()];
-        let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
-        self.frame = last_action_frame.min(self.frame + self.land_frame_skip as u64);
+        let last_action_frame = fighter.actions[self.action as usize].frames.len() as i64 - 1;
+        self.frame = last_action_frame.min(self.frame + self.land_frame_skip as i64);
         self.land_particles(rng, players, fighters, surfaces);
         self.apply_friction(fighter);
 
@@ -1222,7 +1245,7 @@ impl Player {
     }
 
     fn aerialdodge_action(&mut self, input: &PlayerInput, fighter: &Fighter) {
-        if self.frame < fighter.aerialdodge_drift_frame {
+        if self.frame < fighter.aerialdodge_drift_frame as i64 {
             self.x_vel *= 0.9;
             self.y_vel *= 0.9;
         }
@@ -1394,8 +1417,7 @@ impl Player {
         let fighter = &fighters[self.fighter.as_ref()];
         if let Location::Surface { platform_i, .. } = self.location {
             if let Some(platform) = surfaces.get(platform_i) {
-                let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
-                if platform.is_pass_through() && self.frame == last_action_frame && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
+                if platform.is_pass_through() && self.last_frame(fighter) && (input[0].stick_y < -0.65 || input[1].stick_y < -0.65 || input[2].stick_y < -0.65) && input[6].stick_y > -0.3 {
                     self.set_action(Action::PassPlatform);
                     self.set_airbourne(players, fighters, surfaces);
                     return true;
@@ -1906,8 +1928,9 @@ impl Player {
      *  Begin physics section
      */
 
-    pub fn physics_step(&mut self, input: &PlayerInput, players: &[Player], player_i: usize, fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal) {
+    pub fn physics_step(&mut self, input: &PlayerInput, players: &[Player], player_i: usize, fighters: &KeyedContextVec<Fighter>, stage: &Stage, game_frame: usize, goal: Goal, rng: &mut StdRng) {
         if let Hitlag::None = self.hitlag {
+            self.next_action = None;
             let fighter = &fighters[self.fighter.as_ref()];
             let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
 
@@ -1989,7 +2012,7 @@ impl Player {
                 }
             }
 
-            self.next_action_into_action();
+            self.next_action_into_action(input, players, fighters, &stage.surfaces, rng);
         }
     }
 
@@ -2163,7 +2186,7 @@ impl Player {
             _ => 0
         };
 
-        self.aerial_dodge_frame = if let Some(Action::AerialDodge) = action { Some(self.frame) } else { None };
+        self.aerial_dodge_frame = if let Some(Action::AerialDodge) = action { Some(self.frame as u64 ) } else { None };
 
         match action {
             Some(Action::Uair)            => self.set_action(Action::UairLand),

@@ -87,7 +87,7 @@ impl Buffers {
             let (sin, cos) = angle.sin_cos();
             vertices.push(Vertex { position: [cos, sin], edge: 1.0, render_id: 0});
             indices.push(0);
-            indices.push((i + 1));
+            indices.push(i + 1);
             indices.push((i + 1) % iterations + 1);
         }
 
@@ -136,7 +136,7 @@ impl Buffers {
             let y = sin * shield.radius;
             vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: 0});
             indices.push(0);
-            indices.push((i + 1));
+            indices.push(i + 1);
             indices.push((i + 1) % triangles + 1);
         }
 
