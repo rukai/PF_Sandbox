@@ -228,7 +228,7 @@ pub struct PowerShieldEffect {
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct ActionDef {
     pub frames: ContextVec<ActionFrame>,
-    pub iasa:   u64,
+    pub iasa:   i64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]

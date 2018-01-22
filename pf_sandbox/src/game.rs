@@ -10,7 +10,7 @@ use menu::ResumeMenu;
 use network::Netplay;
 use os_input::OsInput;
 use package::Package;
-use player::{Player, RenderPlayer, DebugPlayer};
+use player::{Player, RenderPlayer, DebugPlayer, StepContext};
 use replays::Replay;
 use replays;
 use results::{GameResults, RawPlayerResult, PlayerResult};
@@ -459,7 +459,7 @@ impl Game {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             let selected = {
                                 let player = &self.players[player];
-                                let (p_x, p_y) = player.bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
+                                let (p_x, p_y) = player.public_bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
 
                                 let point = (player.relative_f(m_x - p_x), m_y - p_y);
                                 let new_colbox = CollisionBox::new(point);
@@ -503,7 +503,7 @@ impl Game {
                     if os_input.key_pressed(VirtualKeyCode::Q) {
                         if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
                             let player = &self.players[player];
-                            let (p_x, p_y) = player.bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
+                            let (p_x, p_y) = player.public_bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
 
                             let x = player.relative_f(m_x - p_x);
                             let y = m_y - p_y;
@@ -513,7 +513,7 @@ impl Game {
 
                     // handle single selection
                     if let Some((m_x, m_y)) = self.selector.step_single_selection(os_input, &self.camera) {
-                        let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
+                        let (player_x, player_y) = self.players[player].public_bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
                         let frame = self.players[player].relative_frame(&self.package.fighters[fighter], &self.stage.surfaces);
 
                         for (i, colbox) in frame.colboxes.iter().enumerate() {
@@ -543,7 +543,7 @@ impl Game {
 
                     // handle multiple selection
                     if let Some(rect) = self.selector.step_multiple_selection(os_input, &self.camera) {
-                        let (player_x, player_y) = self.players[player].bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
+                        let (player_x, player_y) = self.players[player].public_bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
                         let frame = self.players[player].relative_frame(&self.package.fighters[fighter], &self.stage.surfaces);
 
                         for (i, colbox) in frame.colboxes.iter().enumerate() {
@@ -924,7 +924,16 @@ impl Game {
             for (i, player) in self.players.iter().enumerate() {
                 let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.action_hitlag_step(input, &self.players, &self.package.fighters, &self.stage.surfaces, &mut rng);
+                let mut context = StepContext {
+                    players:  &self.players,
+                    fighters: &self.package.fighters,
+                    fighter:  &self.package.fighters[player.fighter.as_ref()],
+                    stage:    &self.stage,
+                    surfaces: &self.stage.surfaces,
+                    rng:      &mut rng,
+                    input,
+                };
+                player.action_hitlag_step(&mut context);
                 action_players.push(player);
             }
 
@@ -933,7 +942,16 @@ impl Game {
             for (i, player) in action_players.iter().enumerate() {
                 let mut player = player.clone();
                 let input = &player_input[self.selected_controllers[i]];
-                player.physics_step(input, &action_players, i, &self.package.fighters, &self.stage, self.current_frame, self.package.rules.goal.clone(), &mut rng);
+                let mut context = StepContext {
+                    players:  &self.players,
+                    fighters: &self.package.fighters,
+                    fighter:  &self.package.fighters[player.fighter.as_ref()],
+                    stage:    &self.stage,
+                    surfaces: &self.stage.surfaces,
+                    rng:      &mut rng,
+                    input,
+                };
+                player.physics_step(&mut context, i, self.current_frame, self.package.rules.goal.clone());
                 physics_players.push(player);
             }
 
@@ -942,7 +960,17 @@ impl Game {
             let collision_results = collision_check(&physics_players, &self.package.fighters, &self.stage.surfaces);
             for (i, player) in physics_players.iter().enumerate() {
                 let mut player = player.clone();
-                player.step_collision(&physics_players, &self.package.fighters, &self.stage.surfaces, &collision_results[i]);
+                let input = &player_input[self.selected_controllers[i]];
+                let mut context = StepContext {
+                    players:  &self.players,
+                    fighters: &self.package.fighters,
+                    fighter:  &self.package.fighters[player.fighter.as_ref()],
+                    stage:    &self.stage,
+                    surfaces: &self.stage.surfaces,
+                    rng:      &mut rng,
+                    input,
+                };
+                player.step_collision(&mut context, &collision_results[i]);
                 collision_players.push(player);
             }
 
