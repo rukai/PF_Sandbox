@@ -828,7 +828,7 @@ impl Player {
     }
 
     fn missed_tech_start_action(&mut self, fighter: &Fighter) {
-        if self.frame == 0 {
+        if self.frame == -1 {
             self.apply_friction(fighter);
         } else {
             self.x_vel = 0.0;
@@ -854,10 +854,10 @@ impl Player {
                     self.set_action(context, Action::MissedTechGetupN);
                 }
             }
-        }
 
-        self.hitstun -= 1.0;
-        self.apply_friction(context.fighter);
+            self.hitstun -= 1.0;
+            self.apply_friction(context.fighter);
+        }
     }
 
     fn damage_action(&mut self, context: &mut StepContext) {
@@ -903,11 +903,15 @@ impl Player {
             {
                 self.set_action(context, Action::Fall);
             }
-
+            else {
+                self.fastfall_action(context);
+                self.air_drift(context);
+            }
         }
-
-        self.air_drift(context);
-        self.fastfall_action(context);
+        else {
+            self.fastfall_action(context);
+            self.air_drift(context);
+        }
     }
 
     fn aerial_action(&mut self, context: &mut StepContext) {
@@ -1039,8 +1043,13 @@ impl Player {
             else if self.check_attacks(context) { }
             else if self.check_taunt(context) { }
             else if self.check_jump(context) { }
+            else {
+                self.apply_friction(&context.fighter);
+            }
         }
-        self.apply_friction(&context.fighter);
+        else {
+            self.apply_friction(&context.fighter);
+        }
     }
 
     fn crouch_action(&mut self, context: &mut StepContext) {
@@ -1055,12 +1064,16 @@ impl Player {
             else if self.check_dash(context) { }
             else if self.check_smash_turn(context) { }
             else if self.check_tilt_turn(context) { }
+            else {
+                self.apply_friction(&context.fighter);
+            }
         }
-        self.apply_friction(&context.fighter);
+        else {
+            self.apply_friction(&context.fighter);
+        }
     }
 
     fn dtilt_action(&mut self, context: &mut StepContext) {
-        self.apply_friction(&context.fighter);
         if self.interruptible(&context.fighter) {
             if self.check_jump(context) { }
             else if self.check_shield(context) { }
@@ -1072,11 +1085,16 @@ impl Player {
             else if self.check_tilt_turn(context) { }
             else if self.check_walk(context) { }
             else if self.check_taunt(context) { }
+            else {
+                self.apply_friction(&context.fighter);
+            }
+        }
+        else {
+            self.apply_friction(&context.fighter);
         }
     }
 
     fn ground_idle_action(&mut self, context: &mut StepContext) {
-        self.apply_friction(&context.fighter);
         if self.interruptible(&context.fighter) {
             if self.check_jump(context) { }
             else if self.check_shield(context) { }
@@ -1089,6 +1107,12 @@ impl Player {
             else if self.check_smash_turn(context) { }
             else if self.check_tilt_turn(context) { }
             else if self.check_walk(context) { }
+            else {
+                self.apply_friction(&context.fighter);
+            }
+        }
+        else {
+            self.apply_friction(&context.fighter);
         }
     }
 
@@ -1096,7 +1120,6 @@ impl Player {
         let last_action_frame = context.fighter.actions[self.action as usize].frames.len() as i64 - 1;
         self.frame = last_action_frame.min(self.frame + self.land_frame_skip as i64);
         self.land_particles(context);
-        self.apply_friction(&context.fighter);
 
         if self.interruptible(&context.fighter) {
             if self.check_jump(context) { }
@@ -1112,12 +1135,17 @@ impl Player {
             else if self.first_interruptible(&context.fighter) && context.input[0].stick_y < -0.5 {
                 self.set_action(context, Action::Crouch);
             }
+            else {
+                self.apply_friction(&context.fighter);
+            }
+        }
+        else {
+            self.apply_friction(&context.fighter);
         }
     }
 
     fn land_action(&mut self, context: &mut StepContext) {
         self.land_particles(context);
-        self.apply_friction(&context.fighter);
 
         if self.interruptible(&context.fighter) {
             if self.check_jump(context) { }
@@ -1133,11 +1161,16 @@ impl Player {
             else if self.first_interruptible(&context.fighter) && context.input[0].stick_y < -0.5 {
                 self.set_action(context, Action::Crouch);
             }
+            else {
+                self.apply_friction(&context.fighter);
+            }
+        }
+        else {
+            self.apply_friction(&context.fighter);
         }
     }
 
     fn teeter_action(&mut self, context: &mut StepContext) {
-        self.apply_friction(&context.fighter);
         if self.interruptible(&context.fighter) {
             if self.check_jump(context) { }
             else if self.check_shield(context) { }
@@ -1215,19 +1248,20 @@ impl Player {
                 }
             }
         }
+
         if self.check_shield(context) {
             self.x_vel *= 0.25;
-        }
-        else if self.check_smash_turn(context) {
-            self.x_vel *= 0.25
-        }
-        else if context.input.a.press {
-            self.set_action(context, Action::DashAttack);
         }
         else if context.input.z.press {
             self.set_action(context, Action::DashGrab);
         }
-        self.check_jump(context);
+        else if context.input.a.press {
+            self.set_action(context, Action::DashAttack);
+        }
+        else if self.check_jump(context) { }
+        else if self.check_smash_turn(context) {
+            self.x_vel *= 0.25
+        }
     }
 
     fn run_action(&mut self, context: &mut StepContext) {
@@ -1307,9 +1341,14 @@ impl Player {
             // allow the first frame to transition to power shield so that powershield input is more consistent
             self.action = Action::PowerShield as u64;
             self.frame = if power_shield_len >= 2 { 1 } else { 0 }; // change self.frame so that a powershield isnt laggier than a normal shield
+
+            self.apply_friction(context.fighter);
+            self.shield_shared_action(context);
         }
-        self.apply_friction(context.fighter);
-        self.shield_shared_action(context);
+        else {
+            self.apply_friction(context.fighter);
+            self.shield_shared_action(context);
+        }
     }
 
     fn shield_action(&mut self, context: &mut StepContext) {
@@ -1325,9 +1364,14 @@ impl Player {
             } else {
                 self.set_action(context, Action::ShieldOff);
             }
+
+            self.apply_friction(context.fighter);
+            self.shield_shared_action(context);
         }
-        self.apply_friction(context.fighter);
-        self.shield_shared_action(context);
+        else {
+            self.apply_friction(context.fighter);
+            self.shield_shared_action(context);
+        }
     }
 
     fn shield_off_action(&mut self, context: &mut StepContext) {
@@ -1337,8 +1381,10 @@ impl Player {
 
         if !lock && self.check_jump(context) { }
         else if !lock && self.check_pass_platform(context) { }
-        self.apply_friction(context.fighter);
-        self.shield_shared_action(context);
+        else {
+            self.apply_friction(context.fighter);
+            self.shield_shared_action(context);
+        }
     }
 
     fn power_shield_action(&mut self, context: &mut StepContext) {
