@@ -686,27 +686,19 @@ impl Player {
             self.hitlist.clear();
         }
 
-        println!("\nSTEP");
-        println!("frame: {} action: {:?}", self.frame, Action::from_index(self.action));
         self.set_action_called = false;
         self.frame_step(context);
 
         let action_frames = context.fighter.actions[self.action as usize].frames.len() as i64;
-        println!("frame: {} action: {:?}", self.frame, Action::from_index(self.action));
-        println!("set_action_called: {}", self.set_action_called);
         if !self.set_action_called && self.frame + 1 >= action_frames {
             // Because frames can be added/removed in the in game editor, we need to be ready to handle the frame index going out of bounds for any action automatically.
             self.action_expired(context);
-            println!("expired");
         }
 
         if !self.set_action_called { // action_expired() can call set_action()
             self.frame += 1;
             self.frame_norestart += 1;
-            println!("inc");
         }
-
-        println!("frame:  {} action: {:?}", self.frame, Action::from_index(self.action));
     }
 
     fn frame_step(&mut self, context: &mut StepContext) {
@@ -980,7 +972,7 @@ impl Player {
 
     fn tilt_turn_action(&mut self, context: &mut StepContext) {
         let last_action_frame = context.fighter.actions[self.action as usize].frames.len() as u64 - 1;
-        if self.frame == context.fighter.run_turn_flip_dir_frame as i64 ||
+        if self.frame == context.fighter.tilt_turn_flip_dir_frame as i64 ||
             (context.fighter.tilt_turn_flip_dir_frame > last_action_frame && self.last_frame(&context.fighter)) // ensure turn still occurs if run_turn_flip_dir_frame is invalid
         {
             self.face_right = !self.face_right;
@@ -1004,8 +996,6 @@ impl Player {
     }
 
     fn smash_turn_action(&mut self, context: &mut StepContext) {
-        if self.frame == 0 {
-        }
         if self.frame == 0 && self.relative_f(context.input[0].stick_x) > 0.79 {
             self.set_action(context, Action::Dash);
         }
@@ -2007,7 +1997,6 @@ impl Player {
      */
 
     pub fn physics_step(&mut self, context: &mut StepContext, player_i: usize, game_frame: usize, goal: Goal) {
-        println!("physics1 {}", self.frame);
         if let Hitlag::None = self.hitlag {
             let fighter_frame = &context.fighter.actions[self.action as usize].frames[self.frame as usize];
 
