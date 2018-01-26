@@ -365,6 +365,7 @@ impl Menu {
                             PlayerSelectUi::HumanFighter (ticker) => {
                                 if ticker.cursor < fighters.len() {
                                     selection.fighter = Some(ticker.cursor);
+                                    selection.animation_frame = 0;
                                 }
                                 else {
                                     match ticker.cursor - fighters.len() {
@@ -377,6 +378,7 @@ impl Menu {
                             PlayerSelectUi::CpuFighter (ticker) => {
                                 if ticker.cursor < fighters.len() {
                                     selection.fighter = Some(ticker.cursor);
+                                    selection.animation_frame = 0;
                                 }
                                 else {
                                     match ticker.cursor - fighters.len() {

@@ -274,8 +274,8 @@
           "dest": "Left",
           "filter": {
             "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
+              "min": -1.0,
+              "max": -0.5
             }
           }
         },
@@ -304,8 +304,8 @@
           "dest": "Down",
           "filter": {
             "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
+              "min": -1.0,
+              "max": -0.5
             }
           }
         },
