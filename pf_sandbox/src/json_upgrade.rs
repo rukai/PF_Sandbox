@@ -4,7 +4,7 @@ use serde_json::{Value, Number};
 
 pub fn build_version() -> String { String::from(env!("BUILD_VERSION")) }
 
-pub fn engine_version() -> u64 { 10 }
+pub fn engine_version() -> u64 { 11 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
@@ -37,16 +37,17 @@ pub fn upgrade_to_latest_fighters(fighters: &mut HashMap<String, Value>) {
         else if meta_engine_version < engine_version() {
             for upgrade_from in meta_engine_version..engine_version() {
                 match upgrade_from {
-                    9 => { upgrade_fighter9(fighter) }
-                    8 => { upgrade_fighter8(fighter) }
-                    7 => { upgrade_fighter7(fighter) }
-                    6 => { upgrade_fighter6(fighter) }
-                    5 => { upgrade_fighter5(fighter) }
-                    4 => { upgrade_fighter4(fighter) }
-                    3 => { upgrade_fighter3(fighter) }
-                    2 => { upgrade_fighter2(fighter) }
-                    1 => { upgrade_fighter1(fighter) }
-                    0 => { upgrade_fighter0(fighter) }
+                    10 => { upgrade_fighter10(fighter) }
+                    9  => { upgrade_fighter9(fighter) }
+                    8  => { upgrade_fighter8(fighter) }
+                    7  => { upgrade_fighter7(fighter) }
+                    6  => { upgrade_fighter6(fighter) }
+                    5  => { upgrade_fighter5(fighter) }
+                    4  => { upgrade_fighter4(fighter) }
+                    3  => { upgrade_fighter3(fighter) }
+                    2  => { upgrade_fighter2(fighter) }
+                    1  => { upgrade_fighter1(fighter) }
+                    0  => { upgrade_fighter0(fighter) }
                     _ => { }
                 }
             }
@@ -106,6 +107,14 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
+
+/// Change CSS properties
+fn upgrade_fighter10(fighter: &mut Value) {
+    if let &mut Value::Object (ref mut fighter) = fighter {
+        fighter.insert(String::from("css_action"), Value::Number(Number::from(2)));
+        fighter.insert(String::from("css_scale"), Value::Number(Number::from(1)));
+    }
+}
 
 /// Add turn properties to fighter
 fn upgrade_fighter9(fighter: &mut Value) {

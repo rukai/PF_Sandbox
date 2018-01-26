@@ -1,5 +1,5 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
-use enum_traits::{Index, Iterable};
+use enum_traits::{Index, ToIndex, Iterable};
 
 use json_upgrade::engine_version;
 
@@ -43,12 +43,8 @@ impl Default for Fighter {
 
             // css render
             name:       "Base Fighter".to_string(),
-            name_short: "BF".to_string(),
-            css_action: Action::Idle,
-            css_frame:  0,
-            css_point1: (0.0, 0.0),
-            css_point2: (0.0, 0.0),
-            css_hide:   false,
+            css_action: Action::Idle.index(),
+            css_scale:  1.0,
 
             // in game attributes
             air_jumps:                1,
@@ -100,12 +96,8 @@ pub struct Fighter {
 
     // css render
     pub name:       String,
-    pub name_short: String,
-    pub css_action: Action,
-    pub css_frame:  u64,
-    pub css_point1: (f32, f32),
-    pub css_point2: (f32, f32),
-    pub css_hide:   bool,
+    pub css_action: u64,
+    pub css_scale:  f32,
 
     // in game attributes
     pub air_jumps:                u64,

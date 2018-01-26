@@ -215,10 +215,11 @@ impl Menu {
                 };
                 let team = Menu::get_free_team(&self.fighter_selections);
                 self.fighter_selections.push(PlayerSelect {
-                    controller: Some((i, MenuTicker::new(1))),
-                    fighter:    None,
-                    cpu_ai:     None,
-                    ui:         ui,
+                    controller:      Some((i, MenuTicker::new(1))),
+                    fighter:         None,
+                    cpu_ai:          None,
+                    ui:              ui,
+                    animation_frame: 0,
                     team
                 });
             }
@@ -230,6 +231,16 @@ impl Menu {
         let mut new_state: Option<MenuState> = None;
         if let &mut MenuState::CharacterSelect { ref mut back_counter } = &mut self.state {
             let fighters = &self.package.get().fighters;
+
+            // animate fighters
+            for selection in self.fighter_selections.iter_mut() {
+                if let Some(fighter_key) = selection.fighter {
+                    let fighter = &self.package.get().fighters[fighter_key];
+                    if let Some(action) = fighter.actions.get(fighter.css_action as usize) {
+                        selection.animation_frame = (selection.animation_frame + 1) % action.frames.len();
+                    }
+                }
+            }
 
             // plug/unplug humans
             for (input_i, input) in player_inputs.iter().enumerate() {
@@ -435,10 +446,11 @@ impl Menu {
                 if self.fighter_selections.iter().filter(|x| x.ui.is_visible()).count() < 4 {
                     let team = Menu::get_free_team(&self.fighter_selections);
                     self.fighter_selections.push(PlayerSelect {
-                        controller: None,
-                        fighter:    None,
-                        cpu_ai:     None,
-                        ui:         PlayerSelectUi::cpu_fighter(self.package.get()),
+                        controller:      None,
+                        fighter:         None,
+                        cpu_ai:          None,
+                        ui:              PlayerSelectUi::cpu_fighter(self.package.get()),
+                        animation_frame: 0,
                         team
                     });
                 }
@@ -976,11 +988,12 @@ pub enum RenderMenuState {
 
 #[derive(Clone)]
 pub struct PlayerSelect {
-    pub controller: Option<(usize, MenuTicker)>, // the cursor of the ticker is ignored
-    pub fighter:    Option<usize>,
-    pub cpu_ai:     Option<usize>,
-    pub team:       usize,
-    pub ui:         PlayerSelectUi,
+    pub controller:      Option<(usize, MenuTicker)>, // the cursor of the ticker is ignored
+    pub fighter:         Option<usize>,
+    pub cpu_ai:          Option<usize>,
+    pub team:            usize,
+    pub ui:              PlayerSelectUi,
+    pub animation_frame: usize,
 }
 
 impl PlayerSelect {

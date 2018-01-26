@@ -12,7 +12,7 @@ use particle::ParticleType;
 use player::{RenderFighter, RenderPlayer, DebugPlayer};
 use results::PlayerResult;
 
-use enum_traits::FromIndex;
+use enum_traits::{FromIndex, ToIndex};
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector3, Rad};
 use rand::{StdRng, Rng, SeedableRng};
@@ -1103,10 +1103,13 @@ impl<'a> VulkanGraphics<'a> {
         }
 
         // render fighter
-        for (fighter_i, fighter_key) in fighters.key_iter().enumerate() {
+        for (fighter_i, (fighter_key, fighter)) in fighters.key_value_iter().enumerate() {
             if let Some(selection_i) = selection.fighter {
                 if fighter_i == selection_i {
-                    // fudge player data (One day I would like to have the menu selection fighters (mostly) playable)
+                    let fighter_actions = &self.package_buffers.fighters[fighter_key];
+                    let css_action = fighter.css_action as usize;
+
+                    // draw fighter
                     let player = RenderPlayer {
                         team:              selection.team,
                         debug:             DebugPlayer::default(),
@@ -1114,9 +1117,9 @@ impl<'a> VulkanGraphics<'a> {
                         stocks:            None,
                         bps:               (0.0, 0.0),
                         ecb:               ECB::default(),
-                        frame:             0,
+                        frame:             selection.animation_frame,
                         frame_data:        ActionFrame::default(),
-                        action:            Action::Idle as usize,
+                        action:            if css_action < fighter_actions.len() { css_action } else { Action::Idle.index() as usize },
                         fighter:           fighter_key.clone(),
                         face_right:        start_x < 0.0,
                         angle:             0.0,
@@ -1129,22 +1132,18 @@ impl<'a> VulkanGraphics<'a> {
                         particles:         vec!(),
                     };
 
-                    // draw fighter
                     let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
                     if player.frame < fighter_frames.len() {
-                        // TODO: dynamically calculate position and zoom (fit width/height of fighter into selection area)
-                        let zoom_divider = 40.0;
-                        let zoom = 1.0 / zoom_divider;
-                        let fighter_x = start_x + (end_x - start_x) / 2.0;
-                        let fighter_y = end_y - 0.2; // HACK: dont know why the fighters are drawing so low, so just put them 0.2 higher
-                        let fighter_x_scaled = fighter_x * zoom_divider;
-                        let fighter_y_scaled = fighter_y * zoom_divider * -1.0 + player.bps.1;
-
                         if let &Some(_) = &fighter_frames[player.frame] {
+                            // fudge player data TODO: One day I would like to have the menu selection fighters (mostly) playable
+                            let zoom = fighter.css_scale / 40.0;
+                            let fighter_x = start_x + (end_x - start_x) / 2.0;
+                            let fighter_y = end_y * -1.0 + 0.05;
+
                             let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
-                            let position = Matrix4::from_translation(Vector3::new(fighter_x_scaled, fighter_y_scaled, 0.0));
+                            let position = Matrix4::from_translation(Vector3::new(fighter_x, fighter_y, 0.0));
                             let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
-                            let transformation = camera * (position * dir);
+                            let transformation = position * (camera * dir);
                             let uniform = vs::ty::Data {
                                 edge_color:     graphics::get_team_color4(selection.team),
                                 color:          [0.9, 0.9, 0.9, 1.0],
@@ -1185,7 +1184,7 @@ impl<'a> VulkanGraphics<'a> {
                 let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
                 let position = Matrix4::from_translation(Vector3::new(1.0, y, 0.0));
                 let transformation = camera * position;
-                let uniform = surface_vs::ty::Data { transformation:  transformation.into() };
+                let uniform = surface_vs::ty::Data { transformation: transformation.into() };
 
                 let set = self.new_surface_uniform_set(uniform);
                 let entity = MenuEntity::Stage(stage_key.clone());
