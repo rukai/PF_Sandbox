@@ -15,7 +15,7 @@ use replays::Replay;
 use replays;
 use results::{GameResults, RawPlayerResult, PlayerResult};
 use rules::Goal;
-use stage::{Stage, DebugStage, SpawnPoint, Surface};
+use stage::{Stage, DebugStage, SpawnPoint, Surface, Floor};
 
 use rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
@@ -636,27 +636,29 @@ impl Game {
 
                         self.update_frame();
                     }
+                    // add decorative surface
+                    if os_input.key_pressed(VirtualKeyCode::Q) {
+                        self.add_surface(Surface::default(), os_input);
+                    }
+                    // add ceiling surface
+                    if os_input.key_pressed(VirtualKeyCode::W) {
+                        let surface = Surface { ceiling: true, .. Surface::default() };
+                        self.add_surface(surface, os_input);
+                    }
+                    // add wall surface
+                    if os_input.key_pressed(VirtualKeyCode::E) {
+                        let surface = Surface { wall: true, .. Surface::default() };
+                        self.add_surface(surface, os_input);
+                    }
+                    // add stage surface
+                    if os_input.key_pressed(VirtualKeyCode::R) {
+                        let surface = Surface { floor: Some(Floor { traction: 1.0, pass_through: false }), .. Surface::default() };
+                        self.add_surface(surface, os_input);
+                    }
+                    // add platform surface
                     if os_input.key_pressed(VirtualKeyCode::F) {
-                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
-                            if self.selector.surfaces.len() == 1 {
-                                // create new surface, p1 is selected surface, p2 is current mouse
-                                let (x, y) = match self.selector.surfaces.iter().next().unwrap() {
-                                    &SurfaceSelection::P1 (i) => (self.stage.surfaces[i].x1, self.stage.surfaces[i].y1),
-                                    &SurfaceSelection::P2 (i) => (self.stage.surfaces[i].x2, self.stage.surfaces[i].y2)
-                                };
-
-                                self.selector.clear();
-                                self.selector.surfaces.insert(SurfaceSelection::P2(self.stage.surfaces.len()));
-                                self.stage.surfaces.push(Surface::new(x, y, m_x, m_y, os_input.held_shift(), os_input.held_alt(), os_input.held_control()));
-                            }
-                            else if self.selector.surfaces.len() == 0 {
-                                // create new surface, p1 is current mouse, p2 is moving
-                                self.selector.clear();
-                                self.selector.surfaces.insert(SurfaceSelection::P2(self.stage.surfaces.len()));
-                                self.selector.moving = true;
-                                self.stage.surfaces.push(Surface::new(m_x, m_y, m_x, m_y, os_input.held_shift(), os_input.held_alt(), os_input.held_control()));
-                            }
-                        }
+                        let surface = Surface { floor: Some(Floor { traction: 1.0, pass_through: true }), .. Surface::default() };
+                        self.add_surface(surface, os_input);
                     }
                     // add spawn point
                     if os_input.key_pressed(VirtualKeyCode::Z) {
@@ -672,7 +674,7 @@ impl Game {
                             self.update_frame();
                         }
                     }
-                    if os_input.key_pressed(VirtualKeyCode::C) {
+                    if os_input.key_pressed(VirtualKeyCode::S) {
                         let mut join = false;
                         let mut points: Vec<(f32, f32)> = vec!();
                         for selection in self.selector.surfaces.iter() {
@@ -832,6 +834,29 @@ impl Game {
             }
         }
         self.selector.mouse = os_input.game_mouse(&self.camera); // hack to access mouse during render call, dont use this otherwise
+    }
+
+    fn add_surface(&mut self, surface: Surface, os_input: &OsInput) {
+        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+            if self.selector.surfaces.len() == 1 {
+                // create new surface, p1 is selected surface, p2 is current mouse
+                let (x1, y1) = match self.selector.surfaces.iter().next().unwrap() {
+                    &SurfaceSelection::P1 (i) => (self.stage.surfaces[i].x1, self.stage.surfaces[i].y1),
+                    &SurfaceSelection::P2 (i) => (self.stage.surfaces[i].x2, self.stage.surfaces[i].y2)
+                };
+
+                self.selector.clear();
+                self.selector.surfaces.insert(SurfaceSelection::P2(self.stage.surfaces.len()));
+                self.stage.surfaces.push(Surface { x1, y1, x2: m_x, y2: m_y, .. surface });
+            }
+            else if self.selector.surfaces.len() == 0 {
+                // create new surface, p1 is current mouse, p2 is moving
+                self.selector.clear();
+                self.selector.surfaces.insert(SurfaceSelection::P2(self.stage.surfaces.len()));
+                self.selector.moving = true;
+                self.stage.surfaces.push(Surface { x1: m_x, y1: m_y, x2: m_x, y2: m_y, .. surface } );
+            }
+        }
     }
 
     /// next frame is advanced by using the input history on the current frame
