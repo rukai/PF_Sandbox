@@ -1467,7 +1467,7 @@ impl Player {
     }
 
     fn check_crouch(&mut self, context: &mut StepContext) -> bool {
-        if context.input[0].stick_y < -0.69 {
+        if context.input[0].stick_y < -0.77 {
             if let Some(action) = Action::from_index(self.action) {
                 match action {
                     Action::CrouchStart | Action::Crouch | Action::CrouchEnd => {
@@ -1487,7 +1487,9 @@ impl Player {
     fn check_pass_platform(&mut self, context: &mut StepContext) -> bool {
         if let Location::Surface { platform_i, .. } = self.location {
             if let Some(platform) = context.surfaces.get(platform_i) {
-                if platform.is_pass_through() && self.last_frame(&context.fighter) && (context.input[0].stick_y < -0.65 || context.input[1].stick_y < -0.65 || context.input[2].stick_y < -0.65) && context.input[6].stick_y > -0.3 {
+                let last_action_frame = context.fighter.actions[self.action as usize].frames.len() as i64 - 1;
+                let pass_frame = last_action_frame.min(4);
+                if platform.is_pass_through() && self.frame == pass_frame && (context.input[0].stick_y < -0.77 || context.input[2].stick_y < -0.77) && context.input[6].stick_y > -0.36 {
                     self.set_action(context, Action::PassPlatform);
                     self.set_airbourne(context);
                     return true;

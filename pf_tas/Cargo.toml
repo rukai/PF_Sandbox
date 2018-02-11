@@ -12,7 +12,8 @@ winit = "0.10"
 vulkano = "0.7"
 vulkano-shader-derive = "0.7"
 vulkano-win = "0.8"
-vulkano_text = "0.6"
+#vulkano_text = { version = "0.6" }
+vulkano_text = { version = "0.6", git = "https://github.com/rukai/vulkano-text", branch = "pf_sandbox" } # temp while waiting on next vulkano release
 serde_json = "1.0"
 serde_derive = "1.0"
 serde = "1.0"
