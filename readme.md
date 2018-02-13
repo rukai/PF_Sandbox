@@ -1,4 +1,4 @@
-# PF Sandbox [![Build Status](https://travis-ci.org/rukai/PF_Sandbox.svg?branch=master)](https://travis-ci.org/rukai/PF_Sandbox) [![Build status](https://ci.appveyor.com/api/projects/status/89drle66lde9pq35?svg=true)](https://ci.appveyor.com/project/rukai/pf-sandbox)
+# PF Sandbox [![Build Status](https://travis-ci.org/rukai/PF_Sandbox.svg?branch=master)](https://travis-ci.org/rukai/PF_Sandbox) [![Build status](https://ci.appveyor.com/api/projects/status/89drle66lde9pq35?svg=true)](https://ci.appveyor.com/project/rukai/pf-sandbox) [![dependency status](https://deps.rs/repo/github/rukai/pf_sandbox/status.svg)](https://deps.rs/repo/github/rukai/pf_sandbox)
 
 A platform fighter featuring a character editor tightly integrated with gameplay.
 

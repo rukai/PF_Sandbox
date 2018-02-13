@@ -10,12 +10,12 @@ use game::SurfaceSelection;
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
 
-use lyon::path::Path;
-use lyon::path_builder::FlatPathBuilder;
+use lyon::path::default::Path;
+use lyon::path::builder::FlatPathBuilder;
 use lyon::math::point;
 use lyon::tessellation::{VertexBuffers, FillVertex};
 use lyon::tessellation::{FillTessellator, FillOptions};
-use lyon::tessellation::geometry_builder::{VertexConstructor, BuffersBuilder};
+use lyon::tessellation::{VertexConstructor, BuffersBuilder};
 
 use std::collections::{HashSet, HashMap};
 use std::f32::consts;
@@ -372,7 +372,7 @@ impl Buffers {
 
         let mut builder = Path::builder();
         let mut used: Vec<usize> = vec!();
-        let mut cant_loop: Vec<usize> = vec!(); // optmization, so we dont have to keep rechecking surfaces that will never loop
+        let mut cant_loop: Vec<usize> = vec!(); // optimization, so we dont have to keep rechecking surfaces that will never loop
 
         for (i, surface) in surfaces.iter().enumerate() {
             if used.contains(&i) {

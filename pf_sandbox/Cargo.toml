@@ -12,34 +12,33 @@ bincode = "0.9"
 chrono = { version = "0.4", features = ["serde"] }
 enum_traits = "0.3"
 enum_traits_macros = "2.0"
-env_logger = "0.5.0-rc.2"
+env_logger = "0.5"
 getopts = "0.2"
 gilrs = "0.6"
 libusb = "0.3"
 log = "0.4"
-lyon = "0.8"
+lyon = "0.9"
 matches = "0.1"
-rand = "0.3"
-reqwest = "0.7"
+rand = "0.4"
+reqwest = "0.8"
 rust-crypto = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 treeflection = "0.1"
 treeflection_derive = "0.2"
-uuid = { version = "0.5", features = ["v4", "serde"] }
-winit = "0.10" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
-zip = "0.2"
+uuid = { version = "0.6.0-beta", features = ["v4", "serde"] }
+winit = "0.11" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+zip = "0.3"
 
 vulkano = { version = "0.7", optional = true }
 vulkano-win = { version = "0.8", optional = true }
 vulkano-shader-derive = { version = "0.7", optional = true }
-#vulkano_text = { version = "0.6", optional = true }
-vulkano_text = { version = "0.6", optional = true, git = "https://github.com/rukai/vulkano-text", branch = "pf_sandbox" } # temp while waiting on next vulkano release
-cgmath = { version = "0.15.0", optional = true }
-glium = { version = "0.16", optional = true }
+vulkano_text = { version = "0.6", optional = true }
+cgmath = { version = "0.16", optional = true }
+#glium = { version = "0.16", optional = true }
 
 [features]
 default = ["vulkan"]
 vulkan = ["vulkano", "vulkano-win", "vulkano-shader-derive", "vulkano_text", "cgmath"]
-opengl = ["glium"] # opengl is now broken, need to port it over to winit instead of glutin
+#opengl = ["glium"] # opengl is now broken, need to port it over to winit instead of glutin

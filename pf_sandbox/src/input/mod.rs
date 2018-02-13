@@ -103,7 +103,7 @@ impl<'a> Input<'a> {
             input_sources.push(InputSource::GCAdapter { handle, deadzones: Deadzone::empty4() });
         }
 
-        let gilrs = GilrsBuilder::new().build();
+        let gilrs = GilrsBuilder::new().build().unwrap();
 
         let controller_maps = ControllerMaps::load();
 
@@ -161,7 +161,7 @@ impl<'a> Input<'a> {
 
         self.events.clear();
         while let Some(ev) = self.gilrs.next_event() {
-            self.gilrs.update(&ev); // TODO: If we dont call this then we dont get a 0.0 value on the triggers, investigate
+            self.gilrs.update(&ev); // TODO: If we dont call this then we dont get a 0.0 value on the triggers, investigate // TODO: Investigate effects of removing, (was changed in 0.6.0)
             self.events.push(ev);
         }
         self.events.sort_by_key(|x| x.time);
@@ -192,7 +192,7 @@ impl<'a> Input<'a> {
 
                 &mut InputSource::GenericController { index, ref mut state, ref mut deadzone } => {
                     let events = self.events.iter().filter(|x| x.id == index).map(|x| &x.event).cloned().collect();
-                    let gamepad = self.gilrs.gamepad(index);
+                    let gamepad = &self.gilrs[index]; // TODO: different index
                     let maps = &self.controller_maps.maps;
                     inputs.push(read_generic(maps, state, events, gamepad, deadzone));
                 }
@@ -548,7 +548,7 @@ fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, 
                 EventType::ButtonPressed (_, code) => {
                     for map in &controller_map.analog_maps {
                         if let AnalogFilter::FromDigital { value } = map.filter {
-                            if map.source == code as usize {
+                            if map.source == code.into_u32() as usize{
                                 state.set_analog_dest(map.dest.clone(), value);
                             }
                         }
@@ -556,7 +556,7 @@ fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, 
 
                     for map in &controller_map.digital_maps {
                         if let DigitalFilter::FromDigital = map.filter {
-                            if map.source == code as usize {
+                            if map.source == code.into_u32() as usize {
                                 state.set_digital_dest(map.dest.clone(), true);
                             }
                         };
@@ -565,7 +565,7 @@ fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, 
                 EventType::ButtonReleased (_, code) => {
                     for map in &controller_map.analog_maps {
                         if let AnalogFilter::FromDigital { .. } = map.filter {
-                            if map.source == code as usize {
+                            if map.source == code.into_u32() as usize {
                                 state.set_analog_dest(map.dest.clone(), 0.0);
                             }
                         }
@@ -573,7 +573,7 @@ fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, 
 
                     for map in &controller_map.digital_maps {
                         if let DigitalFilter::FromDigital = map.filter {
-                            if map.source == code as usize {
+                            if map.source == code.into_u32() as usize {
                                 state.set_digital_dest(map.dest.clone(), false);
                             }
                         };
@@ -596,7 +596,7 @@ fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, 
                                 _ => { }
                             }
 
-                            if map.source == code as usize {
+                            if map.source == code.into_u32() as usize {
                                 state.set_analog_dest(map.dest.clone(), new_value);
                             }
                         };
@@ -606,7 +606,7 @@ fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, 
                         if let DigitalFilter::FromAnalog { min, max } = map.filter {
                             let value = value >= min && value <= max;
 
-                            if map.source == code as usize {
+                            if map.source == code.into_u32() as usize {
                                 state.set_digital_dest(map.dest.clone(), value);
                             }
                         };

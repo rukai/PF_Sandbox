@@ -41,7 +41,7 @@ impl AnalogHistory {
 
 impl State {
     pub fn new() -> State {
-        let gilrs = GilrsBuilder::new().build();
+        let gilrs = GilrsBuilder::new().build().unwrap();
         let mut controller_maps = ControllerMaps::load();
 
         // add gamepads that dont have an existing mapping

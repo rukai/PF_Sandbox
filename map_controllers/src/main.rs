@@ -202,11 +202,11 @@ fn input_management_hbox(state: Rc<RwLock<State>>) -> Box {
         while let Some(ev) = state.gilrs.next_event() {
             match ev.event {
                 EventType::ButtonPressed (_, code) => {
-                    state.last_code = Code::Digital(code as usize);
+                    state.last_code = Code::Digital(code.into_u32() as usize);
                     label.set_text(format!("Digital: {}", code).as_ref());
                 }
                 EventType::AxisChanged (_, value, code) => {
-                    let code = code as usize;
+                    let code = code.into_u32() as usize;
                     let new_history = match state.analog_history.get(&code).cloned() {
                         Some(mut history) => {
                             if value > history.max {
