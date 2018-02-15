@@ -233,6 +233,8 @@ impl Package {
         String::from("Publish completed succesfully.")
     }
 
+    // Write to a new folder first, in case there is a panic, in between deleting and writing data
+    // Then we delete the existing folder and rename the new one
     pub fn save(&mut self) -> String {
         if self.meta.published {
             return String::from("Save FAILED! The published property in package_meta is set.");
@@ -242,17 +244,27 @@ impl Package {
         self.meta.stage_keys = self.stages.keys();
         self.meta.hash = self.compute_hash();
 
+        // setup new directory to save to
+        let mut name = self.meta.path.file_name().unwrap().to_os_string();
+        name.push("_name_conflict_avoiding_temp_string");
+        let new_path = self.meta.path.with_file_name(name);
+        fs::create_dir(&new_path).unwrap();
+
         // save all json files
-        files::save_struct(self.meta.path.join("rules.json"), &self.rules);
-        files::save_struct(self.meta.path.join("package_meta.json"), &self.meta);
+        files::save_struct(new_path.join("rules.json"), &self.rules);
+        files::save_struct(new_path.join("package_meta.json"), &self.meta);
 
         for (key, fighter) in self.fighters.key_value_iter() {
-            files::save_struct(self.meta.path.join("Fighters").join(key), fighter);
+            files::save_struct(new_path.join("Fighters").join(key), fighter);
         }
         
         for (key, stage) in self.stages.key_value_iter() {
-            files::save_struct(self.meta.path.join("Stages").join(key), stage);
+            files::save_struct(new_path.join("Stages").join(key), stage);
         }
+
+        // replace old directory with new directory
+        fs::remove_dir_all(&self.meta.path).ok();
+        fs::rename(new_path, &self.meta.path).unwrap();
         String::from("Save completed successfully.")
     }
 

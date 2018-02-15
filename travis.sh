@@ -18,8 +18,7 @@ set -ev
 # test
 #cargo test --release -v --all -j 2 # temp disabled for gtk version
 cd pf_sandbox
-cargo check --release --no-default-features
-cargo check --release --no-default-features --features=vulkan
+cargo build --release --no-default-features
 cd ..
 
 # build
