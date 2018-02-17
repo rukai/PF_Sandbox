@@ -1,7 +1,7 @@
 {
   "engine_version": 9,
   "maps": [
-      {
+    {
       "os": "Windows",
       "uuid": "00000000-0000-0000-0000-000000000000",
       "name": "Xbox Controller",
@@ -551,6 +551,127 @@
           "filter": {
             "FromAnalog": {
               "min": 0.97,
+              "max": 1.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "os": "Linux",
+      "uuid": "03000000-222c-0000-0020-000011010000",
+      "name": "QANBA USA,LLC QANBA DRONE ARCADE JOYSTICK",
+      "analog_maps": [
+        {
+          "source": 16,
+          "dest": "StickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 17,
+          "dest": "StickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -1.0,
+              "max": 1.0,
+              "flip": true
+            }
+          }
+        }
+      ],
+      "digital_maps": [
+        {
+          "source": 313,
+          "dest": "Start",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.0,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 306,
+          "dest": "A",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 305,
+          "dest": "B",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 4,
+          "dest": "X",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 304,
+          "dest": "L",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 312,
+          "dest": "Up",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 307,
+          "dest": "Y",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 3,
+          "dest": "Z",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.0,
+              "max": 1.0
+            }
+          }
+        },
+        {
+          "source": 309,
+          "dest": "R",
+          "filter": {
+            "FromAnalog": {
+              "min": 0.5,
               "max": 1.0
             }
           }

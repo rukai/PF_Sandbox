@@ -26,7 +26,9 @@ use gtk::{
     WindowType,
 };
 use gilrs::EventType;
+use gilrs::ev::Button as EvButton;
 
+use pf_sandbox::input;
 use pf_sandbox::input::maps::{
     AnalogDest,
     DigitalDest,
@@ -201,12 +203,19 @@ fn input_management_hbox(state: Rc<RwLock<State>>) -> Box {
         let mut state = state.write().unwrap();
         while let Some(ev) = state.gilrs.next_event() {
             match ev.event {
-                EventType::ButtonPressed (_, code) => {
-                    state.last_code = Code::Digital(code.into_u32() as usize);
-                    label.set_text(format!("Digital: {}", code).as_ref());
+                EventType::ButtonPressed (button, code) => {
+                    // gilrs creates button press events for some analog trigger value, hopefully this is the correct way to ignore on all controllers + os's
+                    match button {
+                        EvButton::LeftTrigger2 | EvButton::RightTrigger2 => { }
+                        _ => {
+                            state.last_code = Code::Digital(input::code_to_usize(&code));
+                            label.set_text(format!("Digital: {}", code).as_ref());
+                        }
+                    }
                 }
-                EventType::AxisChanged (_, value, code) => {
-                    let code = code.into_u32() as usize;
+                EventType::AxisChanged (_, value, code) |
+                EventType::ButtonChanged (_, value, code) => {
+                    let code = input::code_to_usize(&code);
                     let new_history = match state.analog_history.get(&code).cloned() {
                         Some(mut history) => {
                             if value > history.max {
