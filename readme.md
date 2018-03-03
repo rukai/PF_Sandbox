@@ -11,7 +11,8 @@ A platform fighter featuring a character editor tightly integrated with gameplay
 
 ## OS/Controller requirements
 
-*   Windows: Xbox controllers + native GC adapter
+*   Windows 10: Xbox controllers + native GC adapter
+*   Other Windows: [Unsupported](https://gitlab.com/Arvamer/gilrs/commit/56bf4e2d04c972a73cb195afff2a9a8563f6aa34#note_58842780)
 *   Linux: All controllers + native GC adapter
 *   Mac OS: Unsupported
 

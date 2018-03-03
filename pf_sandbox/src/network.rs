@@ -190,7 +190,7 @@ impl Netplay {
             NetplayState::Disconnected { .. } => { }
             NetplayState::MatchMaking { request, } => {
                 if self.state_frame % 600 == 1 { // Send a request every 10 seconds
-                    let mut data = bincode::serialize(&request, bincode::Infinite).unwrap();
+                    let mut data = bincode::serialize(&request).unwrap();
                     data.insert(0, 0x00);
                     if let Err(_) = self.socket.send_to(&data, "matchmaking.pfsandbox.net:8413") {
                         self.disconnect_with_reason("matchmaking.pfsandbox.net:8413 is inaccessible");
@@ -214,7 +214,7 @@ impl Netplay {
             }
             NetplayState::InitConnection (local) => {
                 // send init
-                let mut data = bincode::serialize(&local, bincode::Infinite).unwrap();
+                let mut data = bincode::serialize(&local).unwrap();
                 data.insert(0, 0x01);
                 self.broadcast(&data, "init");
 
@@ -246,7 +246,7 @@ impl Netplay {
             NetplayState::PingTest { local_init, mut pings } => {
                 // if we havnt received a ping yet then resend init message
                 if pings.iter().all(|x| x.time_received.is_none()) {
-                    let mut data = bincode::serialize(&local_init, bincode::Infinite).unwrap();
+                    let mut data = bincode::serialize(&local_init).unwrap();
                     data.insert(0, 0x01);
                     self.broadcast(&data, "init2");
                 }
@@ -458,7 +458,7 @@ impl Netplay {
                 frame: self.state_frame,
                 inputs
             };
-            let mut data = bincode::serialize(&input_confirm, bincode::Infinite).unwrap();
+            let mut data = bincode::serialize(&input_confirm).unwrap();
             data.insert(0, 0x04);
             self.broadcast(&data, "controller input");
         }

@@ -4,7 +4,7 @@ environment:
   matrix:
     - TARGET: x86_64-pc-windows-gnu
 
-image: Visual Studio 2015
+image: Visual Studio 2017
 
 install:
     # setup ssh keys
@@ -19,16 +19,16 @@ install:
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
   - rustc -V
   - cargo -V
-  # setup libusb
-  - set PATH=%PATH%;C:\msys64\mingw64\bin # access libusb
+  # setup msys2
+  - set PATH=%PATH%;C:\msys64\mingw64\bin # access libraries
   - set PATH=%PATH%;C:\msys64\usr\bin # access pacman
   - echo %PATH%
-  - pacman --noconfirm -Syu
+  - pacman --ask 20 --noconfirm -Syu # TODO: Apparently when appveyor and/or msys fix the issue, it will break again and I will need to remove the --ask 20 
   - pacman --noconfirm -Syu
   - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3
 
 test_script:
-  #- cargo test --release --all # disabled tests because running tests on appveyor explodes without any error message. Cannot reproduce locally. Too painful to continue debugging by pushing changes to appveyor and waiting 20 minutes for the result.
+  - cargo test --release --all
   - cargo build --release --all
   - mkdir pf\tools
   - move target\release\pf_sandbox.exe pf
@@ -44,7 +44,7 @@ test_script:
   - echo put pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip /home/rubic/PF_Sandbox_Website/builds/ | sftp rubic@pfsandbox.net
 
 skip_tags: true
-cache:
-  - C:\Users\appveyor\.cargo\registry
+#cache:
+  #- C:\Users\appveyor\.cargo\registry
 # Building is done in the test phase, so we disable Appveyor's build phase.
 build: false
