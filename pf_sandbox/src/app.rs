@@ -1,12 +1,10 @@
 #[cfg(feature = "vulkan")]
 use ::vulkan::VulkanGraphics;
-#[cfg(feature = "opengl")]
-use ::opengl::OpenGLGraphics;
-#[cfg(any(feature = "vulkan", feature = "opengl"))]
+#[cfg(feature = "vulkan")]
 use ::cli::GraphicsBackendChoice;
-#[cfg(any(feature = "vulkan", feature = "opengl"))]
+#[cfg(feature = "vulkan")]
 use ::graphics::GraphicsMessage;
-#[cfg(any(feature = "vulkan", feature = "opengl"))]
+#[cfg(feature = "vulkan")]
 use std::sync::mpsc::Sender;
 use std;
 
@@ -32,7 +30,7 @@ pub fn run(mut cli_results: CLIResults) {
 
     let mut context = Context::new().unwrap();
     let mut input = Input::new(&mut context);
-    #[cfg(any(feature = "vulkan", feature = "opengl"))]
+    #[cfg(feature = "vulkan")]
     let mut graphics_tx: Option<Sender<GraphicsMessage>> = None;
     let mut net_command_line = NetCommandLine::new();
     let mut netplay = Netplay::new();
@@ -46,26 +44,18 @@ pub fn run(mut cli_results: CLIResults) {
         let config = Config::load();
         let package_string = cli_results.package.or(config.current_package.clone());
 
-        #[cfg(any(feature = "vulkan", feature = "opengl"))]
+        #[cfg(feature = "vulkan")]
         {
             match cli_results.graphics_backend {
                 #[cfg(feature = "vulkan")]
                 GraphicsBackendChoice::Vulkan => {
                     graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone()));
                 }
-                #[cfg(feature = "opengl")]
-                GraphicsBackendChoice::OpenGL => {
-                    graphics_tx = Some(OpenGLGraphics::init(os_input_tx.clone()));
-                }
                 GraphicsBackendChoice::Headless => {}
                 GraphicsBackendChoice::Default => {
                     #[cfg(feature = "vulkan")]
                     {
                         graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone()));
-                    }
-                    #[cfg(all(not(feature = "vulkan"), feature = "opengl"))]
-                    {
-                        graphics_tx = Some(OpenGLGraphics::init(os_input_tx.clone()));
                     }
                 }
             }
@@ -256,7 +246,7 @@ pub fn run(mut cli_results: CLIResults) {
                 if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block(), &netplay) {
                     resume_menu = Some(resume_menu_inner)
                 }
-                #[cfg(any(feature = "vulkan", feature = "opengl"))]
+                #[cfg(feature = "vulkan")]
                 {
                     if let Some(ref tx) = graphics_tx {
                         if let Err(_) = tx.send(game.graphics_message(&command_line)) {
@@ -278,7 +268,7 @@ pub fn run(mut cli_results: CLIResults) {
                 game = Some(Game::new(package, config, menu_game_setup));
             }
             else {
-                #[cfg(any(feature = "vulkan", feature = "opengl"))]
+                #[cfg(feature = "vulkan")]
                 {
                     if let Some(ref tx) = graphics_tx {
                         if let Err(_) = tx.send(menu.graphics_message(&command_line)) {

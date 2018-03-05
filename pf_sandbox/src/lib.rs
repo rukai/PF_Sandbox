@@ -64,11 +64,3 @@ extern crate cgmath;
 
 #[cfg(feature = "vulkan")]
 pub mod vulkan;
-
-#[cfg(feature = "opengl")]
-#[macro_use]
-extern crate glium;
-#[cfg(feature = "opengl")]
-pub mod opengl;
-#[cfg(feature = "opengl")]
-pub mod opengl_buffers;

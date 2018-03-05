@@ -22,12 +22,8 @@ pub fn cli() -> CLIResults {
     opts.optopt("n",  "netplayplayers",  "Search for a netplay game with the specified number of players", "NUM_PLAYERS");
     opts.optopt("r",  "netplayregion",   "Search for a netplay game with the specified region", "REGION");
     opts.optopt("g",  "graphics",        "Graphics backend to use",
-        if cfg!(features =  "vulkan") && cfg!(features = "opengl") {
-            "[vulkan|opengl|none]"
-        } else if cfg!(features =  "vulkan") {
+        if cfg!(features = "vulkan") {
             "[vulkan|none]"
-        } else if cfg!(features = "opengl") {
-            "[opengl|none]"
         } else {
             "[none]"
         }
@@ -112,8 +108,6 @@ pub fn cli() -> CLIResults {
         results.graphics_backend = match backend_string.to_lowercase().as_ref() {
             #[cfg(feature = "vulkan")]
             "vulkan" => { GraphicsBackendChoice::Vulkan }
-            #[cfg(feature = "opengl")]
-            "opengl" => { GraphicsBackendChoice::OpenGL }
             "none"   => { GraphicsBackendChoice::Headless }
             _ => {
                 print_usage(&program, opts);
@@ -183,8 +177,6 @@ pub enum ContinueFrom {
 pub enum GraphicsBackendChoice {
     #[cfg(feature = "vulkan")]
     Vulkan,
-    #[cfg(feature = "opengl")]
-    OpenGL,
     Headless,
     Default,
 }
