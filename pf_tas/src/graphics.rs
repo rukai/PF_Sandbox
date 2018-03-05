@@ -1,4 +1,4 @@
-use winit::{WindowBuilder, EventsLoop};
+use winit::{Window, WindowBuilder, EventsLoop};
 
 use vulkano_text::{DrawText, DrawTextTrait};
 
@@ -11,7 +11,7 @@ use vulkano::device::{Device, Queue};
 use vulkano::framebuffer::{Framebuffer, FramebufferAbstract};
 use vulkano::image::SwapchainImage;
 use vulkano::instance::{Instance, PhysicalDevice};
-use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentMode};
+use vulkano::swapchain::{Surface, Swapchain, SurfaceTransform, AcquireError, PresentMode};
 use vulkano::sync::{GpuFuture, FlushError};
 
 use std::sync::Arc;
@@ -20,10 +20,10 @@ use std::mem;
 use state::State;
 
 pub struct Graphics<'a> {
-    window:          vulkano_win::Window,
+    surface:         Arc<Surface<Window>>,
     device:          Arc<Device>,
     future:          Box<GpuFuture>,
-    swapchain:       Arc<Swapchain>,
+    swapchain:       Arc<Swapchain<Window>>,
     queue:           Arc<Queue>,
     framebuffers:    Vec<Arc<FramebufferAbstract + Send + Sync>>,
     draw_text:       DrawText<'a>,
@@ -39,11 +39,11 @@ impl<'a> Graphics<'a> {
         };
 
         let physical = PhysicalDevice::enumerate(&instance).next().expect("no device available");
-        let window  = WindowBuilder::new().build_vk_surface(events_loop, instance.clone()).unwrap();
-        window.window().set_title("PF TAS");
+        let surface = WindowBuilder::new().build_vk_surface(events_loop, instance.clone()).unwrap();
+        surface.window().set_title("PF TAS");
 
         let queue = physical.queue_families().find(|&q| {
-            q.supports_graphics() && window.surface().is_supported(q).unwrap_or(false)
+            q.supports_graphics() && surface.is_supported(q).unwrap_or(false)
         }).unwrap();
 
         let (device, mut queues) = {
@@ -59,11 +59,11 @@ impl<'a> Graphics<'a> {
         let queue = queues.next().unwrap();
 
         let (swapchain, images) = {
-            let caps = window.surface().capabilities(physical).unwrap();
+            let caps = surface.capabilities(physical).unwrap();
             let dimensions = caps.current_extent.unwrap_or([640, 480]);
             let alpha = caps.supported_composite_alpha.iter().next().unwrap();
             let format = caps.supported_formats[0].0;
-            Swapchain::new(device.clone(), window.surface().clone(), caps.min_image_count, format, dimensions, 1,
+            Swapchain::new(device.clone(), surface.clone(), caps.min_image_count, format, dimensions, 1,
                 caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, PresentMode::Fifo, true, None
             ).unwrap()
         };
@@ -73,22 +73,22 @@ impl<'a> Graphics<'a> {
         let draw_text = DrawText::new(device.clone(), queue.clone(), swapchain.clone(), &images);
 
         Graphics {
-            window:          window,
-            device:          device,
-            future:          future,
-            swapchain:       swapchain,
-            queue:           queue,
-            framebuffers:    framebuffers,
-            draw_text:       draw_text,
-            width:           0,
-            height:          0,
+            width:  0,
+            height: 0,
+            surface,
+            device,
+            future,
+            swapchain,
+            queue,
+            framebuffers,
+            draw_text,
         }
     }
 
     fn framebuffers(
         device: Arc<Device>,
-        swapchain: Arc<Swapchain>,
-        images: &[Arc<SwapchainImage>]
+        swapchain: Arc<Swapchain<Window>>,
+        images: &[Arc<SwapchainImage<Window>>]
     ) -> Vec<Arc<FramebufferAbstract + Send + Sync>> {
         let render_pass = Arc::new(single_pass_renderpass!(device.clone(),
             attachments: {
@@ -127,7 +127,7 @@ impl<'a> Graphics<'a> {
 
     pub fn draw(&mut self, state: &State) {
         self.future.cleanup_finished();
-        let (new_width, new_height) = self.window.window().get_inner_size().unwrap();
+        let (new_width, new_height) = self.surface.window().get_inner_size().unwrap();
         if self.width != new_width || self.height != new_height {
             self.window_resize(new_width, new_height);
         }

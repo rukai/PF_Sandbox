@@ -35,10 +35,10 @@ use vulkano::pipeline::blend::LogicOp;
 use vulkano::pipeline::depth_stencil::{DepthStencil, DepthBounds, Compare};
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
-use vulkano::swapchain::{Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
+use vulkano::swapchain::{Surface, Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
 use vulkano_text::{DrawText, DrawTextTrait};
-use winit::{Event, WindowEvent, WindowBuilder, EventsLoop};
+use winit::{Window, Event, WindowEvent, WindowBuilder, EventsLoop};
 
 use std::collections::HashSet;
 use std::f32;
@@ -83,11 +83,11 @@ mod surface_fs {
 
 pub struct VulkanGraphics<'a> {
     package_buffers:             PackageBuffers,
-    window:                      vulkano_win::Window,
+    surface:                     Arc<Surface<Window>>,
     events_loop:                 EventsLoop,
     device:                      Arc<Device>,
     future:                      Box<GpuFuture>,
-    swapchain:                   Arc<Swapchain>,
+    swapchain:                   Arc<Swapchain<Window>>,
     queue:                       Arc<Queue>,
     vs:                          vs::Shader,
     fs:                          fs::Shader,
@@ -143,11 +143,11 @@ impl<'a> VulkanGraphics<'a> {
         println!("GPU: {} (type: {:?})", physical.name(), physical.ty());
 
         let events_loop = EventsLoop::new();
-        let window = WindowBuilder::new().build_vk_surface(&events_loop, instance.clone()).unwrap();
-        window.window().set_title("PF Sandbox");
+        let surface = WindowBuilder::new().build_vk_surface(&events_loop, instance.clone()).unwrap();
+        surface.window().set_title("PF Sandbox");
 
         let queue = physical.queue_families().find(|&q| {
-            q.supports_graphics() && window.surface().is_supported(q).unwrap_or(false)
+            q.supports_graphics() && surface.is_supported(q).unwrap_or(false)
         }).unwrap();
 
         let (device, mut queues) = {
@@ -168,11 +168,11 @@ impl<'a> VulkanGraphics<'a> {
         let queue = queues.next().unwrap();
 
         let (swapchain, images) = {
-            let caps = window.surface().capabilities(physical).unwrap();
+            let caps = surface.capabilities(physical).unwrap();
             let dimensions = caps.current_extent.unwrap_or([640, 480]);
             let alpha = caps.supported_composite_alpha.iter().next().unwrap();
             let format = caps.supported_formats[0].0;
-            Swapchain::new(device.clone(), window.surface().clone(), caps.min_image_count, format, dimensions, 1,
+            Swapchain::new(device.clone(), surface.clone(), caps.min_image_count, format, dimensions, 1,
                 caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, PresentMode::Fifo, true, None
             ).unwrap()
         };
@@ -184,7 +184,7 @@ impl<'a> VulkanGraphics<'a> {
         let surface_uniform_buffer_pool = CpuBufferPool::<surface_vs::ty::Data>::new(device.clone(), BufferUsage::all());
 
         VulkanGraphics {
-            window,
+            surface,
             events_loop,
             device,
             future,
@@ -218,8 +218,8 @@ impl<'a> VulkanGraphics<'a> {
         surface_vs: &surface_vs::Shader,
         surface_fs: &surface_fs::Shader,
         device: Arc<Device>,
-        swapchain: Arc<Swapchain>,
-        images: &[Arc<SwapchainImage>]
+        swapchain: Arc<Swapchain<Window>>,
+        images: &[Arc<SwapchainImage<Window>>]
     ) -> (
         Arc<RenderPassAbstract + Send + Sync>,
         Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>,      Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
@@ -377,7 +377,7 @@ impl<'a> VulkanGraphics<'a> {
                 }
 
                 // MS Windows removes the window immediately on close before the process ends
-                if let Some((new_width, new_height)) = self.window.window().get_inner_size() {
+                if let Some((new_width, new_height)) = self.surface.window().get_inner_size() {
                     self.window_resize(new_width, new_height);
                 }
                 else {
@@ -439,11 +439,11 @@ impl<'a> VulkanGraphics<'a> {
         #[cfg(unix)] // remove when winit implements set_fullscreen and get_current_monitor for windows
         {
             if render.fullscreen {
-                let monitor = self.window.window().get_current_monitor();
-                self.window.window().set_fullscreen(Some(monitor));
+                let monitor = self.surface.window().get_current_monitor();
+                self.surface.window().set_fullscreen(Some(monitor));
             }
             else {
-                self.window.window().set_fullscreen(None);
+                self.surface.window().set_fullscreen(None);
             }
         }
 
@@ -1241,7 +1241,7 @@ impl<'a> VulkanGraphics<'a> {
     /// returns true iff succeeds
     fn handle_events(&mut self) -> bool {
         // force send the current resolution
-        let window = self.window.window();
+        let window = self.surface.window();
 
         // MS Windows removes the window immediately on close before the process ends
         if let Some((res_x, res_y)) = window.get_inner_size() {
