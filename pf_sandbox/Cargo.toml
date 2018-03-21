@@ -36,9 +36,7 @@ vulkano-win = { git = "https://github.com/rukai/vulkano", branch = "git_winit", 
 vulkano-shader-derive = { git = "https://github.com/vulkano-rs/vulkano", optional = true }
 vulkano_text = { git = "https://github.com/rukai/vulkano-text", optional = true }
 cgmath = { version = "0.16", optional = true }
-#glium = { version = "0.16", optional = true }
 
 [features]
 default = ["vulkan"]
 vulkan = ["vulkano", "vulkano-win", "vulkano-shader-derive", "vulkano_text", "cgmath"]
-#opengl = ["glium"] # opengl is now broken, need to port it over to winit instead of glutin

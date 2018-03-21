@@ -244,7 +244,7 @@ impl<'a> Input<'a> {
     /// Call this once from the game update logic only
     /// Throws out all future history that may exist
     pub fn game_update(&mut self, frame: usize) {
-        for _ in frame..(self.game_inputs.len()+1) {
+        for _ in frame..=self.game_inputs.len() {
             self.game_inputs.pop();
         }
 

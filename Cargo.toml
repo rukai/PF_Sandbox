@@ -8,11 +8,6 @@ members = [
 
 [patch.crates-io]
 gilrs = { git = "https://gitlab.com/rukai/gilrs", branch = "pf_sandbox2" }
-#vulkano = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox2" }
-#vulkano-win = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox2" }
-#vulkano-shader-derive = { git = "https://github.com/rukai/vulkano", branch = "pf_sandbox2" }
-#vulkano_text = { git = "https://github.com/rukai/vulkano-text", branch = "pf_sandbox2" }
-#winit = { git = "https://github.com/tomaka/winit" }
 
 [profile.release]
 debug-assertions = true

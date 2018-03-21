@@ -1,4 +1,5 @@
 #![feature(ord_max_min)]
+#![feature(nll)]
 
 extern crate bincode;
 extern crate chrono;

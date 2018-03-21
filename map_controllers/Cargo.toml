@@ -4,9 +4,9 @@ version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 
 [dependencies]
-gdk = "0.7"
+gdk = "0.8"
 gilrs = "0.6"
 serde_json = "1.0"
-gtk = { version = "0.3", features = ["v3_12"] }
+gtk = { version = "0.4", features = ["v3_12"] }
 uuid = { version = "0.6.0-beta", features = ["v4", "serde"] }
 pf_sandbox = { path = "../pf_sandbox" }

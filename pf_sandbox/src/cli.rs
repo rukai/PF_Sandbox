@@ -10,7 +10,7 @@ fn print_usage(program: &str, opts: Options) {
 
 pub fn cli() -> CLIResults {
     let args: Vec<String> = env::args().collect();
-    let program = args[0].clone();
+    let program = &args[0];
 
     let mut opts = Options::new();
     opts.optflag("l", "list",            "List available packages and close");
@@ -32,9 +32,9 @@ pub fn cli() -> CLIResults {
     let mut results = CLIResults::new();
 
     let matches = match opts.parse(&args[1..]) {
-        Ok(m)  => { m },
+        Ok(m)  => m,
         Err(_) => {
-            print_usage(&program, opts);
+            print_usage(program, opts);
             results.continue_from = ContinueFrom::Close;
             return results;
         },
@@ -47,7 +47,7 @@ pub fn cli() -> CLIResults {
     }
 
     if matches.free.len() > 1 {
-        print_usage(&program, opts);
+        print_usage(program, opts);
         results.continue_from = ContinueFrom::Close;
         return results;
     }
@@ -62,7 +62,7 @@ pub fn cli() -> CLIResults {
             results.max_human_players = Some(players);
         }
         else {
-            print_usage(&program, opts);
+            print_usage(program, opts);
             results.continue_from = ContinueFrom::Close;
             return results;
         }
@@ -74,7 +74,7 @@ pub fn cli() -> CLIResults {
             results.total_cpu_players = Some(players);
         }
         else {
-            print_usage(&program, opts);
+            print_usage(program, opts);
             results.continue_from = ContinueFrom::Close;
             return results;
         }
@@ -98,7 +98,7 @@ pub fn cli() -> CLIResults {
             results.continue_from = ContinueFrom::Netplay;
         }
         else {
-            print_usage(&program, opts);
+            print_usage(program, opts);
             results.continue_from = ContinueFrom::Close;
             return results;
         }
@@ -110,7 +110,7 @@ pub fn cli() -> CLIResults {
             "vulkan" => { GraphicsBackendChoice::Vulkan }
             "none"   => { GraphicsBackendChoice::Headless }
             _ => {
-                print_usage(&program, opts);
+                print_usage(program, opts);
                 results.continue_from = ContinueFrom::Close;
                 return results;
             }
@@ -122,7 +122,7 @@ pub fn cli() -> CLIResults {
             results.netplay_players = Some(players);
             results.continue_from = ContinueFrom::MatchMaking;
         } else {
-            print_usage(&program, opts);
+            print_usage(program, opts);
             results.continue_from = ContinueFrom::Close;
             return results;
         }

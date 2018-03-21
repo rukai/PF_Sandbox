@@ -86,11 +86,11 @@ fn main() {
     let inputs_vbox = Box::new(Orientation::Vertical, 20);
     inputs_vbox.set_margin_top(10);
     inputs_vbox.set_margin_bottom(10);
-    inputs_vbox.set_margin_right(10);
-    scrolled_window.add_with_viewport(&inputs_vbox);
+    inputs_vbox.set_margin_end(10);
+    scrolled_window.add(&inputs_vbox);
 
     let controller_select = controller_select_hbox(state.clone(), inputs_vbox.clone());
-    controller_select.set_margin_right(10);
+    controller_select.set_margin_end(10);
     vbox.add(&controller_select);
 
     vbox.add(&input_management_hbox(state.clone()));
