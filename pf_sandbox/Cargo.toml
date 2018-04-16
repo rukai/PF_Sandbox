@@ -14,7 +14,7 @@ enum_traits = "0.3"
 enum_traits_macros = "2.0"
 env_logger = "0.5"
 getopts = "0.2"
-gilrs = "0.6"
+gilrs = { git = "https://gitlab.com/gilrs-project/gilrs" }
 libusb = "0.3"
 log = "0.4"
 lyon = "0.10"
@@ -28,7 +28,7 @@ serde_json = "1"
 treeflection = "0.1"
 treeflection_derive = "0.2"
 uuid = { version = "0.6.0-beta", features = ["v4", "serde"] }
-winit = { git = "https://github.com/tomaka/winit" } # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+winit = { git = "https://github.com/francesca64/winit", branch = "x11-imesender-sync" } # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 zip = "0.3"
 
 vulkano = { git = "https://github.com/vulkano-rs/vulkano", optional = true }

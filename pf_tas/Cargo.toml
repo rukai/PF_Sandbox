@@ -8,7 +8,7 @@ repository = "https://github.com/rukai/pf_sandbox"
 keywords = ["pf", "sandbox", "TAS"]
 
 [dependencies]
-winit = { git = "https://github.com/tomaka/winit" }
+winit = { git = "https://github.com/francesca64/winit", branch = "x11-imesender-sync" }
 vulkano = { git = "https://github.com/vulkano-rs/vulkano" }
 vulkano-win = { git = "https://github.com/rukai/vulkano", branch = "git_winit" }
 vulkano-shader-derive = { git = "https://github.com/vulkano-rs/vulkano" }

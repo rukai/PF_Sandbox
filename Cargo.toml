@@ -6,8 +6,5 @@ members = [
     "map_controllers"
 ]
 
-[patch.crates-io]
-gilrs = { git = "https://gitlab.com/rukai/gilrs", branch = "pf_sandbox2" }
-
 [profile.release]
 debug-assertions = true

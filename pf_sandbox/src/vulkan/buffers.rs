@@ -74,7 +74,7 @@ pub struct ColorBuffers {
 }
 
 impl Buffers {
-    /// Creates a single tringle with radius 1 around the origin
+    /// Creates a single circle with radius 1 around the origin
     pub fn new_circle(device: Arc<Device>) -> Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
@@ -97,7 +97,7 @@ impl Buffers {
         }
     }
 
-    /// Creates a single tringle with sides of length 1
+    /// Creates a single triangle with sides of length 1
     pub fn new_triangle(device: Arc<Device>) -> Buffers {
         let h = ((3.0/4.0) as f32).sqrt();
         let vertices = [
