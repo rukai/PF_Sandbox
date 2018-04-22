@@ -48,8 +48,8 @@ You cannot use a keyboard to play, you must use a controller.
 
 We build and test on:
 
-*   Rust nightly - Linux 64 bit (Travis)
-*   Rust nightly gnu - Windows 64 bit (Appveyor)
+*   Rust stable/nightly - Linux 64 bit (Travis)
+*   Rust stable/nightly GNU - Windows 64 bit (Appveyor)
 
 We build and test when:
 

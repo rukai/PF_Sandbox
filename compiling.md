@@ -1,7 +1,7 @@
 # Setup for Windows
 
 Install rust via https://www.rustup.rs/
-Do a custom install and select nightly and GNU compatible rust version. (instead of MSVC)
+Do a custom install with GNU compatible rust version. (Everything else default)
 
 Install [msys2](http://www.msys2.org/), following ALL of the instructions.
 
@@ -17,14 +17,15 @@ TODO
 
 # Setup for Ubuntu
 
-Install rust via https://www.rustup.rs/
-Do a custom install and select nightly all other settings default.
+Install rust via https://www.rustup.rs/ (Use the default settings)
 
+```
 sudo apt-get install libssl-dev libusb-1.0-0-dev pkg-config cmake libvulkan-dev vulkan-utils libudev-dev
+```
 
-You will also need vulkan drivers:
+Need to also install one of the following packages depending on your graphics card:
 *   Intel: sudo apt-get install mesa-vulkan-drivers
-*   Nvida: No extra drivers required
+*   Nvidia: No extra drivers required
 *   AMD:   TODO
 
 If it fails to launch, you may need to enable DRI3,
@@ -39,11 +40,14 @@ EndSection
 
 # Setup for Arch
 
-sudo pacman -Syu gcc libusb cmake
+```
+sudo pacman -Syu rustup gcc libusb cmake vulkan-icd-loader
+rustup default stable
+```
 
-need vulkan drivers: vulkan-icd-loader
+Need to also install one of the following packages depending on your graphics card:
 *   Intel: vulkan-intel
-*   Nvida: No extra drivers required
+*   Nvidia: No extra drivers required
 *   AMD:   vulkan-radeon
 
 # Compile and run PF Sandbox
