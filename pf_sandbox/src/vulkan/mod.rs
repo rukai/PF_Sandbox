@@ -81,7 +81,7 @@ mod surface_fs {
     struct Dummy;
 }
 
-pub struct VulkanGraphics<'a> {
+pub struct VulkanGraphics {
     package_buffers:             PackageBuffers,
     surface:                     Arc<Surface<Window>>,
     events_loop:                 EventsLoop,
@@ -100,7 +100,7 @@ pub struct VulkanGraphics<'a> {
     framebuffers:                Vec<Arc<FramebufferAbstract + Send + Sync>>,
     uniform_buffer_pool:         CpuBufferPool<vs::ty::Data>,
     surface_uniform_buffer_pool: CpuBufferPool<surface_vs::ty::Data>,
-    draw_text:                   DrawText<'a>,
+    draw_text:                   DrawText,
     os_input_tx:                 Sender<WindowEvent>,
     render_rx:                   Receiver<GraphicsMessage>,
     frame_durations:             Vec<Duration>,
@@ -109,7 +109,7 @@ pub struct VulkanGraphics<'a> {
     height:                      u32,
 }
 
-impl<'a> VulkanGraphics<'a> {
+impl VulkanGraphics {
     pub fn init(os_input_tx: Sender<WindowEvent>) -> Sender<GraphicsMessage> {
         let (render_tx, render_rx) = channel();
 
@@ -130,7 +130,7 @@ impl<'a> VulkanGraphics<'a> {
         }
     }
 
-    fn new(os_input_tx: Sender<WindowEvent>, render_rx: Receiver<GraphicsMessage>) -> VulkanGraphics<'a> {
+    fn new(os_input_tx: Sender<WindowEvent>, render_rx: Receiver<GraphicsMessage>) -> VulkanGraphics {
         let instance = {
             let extensions = vulkano_win::required_extensions();
             Instance::new(None, &extensions, None).expect("failed to create Vulkan instance")

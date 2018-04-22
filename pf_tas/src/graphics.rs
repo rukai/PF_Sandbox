@@ -19,20 +19,20 @@ use std::mem;
 
 use state::State;
 
-pub struct Graphics<'a> {
+pub struct Graphics {
     surface:         Arc<Surface<Window>>,
     device:          Arc<Device>,
     future:          Box<GpuFuture>,
     swapchain:       Arc<Swapchain<Window>>,
     queue:           Arc<Queue>,
     framebuffers:    Vec<Arc<FramebufferAbstract + Send + Sync>>,
-    draw_text:       DrawText<'a>,
+    draw_text:       DrawText,
     width:           u32,
     height:          u32,
 }
 
-impl<'a> Graphics<'a> {
-    pub fn new(events_loop: &EventsLoop) -> Graphics<'a> {
+impl Graphics {
+    pub fn new(events_loop: &EventsLoop) -> Graphics {
         let instance = {
             let extensions = vulkano_win::required_extensions();
             Instance::new(None, &extensions, None).expect("failed to create Vulkan instance")
