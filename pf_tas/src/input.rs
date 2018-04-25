@@ -77,7 +77,8 @@ impl Input {
 
         for event in events {
             match event {
-                WindowEvent::Closed         => { self.quit = true; },
+                WindowEvent::CloseRequested |
+                WindowEvent::Destroyed      => { self.quit = true }
                 WindowEvent::Focused(false) => { self.current = None; },
                 WindowEvent::Focused(true)  => { self.current = Some(CurrentInput::new()); },
                 _ => { },
