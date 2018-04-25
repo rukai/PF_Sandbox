@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 extern crate gdk;
 extern crate gtk;
 extern crate gilrs;

@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 extern crate serde_json;
 extern crate winit;
 extern crate vulkano_win;
