@@ -492,11 +492,7 @@ impl Buffers {
                 ColboxOrLink::Link (ref link) => {
                     let colbox1 = &frame.colboxes[link.one];
                     let colbox2 = &frame.colboxes[link.two];
-                    let render_id1 = graphics::get_render_id(&colbox1.role);
-                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox1, &mut index_count, render_id1);
-                    let render_id2 = graphics::get_render_id(&colbox2.role);
-                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox2, &mut index_count, render_id2);
-                    Buffers::gen_link(&mut vertices, &mut indices, link, colbox1, colbox2, &mut index_count, render_id1);
+                    Buffers::gen_link(&mut vertices, &mut indices, link, colbox1, colbox2, &mut index_count);
                 }
             }
         }
@@ -508,8 +504,7 @@ impl Buffers {
     }
 
     pub fn gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16, render_id: u32) {
-        // TODO: maybe bake damage into an extra field on vertex and use to change hitbox render
-        let triangles = 25;
+        let triangles = 60;
         // triangles are drawn meeting at the centre, forming a circle
         let point = &colbox.point;
         vertices.push(Vertex { position: [point.0, point.1], edge: 0.0, render_id});
@@ -526,7 +521,11 @@ impl Buffers {
         *index_count += triangles + 1;
     }
 
-    pub fn gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16, render_id: u32) {
+    pub fn gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16) {
+        let render_id1 = graphics::get_render_id(&colbox1.role);
+        let render_id2 = graphics::get_render_id(&colbox2.role);
+
+        let render_id_link = render_id1;
         match link.link_type {
             LinkType::MeldFirst | LinkType::MeldSecond => {
                 // draw a rectangle connecting two colboxes
@@ -556,12 +555,12 @@ impl Buffers {
                 let link_y6 = y2;
 
                 // rectangle into buffers
-                vertices.push(Vertex { position: [link_x1, link_y1], edge: 1.0, render_id});
-                vertices.push(Vertex { position: [link_x2, link_y2], edge: 1.0, render_id});
-                vertices.push(Vertex { position: [link_x3, link_y3], edge: 1.0, render_id});
-                vertices.push(Vertex { position: [link_x4, link_y4], edge: 1.0, render_id});
-                vertices.push(Vertex { position: [link_x5, link_y5], edge: 0.0, render_id});
-                vertices.push(Vertex { position: [link_x6, link_y6], edge: 0.0, render_id});
+                vertices.push(Vertex { position: [link_x1, link_y1], edge: 1.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x2, link_y2], edge: 1.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x3, link_y3], edge: 1.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x4, link_y4], edge: 1.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x5, link_y5], edge: 0.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x6, link_y6], edge: 0.0, render_id: render_id_link });
 
                 indices.push(*index_count);
                 indices.push(*index_count + 4);
@@ -579,6 +578,40 @@ impl Buffers {
                 indices.push(*index_count + 4);
                 indices.push(*index_count + 5);
                 *index_count += 6;
+
+                let triangles = 30;
+
+                // draw colbox1, triangles are drawn meeting at the centre, forming a circle
+                vertices.push(Vertex { position: [x1, y1], edge: 0.0, render_id: render_id2 });
+                for i in 0..triangles + 1 {
+                    let angle = angle2 + i as f32 * consts::PI / (triangles as f32);
+                    let (sin, cos) = angle.sin_cos();
+                    let x = x1 + cos * colbox1.radius;
+                    let y = y1 + sin * colbox1.radius;
+                    vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id1 });
+                }
+                for i in 0..triangles {
+                    indices.push(*index_count);
+                    indices.push(*index_count + i + 1);
+                    indices.push(*index_count + i + 2);
+                }
+                *index_count += triangles + 2;
+
+                // draw colbox2, triangles are drawn meeting at the centre, forming a circle
+                vertices.push(Vertex { position: [x2, y2], edge: 0.0, render_id: render_id2 });
+                for i in 0..triangles + 1 {
+                    let angle = angle1 + i as f32 * consts::PI / (triangles as f32);
+                    let (sin, cos) = angle.sin_cos();
+                    let x = x2 + cos * colbox2.radius;
+                    let y = y2 + sin * colbox2.radius;
+                    vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id2 });
+                }
+                for i in 0..triangles {
+                    indices.push(*index_count);
+                    indices.push(*index_count + i + 1);
+                    indices.push(*index_count + i + 2);
+                }
+                *index_count += triangles + 2;
             },
             LinkType::Simple => { },
         }
