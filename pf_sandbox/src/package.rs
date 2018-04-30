@@ -443,6 +443,7 @@ impl Package {
         let new_colbox_index = fighter_frame.colboxes.len();
         fighter_frame.colboxes.push(new_colbox);
 
+        // insert links + render orders
         for colbox_index in link_to {
             let new_link_index = fighter_frame.colbox_links.len();
             fighter_frame.colbox_links.push(CollisionBoxLink {
@@ -453,8 +454,18 @@ impl Package {
             fighter_frame.render_order.push(RenderOrder::Link(new_link_index));
         }
 
+        // handle render order
         if link_to.len() == 0 {
             fighter_frame.render_order.push(RenderOrder::Colbox(new_colbox_index));
+        }
+        else {
+            // remove outdated render order
+            fighter_frame.render_order = fighter_frame.render_order.iter().filter(
+                |x| match x {
+                    &RenderOrder::Colbox (order_colbox_i) => !link_to.contains(&order_colbox_i),
+                    &RenderOrder::Link (_) => true,
+                }
+            ).cloned().collect();
         }
 
         self.package_updates.push(PackageUpdate::DeleteFighterFrame {
