@@ -297,6 +297,11 @@ impl<'a> Input<'a> {
         result_inputs
     }
 
+    /// Return raw ControllerInputs this frame
+    pub fn current_inputs(&self) -> Vec<ControllerInput> {
+        self.current_inputs.clone()
+    }
+
     fn controller_inputs_to_player_input(inputs: Vec<ControllerInput>) -> PlayerInput {
         if inputs[0].plugged_in {
             PlayerInput {
@@ -354,7 +359,7 @@ impl<'a> Input<'a> {
             );
         }
 
-        assert!(result.len() == 8, "get_player_inputs needs to return a vector of size 8 but it was {}", result.len());
+        assert!(result.len() == 8, "get_8frames_of_input needs to return a vector of size 8 but it was {}", result.len());
         result
     }
 

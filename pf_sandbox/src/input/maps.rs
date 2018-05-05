@@ -21,7 +21,7 @@ impl ControllerMaps {
 
     pub fn load() -> ControllerMaps {
         if let Ok (json) = files::load_json(ControllerMaps::get_path()) {
-            if let Ok (mut maps) = serde_json::from_value::<ControllerMaps>(json) {
+            if let Ok (maps) = serde_json::from_value::<ControllerMaps>(json) {
                 return maps;
             }
         }
