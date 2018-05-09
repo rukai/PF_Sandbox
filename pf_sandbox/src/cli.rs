@@ -1,4 +1,6 @@
 use package;
+use config::Config;
+
 use getopts::Options;
 use std::env;
 use std::net::IpAddr;
@@ -8,21 +10,24 @@ fn print_usage(program: &str, opts: Options) {
     print!("{}", opts.usage(&brief));
 }
 
-pub fn cli() -> CLIResults {
+pub fn cli(config: &Config) -> CLIResults {
     let args: Vec<String> = env::args().collect();
     let program = &args[0];
 
     let mut opts = Options::new();
-    opts.optflag("l", "list",            "List available packages and close");
-    opts.optopt("s",  "stage",           "Use the stage specified", "NAME");
-    opts.optopt("f",  "fighters",        "Use the fighters specified", "NAME1,NAME2,NAME3...");
-    opts.optopt("h",  "humanplayers",    "Number of human players in the game", "NUM_HUMAN_PLAYERS");
-    opts.optopt("c",  "cpuplayers",      "Number of CPU players in the game", "NUM_CPU_PLAYERS");
-    opts.optopt("a",  "address",         "IP Address of other client to start netplay with", "IP_ADDRESS");
-    opts.optopt("n",  "netplayplayers",  "Search for a netplay game with the specified number of players", "NUM_PLAYERS");
-    opts.optopt("r",  "netplayregion",   "Search for a netplay game with the specified region", "REGION");
-    opts.optopt("g",  "graphics",        "Graphics backend to use",
-        if cfg!(features = "vulkan") {
+    opts.optflag("l", "list", "List available packages and close");
+    if cfg!(feature = "vulkan") {
+        opts.optflag("d", "devices", "List vulkan physical devices and close");
+    }
+    opts.optopt("s", "stage",          "Use the stage specified", "NAME");
+    opts.optopt("f", "fighters",       "Use the fighters specified", "NAME1,NAME2,NAME3...");
+    opts.optopt("h", "humanplayers",   "Number of human players in the game", "NUM_HUMAN_PLAYERS");
+    opts.optopt("c", "cpuplayers",     "Number of CPU players in the game", "NUM_CPU_PLAYERS");
+    opts.optopt("a", "address",        "IP Address of other client to start netplay with", "IP_ADDRESS");
+    opts.optopt("n", "netplayplayers", "Search for a netplay game with the specified number of players", "NUM_PLAYERS");
+    opts.optopt("r", "netplayregion",  "Search for a netplay game with the specified region", "REGION");
+    opts.optopt("g", "graphics",       "Graphics backend to use",
+        if cfg!(feature = "vulkan") {
             "[vulkan|none]"
         } else {
             "[none]"
@@ -44,6 +49,20 @@ pub fn cli() -> CLIResults {
         package::print_list();
         results.continue_from = ContinueFrom::Close;
         return results;
+    }
+
+	// avoid unused warning on headless build
+    #[allow(unused_variables)]
+	let config = config;
+
+    #[cfg(feature = "vulkan")]
+    {
+        if matches.opt_present("d") {
+            use vulkan;
+            vulkan::print_physical_devices(config.physical_device_name.clone());
+            results.continue_from = ContinueFrom::Close;
+            return results;
+        }
     }
 
     if matches.free.len() > 1 {

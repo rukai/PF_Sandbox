@@ -1,4 +1,5 @@
 #![feature(ord_max_min)]
+#![feature(drain_filter)]
 #![feature(nll)]
 
 extern crate bincode;

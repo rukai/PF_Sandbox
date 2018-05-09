@@ -13,6 +13,7 @@ pub struct Config {
     pub auto_save_replay:      bool,
     pub verify_package_hashes: bool,
     pub fullscreen:            bool,
+    pub physical_device_name:  Option<String>,
 }
 
 impl Config {
@@ -51,6 +52,7 @@ impl Default for Config {
             auto_save_replay:      false,
             verify_package_hashes: true,
             fullscreen:            false,
+            physical_device_name:  None,
         }
     }
 }

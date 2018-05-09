@@ -81,6 +81,59 @@ mod surface_fs {
     struct Dummy;
 }
 
+/// Returns a list of physical devices, ordered from most preferred to least preferred
+fn get_physical_devices(instance: &Arc<Instance>, force_name: Option<String>) -> Vec<PhysicalDevice> {
+    let mut devices: Vec<PhysicalDevice> = PhysicalDevice::enumerate(&instance).collect();
+    assert_ne!(devices.len(), 0, "there are no physical devices");
+
+    devices.sort_by_key(rank_physical_device);
+
+    if let Some(force_name) = force_name {
+        for device in devices.drain_filter(|x| x.name().to_lowercase() == force_name.to_lowercase()).collect::<Vec<_>>() {
+            devices.insert(0, device);
+        }
+    }
+
+    devices
+}
+
+/// Returns an integer ranking for a physical device, the lower number the higher it's preferred
+fn rank_physical_device(physical: &PhysicalDevice) -> u32 {
+    match physical.ty() {
+        PhysicalDeviceType::DiscreteGpu => 0,
+        PhysicalDeviceType::IntegratedGpu => 1,
+        PhysicalDeviceType::VirtualGpu => 2,
+        PhysicalDeviceType::Cpu => 3,
+        PhysicalDeviceType::Other => 4,
+    }
+}
+
+pub fn print_physical_devices(force_name: Option<String>) {
+    let extensions = vulkano_win::required_extensions();
+    let instance = Instance::new(None, &extensions, None).expect("failed to create Vulkan instance");
+
+    println!("Physical vulkan devices, ordered by preference:");
+
+    let physical_devices = get_physical_devices(&instance, force_name.clone());
+    for (i, device) in physical_devices.iter().enumerate() {
+        let chosen = if force_name.as_ref().map(|x| x.to_lowercase() == device.name().to_lowercase()).unwrap_or(false) {
+            " (Forced by config)"
+        } else if i == 0 {
+            " (Automatically chosen)"
+        } else {
+            ""
+        };
+
+        println!("    name: '{}' type: {:?}{}", device.name(), device.ty(), chosen);
+    }
+
+    if let Some(force_name) = force_name {
+        if physical_devices.iter().all(|x| x.name().to_lowercase() != force_name.to_lowercase()) {
+            println!("Warning: The physical_device_name '{}' used in config did not match any devices.", force_name);
+        }
+    }
+}
+
 pub struct VulkanGraphics {
     package_buffers:             PackageBuffers,
     surface:                     Arc<Surface<Window>>,
@@ -110,43 +163,29 @@ pub struct VulkanGraphics {
 }
 
 impl VulkanGraphics {
-    pub fn init(os_input_tx: Sender<WindowEvent>) -> Sender<GraphicsMessage> {
+    pub fn init(os_input_tx: Sender<WindowEvent>, device_name: Option<String>) -> Sender<GraphicsMessage> {
         let (render_tx, render_rx) = channel();
 
         thread::spawn(move || {
-            let mut graphics = VulkanGraphics::new(os_input_tx, render_rx);
+            let mut graphics = VulkanGraphics::new(os_input_tx, render_rx, device_name);
             graphics.run();
         });
         render_tx
     }
 
-    fn rank_physical_device(physical: &PhysicalDevice) -> u32 {
-        match physical.ty() {
-            PhysicalDeviceType::DiscreteGpu => 0,
-            PhysicalDeviceType::IntegratedGpu => 1,
-            PhysicalDeviceType::VirtualGpu => 2,
-            PhysicalDeviceType::Cpu => 3,
-            PhysicalDeviceType::Other => 4,
-        }
-    }
-
-    fn new(os_input_tx: Sender<WindowEvent>, render_rx: Receiver<GraphicsMessage>) -> VulkanGraphics {
+    fn new(os_input_tx: Sender<WindowEvent>, render_rx: Receiver<GraphicsMessage>, device_name: Option<String>) -> VulkanGraphics {
         let instance = {
             let extensions = vulkano_win::required_extensions();
             Instance::new(None, &extensions, None).expect("failed to create Vulkan instance")
         };
 
-        let mut physical_devices: Vec<PhysicalDevice> = PhysicalDevice::enumerate(&instance).collect();
-        physical_devices.sort_by_key(VulkanGraphics::rank_physical_device);
-        assert_ne!(physical_devices.len(), 0, "there are no physical devices");
-        let physical = physical_devices.remove(0);
-        println!("GPU: {} (type: {:?})", physical.name(), physical.ty());
+        let physical_device = get_physical_devices(&instance, device_name).remove(0);
 
         let events_loop = EventsLoop::new();
         let surface = WindowBuilder::new().build_vk_surface(&events_loop, instance.clone()).unwrap();
         surface.window().set_title("PF Sandbox");
 
-        let queue = physical.queue_families().find(|&q| {
+        let queue = physical_device.queue_families().find(|&q| {
             q.supports_graphics() && surface.is_supported(q).unwrap_or(false)
         }).unwrap();
 
@@ -155,7 +194,7 @@ impl VulkanGraphics {
                 khr_swapchain: true,
                 .. vulkano::device::DeviceExtensions::none()
             };
-            Device::new(physical, physical.supported_features(), &device_ext, [(queue, 0.5)].iter().cloned()).unwrap()
+            Device::new(physical_device, physical_device.supported_features(), &device_ext, [(queue, 0.5)].iter().cloned()).unwrap()
         };
 
         let vs = vs::Shader::load(device.clone()).unwrap();
@@ -168,7 +207,7 @@ impl VulkanGraphics {
         let queue = queues.next().unwrap();
 
         let (swapchain, images) = {
-            let caps = surface.capabilities(physical).unwrap();
+            let caps = surface.capabilities(physical_device).unwrap();
             let dimensions = caps.current_extent.unwrap_or([640, 480]);
             let alpha = caps.supported_composite_alpha.iter().next().unwrap();
             let format = caps.supported_formats[0].0;

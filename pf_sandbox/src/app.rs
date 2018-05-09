@@ -23,7 +23,7 @@ use package;
 use libusb::Context;
 use std::time::{Duration, Instant};
 
-pub fn run(mut cli_results: CLIResults) {
+pub fn run(mut cli_results: CLIResults, config: Config) {
     if let ContinueFrom::Close = cli_results.continue_from {
         return;
     }
@@ -41,7 +41,6 @@ pub fn run(mut cli_results: CLIResults) {
         let (os_input, os_input_tx) = OsInput::new();
 
         package::generate_example_stub();
-        let config = Config::load();
         let package_string = cli_results.package.or(config.current_package.clone());
 
         #[cfg(feature = "vulkan")]
@@ -49,13 +48,13 @@ pub fn run(mut cli_results: CLIResults) {
             match cli_results.graphics_backend {
                 #[cfg(feature = "vulkan")]
                 GraphicsBackendChoice::Vulkan => {
-                    graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone()));
+                    graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone(), config.physical_device_name.clone()));
                 }
                 GraphicsBackendChoice::Headless => {}
                 GraphicsBackendChoice::Default => {
                     #[cfg(feature = "vulkan")]
                     {
-                        graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone()));
+                        graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone(), config.physical_device_name.clone()));
                     }
                 }
             }
