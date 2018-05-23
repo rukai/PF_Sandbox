@@ -103,7 +103,7 @@ impl Hitlag {
 
     fn wobble(&mut self, rng: &mut StdRng) {
         if let &mut Hitlag::Launch { ref mut wobble_x, .. } = self {
-            *wobble_x = (rng.next_f32() - 0.5) * 3.0;
+            *wobble_x = (rng.gen::<f32>() - 0.5) * 3.0;
         }
     }
 }
@@ -2627,7 +2627,7 @@ impl Player {
                     y_vel:      context.rng.gen_range(0.0, 0.2),
                     size:       context.rng.gen_range(1.0, 3.0),
                     angle_vel:  context.rng.gen_range(0.0, 1.0),
-                    background: context.rng.gen_weighted_bool(2),
+                    background: context.rng.gen::<bool>(),
                 }
             });
         }
@@ -2660,7 +2660,7 @@ impl Player {
                     y_vel:      context.rng.gen_range(0.0, 0.3),
                     size:       context.rng.gen_range(1.0, 3.0),
                     angle_vel:  context.rng.gen_range(0.0, 1.0),
-                    background: context.rng.gen_weighted_bool(2),
+                    background: context.rng.gen::<bool>(),
                 }
             });
         }

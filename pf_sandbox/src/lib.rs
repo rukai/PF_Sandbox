@@ -2,22 +2,23 @@
 #![feature(drain_filter)]
 #![feature(nll)]
 
-extern crate bincode;
-extern crate chrono;
-extern crate crypto;
-extern crate enum_traits;
-extern crate env_logger;
-extern crate getopts;
-extern crate gilrs;
-extern crate libusb;
-extern crate lyon;
-extern crate rand;
-extern crate reqwest;
-extern crate serde;
-extern crate treeflection;
-extern crate uuid;
-extern crate winit;
-extern crate zip;
+             extern crate bincode;
+             extern crate byteorder;
+             extern crate chrono;
+             extern crate crypto;
+             extern crate enum_traits;
+             extern crate env_logger;
+             extern crate getopts;
+             extern crate gilrs;
+             extern crate libusb;
+             extern crate lyon;
+             extern crate rand;
+             extern crate reqwest;
+             extern crate serde;
+             extern crate treeflection;
+             extern crate uuid;
+             extern crate winit;
+             extern crate zip;
 #[macro_use] extern crate enum_traits_macros;
 #[macro_use] extern crate log;
 #[macro_use] extern crate matches;

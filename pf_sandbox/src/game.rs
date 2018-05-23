@@ -27,6 +27,7 @@ use enum_traits::{FromIndex, ToIndex};
 
 use treeflection::{Node, NodeRunner, NodeToken};
 use winit::VirtualKeyCode;
+use byteorder::{LittleEndian, WriteBytesExt};
 
 #[NodeActions(
     NodeAction(function="save_replay", return_string),
@@ -932,14 +933,16 @@ impl Game {
     //    }
     //}
 
-    /// TODO: Weird that StdRng takes usize, I thought usize was only for indexing.
-    fn get_seed(&self) -> [usize; 2] {
-        [self.init_seed as usize, self.current_frame as usize]
+    fn get_seed(&self) -> [u8; 32] {
+        let mut seed = [0; 32];
+        (&mut seed[0..8]).write_u64::<LittleEndian>(self.init_seed).unwrap();
+        (&mut seed[8..16]).write_u64::<LittleEndian>(self.current_frame as u64).unwrap();
+        seed
     }
 
     fn step_game(&mut self, input: &Input, player_input: &Vec<PlayerInput>) {
         {
-            let mut rng = StdRng::from_seed(&self.get_seed());
+            let mut rng = StdRng::from_seed(self.get_seed());
 
             // To synchronize player stepping, we step through player logic in stages (action logic, physics logic, collision logic)
             // Modified players are copied from the previous stage so that every player perceives themselves as being stepped first, within that stage.
@@ -1402,7 +1405,7 @@ impl Default for SurfaceSelection {
 }
 
 pub struct RenderGame {
-    pub seed:              [usize; 2],
+    pub seed:              [u8; 32],
     pub surfaces:          Vec<Surface>,
     pub selected_surfaces: HashSet<SurfaceSelection>,
     pub entities:          Vec<RenderEntity>,

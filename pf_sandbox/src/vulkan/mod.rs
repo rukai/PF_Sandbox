@@ -649,7 +649,7 @@ impl VulkanGraphics {
     }
 
     fn game_render(&mut self, render: RenderGame, mut command_buffer: AutoCommandBufferBuilder, command_output: &[String]) -> AutoCommandBufferBuilder {
-        let mut rng = StdRng::from_seed(&render.seed);
+        let mut rng = StdRng::from_seed(render.seed);
         if command_output.len() == 0 {
             self.game_hud_render(&render.entities);
             self.game_timer_render(&render.timer);
