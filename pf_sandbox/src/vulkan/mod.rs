@@ -416,8 +416,9 @@ impl VulkanGraphics {
                 }
 
                 // MS Windows removes the window immediately on close before the process ends
-                if let Some((new_width, new_height)) = self.surface.window().get_inner_size() {
-                    self.window_resize(new_width, new_height);
+                if let Some(resolution) = self.surface.window().get_inner_size() {
+                    let resolution: (u32, u32) = resolution.to_physical(self.surface.window().get_hidpi_factor()).into();
+                    self.window_resize(resolution.0, resolution.1);
                 }
                 else {
                     return;
@@ -1279,15 +1280,21 @@ impl VulkanGraphics {
 
     /// returns true iff succeeds
     fn handle_events(&mut self) -> bool {
-        // force send the current resolution
+        // We need to force send the resolution and dpi every frame because OsInput may receive the normal events while it isn't listening for them.
         let window = self.surface.window();
 
-        // MS Windows removes the window immediately on close before the process ends
-        if let Some((res_x, res_y)) = window.get_inner_size() {
-            if let Err(_) = self.os_input_tx.send(WindowEvent::Resized(res_x, res_y)) {
+        if let Some(resolution) = window.get_inner_size() {
+            // force send the current resolution
+            if let Err(_) = self.os_input_tx.send(WindowEvent::Resized(resolution)) {
                 return false;
             }
         } else {
+            // MS Windows removes the window immediately on close before the process ends
+            return false;
+        }
+
+        // force send the current dpi
+        if let Err(_) = self.os_input_tx.send(WindowEvent::HiDpiFactorChanged(window.get_hidpi_factor())) {
             return false;
         }
 

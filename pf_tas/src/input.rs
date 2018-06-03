@@ -39,8 +39,8 @@ impl CurrentInput {
                     }
                 }
             }
-            WindowEvent::Resized (x, y) => {
-                self.resolution = (x, y);
+            WindowEvent::Resized (resolution) => {
+                self.resolution = resolution.into();
             }
             _ => {},
         }

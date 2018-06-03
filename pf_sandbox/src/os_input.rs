@@ -14,6 +14,7 @@ struct CurrentInput {
     pub mouse_point:      Option<(f32, f32)>,
     pub mouse_point_prev: Option<(f32, f32)>,
     pub scroll_diff:      f32,
+    pub dpi_factor:       f64,
     pub resolution:       (u32, u32),
     pub text:             Vec<TextChar>,
 }
@@ -38,6 +39,7 @@ impl CurrentInput {
             mouse_point:      None,
             mouse_point_prev: None,
             scroll_diff:      0.0,
+            dpi_factor:       1.0,
             resolution:       (1, 1),
             text:             vec!(),
         }
@@ -76,7 +78,8 @@ impl CurrentInput {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                self.mouse_point = Some((position.0 as f32, position.1 as f32));
+                let position = position.to_physical(self.dpi_factor);
+                self.mouse_point = Some((position.x as f32, position.y as f32));
             },
             WindowEvent::MouseInput { state: Pressed, button, .. } => {
                 let button = mouse_button_to_int(button);
@@ -91,11 +94,14 @@ impl CurrentInput {
             WindowEvent::MouseWheel { delta, .. } => {
                 match delta {
                     MouseScrollDelta::LineDelta  (_, y) => { self.scroll_diff += y; },
-                    MouseScrollDelta::PixelDelta (_, _) => { panic!("Ooer, I dont know how to handle PixelDelta...") }, // TODO
+                    MouseScrollDelta::PixelDelta (_) => { panic!("Ooer, I dont know how to handle PixelDelta...") }, // TODO
                 }
             },
-            WindowEvent::Resized (x, y) => {
-                self.resolution = (x, y);
+            WindowEvent::Resized (resolution) => {
+                self.resolution = resolution.to_physical(self.dpi_factor).into();
+            }
+            WindowEvent::HiDpiFactorChanged (factor) => {
+                self.dpi_factor = factor;
             }
             _ => {},
         }

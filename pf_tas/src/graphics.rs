@@ -127,7 +127,7 @@ impl Graphics {
 
     pub fn draw(&mut self, state: &State) {
         self.future.cleanup_finished();
-        let (new_width, new_height) = self.surface.window().get_inner_size().unwrap();
+        let (new_width, new_height) = self.surface.window().get_inner_size().unwrap().to_physical(self.surface.window().get_hidpi_factor()).into();
         if self.width != new_width || self.height != new_height {
             self.window_resize(new_width, new_height);
         }
