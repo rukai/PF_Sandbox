@@ -674,11 +674,11 @@ impl Player {
         let fighter_frame = &context.fighter.actions[self.action as usize].frames[self.frame as usize];
 
         // update ecb
-        let prev_bot_y = self.ecb.bot_y;
+        let prev_bottom = self.ecb.bottom;
         self.ecb = fighter_frame.ecb.clone();
         match Action::from_index(self.action) {
             Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.frame < 10
-                => { self.ecb.bot_y = prev_bot_y }
+                => { self.ecb.bottom = prev_bottom }
             _   => { }
         }
 
@@ -2578,7 +2578,7 @@ impl Player {
                 counter:     0,
                 counter_max: 30,
                 x:           x,
-                y:           y + (self.ecb.left_y + self.ecb.right_y) / 2.0,
+                y:           y + self.ecb.top / 2.0,
                 angle:       context.rng.gen_range(0.0, 2.0 * PI),
                 p_type:      ParticleType::Spark {
                     x_vel:      angle.cos() * vec_mult * -1.0,

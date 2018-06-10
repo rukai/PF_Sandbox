@@ -618,12 +618,13 @@ impl Buffers {
     }
 
     pub fn new_player(device: Arc<Device>, player: &RenderPlayer) -> Buffers {
+        let mid_y = (player.ecb.top + player.ecb.bottom) / 2.0;
         let vertices: [Vertex; 12] = [
             // ecb
-            vertex(player.ecb.bot_x,   player.ecb.bot_y),
-            vertex(player.ecb.left_x,  player.ecb.left_y),
-            vertex(player.ecb.right_x, player.ecb.right_y),
-            vertex(player.ecb.top_x,   player.ecb.top_y),
+            vertex(0.0,              player.ecb.bottom),
+            vertex(player.ecb.left,  mid_y),
+            vertex(player.ecb.right, mid_y),
+            vertex(0.0,              player.ecb.top),
 
             // horizontal bps
             vertex(-4.0, -0.15),

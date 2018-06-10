@@ -4,7 +4,7 @@ use serde_json::{Value, Number};
 
 pub fn build_version() -> String { String::from(env!("BUILD_VERSION")) }
 
-pub fn engine_version() -> u64 { 11 }
+pub fn engine_version() -> u64 { 12 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
@@ -37,6 +37,7 @@ pub fn upgrade_to_latest_fighters(fighters: &mut HashMap<String, Value>) {
         else if meta_engine_version < engine_version() {
             for upgrade_from in meta_engine_version..engine_version() {
                 match upgrade_from {
+                    11 => { upgrade_fighter11(fighter) }
                     10 => { upgrade_fighter10(fighter) }
                     9  => { upgrade_fighter9(fighter) }
                     8  => { upgrade_fighter8(fighter) }
@@ -107,6 +108,28 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
+
+/// Upgrade to new ECB format
+fn upgrade_fighter11(fighter: &mut Value) {
+    let ecb = json!({
+        "top": 16.0,
+        "left": -4.0,
+        "right": 4.0,
+        "bottom": 0.0
+    });
+
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let &mut Value::Object (ref mut frame) = frame {
+                        frame.insert(String::from("ecb"), ecb.clone());
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Change CSS properties
 fn upgrade_fighter10(fighter: &mut Value) {
