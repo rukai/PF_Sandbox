@@ -119,7 +119,7 @@ impl Package {
         !self.package_updates.is_empty()
     }
 
-    pub fn blank() -> Package {
+    fn inner_blank() -> Package {
         Package {
             meta:            PackageMeta::new(),
             rules:           Rules::default(),
@@ -129,9 +129,33 @@ impl Package {
         }
     }
 
+    /// Creates a new blank package with the specified name.
+    /// DANGER: If a package with the same name does exist, saving the returned package will overwrite the existing package.
+    pub fn blank(name: &str) -> Package {
+        let path = get_packages_path().join(name);
+
+        let meta = PackageMeta {
+            path:              path,
+            engine_version:    engine_version(),
+            published_version: 0,
+            title:             name.to_string(),
+            source:            None,
+            published:         false,
+            hash:              "".to_string(),
+            fighter_keys:      vec!(),
+            stage_keys:        vec!(),
+        };
+
+        Package {
+            meta,
+            .. Package::inner_blank()
+        }
+    }
+
+    /// Loads and returns the package with the specified name.
+    /// Returns None if the package doesnt exist or is broken.
     pub fn open(name: &str) -> Option<Package> {
-        let mut path = get_packages_path();
-        path.push(name);
+        let path = get_packages_path().join(name);
 
         let mut package = Package {
             meta:            PackageMeta { path, .. PackageMeta::new() },
@@ -152,8 +176,7 @@ impl Package {
     }
 
     fn generate_base(name: &str) -> Package {
-        let mut path = get_packages_path();
-        path.push(name);
+        let path = get_packages_path().join(name);
 
         let meta = PackageMeta {
             path:              path,
@@ -182,13 +205,13 @@ impl Package {
     /// Opens a package if it exists
     /// Creates and opens it if it doesn't
     /// However if it does exist but is broken in some way it returns None
-    pub fn open_or_generate(package_name: &str) -> Option<Package> {
-        let package_path = get_packages_path().join(package_name);
+    pub fn open_or_generate(name: &str) -> Option<Package> {
+        let path = get_packages_path().join(name);
 
         // if a package does not already exist create a new one
-        match fs::metadata(package_path) {
-            Ok(_)  => Package::open(package_name),
-            Err(_) => Some(Package::generate_base(package_name)),
+        match fs::metadata(path) {
+            Ok(_)  => Package::open(name),
+            Err(_) => Some(Package::generate_base(name)),
         }
     }
 
@@ -900,7 +923,7 @@ impl PackageMeta {
     pub fn load(self) -> Result<Package, String> {
         let mut package = Package {
             meta: self,
-            .. Package::blank()
+            .. Package::inner_blank()
         };
         package.load()?;
         Ok(package)
