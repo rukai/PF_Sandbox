@@ -31,14 +31,14 @@ use vulkano::image::SwapchainImage;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::instance::{Instance, PhysicalDevice, PhysicalDeviceType};
 use vulkano::pipeline::GraphicsPipeline;
-use vulkano::pipeline::blend::LogicOp;
+//use vulkano::pipeline::blend::LogicOp;
 use vulkano::pipeline::depth_stencil::{DepthStencil, DepthBounds, Compare};
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::swapchain::{Surface, Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
 use vulkano_text::{DrawText, DrawTextTrait};
-use winit::{Window, Event, WindowEvent, WindowBuilder, EventsLoop};
+use winit::{Window, Event, WindowEvent, WindowBuilder, EventsLoop, CursorState};
 
 use std::collections::HashSet;
 use std::f32;
@@ -212,7 +212,7 @@ impl VulkanGraphics {
             let alpha = caps.supported_composite_alpha.iter().next().unwrap();
             let format = caps.supported_formats[0].0;
             Swapchain::new(device.clone(), surface.clone(), caps.min_image_count, format, dimensions, 1,
-                caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, PresentMode::Fifo, true, None
+                caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, PresentMode::Immediate, true, None
             ).unwrap()
         };
 
@@ -374,7 +374,8 @@ impl VulkanGraphics {
             .render_pass(Subpass::from(render_pass.clone(), 0).unwrap());
 
         let builder = if invert {
-            builder.blend_logic_op(LogicOp::Invert)
+            //builder.blend_logic_op(LogicOp::Invert) // Fixes crash on my laptop with intel device
+            builder
         } else {
             builder
         };
@@ -476,16 +477,29 @@ impl VulkanGraphics {
     }
 
     fn render(&mut self, render: Render) {
-        #[cfg(unix)] // remove when winit implements set_fullscreen and get_current_monitor for windows
-        {
-            if render.fullscreen {
-                let monitor = self.surface.window().get_current_monitor();
-                self.surface.window().set_fullscreen(Some(monitor));
-            }
-            else {
-                self.surface.window().set_fullscreen(None);
-            }
+        if render.fullscreen {
+            let monitor = self.surface.window().get_current_monitor();
+            self.surface.window().set_fullscreen(Some(monitor));
         }
+        else {
+            self.surface.window().set_fullscreen(None);
+        }
+
+        // hide cursor during regular play in fullscreen
+        let cursor_type = if render.fullscreen {
+            if let RenderType::Game(game) = &render.render_type {
+                if let GameState::Paused = &game.state {
+                    CursorState::Normal
+                } else {
+                    CursorState::Hide
+                }
+            } else {
+                CursorState::Hide
+            }
+        } else {
+            CursorState::Normal
+        };
+        self.surface.window().set_cursor_state(cursor_type).unwrap();
 
         self.future.cleanup_finished();
         let (image_num, new_future) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
