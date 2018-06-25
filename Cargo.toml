@@ -7,4 +7,4 @@ members = [
 ]
 
 [profile.release]
-debug-assertions = true
+#debug-assertions = true # vulkano has invalid debug_asserts and I cant upstream the fixes ;-;

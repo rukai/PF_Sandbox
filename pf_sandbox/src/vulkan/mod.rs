@@ -38,7 +38,7 @@ use vulkano::pipeline::viewport::Viewport;
 use vulkano::swapchain::{Surface, Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
 use vulkano_text::{DrawText, DrawTextTrait};
-use winit::{Window, Event, WindowEvent, WindowBuilder, EventsLoop, CursorState};
+use winit::{Window, Event, WindowEvent, WindowBuilder, EventsLoop};
 
 use std::collections::HashSet;
 use std::f32;
@@ -486,20 +486,16 @@ impl VulkanGraphics {
         }
 
         // hide cursor during regular play in fullscreen
-        let cursor_type = if render.fullscreen {
-            if let RenderType::Game(game) = &render.render_type {
-                if let GameState::Paused = &game.state {
-                    CursorState::Normal
-                } else {
-                    CursorState::Hide
-                }
+        let in_game_paused = if let RenderType::Game(game) = &render.render_type {
+            if let GameState::Paused = &game.state {
+                true
             } else {
-                CursorState::Hide
+                false
             }
         } else {
-            CursorState::Normal
+            false
         };
-        self.surface.window().set_cursor_state(cursor_type).unwrap();
+        self.surface.window().hide_cursor(render.fullscreen && !in_game_paused);
 
         self.future.cleanup_finished();
         let (image_num, new_future) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
