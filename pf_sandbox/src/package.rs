@@ -268,10 +268,21 @@ impl Package {
         self.meta.hash = self.compute_hash();
 
         // setup new directory to save to
-        let mut name = self.meta.path.file_name().unwrap().to_os_string();
+        let mut name = if let Some(name) = self.meta.path.file_name() {
+            name.to_os_string()
+        } else {
+            return String::from("Save FAILED! Failed to retrieve file_name from path");
+        };
         name.push("_name_conflict_avoiding_temp_string");
         let new_path = self.meta.path.with_file_name(name);
-        fs::create_dir(&new_path).unwrap();
+        if let Err(_) = fs::create_dir(&new_path) {
+            if let Err(_) = fs::remove_dir_all(&new_path) {
+                return String::from("Save FAILED! Failed to delete an existing *_name_conflict_avoiding_temp_string folder");
+            }
+            if let Err(_) = fs::create_dir(&new_path) {
+                return String::from("Save FAILED! Failed to create *_name_conflict_avoiding_temp_string folder even after succesfully deleting an existing one");
+            }
+        }
 
         // save all json files
         files::save_struct(new_path.join("rules.json"), &self.rules);
@@ -287,7 +298,10 @@ impl Package {
 
         // replace old directory with new directory
         fs::remove_dir_all(&self.meta.path).ok();
-        fs::rename(new_path, &self.meta.path).unwrap();
+        if let Err(_) = fs::rename(new_path, &self.meta.path) {
+            return String::from("Save FAILED! Failed to rename temp package");
+        }
+
         String::from("Save completed successfully.")
     }
 
