@@ -160,6 +160,7 @@ pub struct VulkanGraphics {
     fps:                         String,
     width:                       u32,
     height:                      u32,
+    prev_fullscreen:             Option<bool>,
 }
 
 impl VulkanGraphics {
@@ -248,6 +249,7 @@ impl VulkanGraphics {
             fps:             String::new(),
             width:           0,
             height:          0,
+            prev_fullscreen: None,
         }
     }
 
@@ -477,12 +479,23 @@ impl VulkanGraphics {
     }
 
     fn render(&mut self, render: Render) {
-        if render.fullscreen {
-            let monitor = self.surface.window().get_current_monitor();
-            self.surface.window().set_fullscreen(Some(monitor));
+        // TODO: Fullscreen logic should handle the window manager setting fullscreen state.
+        // *    Use this instead of self.prev_fullscreen
+        // *    Send new fullscreen state back to the main thread
+        // Waiting on Window::get_fullscreen() to be added to winit: https://github.com/tomaka/winit/issues/579
+
+        if self.prev_fullscreen.is_none() {
+            self.prev_fullscreen = Some(!render.fullscreen); // force set fullscreen state on first update
         }
-        else {
-            self.surface.window().set_fullscreen(None);
+        if render.fullscreen != self.prev_fullscreen.unwrap() { // Need to avoid needlessly recalling set_fullscreen(Some(..)) or it causes FPS drops on at least X11
+            if render.fullscreen {
+                let monitor = self.surface.window().get_current_monitor();
+                self.surface.window().set_fullscreen(Some(monitor));
+            }
+            else {
+                self.surface.window().set_fullscreen(None);
+            }
+            self.prev_fullscreen = Some(render.fullscreen);
         }
 
         // hide cursor during regular play in fullscreen
