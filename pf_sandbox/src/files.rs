@@ -1,17 +1,17 @@
-use std::env;
 use std::fs::{DirBuilder, File};
 use std::fs;
 use std::io::{Cursor, Read, Write, Seek};
 use std::path::{PathBuf, Path};
 
+use dirs;
 use reqwest::Url;
 use reqwest;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use serde_json::Value;
 use serde_json;
-use zip::{ZipArchive, ZipWriter};
 use zip::write::FileOptions;
+use zip::{ZipArchive, ZipWriter};
 
 pub fn write_to_zip<TObject: Serialize, TWriter: Write + Seek>(zip: &mut ZipWriter<TWriter>, path: &str, object: &TObject) {
     zip.start_file(path, FileOptions::default()).unwrap();
@@ -158,35 +158,10 @@ pub fn has_ext(path: &PathBuf, check_ext: &str) -> bool {
 }
 
 pub fn get_path() -> PathBuf {
-    match env::home_dir() {
-        Some (mut home) => {
-            #[cfg(unix)]
-            {
-                let share = match env::var("XDG_DATA_HOME") {
-                    Ok(share) => {
-                        if share == "" {
-                            String::from(".local/share")
-                        } else {
-                            share
-                        }
-                    }
-                    Err(_) => {
-                        String::from(".local/share")
-                    }
-                };
-                home.push(&share);
-                home.push("PF_Sandbox");
-                home
-            }
-            #[cfg(windows)]
-            {
-                home.push("AppData\\Local\\PF_Sandbox");
-                home
-            }
-            #[cfg(macos)]
-            {
-                compile_error!("macos is unimplemented");
-            }
+    match dirs::data_local_dir() {
+        Some (mut data_local) => {
+            data_local.push("PF_Sandbox");
+            data_local
         }
         None => {
             panic!("could not get path of home");

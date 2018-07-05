@@ -6,6 +6,7 @@
              extern crate byteorder;
              extern crate chrono;
              extern crate crypto;
+             extern crate dirs;
              extern crate enum_traits;
              extern crate env_logger;
              extern crate getopts;
