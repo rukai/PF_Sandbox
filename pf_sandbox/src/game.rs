@@ -1235,7 +1235,8 @@ impl Game {
         let render = Render {
             command_output: command_line.output(),
             render_type:    RenderType::Game(self.render()),
-            fullscreen:     self.config.fullscreen
+            // TODO: Waiting on: https://github.com/tomaka/winit/issues/574
+            fullscreen:     self.config.fullscreen && !cfg!(target_os = "windows"),
         };
 
         GraphicsMessage {
