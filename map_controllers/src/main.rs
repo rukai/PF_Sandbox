@@ -1,11 +1,12 @@
 #![windows_subsystem = "windows"]
 
-extern crate gdk;
-extern crate gtk;
-extern crate gilrs;
-extern crate serde_json;
-extern crate pf_sandbox;
-extern crate uuid;
+             extern crate gdk;
+             extern crate gtk;
+             extern crate gilrs;
+             extern crate serde_json;
+             extern crate uuid;
+#[macro_use] extern crate human_panic;
+#[macro_use] extern crate pf_sandbox;
 
 mod state;
 
@@ -65,6 +66,8 @@ macro_rules! clone {
 }
 
 fn main() {
+    pf_sandbox_setup_panic_handler!();
+
     // Need to be careful with the rw lock.
     // It is easy to accidentally create a deadlock by accidentally triggering
     // a write locking callback, while we have a read lock, or vice versa.
