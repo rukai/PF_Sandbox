@@ -158,13 +158,7 @@ pub fn has_ext(path: &PathBuf, check_ext: &str) -> bool {
 }
 
 pub fn get_path() -> PathBuf {
-    match dirs::data_local_dir() {
-        Some (mut data_local) => {
-            data_local.push("PF_Sandbox");
-            data_local
-        }
-        None => {
-            panic!("could not get path of home");
-        }
-    }
+    let mut data_local = dirs::data_local_dir().expect("Could not get data_local_dir");
+    data_local.push("PF_Sandbox");
+    data_local
 }

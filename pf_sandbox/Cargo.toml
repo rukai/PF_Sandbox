@@ -5,7 +5,9 @@ authors = ["Rukai <rubickent@gmail.com>"]
 description = "A platform fighter sandbox featuring a character editor tightly integrated with gameplay."
 license = "GPL-3.0"
 repository = "https://github.com/rukai/pf_sandbox"
-keywords = ["pf", "sandbox", "platform", "fighter"]
+homepage = "https://pfsandbox.net"
+keywords = ["pf", "sandbox", "platform", "fighter", "game"]
+categories = ["games", "game-engines"]
 
 [dependencies]
 bincode = "1"
@@ -15,6 +17,7 @@ enum_traits = "0.3"
 enum_traits_macros = "2.0"
 env_logger = "0.5"
 getopts = "0.2"
+human-panic = { git = "https://github.com/rukai/human-panic", branch = "native_window", features = ["gui"] }
 gilrs = { git = "https://gitlab.com/gilrs-project/gilrs" }
 libusb = "0.3"
 log = "0.4"
