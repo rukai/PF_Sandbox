@@ -409,6 +409,8 @@ impl Player {
                     self.hitlag = Hitlag::Some ((hitbox.damage / 3.0 + 3.0) as u64);
                 }
                 &CollisionResult::HitDef { ref hitbox, ref hurtbox, player_atk_i } => {
+                    let player_atk = &context.players[player_atk_i];
+
                     let damage_done = hitbox.damage * hurtbox.damage_mult; // TODO: apply staling
                     self.damage += damage_done;
 
@@ -444,6 +446,7 @@ impl Player {
                         }
                     }
 
+                    // handle sakurai angle
                     let angle_deg = if hitbox.angle == 361.0 {
                         if kb_vel < 32.1 {
                             0.0
@@ -461,7 +464,14 @@ impl Player {
                     } else {
                         hitbox.angle
                     };
-                    let angle = angle_deg.to_radians() + if angle_deg < 0.0 { PI * 2.0 } else { 0.0 };
+
+                    // convert from degrees to radians
+                    let angle_rad = angle_deg.to_radians() + if angle_deg < 0.0 { PI * 2.0 } else { 0.0 };
+
+                    // handle reverse hits
+                    let behind_player_atk = self.bps_xy(context).0 < player_atk.bps_xy(context).0 && player_atk.face_right ||
+                                            self.bps_xy(context).0 > player_atk.bps_xy(context).0 && !player_atk.face_right;
+                    let angle = if hitbox.enable_reverse_hit && behind_player_atk { PI - angle_rad } else { angle_rad };
 
                     // debug data
                     self.hit_angle_pre_di = Some(angle);
@@ -470,7 +480,7 @@ impl Player {
 
                     self.hitlag = Hitlag::Launch { counter: (hitbox.damage / 3.0 + 3.0) as u64, kb_vel, angle, wobble_x: 0.0 };
                     self.hit_by = Some(player_atk_i);
-                    self.face_right = self.bps_xy(context).0 < context.players[player_atk_i].bps_xy(context).0;
+                    self.face_right = self.bps_xy(context).0 < player_atk.bps_xy(context).0;
                 }
                 &CollisionResult::HitShieldAtk { ref hitbox, ref power_shield, player_def_i} => {
                     self.hitlist.push(player_def_i);

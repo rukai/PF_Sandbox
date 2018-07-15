@@ -4,7 +4,7 @@ use serde_json::{Value, Number};
 
 pub fn build_version() -> String { String::from(env!("BUILD_VERSION")) }
 
-pub fn engine_version() -> u64 { 12 }
+pub fn engine_version() -> u64 { 13 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
@@ -37,6 +37,7 @@ pub fn upgrade_to_latest_fighters(fighters: &mut HashMap<String, Value>) {
         else if meta_engine_version < engine_version() {
             for upgrade_from in meta_engine_version..engine_version() {
                 match upgrade_from {
+                    12 => { upgrade_fighter12(fighter) }
                     11 => { upgrade_fighter11(fighter) }
                     10 => { upgrade_fighter10(fighter) }
                     9  => { upgrade_fighter9(fighter) }
@@ -108,6 +109,33 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
+
+/// add enable_reverse_hit to Hit
+fn upgrade_fighter12(fighter: &mut Value) {
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let Some (colboxes) = get_vec(frame, "colboxes") {
+                        for colbox in colboxes {
+                            if let &mut Value::Object (ref mut colbox) = colbox {
+                                if let Some (role) = colbox.get_mut("role") {
+                                    if let &mut Value::Object (ref mut role) = role {
+                                        if let Some (hitbox) = role.get_mut("Hit") {
+                                            if let &mut Value::Object (ref mut hitbox) = hitbox {
+                                                hitbox.insert(String::from("enable_reverse_hit"), Value::Bool(true));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Upgrade to new ECB format
 fn upgrade_fighter11(fighter: &mut Value) {

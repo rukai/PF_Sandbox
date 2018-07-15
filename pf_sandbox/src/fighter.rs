@@ -717,30 +717,32 @@ impl Default for HurtBox {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Node)]
 pub struct HitBox {
-    pub shield_damage:     f32,
-    pub damage:            f32,
-    pub bkb:               f32, // base knockback
-    pub kbg:               f32, // knockback growth = old value / 100
-    pub angle:             f32,
-    pub hitstun:           HitStun,
-    pub enable_clang:      bool,
-    pub enable_rebound:    bool,
-    pub effect:            HitboxEffect,
+    pub shield_damage:      f32,
+    pub damage:             f32,
+    pub bkb:                f32, // base knockback
+    pub kbg:                f32, // knockback growth = old value / 100
+    pub angle:              f32,
+    pub hitstun:            HitStun,
+    pub enable_clang:       bool,
+    pub enable_rebound:     bool,
+    pub effect:             HitboxEffect,
+    pub enable_reverse_hit: bool, // if the defender is behind the attacker the direction is reversed.
     //pub team_funnel_angle: Option<f32>, // degrees to +- towards nearest teammate
 }
 
 impl Default for HitBox {
     fn default() -> HitBox {
         HitBox {
-            shield_damage:  0.0,
-            damage:         10.0,
-            bkb:            60.0,
-            kbg:            1.0,
-            angle:          0.0,
-            enable_clang:   true,
-            enable_rebound: true,
-            hitstun:        HitStun::default(),
-            effect:         HitboxEffect::default()
+            shield_damage:      0.0,
+            damage:             10.0,
+            bkb:                60.0,
+            kbg:                1.0,
+            angle:              0.0,
+            enable_clang:       true,
+            enable_rebound:     true,
+            enable_reverse_hit: true,
+            hitstun:            HitStun::default(),
+            effect:             HitboxEffect::default(),
         }
     }
 }
