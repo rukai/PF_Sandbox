@@ -427,6 +427,12 @@ impl VulkanGraphics {
                     return;
                 }
 
+                // TODO: Waiting on: https://github.com/tomaka/winit/issues/574
+                #[cfg(target_os = "windows")]
+                {
+                    render.fullscreen = false;
+                }
+
                 self.render(render);
                 self.frame_durations.push(frame_start.elapsed());
             }
