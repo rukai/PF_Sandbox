@@ -36,10 +36,10 @@ uuid = { version = "0.6.0-beta", features = ["v4", "serde"] }
 winit = { git = "https://github.com/tomaka/winit" } # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 zip = "0.4"
 
-vulkano = { git = "https://github.com/vulkano-rs/vulkano", optional = true }
-vulkano-win = { git = "https://github.com/rukai/vulkano", branch = "git_winit", optional = true }
-vulkano-shader-derive = { git = "https://github.com/vulkano-rs/vulkano", optional = true }
-vulkano_text = { git = "https://github.com/rukai/vulkano-text", optional = true }
+vulkano = { git = "https://github.com/rukai/vulkano", branch = "fix_cpu_pool_conflict_key", optional = true }
+vulkano-win = { git = "https://github.com/rukai/vulkano", branch = "git_winit_alt", optional = true }
+vulkano-shader-derive = { git = "https://github.com/rukai/vulkano", branch = "fix_cpu_pool_conflict_key", optional = true }
+vulkano_text = { git = "https://github.com/rukai/vulkano-text", branch = "rukai", optional = true }
 cgmath = { version = "0.16", optional = true }
 
 [features]
