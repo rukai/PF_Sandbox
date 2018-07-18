@@ -5,9 +5,9 @@ authors = ["Rukai <rubickent@gmail.com>"]
 
 [dependencies]
 gdk = "0.8"
-gilrs = { git = "https://gitlab.com/gilrs-project/gilrs" }
+gilrs = "0.6"
 gtk = { version = "0.4", features = ["v3_12"] }
 human-panic = { git = "https://github.com/rukai/human-panic", branch = "native_window" }
-pf_sandbox = { path = "../pf_sandbox" }
+pf_sandbox_lib = { path = "../pf_sandbox_lib" }
 serde_json = "1.0"
 uuid = { version = "0.6.0-beta", features = ["v4", "serde"] }

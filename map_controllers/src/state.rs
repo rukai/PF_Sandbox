@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use gilrs::{Gilrs, GilrsBuilder};
 use uuid::Uuid;
 
-use pf_sandbox::input::maps::{ControllerMaps, ControllerMap, OS};
+use pf_sandbox_lib::input::maps::{ControllerMaps, ControllerMap, OS};
 
 pub struct State {
     pub gilrs:             Gilrs,

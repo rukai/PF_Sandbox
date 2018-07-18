@@ -1,5 +1,5 @@
+use pf_sandbox_lib::input::ControllerInput;
 use game::Game;
-use input::ControllerInput;
 
 pub fn gen_inputs(game: &Game) -> Vec<ControllerInput> {
     game.selected_ais.iter().map(|_| {

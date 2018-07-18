@@ -1,5 +1,5 @@
-extern crate pf_sandbox;
-use pf_sandbox::input::stick_deadzone;
+extern crate pf_sandbox_lib;
+use pf_sandbox_lib::input::stick_deadzone;
 
 #[test]
 fn stick_deadzone_test() {

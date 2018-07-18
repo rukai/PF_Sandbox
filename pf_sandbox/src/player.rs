@@ -1,15 +1,16 @@
+use pf_sandbox_lib::fighter::*;
+use pf_sandbox_lib::geometry::Rect;
+use pf_sandbox_lib::geometry;
+use pf_sandbox_lib::input::{PlayerInput};
+use pf_sandbox_lib::os_input::OsInput;
+use pf_sandbox_lib::package::Package;
+use pf_sandbox_lib::stage::{Stage, Surface, SpawnPoint};
+
 use collision::CollisionResult;
-use fighter::*;
-use geometry::Rect;
-use geometry;
 use graphics;
-use input::{PlayerInput};
-use package::Package;
 use particle::{Particle, ParticleType};
 use results::{RawPlayerResult, DeathRecord};
-use rules::Goal;
-use stage::{Stage, Surface, SpawnPoint};
-use os_input::OsInput;
+use pf_sandbox_lib::rules::Goal;
 
 use std::f32;
 use std::f32::consts::PI;
@@ -286,6 +287,7 @@ impl Player {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_ledge(&self) -> bool {
         if let &Location::GrabbedLedge { .. } = &self.location {
             true

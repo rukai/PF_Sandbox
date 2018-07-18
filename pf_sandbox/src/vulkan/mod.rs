@@ -1,13 +1,13 @@
 mod buffers;
 
+use pf_sandbox_lib::fighter::{Action, ECB, CollisionBoxRole, ActionFrame};
+use pf_sandbox_lib::geometry::Rect;
+use pf_sandbox_lib::json_upgrade;
+use pf_sandbox_lib::package::Verify;
 use self::buffers::{Vertex, ColorVertex, Buffers, ColorBuffers, PackageBuffers};
-use fighter::{Action, ECB, CollisionBoxRole, ActionFrame};
 use game::{GameState, RenderEntity, RenderGame};
-use geometry::Rect;
 use graphics::{self, GraphicsMessage, Render, RenderType};
-use json_upgrade;
 use menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
-use package::Verify;
 use particle::ParticleType;
 use player::{RenderFighter, RenderPlayer, DebugPlayer};
 use results::PlayerResult;

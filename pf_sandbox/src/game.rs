@@ -1,21 +1,22 @@
+use pf_sandbox_lib::command_line::CommandLine;
+use pf_sandbox_lib::config::Config;
+use pf_sandbox_lib::fighter::{ActionFrame, CollisionBox, LinkType, Action};
+use pf_sandbox_lib::geometry::Rect;
+use pf_sandbox_lib::input::{PlayerInput, ControllerInput};
+use pf_sandbox_lib::network::Netplay;
+use pf_sandbox_lib::os_input::OsInput;
+use pf_sandbox_lib::rules::Goal;
+use pf_sandbox_lib::stage::{Stage, DebugStage, SpawnPoint, Surface, Floor};
 use camera::Camera;
 use collision::collision_check;
-use command_line::CommandLine;
-use config::Config;
-use fighter::{ActionFrame, CollisionBox, LinkType, Action};
-use geometry::Rect;
 use graphics::{GraphicsMessage, Render, RenderType};
-use input::{Input, PlayerInput, ControllerInput};
+use input::Input;
 use menu::ResumeMenu;
-use network::Netplay;
-use os_input::OsInput;
-use package::Package;
+use pf_sandbox_lib::package::Package;
 use player::{Player, RenderPlayer, DebugPlayer, StepContext};
 use replays::Replay;
 use replays;
 use results::{GameResults, RawPlayerResult, PlayerResult};
-use rules::Goal;
-use stage::{Stage, DebugStage, SpawnPoint, Surface, Floor};
 
 use rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
@@ -385,7 +386,7 @@ impl Game {
                 // move collisionboxes
                 if self.selector.moving {
                     // undo the operations used to render the player
-                    let (raw_d_x, raw_d_y) = os_input.game_mouse_diff(&self.camera);
+                    let (raw_d_x, raw_d_y) = os_input.game_mouse_diff(self.camera.for_os_input());
                     let angle = -self.players[player].angle(&self.package.fighters[fighter], &self.stage.surfaces); // rotate by the inverse of the angle
                     let d_x = raw_d_x * angle.cos() - raw_d_y * angle.sin();
                     let d_y = raw_d_x * angle.sin() + raw_d_y * angle.cos();
@@ -457,7 +458,7 @@ impl Game {
                     }
                     // add collisionbox
                     if os_input.key_pressed(VirtualKeyCode::F) {
-                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(self.camera.for_os_input()) {
                             let selected = {
                                 let player = &self.players[player];
                                 let (p_x, p_y) = player.public_bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
@@ -502,7 +503,7 @@ impl Game {
                     }
                     // set hitbox angle
                     if os_input.key_pressed(VirtualKeyCode::Q) {
-                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(self.camera.for_os_input()) {
                             let player = &self.players[player];
                             let (p_x, p_y) = player.public_bps_xy(&self.players, &self.package.fighters, &self.stage.surfaces);
 
@@ -569,7 +570,7 @@ impl Game {
             Edit::Stage => {
                 self.debug_stage.step(os_input);
                 if self.selector.moving {
-                    let (d_x, d_y) = os_input.game_mouse_diff(&self.camera);
+                    let (d_x, d_y) = os_input.game_mouse_diff(self.camera.for_os_input());
                     for (i, spawn) in self.stage.spawn_points.iter_mut().enumerate() {
                         if self.selector.spawn_points.contains(&i) {
                             spawn.x += d_x;
@@ -663,14 +664,14 @@ impl Game {
                     }
                     // add spawn point
                     if os_input.key_pressed(VirtualKeyCode::Z) {
-                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(self.camera.for_os_input()) {
                             self.stage.spawn_points.push(SpawnPoint::new(m_x, m_y));
                             self.update_frame();
                         }
                     }
                     // add respawn point
                     if os_input.key_pressed(VirtualKeyCode::X) {
-                        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+                        if let Some((m_x, m_y)) = os_input.game_mouse(self.camera.for_os_input()) {
                             self.stage.respawn_points.push(SpawnPoint::new(m_x, m_y));
                             self.update_frame();
                         }
@@ -834,11 +835,11 @@ impl Game {
                 }
             }
         }
-        self.selector.mouse = os_input.game_mouse(&self.camera); // hack to access mouse during render call, dont use this otherwise
+        self.selector.mouse = os_input.game_mouse(self.camera.for_os_input()); // hack to access mouse during render call, dont use this otherwise
     }
 
     fn add_surface(&mut self, surface: Surface, os_input: &OsInput) {
-        if let Some((m_x, m_y)) = os_input.game_mouse(&self.camera) {
+        if let Some((m_x, m_y)) = os_input.game_mouse(self.camera.for_os_input()) {
             if self.selector.surfaces.len() == 1 {
                 // create new surface, p1 is selected surface, p2 is current mouse
                 let (x1, y1) = match self.selector.surfaces.iter().next().unwrap() {
@@ -1352,13 +1353,13 @@ impl Selector {
     fn step_multiple_selection(&mut self, os_input: &OsInput, camera: &Camera) -> Option<Rect> {
         // start selection
         if os_input.mouse_pressed(1) {
-            if let Some(mouse) = os_input.game_mouse(camera) {
+            if let Some(mouse) = os_input.game_mouse(camera.for_os_input()) {
                 self.start(mouse);
             }
         }
 
         // finish selection
-        if let (Some(p1), Some(p2)) = (self.point, os_input.game_mouse(camera)) {
+        if let (Some(p1), Some(p2)) = (self.point, os_input.game_mouse(camera.for_os_input())) {
             if os_input.mouse_released(1) {
                 if !(os_input.held_shift() || os_input.held_alt()) {
                     self.clear();
@@ -1372,7 +1373,7 @@ impl Selector {
     /// Returns a selection point iff a single selection is made.
     fn step_single_selection(&mut self, os_input: &OsInput, camera: &Camera) -> Option<(f32, f32)> {
         if os_input.mouse_pressed(0) {
-            if let point @ Some(_) = os_input.game_mouse(camera) {
+            if let point @ Some(_) = os_input.game_mouse(camera.for_os_input()) {
                 if !(os_input.held_shift() || os_input.held_alt()) {
                     self.clear();
                 }

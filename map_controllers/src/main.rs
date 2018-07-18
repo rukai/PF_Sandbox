@@ -6,7 +6,7 @@
              extern crate serde_json;
              extern crate uuid;
 #[macro_use] extern crate human_panic;
-#[macro_use] extern crate pf_sandbox;
+#[macro_use] extern crate pf_sandbox_lib;
 
 mod state;
 
@@ -31,8 +31,8 @@ use gtk::{
 use gilrs::EventType;
 use gilrs::ev::Button as EvButton;
 
-use pf_sandbox::input;
-use pf_sandbox::input::maps::{
+use pf_sandbox_lib::input;
+use pf_sandbox_lib::input::maps::{
     AnalogDest,
     DigitalDest,
     AnalogMap,

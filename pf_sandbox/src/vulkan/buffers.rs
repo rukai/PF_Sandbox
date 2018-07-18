@@ -1,10 +1,10 @@
-use fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
+use pf_sandbox_lib::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
+use pf_sandbox_lib::geometry::Rect;
+use pf_sandbox_lib::stage::Surface;
+use pf_sandbox_lib::package::{Package, PackageUpdate};
 use player::RenderShield;
-use geometry::Rect;
 use graphics;
-use package::{Package, PackageUpdate};
 use player::RenderPlayer;
-use stage::Surface;
 use game::SurfaceSelection;
 
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};

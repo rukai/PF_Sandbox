@@ -1,8 +1,8 @@
 use treeflection::KeyedContextVec;
 
+use pf_sandbox_lib::fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole, PowerShield};
+use pf_sandbox_lib::stage::Surface;
 use player::Player;
-use fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole, PowerShield};
-use stage::Surface;
 
 // def - player who was attacked
 // atk - player who attacked
@@ -178,6 +178,7 @@ fn colbox_shield_collision_check(player1_xy: (f32, f32), colbox1: &CollisionBox,
     }
 }
 
+#[allow(dead_code)]
 pub enum CollisionResult {
     PhantomDef   (HitBox, HurtBox),
     PhantomAtk   (HitBox, usize),

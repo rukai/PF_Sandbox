@@ -27,6 +27,8 @@ cd ..
 cd pf_sandbox
 cargo test --release -v -j 2
 cargo build --release -j 2
+cd ../pf_sandbox_lib
+cargo test --release -v -j 2
 cd ../pf_tas
 cargo test --release -v -j 2
 cargo build --release -j 2

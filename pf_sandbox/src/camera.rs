@@ -1,7 +1,8 @@
-use os_input::OsInput;
+use pf_sandbox_lib::fighter::Fighter;
+use pf_sandbox_lib::os_input::Camera as CameraOsInput;
+use pf_sandbox_lib::os_input::OsInput;
+use pf_sandbox_lib::stage::Stage;
 use player::Player;
-use stage::Stage;
-use fighter::Fighter;
 
 use winit::VirtualKeyCode;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
@@ -141,6 +142,13 @@ impl Camera {
             self.pan.0 += diff_pan_x / 10.0;
             self.pan.1 += diff_pan_y / 10.0;
             self.zoom += diff_zoom / 10.0;
+        }
+    }
+
+    pub fn for_os_input(&self) -> CameraOsInput {
+        CameraOsInput {
+            zoom: self.zoom,
+            pan:  self.pan,
         }
     }
 }

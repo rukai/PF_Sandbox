@@ -1,5 +1,5 @@
-use package;
-use config::Config;
+use pf_sandbox_lib::config::Config;
+use pf_sandbox_lib::package;
 
 use getopts::Options;
 use std::env;

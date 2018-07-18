@@ -1,12 +1,61 @@
 #![windows_subsystem = "windows"]
 
-#[macro_use] extern crate pf_sandbox;
+#![feature(ord_max_min)]
+#![feature(drain_filter)]
+#![feature(nll)]
+
+             extern crate byteorder;
+             extern crate chrono;
+             extern crate enum_traits;
+             extern crate getopts;
+             extern crate gilrs;
+             extern crate libusb;
+             extern crate lyon;
+             extern crate rand;
+             extern crate serde;
+             extern crate treeflection;
+             extern crate winit;
+             extern crate serde_json;
+#[macro_use] extern crate serde_derive;
+#[macro_use] extern crate log;
+#[macro_use] extern crate treeflection_derive;
+#[macro_use] extern crate pf_sandbox_lib;
 #[macro_use] extern crate human_panic;
 
-use pf_sandbox::app::run;
-use pf_sandbox::cli::cli;
-use pf_sandbox::config::Config;
-use pf_sandbox::logger;
+pub(crate) mod ai;
+pub(crate) mod app;
+pub(crate) mod camera;
+pub(crate) mod cli;
+pub(crate) mod collision;
+pub(crate) mod game;
+pub(crate) mod graphics;
+pub(crate) mod input;
+pub(crate) mod menu;
+pub(crate) mod particle;
+pub(crate) mod player;
+pub(crate) mod replays;
+pub(crate) mod results;
+
+#[cfg(feature = "vulkan")]
+#[macro_use]
+extern crate vulkano;
+#[cfg(feature = "vulkan")]
+#[macro_use]
+extern crate vulkano_shader_derive;
+#[cfg(feature = "vulkan")]
+extern crate vulkano_win;
+#[cfg(feature = "vulkan")]
+extern crate vulkano_text;
+#[cfg(feature = "vulkan")]
+extern crate cgmath;
+
+#[cfg(feature = "vulkan")]
+pub(crate) mod vulkan;
+
+use app::run;
+use cli::cli;
+use pf_sandbox_lib::config::Config;
+use pf_sandbox_lib::logger;
 
 fn main() {
     pf_sandbox_setup_panic_handler!();

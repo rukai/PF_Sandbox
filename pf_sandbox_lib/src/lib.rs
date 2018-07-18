@@ -3,16 +3,12 @@
 #![feature(nll)]
 
              extern crate bincode;
-             extern crate byteorder;
              extern crate chrono;
              extern crate crypto;
              extern crate dirs;
              extern crate enum_traits;
              extern crate env_logger;
-             extern crate getopts;
              extern crate gilrs;
-             extern crate libusb;
-             extern crate lyon;
              extern crate rand;
              extern crate reqwest;
              extern crate serde;
@@ -27,47 +23,19 @@
 #[macro_use] extern crate serde_json;
 #[macro_use] extern crate treeflection_derive;
 
-pub mod ai;
-pub mod app;
-pub mod camera;
-pub mod cli;
-pub mod collision;
 pub mod command_line;
 pub mod config;
 pub mod fighter;
 pub mod files;
-pub mod game;
 pub mod geometry;
-pub mod graphics;
 pub mod input;
 pub mod json_upgrade;
 pub mod logger;
-pub mod menu;
 pub mod network;
 pub mod os_input;
 pub mod package;
-pub mod particle;
-pub mod player;
-pub mod replays;
-pub mod results;
 pub mod rules;
 pub mod stage;
-
-#[cfg(feature = "vulkan")]
-#[macro_use]
-extern crate vulkano;
-#[cfg(feature = "vulkan")]
-#[macro_use]
-extern crate vulkano_shader_derive;
-#[cfg(feature = "vulkan")]
-extern crate vulkano_win;
-#[cfg(feature = "vulkan")]
-extern crate vulkano_text;
-#[cfg(feature = "vulkan")]
-extern crate cgmath;
-
-#[cfg(feature = "vulkan")]
-pub mod vulkan;
 
 #[macro_export]
 macro_rules! pf_sandbox_setup_panic_handler {
@@ -77,10 +45,10 @@ macro_rules! pf_sandbox_setup_panic_handler {
             use std::boxed::Box;
             if env::var("PFS_DEV").map(|x| x.to_lowercase() != String::from("true")).unwrap_or(true) {
                 setup_panic!(Metadata {
-                    name:          env!("CARGO_PKG_NAME").into(),
-                    version:       env!("BUILD_VERSION").into(),
-                    authors:       "".into(),
-                    homepage:      "https://github.com/rukai/PF_Sandbox/issues".into(),
+                    name:     env!("CARGO_PKG_NAME").into(),
+                    version:  env!("BUILD_VERSION").into(),
+                    authors:  "".into(),
+                    homepage: "https://github.com/rukai/PF_Sandbox/issues".into(),
                 });
             }
         }

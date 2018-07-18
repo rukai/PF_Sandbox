@@ -1,5 +1,5 @@
-extern crate pf_sandbox;
-use pf_sandbox::package::PackageMeta;
+extern crate pf_sandbox_lib;
+use pf_sandbox_lib::package::PackageMeta;
 
 #[test]
 fn package_meta_source() {

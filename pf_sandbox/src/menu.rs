@@ -1,13 +1,14 @@
-use command_line::CommandLine;
-use config::Config;
+use pf_sandbox_lib::command_line::CommandLine;
+use pf_sandbox_lib::config::Config;
+use pf_sandbox_lib::input::PlayerInput;
+use pf_sandbox_lib::network::{Netplay, NetplayState};
+use pf_sandbox_lib::os_input::OsInput;
+use pf_sandbox_lib::package::{Package, PackageMeta, Verify};
+use pf_sandbox_lib::package;
 use game::{GameSetup, GameState, PlayerSetup};
 use graphics::{GraphicsMessage, Render, RenderType};
 use graphics;
-use input::{Input, PlayerInput};
-use network::{Netplay, NetplayState};
-use os_input::OsInput;
-use package::{Package, PackageMeta, Verify};
-use package;
+use input::Input;
 use replays;
 use results::{GameResults, PlayerResult};
 
@@ -952,6 +953,7 @@ struct PackageLoader {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum PackageLoadState {
     Starting,
     Downloading,
@@ -1006,6 +1008,7 @@ impl PlayerSelect {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum PlayerSelectUi {
     CpuAi        (MenuTicker),
     CpuFighter   (MenuTicker),
@@ -1016,6 +1019,7 @@ pub enum PlayerSelectUi {
 }
 
 impl PlayerSelectUi {
+    #[allow(dead_code)]
     pub fn cpu_ai() -> Self {
         PlayerSelectUi::CpuAi (MenuTicker::new(/* TODO: number_of_ai + */ 1))
     }

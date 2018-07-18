@@ -1,5 +1,3 @@
-use camera::Camera;
-
 use winit::ElementState::{Pressed, Released};
 use winit::{WindowEvent, MouseScrollDelta, MouseButton, VirtualKeyCode};
 
@@ -264,10 +262,10 @@ impl OsInput {
         }
     }
 
-    pub fn game_mouse(&self, camera: &Camera) -> Option<(f32, f32)> {
+    pub fn game_mouse(&self, camera: Camera) -> Option<(f32, f32)> {
         if let Some(ref current) = self.current {
             if let Some(point) = current.mouse_point {
-                return Some(current.mouse_to_game(point, camera));
+                return Some(current.mouse_to_game(point, &camera));
             }
         }
         None
@@ -284,12 +282,12 @@ impl OsInput {
         (0.0, 0.0)
     }
 
-    pub fn game_mouse_diff(&self, camera: &Camera) -> (f32, f32) {
+    pub fn game_mouse_diff(&self, camera: Camera) -> (f32, f32) {
         if let Some(ref current_input) = self.current {
             if let Some(cur) = current_input.mouse_point {
                 if let Some(prev) = current_input.mouse_point_prev {
-                    let cur  = current_input.mouse_to_game(cur, camera);
-                    let prev = current_input.mouse_to_game(prev, camera);
+                    let cur  = current_input.mouse_to_game(cur, &camera);
+                    let prev = current_input.mouse_to_game(prev, &camera);
                     return (cur.0 - prev.0, cur.1 - prev.1);
                 }
             }
@@ -338,3 +336,9 @@ fn mouse_button_to_int(button: MouseButton) -> usize {
         MouseButton::Other(byte) => { byte as usize },
     }
 }
+
+pub struct Camera {
+    pub zoom:  f32,
+    pub pan:   (f32, f32),
+}
+
