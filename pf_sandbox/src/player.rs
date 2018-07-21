@@ -852,6 +852,9 @@ impl Player {
         else if context.input[0].stick_y > 0.7 {
             self.set_action(context, Action::MissedTechGetupN);
         }
+        else if context.input.a.press || context.input.b.press {
+            self.set_action(context, Action::MissedTechAttack);
+        }
         else {
             if let Some(getup_frame) = context.fighter.missed_tech_forced_getup {
                 if self.frame_norestart > getup_frame as i64 {
