@@ -56,7 +56,7 @@ impl VertexConstructor<FillVertex, ColorVertex> for StageVertexConstructor {
     fn new_vertex(&mut self, vertex: FillVertex) -> ColorVertex {
         ColorVertex {
             position: vertex.position.to_array(),
-            color:    [0.3, 0.3, 0.3, 0.3]
+            color:    [0.16, 0.16, 0.16, 1.0]
         }
     }
 }
@@ -444,14 +444,6 @@ impl Buffers {
                 builder.close();
             }
             else {
-                let angle = surface.render_angle() - 90f32.to_radians();
-                let d_x = angle.cos() / 4.0;
-                let d_y = angle.sin() / 4.0;
-                builder.move_to(point(surface.x1 + d_x, surface.y1 + d_y));
-                builder.line_to(point(surface.x2 + d_x, surface.y2 + d_y));
-                builder.line_to(point(surface.x2 - d_x, surface.y2 - d_y));
-                builder.line_to(point(surface.x1 - d_x, surface.y1 - d_y));
-                builder.close();
                 for j in loop_elements {
                     cant_loop.push(j);
                 }
