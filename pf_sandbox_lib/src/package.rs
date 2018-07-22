@@ -105,7 +105,9 @@ pub struct Package {
     pub rules:              Rules,
     pub stages:             KeyedContextVec<Stage>, // TODO: Can just use a std map here
     pub fighters:           KeyedContextVec<Fighter>,
-        package_updates:    Vec<PackageUpdate>,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    package_updates: Vec<PackageUpdate>,
 }
 
 impl Default for Package {
@@ -350,7 +352,7 @@ impl Package {
         self.json_into_structs(meta, rules, fighters, stages);
         self.meta.path = path;
 
-        self.force_update_entire_package();
+        self.package_updates.push(PackageUpdate::Package(self.clone()));
         Ok(())
     }
 
@@ -750,12 +752,6 @@ impl Package {
         });
     }
 
-    // TODO: Refactor to use a reference would be way faster
-    pub fn force_update_entire_package(&mut self) {
-        let package_update = PackageUpdate::Package(self.clone());
-        self.package_updates.push(package_update);
-    }
-
     pub fn updates(&mut self) -> Vec<PackageUpdate> {
         mem::replace(&mut self.package_updates, vec!())
     }
@@ -763,6 +759,7 @@ impl Package {
 
 impl Node for Package {
     fn node_step(&mut self, mut runner: NodeRunner) -> String {
+        let backup_runner = runner.clone();
         let result = match runner.step() {
             NodeToken::ChainProperty (property) => {
                 match property.as_str() {
@@ -812,9 +809,19 @@ Accessors:
             action => { format!("Package cannot '{:?}'", action) }
         };
 
-        self.force_update_entire_package();
+        // TODO: generate_context
+        let fighter_context = vec!();
+        let stage_context = vec!();
+
+        self.package_updates.push(PackageUpdate::Command { runner: backup_runner, fighter_context, stage_context });
         result
     }
+}
+
+#[derive(Clone)]
+pub struct ContextDescription {
+    pub context:  usize,
+    pub children: Vec<ContextDescription>
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -827,13 +834,14 @@ pub enum Verify {
 }
 
 // Finer grained changes are used when speed is needed
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub enum PackageUpdate {
     Package (Package),
     DeleteFighterFrame { fighter: String, action: usize, frame_index: usize },
     InsertFighterFrame { fighter: String, action: usize, frame_index: usize, frame: ActionFrame },
     DeleteStage { index: usize, key: String },
     InsertStage { index: usize, key: String, stage: Stage },
+    Command { runner: NodeRunner, fighter_context: Vec<ContextDescription>, stage_context: Vec<ContextDescription> },
 }
 
 /// Stores metadata for the package

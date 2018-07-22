@@ -7,6 +7,8 @@ use graphics;
 use player::RenderPlayer;
 use game::SurfaceSelection;
 
+use treeflection::Node;
+
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
 
@@ -689,6 +691,33 @@ impl PackageBuffers {
                         self.stages_fill.insert(key.clone(), Buffers::new_surfaces_fill(device.clone(), &stage.surfaces));
                     }
                     self.package = Some(package);
+                }
+                PackageUpdate::Command { runner, fighter_context, stage_context } => {
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        // TODO: apply context from fighter_context and stage_context
+
+                        package.node_step(runner);
+
+                        self.stages = HashMap::new();
+                        self.fighters = HashMap::new();
+
+                        for (key, fighter) in package.fighters.key_value_iter() {
+                            let mut action_buffers: Vec<Vec<Option<Buffers>>> = vec!();
+                            for action in &fighter.actions[..] {
+                                let mut frame_buffers: Vec<Option<Buffers>> = vec!();
+                                for frame in &action.frames[..] {
+                                    frame_buffers.push(Buffers::new_fighter_frame(device.clone(), frame));
+                                }
+                                action_buffers.push(frame_buffers);
+                            }
+                            self.fighters.insert(key.clone(), action_buffers);
+                        }
+
+                        for (key, stage) in package.stages.key_value_iter() {
+                            self.stages     .insert(key.clone(), Buffers::new_surfaces     (device.clone(), &stage.surfaces));
+                            self.stages_fill.insert(key.clone(), Buffers::new_surfaces_fill(device.clone(), &stage.surfaces));
+                        }
+                    }
                 }
                 PackageUpdate::DeleteFighterFrame { fighter, action, frame_index } => {
                     let fighter: &str = &fighter;
