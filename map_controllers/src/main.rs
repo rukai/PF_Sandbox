@@ -5,7 +5,6 @@
              extern crate gilrs;
              extern crate serde_json;
              extern crate uuid;
-#[macro_use] extern crate human_panic;
 #[macro_use] extern crate pf_sandbox_lib;
 
 mod state;
@@ -66,7 +65,7 @@ macro_rules! clone {
 }
 
 fn main() {
-    pf_sandbox_setup_panic_handler!();
+    setup_panic_handler!();
 
     // Need to be careful with the rw lock.
     // It is easy to accidentally create a deadlock by accidentally triggering

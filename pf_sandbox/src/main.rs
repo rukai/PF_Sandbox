@@ -20,7 +20,6 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate treeflection_derive;
 #[macro_use] extern crate pf_sandbox_lib;
-#[macro_use] extern crate human_panic;
 
 pub(crate) mod ai;
 pub(crate) mod app;
@@ -58,7 +57,7 @@ use pf_sandbox_lib::config::Config;
 use pf_sandbox_lib::logger;
 
 fn main() {
-    pf_sandbox_setup_panic_handler!();
+    setup_panic_handler!();
     logger::init();
     let config = Config::load();
     run(cli(&config), config);

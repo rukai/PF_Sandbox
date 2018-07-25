@@ -3,7 +3,8 @@ members = [
     "pf_sandbox",
     "pf_tas",
     "pf_cli",
-    "map_controllers"
+    "map_controllers",
+    "panic_handler"
 ]
 
 [profile.release]

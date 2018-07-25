@@ -2,6 +2,7 @@
 #![feature(drain_filter)]
 #![feature(nll)]
 
+             extern crate backtrace;
              extern crate bincode;
              extern crate chrono;
              extern crate crypto;
@@ -9,9 +10,12 @@
              extern crate enum_traits;
              extern crate env_logger;
              extern crate gilrs;
+             extern crate os_type;
              extern crate rand;
              extern crate reqwest;
              extern crate serde;
+             extern crate tempdir;
+             extern crate toml;
              extern crate treeflection;
              extern crate uuid;
              extern crate winit;
@@ -34,23 +38,6 @@ pub mod logger;
 pub mod network;
 pub mod os_input;
 pub mod package;
+pub mod panic_handler;
 pub mod rules;
 pub mod stage;
-
-#[macro_export]
-macro_rules! pf_sandbox_setup_panic_handler {
-    () => {
-        {
-            use std::env;
-            use std::boxed::Box;
-            if env::var("PFS_DEV").map(|x| x.to_lowercase() != String::from("true")).unwrap_or(true) {
-                setup_panic!(Metadata {
-                    name:     env!("CARGO_PKG_NAME").into(),
-                    version:  env!("BUILD_VERSION").into(),
-                    authors:  "".into(),
-                    homepage: "https://github.com/rukai/PF_Sandbox/issues".into(),
-                });
-            }
-        }
-    }
-}

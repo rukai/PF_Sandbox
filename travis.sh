@@ -23,7 +23,7 @@ cd ..
 
 # build
 #cargo build --release --all -j 2
-# START TEMP - Manually build each crate as we cant build pf_map_controllers because travis has ancient GTK version
+# START TEMP - Manually build each crate as we cant build pf_map_controllers or panic_handler because travis has ancient GTK version
 cd pf_sandbox
 cargo test --release -v -j 2
 cargo build --release -j 2

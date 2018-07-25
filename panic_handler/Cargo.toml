@@ -1,12 +1,9 @@
 [package]
-name = "pf_map_controllers"
+name = "panic_handler"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 
 [dependencies]
-gdk = "0.8"
 gilrs = "0.6"
 gtk = { version = "0.4", features = ["v3_12"] }
 pf_sandbox_lib = { path = "../pf_sandbox_lib" }
-serde_json = "1.0"
-uuid = { version = "0.6.0-beta", features = ["v4", "serde"] }

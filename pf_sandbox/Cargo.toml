@@ -16,7 +16,6 @@ chrono = { version = "0.4", features = ["serde"] }
 enum_traits = "0.3"
 enum_traits_macros = "2.0"
 getopts = "0.2"
-human-panic = { git = "https://github.com/rukai/human-panic", branch = "native_window", features = ["gui"] }
 gilrs = "0.6"
 libusb = "0.3"
 log = "0.4"
