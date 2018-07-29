@@ -734,10 +734,10 @@ impl Default for HitBox {
     fn default() -> HitBox {
         HitBox {
             shield_damage:      0.0,
-            damage:             10.0,
-            bkb:                60.0,
+            damage:             6.0,
+            bkb:                40.0,
             kbg:                1.0,
-            angle:              0.0,
+            angle:              45.0,
             enable_clang:       true,
             enable_rebound:     true,
             enable_reverse_hit: true,
