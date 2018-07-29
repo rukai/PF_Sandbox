@@ -231,7 +231,7 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "num-integer 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -683,7 +683,7 @@ dependencies = [
 [[package]]
 name = "glsl-to-spirv"
 version = "0.1.6"
-source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#01d779b33883e72ced2870388173c4cb3d611d57"
+source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#53f561fad9fe08c271c08b5dbbcbaccda2092608"
 dependencies = [
  "cmake 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -693,7 +693,7 @@ dependencies = [
 [[package]]
 name = "glsl-to-spirv"
 version = "0.1.6"
-source = "git+https://github.com/vulkano-rs/vulkano#67ace6b1c5e7506dbf623741a7d940d4a77d2298"
+source = "git+https://github.com/vulkano-rs/vulkano#29399c7acf249ab08a36217817594654ec555ad0"
 dependencies = [
  "cmake 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1373,7 +1373,7 @@ version = "0.1.1"
 dependencies = [
  "byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "cgmath 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "chrono 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chrono 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_traits_macros 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1401,7 +1401,7 @@ version = "0.1.0"
 dependencies = [
  "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "chrono 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chrono 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "dirs 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_traits_macros 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2251,12 +2251,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "vk-sys"
 version = "0.3.3"
-source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#01d779b33883e72ced2870388173c4cb3d611d57"
+source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#53f561fad9fe08c271c08b5dbbcbaccda2092608"
 
 [[package]]
 name = "vk-sys"
 version = "0.3.3"
-source = "git+https://github.com/vulkano-rs/vulkano#67ace6b1c5e7506dbf623741a7d940d4a77d2298"
+source = "git+https://github.com/vulkano-rs/vulkano#29399c7acf249ab08a36217817594654ec555ad0"
 
 [[package]]
 name = "void"
@@ -2266,7 +2266,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "vulkano"
 version = "0.9.0"
-source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#01d779b33883e72ced2870388173c4cb3d611d57"
+source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#53f561fad9fe08c271c08b5dbbcbaccda2092608"
 dependencies = [
  "crossbeam 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2280,7 +2280,7 @@ dependencies = [
 [[package]]
 name = "vulkano"
 version = "0.9.0"
-source = "git+https://github.com/vulkano-rs/vulkano#67ace6b1c5e7506dbf623741a7d940d4a77d2298"
+source = "git+https://github.com/vulkano-rs/vulkano#29399c7acf249ab08a36217817594654ec555ad0"
 dependencies = [
  "crossbeam 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2294,7 +2294,7 @@ dependencies = [
 [[package]]
 name = "vulkano-shader-derive"
 version = "0.9.0"
-source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#01d779b33883e72ced2870388173c4cb3d611d57"
+source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#53f561fad9fe08c271c08b5dbbcbaccda2092608"
 dependencies = [
  "glsl-to-spirv 0.1.6 (git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key)",
  "syn 0.14.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2304,7 +2304,7 @@ dependencies = [
 [[package]]
 name = "vulkano-shader-derive"
 version = "0.9.0"
-source = "git+https://github.com/vulkano-rs/vulkano#67ace6b1c5e7506dbf623741a7d940d4a77d2298"
+source = "git+https://github.com/vulkano-rs/vulkano#29399c7acf249ab08a36217817594654ec555ad0"
 dependencies = [
  "glsl-to-spirv 0.1.6 (git+https://github.com/vulkano-rs/vulkano)",
  "syn 0.14.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2314,7 +2314,7 @@ dependencies = [
 [[package]]
 name = "vulkano-shaders"
 version = "0.9.0"
-source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#01d779b33883e72ced2870388173c4cb3d611d57"
+source = "git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key#53f561fad9fe08c271c08b5dbbcbaccda2092608"
 dependencies = [
  "glsl-to-spirv 0.1.6 (git+https://github.com/rukai/vulkano?branch=fix_cpu_pool_conflict_key)",
 ]
@@ -2322,7 +2322,7 @@ dependencies = [
 [[package]]
 name = "vulkano-shaders"
 version = "0.9.0"
-source = "git+https://github.com/vulkano-rs/vulkano#67ace6b1c5e7506dbf623741a7d940d4a77d2298"
+source = "git+https://github.com/vulkano-rs/vulkano#29399c7acf249ab08a36217817594654ec555ad0"
 dependencies = [
  "glsl-to-spirv 0.1.6 (git+https://github.com/vulkano-rs/vulkano)",
 ]
@@ -2471,7 +2471,7 @@ dependencies = [
 [[package]]
 name = "winit"
 version = "0.16.2"
-source = "git+https://github.com/tomaka/winit#72b24a93488a7eac8ce73bc6d03e67084a4ac8c2"
+source = "git+https://github.com/tomaka/winit#21ff2e0ffcc01819a785bad50329e3c1936db726"
 dependencies = [
  "android_glue 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "cocoa 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2560,7 +2560,7 @@ dependencies = [
 "checksum cc 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)" = "2119ea4867bd2b8ed3aecab467709720b2d55b1bcfe09f772fd68066eaf15275"
 "checksum cfg-if 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "efe5c877e17a9c717a0bf3613b2709f723202c4e4675cc8f12926ded29bcb17e"
 "checksum cgmath 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)" = "64a4b57c8f4e3a2e9ac07e0f6abc9c24b6fc9e1b54c3478cfb598f3d0023e51c"
-"checksum chrono 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "6962c635d530328acc53ac6a955e83093fedc91c5809dfac1fa60fa470830a37"
+"checksum chrono 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "e48d85528df61dc964aa43c5f6ca681a19cfa74939b2348d204bd08a981f2fb0"
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 "checksum cmake 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)" = "95470235c31c726d72bf2e1f421adc1e65b9d561bf5529612cbe1a72da1467b3"
 "checksum cocoa 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ac0d785ff4faf0ff23d7b5561346bb50dc7ef9a11cb0e65e07ef776b7752938f"

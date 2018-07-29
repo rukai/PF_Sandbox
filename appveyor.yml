@@ -36,16 +36,20 @@ test_script:
   - move target\release\pf_cli.exe pf
   - move target\release\pf_map_controllers.exe pf
   - move target\release\panic_handler.exe pf
-  - copy C:\msys64\mingw64\bin\libusb-1.0.dll pf
-  - copy C:\msys64\mingw64\bin\libglib-2.0-0.dll pf
   - copy C:\msys64\mingw64\bin\libcairo-2.dll pf
-  - copy C:\msys64\mingw64\bin\libgdk-3-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgobject-2.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgio-2.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgtk-3-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgdk_pixbuf-2.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libpango-1.0-0.dll pf
+  - copy C:\msys64\mingw64\bin\libcairo-gobject-2.dll pf
+  - copy C:\msys64\mingw64\bin\libepoxy-0.dll pf
   - copy C:\msys64\mingw64\bin\libfribidi-0.dll pf
+  - copy C:\msys64\mingw64\bin\libgdk-3-0.dll pf
+  - copy C:\msys64\mingw64\bin\libgdk_pixbuf-2.0-0.dll pf
+  - copy C:\msys64\mingw64\bin\libgio-2.0-0.dll pf
+  - copy C:\msys64\mingw64\bin\libglib-2.0-0.dll pf
+  - copy C:\msys64\mingw64\bin\libgmodule-2.0-0.dll pf
+  - copy C:\msys64\mingw64\bin\libgobject-2.0-0.dll pf
+  - copy C:\msys64\mingw64\bin\libgtk-3-0.dll pf
+  - copy C:\msys64\mingw64\bin\libintl-8.dll pf
+  - copy C:\msys64\mingw64\bin\libpango-1.0-0.dll pf
+  - copy C:\msys64\mingw64\bin\libusb-1.0.dll pf
   - 7z a pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip pf
   - echo put pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip /home/rubic/PF_Sandbox_Website/builds/ | sftp rubic@pfsandbox.net
 
