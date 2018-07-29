@@ -7,7 +7,6 @@ use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use reqwest::Url;
 use reqwest::UrlError;
-use serde_json::Value;
 use serde_json;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use zip::ZipWriter;
@@ -75,6 +74,7 @@ pub fn get_package_metas() -> Vec<(String, PackageMeta)> {
             let mut meta_path = file.path();
             meta_path.push("package_meta.json");
 
+            // TODO: Use upgrade_to_latest_meta
             match files::load_struct::<PackageMeta>(meta_path) {
                 Ok (mut meta) => {
                     meta.path = file.path();
@@ -305,95 +305,102 @@ impl Package {
         String::from("Save completed successfully.")
     }
 
+    /// Clears the current package data, then loads the package from disk
+    /// The upgraded json is loaded into this package
+    /// the user can then save the package to make the upgrade permanent
+    /// Advantages over saving upgraded json immediately:
+    /// *    the package cannot be saved if it wont load
+    /// *    the user can choose to not save, if they find issues with the upgrade
     pub fn load(&mut self) -> Result<(), String> {
-        let path = self.meta.path.clone();
-        let mut meta = match files::load_file(self.meta.path.join("package_meta.json")) {
-            Ok (string) => serde_json::from_str(&string).map_err(|x| format!("{:?}", x))?,
-            Err (_) => None
+        // Previously all the json files were loaded from disk, then every json file was upgraded,
+        // then every json file was converted to a struct.
+        // This ran out of memory very quickly.
+        // So now we "load, upgrade, convert" one by one instead of batched.
+
+        // load the meta file if exists otherwise generate one.
+        // if the meta file exists but is invalid fail the package load
+        let path = self.meta.path.clone(); // path is only set at runtime, back it up
+        self.meta = match files::load_file(self.meta.path.join("package_meta.json")) {
+            Ok (string) => {
+                let mut json = serde_json::from_str(&string).map_err(|x| format!("{:?}", x))?;
+                json_upgrade::upgrade_to_latest_meta(&mut json);
+                serde_json::from_value(json).map_err(|x| format!("{:?}", x))?
+            }
+            Err (_) => PackageMeta::default()
         };
-        let mut rules = match files::load_file(self.meta.path.join("rules.json")) {
-            Ok (string) => serde_json::from_str(&string).map_err(|x| format!("{:?}", x))?,
-            Err (_) => None
+        self.meta.path = path; // restore the backed up path
+
+        // load the rules file if exists otherwise generate one.
+        // if the rules file exists but is invalid fail the package load
+        self.rules = match files::load_file(self.meta.path.join("rules.json")) {
+            Ok (string) => {
+                let mut json = serde_json::from_str(&string).map_err(|x| format!("{:?}", x))?;
+                json_upgrade::upgrade_to_latest_rules(&mut json);
+                serde_json::from_value(json).map_err(|x| format!("{:?}", x))?
+            }
+            Err (_) => Rules::default()
         };
 
-        let mut fighters: HashMap<String, Value> = HashMap::new();
+        // Get paths to the fighters
+        let mut fighter_paths: HashMap<String, PathBuf> = HashMap::new();
         if let Ok (dir) = fs::read_dir(self.meta.path.join("Fighters")) {
             for path in dir {
                 let full_path = path.unwrap().path();
                 let key = full_path.file_name().unwrap().to_str().unwrap().to_string();
-                fighters.insert(key, files::load_json(full_path)?);
+                fighter_paths.insert(key, full_path);
             }
         }
 
-        let mut stages: HashMap<String, Value> = HashMap::new();
-        if let Ok (dir) = fs::read_dir(self.meta.path.join("Stages")) {
-            for path in dir {
-                let full_path = path.unwrap().path();
-                let key = full_path.file_name().unwrap().to_str().unwrap().to_string();
-                stages.insert(key, files::load_json(full_path)?);
-            }
-        }
-
-        // the upgraded json is loaded into this package
-        // the user can then save the package to make the upgrade permanent
-        // some nice side effects:
-        // *    the package cannot be saved if it wont load
-        // *    the user can choose to not save, if they find issues with the upgrade
-        json_upgrade::upgrade_to_latest_fighters(&mut fighters);
-        json_upgrade::upgrade_to_latest_stages(&mut stages);
-        if let &mut Some(ref mut rules) = &mut rules {
-            json_upgrade::upgrade_to_latest_rules(rules);
-        }
-        if let &mut Some(ref mut meta) = &mut meta {
-            json_upgrade::upgrade_to_latest_rules(meta);
-        }
-        self.json_into_structs(meta, rules, fighters, stages);
-        self.meta.path = path;
-
-        self.force_update_entire_package();
-        Ok(())
-    }
-
-    pub fn json_into_structs(&mut self, meta: Option<Value>, rules: Option<Value>, mut fighters: HashMap<String, Value>, mut stages: HashMap<String, Value>) {
-        if let Some (meta) = meta {
-            self.meta = serde_json::from_value(meta).unwrap();
-        }
-        else {
-            self.meta = PackageMeta::default();
-        }
-
-        if let Some (rules) = rules {
-            self.rules = serde_json::from_value(rules).unwrap();
-        }
-        else {
-            self.rules = Rules::default();
-        }
-    
         // Use meta.fighter_keys for fighter ordering
         self.fighters = KeyedContextVec::new();
-        for key in &self.meta.fighter_keys {
-            if let Some(fighter) = fighters.remove(key) {
-                self.fighters.push(key.clone(), serde_json::from_value(fighter).unwrap());
+        for file_name in &self.meta.fighter_keys {
+            if let Some(file_path) = fighter_paths.remove(file_name) {
+                let mut json = files::load_json(file_path)?;
+                json_upgrade::upgrade_to_latest_fighter(&mut json, file_name);
+                let fighter = serde_json::from_value(json).map_err(|x| format!("{:?}", x))?;
+                self.fighters.push(file_name.clone(), fighter);
             }
         }
 
         // add remaining fighters in any order
-        for (key, fighter) in fighters {
-            self.fighters.push(key, serde_json::from_value(fighter).unwrap());
+        for (file_name, file_path) in fighter_paths {
+            let mut json = files::load_json(file_path)?;
+            json_upgrade::upgrade_to_latest_fighter(&mut json, &file_name);
+            let fighter = serde_json::from_value(json).map_err(|x| format!("{:?}", x))?;
+            self.fighters.push(file_name.clone(), fighter);
+        }
+
+        // Get paths to the stages
+        let mut stage_paths: HashMap<String, PathBuf> = HashMap::new();
+        if let Ok (dir) = fs::read_dir(self.meta.path.join("Stages")) {
+            for path in dir {
+                let full_path = path.unwrap().path();
+                let key = full_path.file_name().unwrap().to_str().unwrap().to_string();
+                stage_paths.insert(key, full_path);
+            }
         }
 
         // Use meta.stage_keys for stage ordering
         self.stages = KeyedContextVec::new();
-        for key in &self.meta.stage_keys {
-            if let Some(stage) = stages.remove(key) {
-                self.stages.push(key.clone(), serde_json::from_value(stage).unwrap());
+        for file_name in &self.meta.stage_keys {
+            if let Some(file_path) = stage_paths.remove(file_name) {
+                let mut json = files::load_json(file_path)?;
+                json_upgrade::upgrade_to_latest_stage(&mut json, file_name);
+                let stage = serde_json::from_value(json).map_err(|x| format!("{:?}", x))?;
+                self.stages.push(file_name.clone(), stage);
             }
         }
 
         // add remaining stages in any order
-        for (key, stage) in stages {
-            self.stages.push(key, serde_json::from_value(stage).unwrap());
+        for (file_name, file_path) in stage_paths {
+            let mut json = files::load_json(file_path)?;
+            json_upgrade::upgrade_to_latest_stage(&mut json, &file_name);
+            let stage = serde_json::from_value(json).map_err(|x| format!("{:?}", x))?;
+            self.stages.push(file_name.clone(), stage);
         }
+
+        self.force_update_entire_package();
+        Ok(())
     }
 
     pub fn compute_hash(&self) -> String {

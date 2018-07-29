@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use serde_json::{Value, Number};
 
 pub fn build_version() -> String { String::from(env!("BUILD_VERSION")) }
@@ -27,64 +25,61 @@ fn upgrade_engine_version(meta: &mut Value) {
     }
 }
 
-pub fn upgrade_to_latest_fighters(fighters: &mut HashMap<String, Value>) {
-    for (key, fighter) in fighters.iter_mut() {
-        let meta_engine_version = get_engine_version(fighter);
-        if meta_engine_version > engine_version() {
-            println!("Fighter: {} is newer than this version of PF Sandbox. Please upgrade to the latest version.", key);
-            // TODO: Display warning in window
-        }
-        else if meta_engine_version < engine_version() {
-            for upgrade_from in meta_engine_version..engine_version() {
-                match upgrade_from {
-                    12 => { upgrade_fighter12(fighter) }
-                    11 => { upgrade_fighter11(fighter) }
-                    10 => { upgrade_fighter10(fighter) }
-                    9  => { upgrade_fighter9(fighter) }
-                    8  => { upgrade_fighter8(fighter) }
-                    7  => { upgrade_fighter7(fighter) }
-                    6  => { upgrade_fighter6(fighter) }
-                    5  => { upgrade_fighter5(fighter) }
-                    4  => { upgrade_fighter4(fighter) }
-                    3  => { upgrade_fighter3(fighter) }
-                    2  => { upgrade_fighter2(fighter) }
-                    1  => { upgrade_fighter1(fighter) }
-                    0  => { upgrade_fighter0(fighter) }
-                    _ => { }
-                }
+pub(crate) fn upgrade_to_latest_fighter(fighter: &mut Value, file_name: &str) {
+    let fighter_engine_version = get_engine_version(fighter);
+    if fighter_engine_version > engine_version() {
+        println!("Fighter: {} is newer than this version of PF Sandbox. Please upgrade to the latest version.", file_name);
+        // TODO: Display warning in window
+    }
+    else if fighter_engine_version < engine_version() {
+        println!("hit upgrade: {}", fighter_engine_version);
+        for upgrade_from in fighter_engine_version..engine_version() {
+            match upgrade_from {
+                12 => { upgrade_fighter12(fighter) }
+                11 => { upgrade_fighter11(fighter) }
+                10 => { upgrade_fighter10(fighter) }
+                9  => { upgrade_fighter9(fighter) }
+                8  => { upgrade_fighter8(fighter) }
+                7  => { upgrade_fighter7(fighter) }
+                6  => { upgrade_fighter6(fighter) }
+                5  => { upgrade_fighter5(fighter) }
+                4  => { upgrade_fighter4(fighter) }
+                3  => { upgrade_fighter3(fighter) }
+                2  => { upgrade_fighter2(fighter) }
+                1  => { upgrade_fighter1(fighter) }
+                0  => { upgrade_fighter0(fighter) }
+                _ => { }
             }
-            upgrade_engine_version(fighter);
         }
+        upgrade_engine_version(fighter);
     }
 }
 
-pub fn upgrade_to_latest_stages(stages: &mut HashMap<String, Value>) {
-    for (key, stage) in stages.iter_mut() {
-        let meta_engine_version = get_engine_version(stage);
-        if meta_engine_version > engine_version() {
-            println!("Stage: {} is newer than this version of PF Sandbox. Please upgrade to the latest version.", key);
-            // TODO: Display warning in window
-        }
-        else if meta_engine_version < engine_version() {
-            // TODO: Handle upgrades here
-            upgrade_engine_version(stage);
-        }
+pub(crate) fn upgrade_to_latest_stage(stage: &mut Value, file_name: &str) {
+    let stage_engine_version = get_engine_version(stage);
+    if stage_engine_version > engine_version() {
+        println!("Stage: {} is newer than this version of PF Sandbox. Please upgrade to the latest version.", file_name);
+        // TODO: Display warning in window
+    }
+    else if stage_engine_version < engine_version() {
+        // TODO: Handle upgrades here
+        upgrade_engine_version(stage);
     }
 }
 
-pub fn upgrade_to_latest_rules(rules: &mut Value) {
-    let meta_engine_version = get_engine_version(rules);
-    if meta_engine_version > engine_version() {
+pub(crate) fn upgrade_to_latest_rules(rules: &mut Value) {
+    let rules_engine_version = get_engine_version(rules);
+    if rules_engine_version > engine_version() {
         println!("rules.json is newer than this version of PF Sandbox. Please upgrade to the latest version.");
         // TODO: Display warning in window
     }
-    else if meta_engine_version < engine_version() {
+    else if rules_engine_version < engine_version() {
         // TODO: Handle upgrades here
         upgrade_engine_version(rules);
     }
 }
 
-pub fn upgrade_to_latest_meta(meta: &mut Value) {
+pub(crate) fn upgrade_to_latest_meta(meta: &mut Value) {
     let meta_engine_version = get_engine_version(meta);
     if meta_engine_version > engine_version() {
         println!("meta.json is newer than this version of PF Sandbox. Please upgrade to the latest version.");
