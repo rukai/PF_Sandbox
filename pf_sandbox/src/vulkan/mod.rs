@@ -766,11 +766,8 @@ impl VulkanGraphics {
                             let transformation = position * rotate * dir;
 
                             // draw fighter
-                            let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
-                            if player.frame < fighter_frames.len() {
-                                if let &Some(ref buffers) = &fighter_frames[player.frame] {
-                                    command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, edge_color, color);
-                                }
+                            if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &player.fighter, player.action, player.frame) {
+                                command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, edge_color, color);
                             }
                             else {
                                  // TODO: Give some indication that we are rendering a deleted or otherwise nonexistent frame
@@ -989,11 +986,8 @@ impl VulkanGraphics {
             let set = entity_and_set.set;
             match entity_and_set.entity {
                 MenuEntity::Fighter { ref fighter, action, frame } => {
-                    let fighter_frames = &self.package_buffers.fighters[fighter][action];
-                    if frame < fighter_frames.len() {
-                        if let &Some(ref buffers) = &fighter_frames[frame] {
-                            command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
-                        }
+                    if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), fighter, action, frame) {
+                        command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
                 MenuEntity::Stage (ref stage) => {
@@ -1181,11 +1175,18 @@ impl VulkanGraphics {
         }
 
         // render fighter
-        for (fighter_i, (fighter_key, fighter)) in fighters.key_value_iter().enumerate() {
+        for (fighter_i, (fighter_key, _)) in fighters.key_value_iter().enumerate() {
             if let Some(selection_i) = selection.fighter {
                 if fighter_i == selection_i {
-                    let fighter_actions = &self.package_buffers.fighters[fighter_key];
+                    let fighter = fighters.key_to_value(fighter_key).unwrap();
+
+                    // Determine action, handling the user setting it to an invalid value
                     let css_action = fighter.css_action as usize;
+                    let action = if css_action < fighter.actions.len() {
+                        css_action
+                    } else {
+                        Action::Idle.index() as usize
+                    };
 
                     // draw fighter
                     let player = RenderPlayer {
@@ -1197,7 +1198,6 @@ impl VulkanGraphics {
                         ecb:               ECB::default(),
                         frame:             selection.animation_frame,
                         frame_data:        ActionFrame::default(),
-                        action:            if css_action < fighter_actions.len() { css_action } else { Action::Idle.index() as usize },
                         fighter:           fighter_key.clone(),
                         face_right:        start_x < 0.0,
                         angle:             0.0,
@@ -1208,36 +1208,32 @@ impl VulkanGraphics {
                         shield:            None,
                         vector_arrows:     vec!(),
                         particles:         vec!(),
+                        action,
                     };
 
-                    let fighter_frames = &self.package_buffers.fighters[&player.fighter][player.action];
-                    if player.frame < fighter_frames.len() {
-                        if let &Some(_) = &fighter_frames[player.frame] {
-                            // fudge player data TODO: One day I would like to have the menu selection fighters (mostly) playable
-                            let zoom = fighter.css_scale / 40.0;
-                            let fighter_x = start_x + (end_x - start_x) / 2.0;
-                            let fighter_y = end_y * -1.0 + 0.05;
+                    // fudge player data TODO: One day I would like to have the menu selection fighters (mostly) playable
+                    let zoom = fighter.css_scale / 40.0;
+                    let fighter_x = start_x + (end_x - start_x) / 2.0;
+                    let fighter_y = end_y * -1.0 + 0.05;
 
-                            let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
-                            let position = Matrix4::from_translation(Vector3::new(fighter_x, fighter_y, 0.0));
-                            let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
-                            let transformation = position * (camera * dir);
-                            let uniform = vs::ty::Data {
-                                edge_color:     graphics::get_team_color4(selection.team),
-                                color:          [0.9, 0.9, 0.9, 1.0],
-                                transformation: transformation.into(),
-                            };
-                            let set = self.new_uniform_set(uniform);
+                    let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
+                    let position = Matrix4::from_translation(Vector3::new(fighter_x, fighter_y, 0.0));
+                    let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                    let transformation = position * (camera * dir);
+                    let uniform = vs::ty::Data {
+                        edge_color:     graphics::get_team_color4(selection.team),
+                        color:          [0.9, 0.9, 0.9, 1.0],
+                        transformation: transformation.into(),
+                    };
+                    let set = self.new_uniform_set(uniform);
 
-                            let entity = MenuEntity::Fighter {
-                                fighter: player.fighter,
-                                action:  player.action,
-                                frame:   player.frame
-                            };
+                    let entity = MenuEntity::Fighter {
+                        fighter: player.fighter,
+                        action:  player.action,
+                        frame:   player.frame
+                    };
 
-                            entities.push(MenuEntityAndSet { set, entity });
-                        }
-                    }
+                    entities.push(MenuEntityAndSet { set, entity });
                 }
             }
         }

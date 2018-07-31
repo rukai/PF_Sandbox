@@ -1,4 +1,4 @@
-use pf_sandbox_lib::fighter::{ActionFrame, LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
+use pf_sandbox_lib::fighter::{LinkType, ColboxOrLink, CollisionBox, CollisionBoxLink};
 use pf_sandbox_lib::geometry::Rect;
 use pf_sandbox_lib::stage::Surface;
 use pf_sandbox_lib::package::{Package, PackageUpdate};
@@ -466,35 +466,6 @@ impl Buffers {
         })
     }
 
-    fn new_fighter_frame(device: Arc<Device>, frame: &ActionFrame) -> Option<Buffers> {
-        if frame.colboxes.len() == 0 {
-            return None;
-        }
-
-        let mut vertices: Vec<Vertex> = vec!();
-        let mut indices: Vec<u16> = vec!();
-        let mut index_count = 0;
-
-        for colbox_or_link in frame.get_colboxes_and_links() {
-            match colbox_or_link {
-                ColboxOrLink::Colbox (ref colbox) => {
-                    let render_id = graphics::get_render_id(&colbox.role);
-                    Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, render_id);
-                }
-                ColboxOrLink::Link (ref link) => {
-                    let colbox1 = &frame.colboxes[link.one];
-                    let colbox2 = &frame.colboxes[link.two];
-                    Buffers::gen_link(&mut vertices, &mut indices, link, colbox1, colbox2, &mut index_count);
-                }
-            }
-        }
-
-        Some(Buffers {
-            index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
-            vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
-        })
-    }
-
     pub fn gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16, render_id: u32) {
         let triangles = 60;
         // triangles are drawn meeting at the centre, forming a circle
@@ -647,10 +618,13 @@ impl Buffers {
     }
 }
 
+// TODO: Delete the PackageBuffers struct.
+// I once thought it was a good idea to cache vertices but because PF Sandbox is so dynamic that is a terrible idea.
+// The fighter cache has already been removed but the entire PackageBuffers struct should just be replaced with an Option<Package>.
+// stages and stages_fill can be generated when rendering the menu as needed.
 pub struct PackageBuffers {
     pub stages:      HashMap<String, Option<ColorBuffers>>, // Only used in menu, ingame stages are recreated every frame
     pub stages_fill: HashMap<String, Option<ColorBuffers>>, // Only used in menu, ingame stages are recreated every frame
-    pub fighters:    HashMap<String, Vec<Vec<Option<Buffers>>>>, // fighters <- actions <- frames
     pub package:     Option<Package>,
 }
 
@@ -659,7 +633,6 @@ impl PackageBuffers {
         PackageBuffers {
             stages:      HashMap::new(),
             stages_fill: HashMap::new(),
-            fighters:    HashMap::new(),
             package:     None,
         }
     }
@@ -670,19 +643,6 @@ impl PackageBuffers {
             match update {
                 PackageUpdate::Package (package) => {
                     self.stages = HashMap::new();
-                    self.fighters = HashMap::new();
-
-                    for (key, fighter) in package.fighters.key_value_iter() {
-                        let mut action_buffers: Vec<Vec<Option<Buffers>>> = vec!();
-                        for action in &fighter.actions[..] {
-                            let mut frame_buffers: Vec<Option<Buffers>> = vec!();
-                            for frame in &action.frames[..] {
-                                frame_buffers.push(Buffers::new_fighter_frame(device.clone(), frame));
-                            }
-                            action_buffers.push(frame_buffers);
-                        }
-                        self.fighters.insert(key.clone(), action_buffers);
-                    }
 
                     for (key, stage) in package.stages.key_value_iter() {
                         self.stages     .insert(key.clone(), Buffers::new_surfaces     (device.clone(), &stage.surfaces));
@@ -691,16 +651,13 @@ impl PackageBuffers {
                     self.package = Some(package);
                 }
                 PackageUpdate::DeleteFighterFrame { fighter, action, frame_index } => {
-                    let fighter: &str = &fighter;
-                    self.fighters.get_mut(fighter).unwrap()[action].remove(frame_index);
+                    let fighter: &str = &fighter; // TODO: coercec?
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.fighters[fighter].actions[action].frames.remove(frame_index);
                     }
                 }
                 PackageUpdate::InsertFighterFrame { fighter, action, frame_index, frame } => {
-                    let fighter: &str = &fighter;
-                    let buffers = Buffers::new_fighter_frame(device.clone(), &frame);
-                    self.fighters.get_mut(fighter).unwrap()[action].insert(frame_index, buffers);
+                    let fighter: &str = &fighter; // TODO coerce?
                     if let &mut Some(ref mut package) = &mut self.package {
                         package.fighters[fighter].actions[action].frames.insert(frame_index, frame);
                     }
@@ -740,6 +697,39 @@ impl PackageBuffers {
         Buffers {
             index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
             vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+        }
+    }
+    pub fn new_fighter_frame(&self, device: Arc<Device>, fighter: &str, action: usize, frame: usize) -> Option<Buffers> {
+        if let &Some(ref package) = &self.package {
+            let frames = &package.fighters[fighter].actions[action].frames;
+            if let Some(frame) = frames.get(frame) {
+                let mut vertices: Vec<Vertex> = vec!();
+                let mut indices: Vec<u16> = vec!();
+                let mut index_count = 0;
+
+                for colbox_or_link in frame.get_colboxes_and_links() {
+                    match colbox_or_link {
+                        ColboxOrLink::Colbox (ref colbox) => {
+                            let render_id = graphics::get_render_id(&colbox.role);
+                            Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, render_id);
+                        }
+                        ColboxOrLink::Link (ref link) => {
+                            let colbox1 = &frame.colboxes[link.one];
+                            let colbox2 = &frame.colboxes[link.two];
+                            Buffers::gen_link(&mut vertices, &mut indices, link, colbox1, colbox2, &mut index_count);
+                        }
+                    }
+                }
+
+                Some(Buffers {
+                    index:  CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap(),
+                    vertex: CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap(),
+                })
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 }
