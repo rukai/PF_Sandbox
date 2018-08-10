@@ -657,7 +657,7 @@ impl VulkanGraphics {
             .add_buffer(uniform_buffer).unwrap()
             .build().unwrap()
         );
-        command_buffer.draw_indexed(pipeline, DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
+        command_buffer.draw_indexed(pipeline, &DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
     }
 
     fn render_surface_buffers(
@@ -679,7 +679,7 @@ impl VulkanGraphics {
             .add_buffer(uniform_buffer).unwrap()
             .build().unwrap()
         );
-        command_buffer.draw_indexed(pipeline, DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
+        command_buffer.draw_indexed(pipeline, &DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
     }
 
     fn game_render(&mut self, render: RenderGame, mut command_buffer: AutoCommandBufferBuilder, command_output: &[String]) -> AutoCommandBufferBuilder {
@@ -987,24 +987,24 @@ impl VulkanGraphics {
             match entity_and_set.entity {
                 MenuEntity::Fighter { ref fighter, action, frame } => {
                     if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), fighter, action, frame) {
-                        command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), &DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
                 MenuEntity::Stage (ref stage) => {
                     let stage: &str = stage.as_ref();
                     if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
-                        command_buffer = command_buffer.draw_indexed(self.pipelines.surface.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        command_buffer = command_buffer.draw_indexed(self.pipelines.surface.clone(), &DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
                 MenuEntity::StageFill (ref stage) => {
                     let stage: &str = stage.as_ref();
                     if let &Some(ref buffers) = &self.package_buffers.stages_fill[stage] {
-                        command_buffer = command_buffer.draw_indexed(self.pipelines.surface.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        command_buffer = command_buffer.draw_indexed(self.pipelines.surface.clone(), &DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
                 MenuEntity::Rect (ref rect) => {
                     let buffers = Buffers::rect_buffers(self.device.clone(), rect.clone());
-                    command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                    command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), &DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
                 }
             }
         }
