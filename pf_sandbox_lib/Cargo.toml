@@ -32,5 +32,5 @@ toml = "0.4"
 treeflection = "0.1"
 treeflection_derive = "0.3"
 uuid = { version = "0.6.0-beta", features = ["v4", "serde"] }
-winit = { git = "https://github.com/tomaka/winit" } # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+winit = "0.17" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 zip = "0.4"
