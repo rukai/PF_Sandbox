@@ -120,7 +120,7 @@ pub struct Report {
 impl Report {
     /// Write the report to disk
     pub fn to_file(&self) -> Result<PathBuf, String> {
-        let uuid = Uuid::new_v4().hyphenated().to_string();
+        let uuid = Uuid::new_v4().to_hyphenated().to_string();
         let tmp_dir = env::temp_dir();
         if let Some(tmp_dir) = tmp_dir.to_str() {
             let file_name = format!("pf-sandbox-panic-{}.toml", &uuid);

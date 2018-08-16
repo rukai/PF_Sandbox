@@ -5,6 +5,7 @@ use std::f32;
 
 use gilrs::ev::Code;
 use gilrs::{Gamepad, EventType};
+use uuid::Uuid;
 use treeflection::{Node, NodeRunner, NodeToken};
 
 use self::maps::{ControllerMap, AnalogFilter, AnalogDest, DigitalFilter, DigitalDest};
@@ -135,7 +136,7 @@ pub fn code_to_usize(code: &Code) -> usize {
 pub fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, events: Vec<EventType>, gamepad: &Gamepad, deadzone: &mut Deadzone) -> ControllerInput {
     let mut controller_map_use = None;
     for controller_map in controller_maps {
-        if controller_map.name == gamepad.os_name() && controller_map.uuid == gamepad.uuid() {
+        if controller_map.name == gamepad.os_name() && controller_map.uuid == Uuid::from_bytes(gamepad.uuid()) {
             controller_map_use = Some(controller_map);
         }
     }

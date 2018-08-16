@@ -1,11 +1,8 @@
-#![feature(ord_max_min)]
-#![feature(drain_filter)]
 #![feature(nll)]
 
              extern crate backtrace;
              extern crate bincode;
              extern crate chrono;
-             extern crate crypto;
              extern crate dirs;
              extern crate enum_traits;
              extern crate env_logger;
@@ -14,7 +11,7 @@
              extern crate rand;
              extern crate reqwest;
              extern crate serde;
-             extern crate tempdir;
+             extern crate sha2;
              extern crate toml;
              extern crate treeflection;
              extern crate uuid;

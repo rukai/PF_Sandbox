@@ -1,3 +1,5 @@
+cargo-features = ["default-run"]
+
 [package]
 name = "pf_sandbox"
 version = "0.1.1"
@@ -8,6 +10,7 @@ repository = "https://github.com/rukai/pf_sandbox"
 homepage = "https://pfsandbox.net"
 keywords = ["pf", "sandbox", "platform", "fighter", "game"]
 categories = ["games", "game-engines"]
+default-run = "pf_sandbox"
 
 [dependencies]
 pf_sandbox_lib = { path = "../pf_sandbox_lib" }
@@ -16,7 +19,8 @@ chrono = { version = "0.4", features = ["serde"] }
 enum_traits = "0.3"
 enum_traits_macros = "2.0"
 getopts = "0.2"
-gilrs = "0.6"
+#gilrs = "0.7"
+gilrs = { git = "https://gitlab.com/gilrs-project/gilrs" }
 libusb = "0.3"
 log = "0.4"
 lyon = "0.11"

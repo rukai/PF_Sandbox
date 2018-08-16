@@ -3,5 +3,5 @@
 *   mingw64/mingw-w64-x86_64-pkg-config
 *   mingw64/mingw-w64-x86_64-libusb
 
-## zip->(flate->miniz-sys & bzip2) & rust-crypto
+## zip->(flate2->miniz-oxide_c_api & bzip2)
 *   mingw-w64-x86_64-gcc

@@ -32,7 +32,6 @@ pub(crate) fn upgrade_to_latest_fighter(fighter: &mut Value, file_name: &str) {
         // TODO: Display warning in window
     }
     else if fighter_engine_version < engine_version() {
-        println!("hit upgrade: {}", fighter_engine_version);
         for upgrade_from in fighter_engine_version..engine_version() {
             match upgrade_from {
                 12 => { upgrade_fighter12(fighter) }

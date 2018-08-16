@@ -3,8 +3,7 @@ use std::fs;
 use std::mem;
 use std::path::PathBuf;
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
+use sha2::{Sha256, Digest};
 use reqwest::Url;
 use reqwest::UrlError;
 use serde_json;
@@ -404,18 +403,18 @@ impl Package {
     }
 
     pub fn compute_hash(&self) -> String {
-        let mut hasher = Sha256::new();
-        hasher.input_str(serde_json::to_string(&self.rules).unwrap().as_str());
+        let mut hasher = Sha256::default();
+        hasher.input(&serde_json::to_vec(&self.rules).unwrap());
 
         for stage in self.stages.iter() {
-            hasher.input_str(serde_json::to_string(stage).unwrap().as_str());
+            hasher.input(&serde_json::to_vec(stage).unwrap());
         }
 
         for fighter in self.fighters.iter() {
-            hasher.input_str(serde_json::to_string(fighter).unwrap().as_str());
+            hasher.input(&serde_json::to_vec(fighter).unwrap());
         }
 
-        hasher.result_str().to_string()
+        hasher.result().iter().map(|x| format!("{:x}", x)).collect()
     }
 
     pub fn verify(&self) -> Verify {

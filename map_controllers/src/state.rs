@@ -47,7 +47,7 @@ impl State {
         // add gamepads that dont have an existing mapping
         for (_, gamepad) in gilrs.gamepads() {
             let name = gamepad.os_name().to_string();
-            let uuid = gamepad.uuid();
+            let uuid = Uuid::from_bytes(gamepad.uuid());
             let os = OS::get_current();
 
             let mut new = true;
