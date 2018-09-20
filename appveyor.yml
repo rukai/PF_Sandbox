@@ -2,7 +2,7 @@ environment:
   global:
     RUST_VERSION: stable
   matrix:
-    - TARGET: x86_64-pc-windows-gnu
+    - TARGET: x86_64-pc-windows-msvc
 
 image: Visual Studio 2017
 
@@ -17,9 +17,10 @@ install:
   - curl -sSf -o rustup-init.exe https://win.rustup.rs/
   - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - rustup target install x86_64-pc-windows-gnu
   - rustc -V
   - cargo -V
-  # Work around https://github.com/rust-lang/rust/issues/47048
+  # Work around https://github.com/rust-lang/rust/issues/49078
   - curl -sSf -o mingw-w64.7z https://s3-us-west-1.amazonaws.com/rust-lang-ci2/rust-ci-mirror/x86_64-6.3.0-release-posix-seh-rt_v5-rev2.7z
   - 7z x mingw-w64.7z
   - set PATH=%PATH%;C:\projects\pf-sandbox\mingw64\bin
@@ -27,19 +28,20 @@ install:
   - set PATH=%PATH%;C:\msys64\mingw64\bin # access libraries
   - set PATH=%PATH%;C:\msys64\usr\bin # access pacman
   - echo %PATH%
-  - pacman --ask 20 --noconfirm -Syu # TODO: Apparently when appveyor and/or msys fix the issue, it will break again and I will need to remove the --ask 20 
+  - pacman --noconfirm -Syu
   - pacman --noconfirm -Syu
   - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3 mingw-w64-x86_64-cmake mingw-w64-x86_64-make
 
 test_script:
-  - cargo test --release --all
-  - cargo build --release --all
+  - set PKG_CONFIG_ALLOW_CROSS=1
+  - cargo test --release --all --target x86_64-pc-windows-gnu
+  - cargo build --release --all --target x86_64-pc-windows-gnu
   - mkdir pf
-  - move target\release\pf_sandbox.exe pf
-  - move target\release\pf_tas.exe pf
-  - move target\release\pf_cli.exe pf
-  - move target\release\pf_map_controllers.exe pf
-  - move target\release\panic_handler.exe pf
+  - move target\x86_64-pc-windows-gnu\release\pf_sandbox.exe pf
+  - move target\x86_64-pc-windows-gnu\release\pf_tas.exe pf
+  - move target\x86_64-pc-windows-gnu\release\pf_cli.exe pf
+  - move target\x86_64-pc-windows-gnu\release\pf_map_controllers.exe pf
+  - move target\x86_64-pc-windows-gnu\release\panic_handler.exe pf
   - copy C:\msys64\mingw64\bin\libcairo-2.dll pf
   - copy C:\msys64\mingw64\bin\libcairo-gobject-2.dll pf
   - copy C:\msys64\mingw64\bin\libepoxy-0.dll pf

@@ -1,15 +1,18 @@
 # Setup for Windows
 
-## Workaround
+Setup for windows is a bit complicated because we use windows-msvc toolchain but crosscompile to the windows-gnu target.
+We do this because we need windows-gnu for libusb, but windows-msvc seems better supported.
 
-Currently you will need to also workaround https://github.com/rust-lang/rust/issues/47048
+## Workaround
+Currently you will need to also workaround https://github.com/rust-lang/rust/issues/49078
 
 1.  download and extract https://s3-us-west-1.amazonaws.com/rust-lang-ci2/rust-ci-mirror/x86_64-6.3.0-release-posix-seh-rt_v5-rev2.7z
 2.  add the absolute path to mingw64\bin to your PATH environment variable. (This path needs to be before the msys2 path)
 
 ## Regular steps
-Install rust via https://www.rustup.rs/
-Do a custom install with GNU compatible rust version. (Everything else default)
+Install rust via https://www.rustup.rs/ using the default settings. If you already have rustup use the msvc toolchain.
+Install [Build Tools for Visual Studio 2017](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2017)
+Run the command `rustup target install x86_64-pc-windows-gnu`
 
 Install [msys2](http://www.msys2.org/), following ALL of the instructions.
 
@@ -60,15 +63,21 @@ Need to also install one of the following packages depending on your graphics ca
 
 # Compile and run PF Sandbox
 
-run `cargo run --release` in the pf_sandbox directory.
+In the pf_sandbox directory run:
+*   for windows: `$ENV:PKG_CONFIG_ALLOW_CROSS=1; cargo run --release --target x86_64-pc-windows-gnu`
+*   for linux: `cargo run --release`
 
 # Compile and run PF TAS
 
-run `cargo run --release` in the pf_tas directory.
+In the pf_tas directory run:
+*   for windows: `$ENV:PKG_CONFIG_ALLOW_CROSS=1; cargo run --release --target x86_64-pc-windows-gnu`
+*   for linux: `cargo run --release`
 
 # Compile and run PF Controller Mapper
 
-run `cargo run --release` in the map_controllers directory.
+In the map_controllers directory run:
+*   for windows: `$ENV:PKG_CONFIG_ALLOW_CROSS=1; cargo run --release --target x86_64-pc-windows-gnu`
+*   for linux: `cargo run --release`
 
 # Setup PF CLI
 To build the CLI tool run `cargo build` in the pf_cli directory, the resulting binary is stored at `target/debug/pf_cli`.
