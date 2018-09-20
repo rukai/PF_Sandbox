@@ -21,9 +21,9 @@ env_logger = "0.5"
 gilrs = { git = "https://gitlab.com/gilrs-project/gilrs" }
 log = "0.4"
 matches = "0.1"
-os_type = "2" # TODO: This crate is unmaintained and has problems, fork it or move functionality into pf sandbox (its very small)
+os_type = "2"
 rand = "0.5"
-reqwest = { git = "https://github.com/seanmonstar/reqwest" }
+reqwest = "0.9"
 sha2 = "0.7"
 serde = "1"
 serde_derive = "1"

@@ -7,25 +7,29 @@ environment:
 image: Visual Studio 2017
 
 install:
-    # setup ssh keys
+  # setup ssh keys
   - nuget install secure-file -ExcludeVersion
   - secure-file\tools\secure-file -decrypt ssh-keys-appveyor.zip.enc -secret %ssh-keys-secret%
   - 7z x ssh-keys-appveyor.zip
   - rm -r C:/Users/appveyor/.ssh
   - mv .ssh C:/Users/appveyor/
-    # setup rust
+  # setup rust
   - curl -sSf -o rustup-init.exe https://win.rustup.rs/
   - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
   - rustc -V
   - cargo -V
+  # Work around https://github.com/rust-lang/rust/issues/47048
+  - curl -sSf -o mingw-w64.7z https://s3-us-west-1.amazonaws.com/rust-lang-ci2/rust-ci-mirror/x86_64-6.3.0-release-posix-seh-rt_v5-rev2.7z
+  - 7z x mingw-w64.7z
+  - set PATH=%PATH%;C:\projects\pf-sandbox\mingw64\bin
   # setup msys2
   - set PATH=%PATH%;C:\msys64\mingw64\bin # access libraries
   - set PATH=%PATH%;C:\msys64\usr\bin # access pacman
   - echo %PATH%
   - pacman --ask 20 --noconfirm -Syu # TODO: Apparently when appveyor and/or msys fix the issue, it will break again and I will need to remove the --ask 20 
   - pacman --noconfirm -Syu
-  - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3
+  - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3 mingw-w64-x86_64-cmake mingw-w64-x86_64-make
 
 test_script:
   - cargo test --release --all

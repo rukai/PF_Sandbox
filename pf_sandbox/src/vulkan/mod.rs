@@ -218,7 +218,8 @@ impl VulkanGraphics {
             let alpha = caps.supported_composite_alpha.iter().next().unwrap();
             let format = caps.supported_formats[0].0;
             Swapchain::new(device.clone(), surface.clone(), caps.min_image_count, format, dimensions, 1,
-                caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, PresentMode::Immediate, true, None
+                // Windows-nvidia driver doesnt support PresentMode::Immediate
+                caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, PresentMode::Fifo, true, None
             ).unwrap()
         };
 
