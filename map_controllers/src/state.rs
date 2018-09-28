@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gilrs::{Gilrs, GilrsBuilder};
+use gilrs_core::Gilrs;
 use uuid::Uuid;
 
 use pf_sandbox_lib::input::maps::{ControllerMaps, ControllerMap, OS};
@@ -24,13 +24,13 @@ pub enum Code {
 
 #[derive(Clone)]
 pub struct AnalogHistory {
-    pub min:        f32,
-    pub max:        f32,
-    pub last_value: f32,
+    pub min:        i32,
+    pub max:        i32,
+    pub last_value: i32,
 }
 
 impl AnalogHistory {
-    pub fn new(value: f32) -> AnalogHistory {
+    pub fn new(value: i32) -> AnalogHistory {
         AnalogHistory {
             min:        value,
             max:        value,
@@ -41,12 +41,13 @@ impl AnalogHistory {
 
 impl State {
     pub fn new() -> State {
-        let gilrs = GilrsBuilder::new().build().unwrap();
+        let gilrs = Gilrs::new().unwrap();
         let mut controller_maps = ControllerMaps::load();
 
         // add gamepads that dont have an existing mapping
-        for (_, gamepad) in gilrs.gamepads() {
-            let name = gamepad.os_name().to_string();
+        for i in 0..gilrs.last_gamepad_hint() {
+            let gamepad = gilrs.gamepad(i).unwrap();
+            let name = gamepad.name().to_string();
             let uuid = Uuid::from_bytes(gamepad.uuid());
             let os = OS::get_current();
 

@@ -117,7 +117,7 @@ pub struct DigitalMap {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum AnalogFilter {
     FromDigital { value: f32 }, // is value when true otherwise unchanged, starting at 0 (can stack multiple AnalogMap's in this way)
-    FromAnalog  { min: f32, max: f32, flip: bool } // map the analog value from [min, max] to [-1.0, 1.0], flipping if enabled.
+    FromAnalog  { min: i32, max: i32, flip: bool } // map the analog value from [min, max] to [-1.0, 1.0], flipping if enabled.
 }
 
 impl AnalogFilter {
@@ -125,7 +125,7 @@ impl AnalogFilter {
         AnalogFilter::FromDigital { value: 1.0 }
     }
     pub fn default_analog() -> AnalogFilter {
-        AnalogFilter::FromAnalog { min: -1.0, max: 1.0, flip: false }
+        AnalogFilter::FromAnalog { min: -1, max: 1, flip: false }
     }
 
     pub fn is_digital_source(&self) -> bool {
@@ -135,14 +135,14 @@ impl AnalogFilter {
         }
     }
 
-    pub fn set_min(&mut self, new_min: f32) {
+    pub fn set_min(&mut self, new_min: i32) {
         match self {
             &mut AnalogFilter::FromAnalog { ref mut min, .. } => { *min = new_min }
             &mut AnalogFilter::FromDigital { .. } => unreachable!()
         }
     }
 
-    pub fn set_max(&mut self, new_max: f32) {
+    pub fn set_max(&mut self, new_max: i32) {
         match self {
             &mut AnalogFilter::FromAnalog { ref mut max, .. } => { *max = new_max }
             &mut AnalogFilter::FromDigital { .. } => unreachable!()
@@ -167,7 +167,7 @@ impl AnalogFilter {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum DigitalFilter {
     FromDigital,
-    FromAnalog { min: f32, max: f32 } // true if between min and max false otherwise
+    FromAnalog { min: i32, max: i32 } // true if between min and max false otherwise
 }
 
 impl DigitalFilter {
@@ -176,7 +176,7 @@ impl DigitalFilter {
     }
 
     pub fn default_analog() -> DigitalFilter {
-        DigitalFilter::FromAnalog { min: 0.5, max: 1.0 }
+        DigitalFilter::FromAnalog { min: 1, max: 2 }
     }
 
     pub fn is_digital_source(&self) -> bool {
@@ -186,14 +186,14 @@ impl DigitalFilter {
         }
     }
 
-    pub fn set_min(&mut self, new_min: f32) {
+    pub fn set_min(&mut self, new_min: i32) {
         match self {
             &mut DigitalFilter::FromAnalog { ref mut min, .. } => { *min = new_min }
             &mut DigitalFilter::FromDigital => unreachable!()
         }
     }
 
-    pub fn set_max(&mut self, new_max: f32) {
+    pub fn set_max(&mut self, new_max: i32) {
         match self {
             &mut DigitalFilter::FromAnalog { ref mut max, .. } => { *max = new_max }
             &mut DigitalFilter::FromDigital => unreachable!()

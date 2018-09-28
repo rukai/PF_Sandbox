@@ -2,7 +2,7 @@
 
              extern crate gdk;
              extern crate gtk;
-             extern crate gilrs;
+             extern crate gilrs_core;
              extern crate serde_json;
              extern crate uuid;
 #[macro_use] extern crate pf_sandbox_lib;
@@ -27,8 +27,7 @@ use gtk::{
     Window,
     WindowType,
 };
-use gilrs::EventType;
-use gilrs::ev::Button as EvButton;
+use gilrs_core::EventType;
 
 use pf_sandbox_lib::input;
 use pf_sandbox_lib::input::maps::{
@@ -161,8 +160,9 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
         if only_plugged_in.get_active() {
             for map in state.controller_maps.maps.iter() {
                 let mut add = false;
-                for (_, gamepad) in state.gilrs.gamepads() {
-                    if gamepad.os_name() == map.name && Uuid::from_bytes(gamepad.uuid()) == map.uuid && OS::get_current() == map.os {
+                for i in 0..state.gilrs.last_gamepad_hint() {
+                    let gamepad = state.gilrs.gamepad(i).unwrap();
+                    if gamepad.name() == map.name && Uuid::from_bytes(gamepad.uuid()) == map.uuid && OS::get_current() == map.os {
                         add = true;
                     }
                 }
@@ -207,18 +207,11 @@ fn input_management_hbox(state: Rc<RwLock<State>>) -> Box {
         let mut state = state.write().unwrap();
         while let Some(ev) = state.gilrs.next_event() {
             match ev.event {
-                EventType::ButtonPressed (button, code) => {
-                    // gilrs creates button press events for some analog trigger value, hopefully this is the correct way to ignore on all controllers + os's
-                    match button {
-                        EvButton::LeftTrigger2 | EvButton::RightTrigger2 => { }
-                        _ => {
-                            state.last_code = Code::Digital(input::code_to_usize(&code));
-                            label.set_text(format!("Digital: {}", code).as_ref());
-                        }
-                    }
+                EventType::ButtonPressed (code) => {
+                    state.last_code = Code::Digital(input::code_to_usize(&code));
+                    label.set_text(format!("Digital: {}", code).as_ref());
                 }
-                EventType::AxisChanged (_, value, code) |
-                EventType::ButtonChanged (_, value, code) => {
+                EventType::AxisValueChanged (value, code) => {
                     let code = input::code_to_usize(&code);
                     let new_history = match state.analog_history.get(&code).cloned() {
                         Some(mut history) => {

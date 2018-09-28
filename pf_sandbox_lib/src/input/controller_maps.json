@@ -2,211 +2,17 @@
   "engine_version": 9,
   "maps": [
     {
-      "os": "Windows",
-      "uuid": "00000000-0000-0000-0000-000000000000",
-      "name": "Xbox Controller",
-      "analog_maps": [
-        {
-          "source": 0,
-          "dest": "StickX",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 1,
-          "dest": "StickY",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 3,
-          "dest": "CStickX",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 4,
-          "dest": "CStickY",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 10,
-          "dest": "RTrigger",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.004444444,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 11,
-          "dest": "LTrigger",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.004444444,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        }
-      ],
-      "digital_maps": [
-        {
-          "source": 0,
-          "dest": "A",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 4,
-          "dest": "B",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 1,
-          "dest": "X",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 3,
-          "dest": "Y",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 15,
-          "dest": "Up",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 16,
-          "dest": "Down",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 17,
-          "dest": "Left",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 18,
-          "dest": "Right",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 11,
-          "dest": "Start",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 6,
-          "dest": "Z",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 7,
-          "dest": "Z",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 11,
-          "dest": "L",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.97,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 10,
-          "dest": "R",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.97,
-              "max": 1.0
-            }
-          }
-        }
-      ]
-    },
-    {
       "os": "Linux",
       "uuid": "03000000-5e04-0000-d102-000001010000",
       "name": "Microsoft X-Box One pad",
       "analog_maps": [
         {
-          "source": 0,
-          "dest": "StickX",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 1,
-          "dest": "StickY",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 3,
-          "dest": "CStickX",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 4,
-          "dest": "CStickY",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
           "source": 2,
           "dest": "LTrigger",
           "filter": {
             "FromAnalog": {
-              "min": 0.0019550342,
-              "max": 1.0,
+              "min": 0,
+              "max": 1023,
               "flip": false
             }
           }
@@ -216,14 +22,138 @@
           "dest": "RTrigger",
           "filter": {
             "FromAnalog": {
-              "min": 0.0019550342,
-              "max": 1.0,
+              "min": 0,
+              "max": 1023,
               "flip": false
+            }
+          }
+        },
+        {
+          "source": 0,
+          "dest": "StickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -32768,
+              "max": 32767,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 1,
+          "dest": "StickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -32768,
+              "max": 32767,
+              "flip": true
+            }
+          }
+        },
+        {
+          "source": 3,
+          "dest": "CStickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -32768,
+              "max": 32767,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 4,
+          "dest": "CStickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -32768,
+              "max": 32767,
+              "flip": true
             }
           }
         }
       ],
       "digital_maps": [
+        {
+          "source": 315,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 314,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 310,
+          "dest": "L",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 311,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 2,
+          "dest": "L",
+          "filter": {
+            "FromAnalog": {
+              "min": 900,
+              "max": 1023
+            }
+          }
+        },
+        {
+          "source": 5,
+          "dest": "R",
+          "filter": {
+            "FromAnalog": {
+              "min": 900,
+              "max": 1023
+            }
+          }
+        },
+        {
+          "source": 16,
+          "dest": "Left",
+          "filter": {
+            "FromAnalog": {
+              "min": -1,
+              "max": -1
+            }
+          }
+        },
+        {
+          "source": 16,
+          "dest": "Right",
+          "filter": {
+            "FromAnalog": {
+              "min": 1,
+              "max": 1
+            }
+          }
+        },
+        {
+          "source": 17,
+          "dest": "Up",
+          "filter": {
+            "FromAnalog": {
+              "min": -1,
+              "max": -1
+            }
+          }
+        },
+        {
+          "source": 17,
+          "dest": "Down",
+          "filter": {
+            "FromAnalog": {
+              "min": 1,
+              "max": 1
+            }
+          }
+        },
         {
           "source": 304,
           "dest": "A",
@@ -243,317 +173,6 @@
           "source": 308,
           "dest": "Y",
           "filter": "FromDigital"
-        },
-        {
-          "source": 310,
-          "dest": "Z",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 311,
-          "dest": "Z",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 315,
-          "dest": "Start",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 314,
-          "dest": "Start",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 316,
-          "dest": "Start",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 16,
-          "dest": "Left",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": -0.5
-            }
-          }
-        },
-        {
-          "source": 16,
-          "dest": "Right",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 17,
-          "dest": "Up",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 17,
-          "dest": "Down",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": -0.5
-            }
-          }
-        },
-        {
-          "source": 2,
-          "dest": "L",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.97,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 5,
-          "dest": "R",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.97,
-              "max": 1.0
-            }
-          }
-        }
-      ]
-    },
-    {
-      "os": "Linux",
-      "uuid": "03000000-8305-0000-6020-000010010000",
-      "name": "USB,2-axis 8-button gamepad  ",
-      "analog_maps": [
-        {
-          "source": 0,
-          "dest": "StickX",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 1,
-          "dest": "StickY",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        }
-      ],
-      "digital_maps": [
-        {
-          "source": 291,
-          "dest": "B",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 289,
-          "dest": "A",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 288,
-          "dest": "X",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 292,
-          "dest": "L",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 293,
-          "dest": "R",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 290,
-          "dest": "Z",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 295,
-          "dest": "Start",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 294,
-          "dest": "Up",
-          "filter": "FromDigital"
-        }
-      ]
-    },
-    {
-      "os": "Linux",
-      "uuid": "03000000-5e04-0000-8e02-000014010000",
-      "name": "Microsoft X-Box 360 pad",
-      "analog_maps": [
-        {
-          "source": 0,
-          "dest": "StickX",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 1,
-          "dest": "StickY",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 3,
-          "dest": "CStickX",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 4,
-          "dest": "CStickY",
-          "filter": {
-            "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 2,
-          "dest": "LTrigger",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.003921569,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        },
-        {
-          "source": 5,
-          "dest": "RTrigger",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.003921569,
-              "max": 1.0,
-              "flip": false
-            }
-          }
-        }
-      ],
-      "digital_maps": [
-        {
-          "source": 304,
-          "dest": "A",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 307,
-          "dest": "B",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 305,
-          "dest": "X",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 308,
-          "dest": "Y",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 315,
-          "dest": "Start",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 314,
-          "dest": "Start",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 546,
-          "dest": "Left",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 547,
-          "dest": "Right",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 544,
-          "dest": "Up",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 545,
-          "dest": "Down",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 310,
-          "dest": "Z",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 311,
-          "dest": "Z",
-          "filter": "FromDigital"
-        },
-        {
-          "source": 2,
-          "dest": "R",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.97,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 5,
-          "dest": "L",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.97,
-              "max": 1.0
-            }
-          }
         }
       ]
     },
@@ -567,8 +186,8 @@
           "dest": "StickX",
           "filter": {
             "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
+              "min": -1,
+              "max": 1,
               "flip": false
             }
           }
@@ -578,8 +197,8 @@
           "dest": "StickY",
           "filter": {
             "FromAnalog": {
-              "min": -1.0,
-              "max": 1.0,
+              "min": -1,
+              "max": 1,
               "flip": true
             }
           }
@@ -587,72 +206,22 @@
       ],
       "digital_maps": [
         {
-          "source": 313,
-          "dest": "Start",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.0,
-              "max": 1.0
-            }
-          }
+          "source": 305,
+          "dest": "B",
+          "filter": "FromDigital"
         },
         {
           "source": 306,
           "dest": "A",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 305,
-          "dest": "B",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
-            }
-          }
+          "filter": "FromDigital"
         },
         {
           "source": 4,
           "dest": "X",
           "filter": {
             "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 304,
-          "dest": "L",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 312,
-          "dest": "Up",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
-            }
-          }
-        },
-        {
-          "source": 307,
-          "dest": "Y",
-          "filter": {
-            "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
+              "min": 255,
+              "max": 255
             }
           }
         },
@@ -661,18 +230,188 @@
           "dest": "Z",
           "filter": {
             "FromAnalog": {
-              "min": 0.0,
-              "max": 1.0
+              "min": 255,
+              "max": 255
             }
           }
         },
         {
+          "source": 304,
+          "dest": "L",
+          "filter": "FromDigital"
+        },
+        {
           "source": 309,
+          "dest": "R",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 307,
+          "dest": "Y",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 312,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 313,
+          "dest": "Start",
+          "filter": "FromDigital"
+        }
+      ]
+    },
+    {
+      "os": "Windows",
+      "uuid": "00000000-0000-0000-0000-000000000000",
+      "name": "Xbox Controller",
+      "analog_maps": [
+        {
+          "source": 0,
+          "dest": "StickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -32768,
+              "max": 32767,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 1,
+          "dest": "StickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -32768,
+              "max": 32767,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 3,
+          "dest": "CStickX",
+          "filter": {
+            "FromAnalog": {
+              "min": -32768,
+              "max": 32767,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 4,
+          "dest": "CStickY",
+          "filter": {
+            "FromAnalog": {
+              "min": -32768,
+              "max": 32767,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 11,
+          "dest": "LTrigger",
+          "filter": {
+            "FromAnalog": {
+              "min": 0,
+              "max": 255,
+              "flip": false
+            }
+          }
+        },
+        {
+          "source": 10,
+          "dest": "RTrigger",
+          "filter": {
+            "FromAnalog": {
+              "min": 0,
+              "max": 255,
+              "flip": false
+            }
+          }
+        }
+      ],
+      "digital_maps": [
+        {
+          "source": 27,
+          "dest": "Up",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 28,
+          "dest": "Down",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 29,
+          "dest": "Left",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 30,
+          "dest": "Right",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 22,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 23,
+          "dest": "Start",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 19,
+          "dest": "Z",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 18,
+          "dest": "L",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 13,
+          "dest": "X",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 12,
+          "dest": "A",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 16,
+          "dest": "B",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 15,
+          "dest": "Y",
+          "filter": "FromDigital"
+        },
+        {
+          "source": 11,
+          "dest": "L",
+          "filter": {
+            "FromAnalog": {
+              "min": 200,
+              "max": 255
+            }
+          }
+        },
+        {
+          "source": 10,
           "dest": "R",
           "filter": {
             "FromAnalog": {
-              "min": 0.5,
-              "max": 1.0
+              "min": 200,
+              "max": 255
             }
           }
         }

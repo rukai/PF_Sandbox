@@ -6,7 +6,7 @@
              extern crate dirs;
              extern crate enum_traits;
              extern crate env_logger;
-             extern crate gilrs;
+             extern crate gilrs_core;
              extern crate os_type;
              extern crate rand;
              extern crate reqwest;

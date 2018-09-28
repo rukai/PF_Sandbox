@@ -7,7 +7,7 @@
              extern crate chrono;
              extern crate enum_traits;
              extern crate getopts;
-             extern crate gilrs;
+             extern crate gilrs_core;
              extern crate libusb;
              extern crate lyon;
              extern crate rand;

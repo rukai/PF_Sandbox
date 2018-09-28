@@ -1,6 +1,6 @@
 /// The contents of this module should really be in pf_sandbox_lib::input
 /// However that would mean adding libusb as a dep to pf_sandbox_lib
-/// So I wont move this code into pf_sandbox_lib until libusb takes has no external dependencies to setup.
+/// So I wont move this code into pf_sandbox_lib until libusb has no external dependencies to setup.
 
 use pf_sandbox_lib::input as pf_sandbox_lib_input;
 use pf_sandbox_lib::input::{
@@ -15,7 +15,7 @@ use pf_sandbox_lib::input::{
 
 use std::time::Duration;
 
-use gilrs::{Gilrs, GilrsBuilder, Event};
+use gilrs_core::{Gilrs, Event};
 use libusb::{Context, Device, DeviceHandle, Error};
 
 use pf_sandbox_lib::network::{Netplay, NetplayState};
@@ -78,7 +78,7 @@ impl<'a> Input<'a> {
             input_sources.push(InputSource::GCAdapter { handle, deadzones: Deadzone::empty4() });
         }
 
-        let gilrs = GilrsBuilder::new().build().unwrap();
+        let gilrs = Gilrs::new().unwrap();
 
         let controller_maps = ControllerMaps::load();
 
@@ -136,13 +136,13 @@ impl<'a> Input<'a> {
 
         self.events.clear();
         while let Some(ev) = self.gilrs.next_event() {
-            self.gilrs.update(&ev); // TODO: If we dont call this then we dont get a 0.0 value on the triggers, investigate // TODO: Investigate effects of removing, (was changed in 0.6.0)
             self.events.push(ev);
         }
         self.events.sort_by_key(|x| x.time);
 
         // find new generic controllers
-        for (index, gamepad) in self.gilrs.gamepads() {
+        for index in 0..self.gilrs.last_gamepad_hint() {
+            let gamepad = self.gilrs.gamepad(index).unwrap();
             let mut exists = false;
             for source in &self.input_sources {
                 if let &InputSource::GenericController { index: check_index, .. } = source {
@@ -153,8 +153,9 @@ impl<'a> Input<'a> {
             }
 
             // Force users to use native GC->Wii U input
-            if !exists && gamepad.os_name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
-                self.input_sources.push(InputSource::GenericController { index, state: ControllerInput::default(), deadzone: Deadzone::empty() });
+            if !exists && gamepad.name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
+                let state = ControllerInput { plugged_in: true, .. ControllerInput::default() };
+                self.input_sources.push(InputSource::GenericController { index, state, deadzone: Deadzone::empty() });
             }
         }
 
@@ -167,7 +168,7 @@ impl<'a> Input<'a> {
 
                 &mut InputSource::GenericController { index, ref mut state, ref mut deadzone } => {
                     let events = self.events.iter().filter(|x| x.id == index).map(|x| &x.event).cloned().collect();
-                    let gamepad = &self.gilrs[index]; // TODO: different index
+                    let gamepad = &self.gilrs.gamepad(index).unwrap(); // TODO: Handle None
                     let maps = &self.controller_maps.maps;
                     inputs.push(pf_sandbox_lib_input::read_generic(maps, state, events, gamepad, deadzone));
                 }

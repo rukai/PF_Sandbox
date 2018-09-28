@@ -3,8 +3,7 @@ pub mod maps;
 use std::ops::Index;
 use std::f32;
 
-use gilrs::ev::Code;
-use gilrs::{Gamepad, EventType};
+use gilrs_core::{EvCode, Gamepad, EventType};
 use uuid::Uuid;
 use treeflection::{Node, NodeRunner, NodeToken};
 
@@ -128,7 +127,7 @@ impl PlayerInput {
 // *   8 bytes  - code
 
 // On linux we only need the code so we strip out the kind, so the numbers are nicer to work with (when creating maps)
-pub fn code_to_usize(code: &Code) -> usize {
+pub fn code_to_usize(code: &EvCode) -> usize {
     (code.into_u32() & 0xFFFF) as usize
 }
 
@@ -136,7 +135,7 @@ pub fn code_to_usize(code: &Code) -> usize {
 pub fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInput, events: Vec<EventType>, gamepad: &Gamepad, deadzone: &mut Deadzone) -> ControllerInput {
     let mut controller_map_use = None;
     for controller_map in controller_maps {
-        if controller_map.name == gamepad.os_name() && controller_map.uuid == Uuid::from_bytes(gamepad.uuid()) {
+        if controller_map.name == gamepad.name() && controller_map.uuid == Uuid::from_bytes(gamepad.uuid()) {
             controller_map_use = Some(controller_map);
         }
     }
@@ -147,7 +146,7 @@ pub fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInp
             match event {
                 // TODO: better handle multiple sources pointing to the same destination
                 // maybe keep a unique ControllerInput state for each source input
-                EventType::ButtonPressed (_, code) => {
+                EventType::ButtonPressed (code) => {
                     for map in &controller_map.analog_maps {
                         if let AnalogFilter::FromDigital { value } = map.filter {
                             if map.source == code_to_usize(&code) {
@@ -158,13 +157,13 @@ pub fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInp
 
                     for map in &controller_map.digital_maps {
                         if let DigitalFilter::FromDigital = map.filter {
-                            if map.source == code_to_usize(&code){
+                            if map.source == code_to_usize(&code) {
                                 state.set_digital_dest(map.dest.clone(), true);
                             }
                         };
                     }
                 }
-                EventType::ButtonReleased (_, code) => {
+                EventType::ButtonReleased (code) => {
                     for map in &controller_map.analog_maps {
                         if let AnalogFilter::FromDigital { .. } = map.filter {
                             if map.source == code_to_usize(&code) {
@@ -181,14 +180,11 @@ pub fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInp
                         };
                     }
                 }
-                EventType::AxisChanged (_, value, code) |
-                EventType::ButtonChanged (_, value, code) => {
+                EventType::AxisValueChanged (value, code) => {
                     for map in &controller_map.analog_maps {
                         if let AnalogFilter::FromAnalog { min, max, flip } = map.filter {
-                            let mut new_value = value;
-
                             // Implemented as per https://stackoverflow.com/questions/345187/math-mapping-numbers
-                            new_value = (new_value-min)/(max-min) * 2.0 - 1.0;
+                            let mut new_value = ((value-min) as f32) / ((max-min) as f32) * 2.0 - 1.0;
 
                             new_value *= if flip { -1.0 } else { 1.0 };
 
@@ -221,7 +217,6 @@ pub fn read_generic(controller_maps: &[ControllerMap], state: &mut ControllerInp
                 EventType::Disconnected => {
                     state.plugged_in = false;
                 }
-                _ => { }
             }
         }
 
