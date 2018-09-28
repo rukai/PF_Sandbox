@@ -31,7 +31,7 @@ TODO
 Install rust via https://www.rustup.rs/ (Use the default settings)
 
 ```
-sudo apt-get install libssl-dev libusb-1.0-0-dev pkg-config cmake libvulkan-dev vulkan-utils libudev-dev
+sudo apt-get install build-essential libssl-dev libusb-1.0-0-dev pkg-config cmake libvulkan-dev vulkan-utils libudev-dev
 ```
 
 Need to also install one of the following packages depending on your graphics card:
@@ -52,8 +52,7 @@ EndSection
 # Setup for Arch
 
 ```
-sudo pacman -Syu rustup gcc libusb cmake vulkan-icd-loader
-rustup default stable
+sudo pacman -Syu rustup gcc make python libusb cmake vulkan-icd-loader
 ```
 
 Need to also install one of the following packages depending on your graphics card:

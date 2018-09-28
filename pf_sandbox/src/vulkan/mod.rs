@@ -219,6 +219,7 @@ impl VulkanGraphics {
             let format = caps.supported_formats[0].0;
             Swapchain::new(device.clone(), surface.clone(), caps.min_image_count, format, dimensions, 1,
                 // Windows-nvidia driver doesnt support PresentMode::Immediate
+                // linux-intel driver has rendering bugs on PresentMode:Fifo
                 caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, PresentMode::Fifo, true, None
             ).unwrap()
         };
