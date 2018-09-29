@@ -7,9 +7,9 @@ layout(location = 0) out float v_edge;
 layout(location = 1) out uint v_render_id;
 
 layout(set = 0, binding = 0) uniform Data {
-    vec4  edge_color;
-    vec4  color;
-    mat4  transformation;
+    vec4 edge_color;
+    vec4 color;
+    mat4 transformation;
 } uniforms;
 
 void main() {

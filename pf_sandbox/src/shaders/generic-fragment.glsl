@@ -5,9 +5,9 @@ layout(location = 1) flat in uint v_render_id;
 layout(location = 0) out vec4 f_color;
 
 layout(set = 0, binding = 0) uniform Data {
-    vec4  edge_color;
-    vec4  color;
-    mat3  transformation;
+    vec4 edge_color;
+    vec4 color;
+    mat3 transformation;
 } uniforms;
 
 void main() {
