@@ -217,11 +217,20 @@ impl VulkanGraphics {
             let dimensions = caps.current_extent.unwrap_or([640, 480]);
             let alpha = caps.supported_composite_alpha.iter().next().unwrap();
             let format = caps.supported_formats[0].0;
+
+            // Windows-nvidia driver doesnt support PresentMode::Immediate
+            // linux-intel driver has rendering bugs on PresentMode:Fifo
+            // Linux-nvidia will gain significant latency (multiple seconds) after a while of usage on PresentMode::Fifo
+            let present_mode = if caps.present_modes.supports(PresentMode::Immediate) {
+                PresentMode::Immediate
+            } else if caps.present_modes.supports(PresentMode::Mailbox) {
+                PresentMode::Mailbox
+            } else {
+                PresentMode::Fifo // guaranteed to be supported
+            };
+
             Swapchain::new(device.clone(), surface.clone(), caps.min_image_count, format, dimensions, 1,
-                // Windows-nvidia driver doesnt support PresentMode::Immediate
-                // linux-intel driver has rendering bugs on PresentMode:Fifo
-                // Linux-nvidia will gain significant latency (multiple seconds) after a while of usage on PresentMode::Fifo
-                caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, PresentMode::Fifo, true, None
+                caps.supported_usage_flags, &queue, SurfaceTransform::Identity, alpha, present_mode, true, None
             ).unwrap()
         };
 
