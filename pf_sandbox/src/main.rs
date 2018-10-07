@@ -38,8 +38,7 @@ pub(crate) mod results;
 #[macro_use]
 extern crate vulkano;
 #[cfg(feature = "vulkan")]
-#[macro_use]
-extern crate vulkano_shader_derive;
+extern crate vulkano_shaders;
 #[cfg(feature = "vulkan")]
 extern crate vulkano_win;
 #[cfg(feature = "vulkan")]

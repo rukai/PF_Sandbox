@@ -24,7 +24,7 @@ use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder};
 use vulkano::descriptor::descriptor_set::{PersistentDescriptorSet, DescriptorSet};
 use vulkano::descriptor::pipeline_layout::PipelineLayoutAbstract;
-use vulkano::device::{Device, Queue};
+use vulkano::device::{Device, Queue, DeviceExtensions};
 use vulkano::format::{Format, ClearValue};
 use vulkano::framebuffer::{Framebuffer, FramebufferAbstract, Subpass, RenderPassAbstract};
 use vulkano::image::SwapchainImage;
@@ -37,6 +37,7 @@ use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::swapchain::{Surface, Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
+use vulkano_shaders::vulkano_shader;
 use vulkano_text::{DrawText, DrawTextTrait};
 use winit::{Window, Event, WindowEvent, WindowBuilder, EventsLoop};
 
@@ -49,36 +50,28 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread;
 use std::time::{Duration, Instant};
 
-mod vs {
-    #[derive(VulkanoShader)]
-    #[ty = "vertex"]
-    #[path = "src/shaders/generic-vertex.glsl"]
-    #[allow(dead_code)]
-    struct Dummy;
+vulkano_shader!{
+    mod_name: vs,
+    ty: "vertex",
+    path: "src/shaders/generic-vertex.glsl"
 }
 
-mod fs {
-    #[derive(VulkanoShader)]
-    #[ty = "fragment"]
-    #[path = "src/shaders/generic-fragment.glsl"]
-    #[allow(dead_code)]
-    struct Dummy;
+vulkano_shader!{
+    mod_name: fs,
+    ty: "fragment",
+    path: "src/shaders/generic-fragment.glsl"
 }
 
-mod surface_vs {
-    #[derive(VulkanoShader)]
-    #[ty = "vertex"]
-    #[path = "src/shaders/surface-vertex.glsl"]
-    #[allow(dead_code)]
-    struct Dummy;
+vulkano_shader!{
+    mod_name: surface_vs,
+    ty: "vertex",
+    path: "src/shaders/surface-vertex.glsl"
 }
 
-mod surface_fs {
-    #[derive(VulkanoShader)]
-    #[ty = "fragment"]
-    #[path = "src/shaders/surface-fragment.glsl"]
-    #[allow(dead_code)]
-    struct Dummy;
+vulkano_shader!{
+    mod_name: surface_fs,
+    ty: "fragment",
+    path: "src/shaders/surface-fragment.glsl"
 }
 
 /// Returns a list of physical devices, ordered from most preferred to least preferred
@@ -196,10 +189,7 @@ impl VulkanGraphics {
         }).unwrap();
 
         let (device, mut queues) = {
-            let device_ext = vulkano::device::DeviceExtensions {
-                khr_swapchain: true,
-                .. vulkano::device::DeviceExtensions::none()
-            };
+            let device_ext = DeviceExtensions { khr_swapchain: true, .. DeviceExtensions::none() };
             Device::new(physical_device, physical_device.supported_features(), &device_ext, [(queue, 0.5)].iter().cloned()).unwrap()
         };
 

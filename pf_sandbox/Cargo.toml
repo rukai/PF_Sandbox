@@ -19,7 +19,7 @@ chrono = { version = "0.4", features = ["serde"] }
 enum_traits = "0.3"
 enum_traits_macros = "2.0"
 getopts = "0.2"
-gilrs-core = { git = "https://gitlab.com/gilrs-project/gilrs-core" }
+gilrs-core = { git = "https://gitlab.com/gilrs-project/gilrs" }
 libusb = "0.3"
 log = "0.4"
 lyon = "0.11"
@@ -31,12 +31,12 @@ treeflection = "0.1"
 treeflection_derive = "0.3"
 winit = "0.17" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 
-vulkano = { version = "0.10", optional = true }
-vulkano-win = { version = "0.10", optional = true }
-vulkano-shader-derive = { version = "0.10", optional = true }
-vulkano_text = { version = "0.8", optional = true }
+vulkano = { git = "https://github.com/rukai/vulkano", branch = "proc_macro_2_0", optional = true }
+vulkano-win = { git = "https://github.com/rukai/vulkano", branch = "proc_macro_2_0", optional = true }
+vulkano-shaders = { git = "https://github.com/rukai/vulkano", branch = "proc_macro_2_0", optional = true }
+vulkano_text = { git = "https://github.com/rukai/vulkano-text", branch = "0.9", optional = true }
 cgmath = { version = "0.16", optional = true }
 
 [features]
 default = ["vulkan"]
-vulkan = ["vulkano", "vulkano-win", "vulkano-shader-derive", "vulkano_text", "cgmath"]
+vulkan = ["vulkano", "vulkano-win", "vulkano-shaders", "vulkano_text", "cgmath"]
