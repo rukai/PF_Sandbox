@@ -162,7 +162,7 @@ fn controller_select_hbox(state: Rc<RwLock<State>>, inputs_vbox: Box) -> Box {
                 let mut add = false;
                 for i in 0..state.gilrs.last_gamepad_hint() {
                     let gamepad = state.gilrs.gamepad(i).unwrap();
-                    if gamepad.name() == map.name && Uuid::from_bytes(gamepad.uuid()) == map.uuid && OS::get_current() == map.os {
+                    if gamepad.is_connected() && gamepad.name() == map.name && Uuid::from_bytes(gamepad.uuid()) == map.uuid && OS::get_current() == map.os {
                         add = true;
                     }
                 }

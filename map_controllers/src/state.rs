@@ -58,7 +58,7 @@ impl State {
                 }
             }
 
-            if new {
+            if new && gamepad.is_connected() {
                 controller_maps.maps.push(ControllerMap {
                     analog_maps:  vec!(),
                     digital_maps: vec!(),

@@ -143,19 +143,21 @@ impl<'a> Input<'a> {
         // find new generic controllers
         for index in 0..self.gilrs.last_gamepad_hint() {
             let gamepad = self.gilrs.gamepad(index).unwrap();
-            let mut exists = false;
-            for source in &self.input_sources {
-                if let &InputSource::GenericController { index: check_index, .. } = source {
-                    if index == check_index {
-                        exists = true;
+            if gamepad.is_connected() {
+                let mut exists = false;
+                for source in &self.input_sources {
+                    if let &InputSource::GenericController { index: check_index, .. } = source {
+                        if index == check_index {
+                            exists = true;
+                        }
                     }
                 }
-            }
 
-            // Force users to use native GC->Wii U input
-            if !exists && gamepad.name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
-                let state = ControllerInput { plugged_in: true, .. ControllerInput::default() };
-                self.input_sources.push(InputSource::GenericController { index, state, deadzone: Deadzone::empty() });
+                // Force users to use native GC->Wii U input
+                if !exists && gamepad.name() != "mayflash limited MAYFLASH GameCube Controller Adapter" {
+                    let state = ControllerInput { plugged_in: true, .. ControllerInput::default() };
+                    self.input_sources.push(InputSource::GenericController { index, state, deadzone: Deadzone::empty() });
+                }
             }
         }
 
@@ -168,7 +170,7 @@ impl<'a> Input<'a> {
 
                 &mut InputSource::GenericController { index, ref mut state, ref mut deadzone } => {
                     let events = self.events.iter().filter(|x| x.id == index).map(|x| &x.event).cloned().collect();
-                    let gamepad = &self.gilrs.gamepad(index).unwrap(); // TODO: Handle None
+                    let gamepad = &self.gilrs.gamepad(index).unwrap(); // Old gamepads stick around forever so its fine to unwrap.
                     let maps = &self.controller_maps.maps;
                     inputs.push(pf_sandbox_lib_input::read_generic(maps, state, events, gamepad, deadzone));
                 }
@@ -194,7 +196,7 @@ impl<'a> Input<'a> {
             }
         }
 
-        self.prev_start     = self.current_inputs.iter().any(|x| x.start);
+        self.prev_start = self.current_inputs.iter().any(|x| x.start);
         self.current_inputs = inputs;
 
         debug!("step");
