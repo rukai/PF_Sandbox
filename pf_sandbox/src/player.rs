@@ -768,7 +768,7 @@ impl Player {
                 Action::ShieldBreakFall  => self.shield_break_fall_action(context.fighter),
                 Action::ShieldBreakGetup => self.shield_break_getup_action(),
                 Action::Stun             => self.stun_action(context),
-                _ => { },
+                _ => { }
             }
         }
     }
@@ -1776,7 +1776,7 @@ impl Player {
 
     fn action_expired(&mut self, context: &mut StepContext) {
         match Action::from_index(self.action) {
-            None => { panic!("Custom defined action expirations have not been implemented"); },
+            None => panic!("Custom defined action expirations have not been implemented"),
 
             // Idle
             Some(Action::Spawn)          => self.set_action(context, Action::SpawnIdle),
@@ -1825,7 +1825,7 @@ impl Player {
             Some(Action::LedgeGrab) => {
                 self.set_action(context, Action::LedgeIdle);
                 self.ledge_idle_timer = 0;
-            },
+            }
             Some(Action::JumpSquat) => {
                 self.set_airbourne(context);
                 if let &mut Location::Airbourne { ref mut y, .. } = &mut self.location {
@@ -1857,7 +1857,7 @@ impl Player {
                 else {
                     self.set_action(context, Action::JumpB);
                 }
-            },
+            }
 
             // Defense
             Some(Action::PowerShield)      => if context.fighter.shield.is_some() { self.set_action(context,Action::Shield) } else { self.set_action(context,Action::Idle) },

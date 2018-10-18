@@ -68,9 +68,7 @@ impl Camera {
             // initialise cam_area using only the first player
             let mut player_iter = players.iter();
             let mut cam_area = match player_iter.next() {
-                Some(player) => {
-                    player.cam_area(&stage.camera, players, fighters, &stage.surfaces)
-                },
+                Some(player) => player.cam_area(&stage.camera, players, fighters, &stage.surfaces),
                 None => {
                     self.pan = (0.0, 0.0);
                     self.zoom = 100.0;

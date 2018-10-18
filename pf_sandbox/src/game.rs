@@ -466,8 +466,8 @@ impl Game {
                                 let point = (player.relative_f(m_x - p_x), m_y - p_y);
                                 let new_colbox = CollisionBox::new(point);
                                 let link_type = match os_input.held_shift() {
-                                    true  => { LinkType::Simple },
-                                    false => { LinkType::MeldFirst }
+                                    true  => LinkType::Simple,
+                                    false => LinkType::MeldFirst
                                 };
 
                                 self.package.append_fighter_colbox(fighter, action, frame, new_colbox, &self.selector.colboxes, link_type)
@@ -1158,11 +1158,11 @@ impl Game {
                             selected_colboxes = self.selector.colboxes.clone();
                             fighter_selected = true;
                         }
-                    },
+                    }
                     Edit::Player (player) => {
                         player_selected = player == i;
-                    },
-                    _ => { },
+                    }
+                    _ => { }
                 }
             }
 

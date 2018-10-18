@@ -61,8 +61,8 @@ impl<'a> Input<'a> {
                                         adapter_handles.push(handle);
                                         println!("GC adapter: Setup complete");
                                     }
-                                },
-                                Err(e) => { println!("GC adapter: Failed to claim interface: {}", e) }
+                                }
+                                Err(e) => println!("GC adapter: Failed to claim interface: {}", e)
                             }
                         }
                         Err(e) => {

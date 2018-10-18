@@ -18,7 +18,6 @@ use cgmath::{Matrix4, Vector3, Rad};
 use rand::{StdRng, Rng, SeedableRng};
 use vulkano_win;
 use vulkano_win::VkSurfaceBuild;
-use vulkano;
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder};
@@ -35,7 +34,9 @@ use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::depth_stencil::{DepthStencil, DepthBounds, Compare};
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
+use vulkano::swapchain;
 use vulkano::swapchain::{Surface, Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
+use vulkano::sync;
 use vulkano::sync::{GpuFuture, FlushError};
 use vulkano_shaders::vulkano_shader;
 use vulkano_text::{DrawText, DrawTextTrait};
@@ -198,7 +199,7 @@ impl VulkanGraphics {
         let surface_vs = surface_vs::Shader::load(device.clone()).unwrap();
         let surface_fs = surface_fs::Shader::load(device.clone()).unwrap();
 
-        let future = Box::new(vulkano::sync::now(device.clone())) as Box<GpuFuture>;
+        let future = Box::new(sync::now(device.clone())) as Box<GpuFuture>;
 
         let queue = queues.next().unwrap();
 
@@ -319,9 +320,9 @@ impl VulkanGraphics {
         }).collect::<Vec<_>>();
 
         let dimensions = [dimensions[0] as f32, dimensions[1] as f32];
-        let standard        = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, false, false);
-        let invert          = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, true, false);
-        let wireframe       = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, false, true);
+        let standard  = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, false, false);
+        let invert    = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, true, false);
+        let wireframe = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, false, true);
         let builder = GraphicsPipeline::start()
             .vertex_input_single_buffer()
             .vertex_shader(surface_vs.main_entry_point(), ())
@@ -523,27 +524,27 @@ impl VulkanGraphics {
         self.surface.window().hide_cursor(render.fullscreen && !in_game_paused);
 
         self.future.cleanup_finished();
-        let (image_num, new_future) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
-            Ok(result) => { result }
+        let (image_num, new_future) = match swapchain::acquire_next_image(self.swapchain.clone(), None) {
+            Ok(result) => result,
             Err(AcquireError::OutOfDate) => {
                 // Just abort this render, the user wont care about losing some frames while resizing. Internal rendering size will be fixed by next frame.
                 return;
             }
-            Err(err) => { panic!("{:?}", err) }
+            Err(err) => panic!("{:?}", err)
         };
 
         let command_buffer = AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.queue.family()).unwrap()
         .begin_render_pass(self.framebuffers[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), ClearValue::None, 1f32.into(), ClearValue::None]).unwrap();
 
         let final_command_buffer = match render.render_type {
-            RenderType::Game(game) => { self.game_render(game, command_buffer, &render.command_output) },
-            RenderType::Menu(menu) => { self.menu_render(menu, command_buffer, &render.command_output) },
+            RenderType::Game(game) => self.game_render(game, command_buffer, &render.command_output),
+            RenderType::Menu(menu) => self.menu_render(menu, command_buffer, &render.command_output)
         }
         .end_render_pass().unwrap()
         .draw_text(&mut self.draw_text, image_num)
         .build().unwrap();
 
-        let mut old_future = Box::new(vulkano::sync::now(self.device.clone())) as Box<GpuFuture>; // TODO: Can I avoid making this dummy future?
+        let mut old_future = Box::new(sync::now(self.device.clone())) as Box<GpuFuture>; // TODO: Can I avoid making this dummy future?
         mem::swap(&mut self.future, &mut old_future);
 
         let future_result = old_future.join(new_future)
@@ -552,12 +553,12 @@ impl VulkanGraphics {
             .then_signal_fence_and_flush();
 
         self.future = match future_result {
-            Ok(value) => { Box::new(value) as Box<_> }
+            Ok(value) => Box::new(value) as Box<_>,
             Err(FlushError::OutOfDate) => {
                 // Just abort this render, the user wont care about losing some frames while resizing. Internal rendering size will be fixed by next frame.
                 return;
             }
-            Err(err) => { panic!("{:?}", err) }
+            Err(err) => panic!("{:?}", err)
         };
     }
 
@@ -865,13 +866,13 @@ impl VulkanGraphics {
                     // TODO: Edit::Player  - render selected player's BPS as green
                     // TODO: Edit::Fighter - Click and drag on ECB points
                     // TODO: Edit::Stage   - render selected surfaces as green
-                },
+                }
                 &RenderEntity::RectOutline (ref render_rect) => {
                     let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.0));
                     let color = render_rect.color;
                     let buffers = Buffers::rect_outline_buffers(self.device.clone(), &render_rect.rect);
                     command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers, &transformation, color, color);
-                },
+                }
 
                 &RenderEntity::SpawnPoint (ref render_point) => {
                     let point = &render_point.point;

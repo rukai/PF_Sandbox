@@ -1,5 +1,4 @@
-use winit::ElementState::{Pressed, Released};
-use winit::{WindowEvent, MouseScrollDelta, MouseButton, VirtualKeyCode};
+use winit::{WindowEvent, MouseScrollDelta, MouseButton, VirtualKeyCode, ElementState};
 
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::path::PathBuf;
@@ -56,17 +55,17 @@ impl CurrentInput {
             WindowEvent::KeyboardInput { input, .. } => {
                 if let Some(keycode) = input.virtual_keycode {
                     match input.state {
-                        Pressed => {
+                        ElementState::Pressed => {
                             self.key_held[keycode as usize] = true;
                             self.key_actions.push(KeyAction::Pressed(keycode));
                             if let VirtualKeyCode::Back = keycode {
                                 self.text.push(TextChar::Back);
                             }
                         }
-                        Released => {
+                        ElementState::Released => {
                             self.key_held[keycode as usize] = false;
                             self.key_actions.push(KeyAction::Released(keycode));
-                        },
+                        }
                     }
                 }
             }
@@ -78,30 +77,30 @@ impl CurrentInput {
             WindowEvent::CursorMoved { position, .. } => {
                 let position = position.to_physical(self.dpi_factor);
                 self.mouse_point = Some((position.x as f32, position.y as f32));
-            },
-            WindowEvent::MouseInput { state: Pressed, button, .. } => {
+            }
+            WindowEvent::MouseInput { state: ElementState::Pressed, button, .. } => {
                 let button = mouse_button_to_int(button);
                 self.mouse_held[button] = true;
                 self.mouse_actions.push(MouseAction::Pressed(button));
-            },
-            WindowEvent::MouseInput { state: Released, button, .. } => {
+            }
+            WindowEvent::MouseInput { state: ElementState::Released, button, .. } => {
                 let button = mouse_button_to_int(button);
                 self.mouse_held[button] = false;
                 self.mouse_actions.push(MouseAction::Released(button));
-            },
+            }
             WindowEvent::MouseWheel { delta, .. } => {
                 match delta {
-                    MouseScrollDelta::LineDelta  (_, y) => { self.scroll_diff += y; },
-                    MouseScrollDelta::PixelDelta (_) => { panic!("Ooer, I dont know how to handle PixelDelta...") }, // TODO
+                    MouseScrollDelta::LineDelta  (_, y) => { self.scroll_diff += y; }
+                    MouseScrollDelta::PixelDelta (_) => panic!("Ooer, I dont know how to handle PixelDelta...") // TODO
                 }
-            },
+            }
             WindowEvent::Resized (resolution) => {
                 self.resolution = resolution.to_physical(self.dpi_factor).into();
             }
             WindowEvent::HiDpiFactorChanged (factor) => {
                 self.dpi_factor = factor;
             }
-            _ => {},
+            _ => {}
         }
     }
 
@@ -152,10 +151,10 @@ impl OsInput {
             match event {
                 WindowEvent::CloseRequested |
                 WindowEvent::Destroyed              => { self.quit = true }
-                WindowEvent::Focused(false)         => { self.current = None }
-                WindowEvent::Focused(true)          => { self.current = Some(CurrentInput::new()) }
+                WindowEvent::Focused (false)        => { self.current = None }
+                WindowEvent::Focused (true)         => { self.current = Some(CurrentInput::new()) }
                 WindowEvent::DroppedFile (ref path) => { self.dropped_file = Some(path.clone()) }
-                _ => { },
+                _ => { }
             }
             if let Some(ref mut current) = self.current {
                 current.handle_event(event);
@@ -223,16 +222,16 @@ impl OsInput {
     /// on
     pub fn key_held(&self, key_code: VirtualKeyCode) -> bool {
         match self.current {
-            Some (ref current) => { current.key_held[key_code as usize] },
-            None               => { false }
+            Some (ref current) => current.key_held[key_code as usize],
+            None               => false
         }
     }
 
     /// on
     pub fn mouse_held(&self, mouse_button: usize) -> bool {
         match self.current {
-            Some (ref current) => { current.mouse_held[mouse_button as usize] },
-            None               => { false }
+            Some (ref current) => current.mouse_held[mouse_button as usize],
+            None               => false
         }
     }
 
@@ -250,15 +249,15 @@ impl OsInput {
 
     pub fn scroll_diff(&self) -> f32 {
         match self.current {
-            Some( ref current) => { current.scroll_diff },
-            None               => { 0.0 }
+            Some(ref current) => current.scroll_diff,
+            None              => 0.0
         }
     }
 
     pub fn mouse(&self) -> Option<(f32, f32)> {
         match self.current {
-            Some(ref current) => { current.mouse_point },
-            None              => { None },
+            Some(ref current) => current.mouse_point,
+            None              => None
         }
     }
 
@@ -330,15 +329,15 @@ pub enum MouseAction {
 
 fn mouse_button_to_int(button: MouseButton) -> usize {
     match button {
-        MouseButton::Left        => { 0 },
-        MouseButton::Right       => { 1 },
-        MouseButton::Middle      => { 2 },
-        MouseButton::Other(byte) => { byte as usize },
+        MouseButton::Left        => 0,
+        MouseButton::Right       => 1,
+        MouseButton::Middle      => 2,
+        MouseButton::Other(byte) => byte as usize
     }
 }
 
 pub struct Camera {
-    pub zoom:  f32,
-    pub pan:   (f32, f32),
+    pub zoom: f32,
+    pub pan:  (f32, f32),
 }
 

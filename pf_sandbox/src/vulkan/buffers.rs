@@ -575,8 +575,8 @@ impl Buffers {
                     indices.push(*index_count + i + 2);
                 }
                 *index_count += triangles + 2;
-            },
-            LinkType::Simple => { },
+            }
+            LinkType::Simple => { }
         }
     }
 
