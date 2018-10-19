@@ -16,9 +16,11 @@ pub struct Render {
 
 pub enum RenderType {
     Game (RenderGame),
+    #[allow(dead_code)] // Needed for headless build
     Menu (RenderMenu),
 }
 
+#[allow(unused)] // Needed for headless build
 pub fn get_render_id(role: &CollisionBoxRole) -> u32 {
     match role {
         &CollisionBoxRole::Hurt (_)       => { 1 }
@@ -32,6 +34,7 @@ pub fn get_render_id(role: &CollisionBoxRole) -> u32 {
     }
 }
 
+#[allow(unused)] // Needed for headless build
 pub fn get_team_color4(i: usize) -> [f32; 4] {
     let colors = get_colors();
     let color = colors[i % colors.len()].value;

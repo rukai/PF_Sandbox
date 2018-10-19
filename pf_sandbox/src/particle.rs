@@ -45,6 +45,7 @@ impl Particle {
         self.counter > self.counter_max
     }
 
+    #[allow(dead_code)] // Needed for headless build
     pub fn counter_mult(&self) -> f32 {
         self.counter as f32 / self.counter_max as f32
     }

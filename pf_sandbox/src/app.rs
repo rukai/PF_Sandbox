@@ -4,9 +4,7 @@ use ::vulkan::VulkanGraphics;
 use ::cli::GraphicsBackendChoice;
 #[cfg(feature = "vulkan")]
 use ::graphics::GraphicsMessage;
-#[cfg(feature = "vulkan")]
 use std::sync::mpsc::{Sender, Receiver};
-#[cfg(feature = "vulkan")]
 use std::sync::mpsc;
 use std;
 
@@ -26,6 +24,7 @@ use winit_input_helper::WinitInputHelper;
 use libusb::Context;
 use std::time::{Duration, Instant};
 
+#[allow(unused)] // Needed for headless build
 struct OsInput {
     input: WinitInputHelper,
     rx: Receiver<Event>

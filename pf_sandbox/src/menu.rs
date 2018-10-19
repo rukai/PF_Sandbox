@@ -76,6 +76,7 @@ impl PackageHolder {
         }
     }
 
+    #[allow(dead_code)] // Needed for headless build
     fn verify(&self) -> Verify {
         match self {
             &PackageHolder::Package (_, ref verify) => { verify.clone() }
@@ -808,6 +809,7 @@ impl Menu {
         self.game_setup.take()
     }
 
+    #[allow(dead_code)] // Needed for headless build
     pub fn render(&self) -> RenderMenu {
         RenderMenu {
             state: match self.state {
@@ -829,6 +831,7 @@ impl Menu {
         }
     }
 
+    #[allow(dead_code)] // Needed for headless build
     pub fn graphics_message(&mut self, command_line: &CommandLine) -> GraphicsMessage {
         let updates = match &mut self.package {
             &mut PackageHolder::Package (ref mut package, _) => {
@@ -1064,6 +1067,7 @@ impl PlayerSelectUi {
         }
     }
 
+    #[allow(dead_code)] // Needed for headless build
     pub fn ticker_unwrap(&self) -> &MenuTicker {
         match self {
             &PlayerSelectUi::HumanFighter (ref ticker) |

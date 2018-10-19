@@ -1144,6 +1144,7 @@ impl Game {
         self.debug_output_this_step = true;
     }
 
+    #[allow(unused)] // Needed for headless build
     pub fn render(&self) -> RenderGame {
         let mut entities = vec!();
 
@@ -1232,6 +1233,7 @@ impl Game {
         }
     }
 
+    #[allow(unused)] // Needed for headless build
     pub fn graphics_message(&mut self, command_line: &CommandLine) -> GraphicsMessage {
         let render = Render {
             command_output: command_line.output(),
