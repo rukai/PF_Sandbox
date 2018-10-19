@@ -1,5 +1,5 @@
 use geometry::Rect;
-use os_input::OsInput;
+use winit_input_helper::WinitInputHelper;
 use json_upgrade::engine_version;
 
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
@@ -333,7 +333,7 @@ pub struct DebugStage {
 }
 
 impl DebugStage {
-    pub fn step(&mut self, os_input: &OsInput) {
+    pub fn step(&mut self, os_input: &WinitInputHelper) {
         if os_input.key_pressed(VirtualKeyCode::F1) {
             self.blast = !self.blast;
         }

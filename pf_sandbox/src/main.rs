@@ -14,6 +14,7 @@
              extern crate serde;
              extern crate treeflection;
              extern crate winit;
+             extern crate winit_input_helper;
              extern crate serde_json;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate log;

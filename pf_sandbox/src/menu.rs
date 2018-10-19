@@ -2,7 +2,6 @@ use pf_sandbox_lib::command_line::CommandLine;
 use pf_sandbox_lib::config::Config;
 use pf_sandbox_lib::input::PlayerInput;
 use pf_sandbox_lib::network::{Netplay, NetplayState};
-use pf_sandbox_lib::os_input::OsInput;
 use pf_sandbox_lib::package::{Package, PackageMeta, Verify};
 use pf_sandbox_lib::package;
 use game::{GameSetup, GameState, PlayerSetup};
@@ -14,6 +13,7 @@ use results::{GameResults, PlayerResult};
 
 use treeflection::{Node, NodeRunner, NodeToken};
 use winit::VirtualKeyCode;
+use winit_input_helper::WinitInputHelper;
 
 use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
 use std::thread;
@@ -737,7 +737,7 @@ impl Menu {
         }
     }
 
-    pub fn step(&mut self, input: &mut Input, os_input: &OsInput, netplay: &mut Netplay) -> Option<GameSetup> {
+    pub fn step(&mut self, input: &mut Input, os_input: &WinitInputHelper, netplay: &mut Netplay) -> Option<GameSetup> {
         if os_input.held_alt() && os_input.key_pressed(VirtualKeyCode::Return) {
             self.config.fullscreen = !self.config.fullscreen;
             self.config.save();

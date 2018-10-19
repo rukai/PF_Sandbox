@@ -16,6 +16,7 @@
              extern crate treeflection;
              extern crate uuid;
              extern crate winit;
+             extern crate winit_input_helper;
              extern crate zip;
 #[macro_use] extern crate enum_traits_macros;
 #[macro_use] extern crate log;
@@ -33,7 +34,6 @@ pub mod input;
 pub mod json_upgrade;
 pub mod logger;
 pub mod network;
-pub mod os_input;
 pub mod package;
 pub mod panic_handler;
 pub mod rules;

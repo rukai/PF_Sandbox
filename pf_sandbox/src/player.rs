@@ -2,7 +2,6 @@ use pf_sandbox_lib::fighter::*;
 use pf_sandbox_lib::geometry::Rect;
 use pf_sandbox_lib::geometry;
 use pf_sandbox_lib::input::{PlayerInput};
-use pf_sandbox_lib::os_input::OsInput;
 use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::stage::{Stage, Surface, SpawnPoint};
 
@@ -20,6 +19,7 @@ use rand::StdRng;
 use rand::Rng;
 use enum_traits::{FromIndex, ToIndex};
 use winit::VirtualKeyCode;
+use winit_input_helper::WinitInputHelper;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Node)]
 pub enum LockTimer {
@@ -2762,7 +2762,7 @@ pub struct DebugPlayer {
 }
 
 impl DebugPlayer {
-    pub fn step(&mut self, os_input: &OsInput) {
+    pub fn step(&mut self, os_input: &WinitInputHelper) {
         if os_input.key_pressed(VirtualKeyCode::F1) {
             self.physics = !self.physics;
         }

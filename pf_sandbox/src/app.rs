@@ -5,13 +5,14 @@ use ::cli::GraphicsBackendChoice;
 #[cfg(feature = "vulkan")]
 use ::graphics::GraphicsMessage;
 #[cfg(feature = "vulkan")]
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, Receiver};
+#[cfg(feature = "vulkan")]
+use std::sync::mpsc;
 use std;
 
 use pf_sandbox_lib::command_line::CommandLine;
 use pf_sandbox_lib::config::Config;
 use pf_sandbox_lib::network::{NetCommandLine, Netplay, NetplayState};
-use pf_sandbox_lib::os_input::OsInput;
 use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::package;
 use ai;
@@ -20,8 +21,32 @@ use game::{Game, GameState, GameSetup, PlayerSetup};
 use input::Input;
 use menu::{Menu, MenuState, ResumeMenu};
 
+use winit::Event;
+use winit_input_helper::WinitInputHelper;
 use libusb::Context;
 use std::time::{Duration, Instant};
+
+struct OsInput {
+    input: WinitInputHelper,
+    rx: Receiver<Event>
+}
+
+impl OsInput {
+    fn new() -> (OsInput, Sender<Event>) {
+        let input = WinitInputHelper::new();
+        let (tx, rx) = mpsc::channel();
+        let os_input = OsInput { input, rx };
+        (os_input, tx)
+    }
+
+    fn step(&mut self) {
+        let mut events = vec!();
+        while let Ok(event) = self.rx.try_recv() {
+            events.push(event);
+        }
+        self.input.update_from_vec(events);
+    }
+}
 
 pub fn run(mut cli_results: CLIResults, config: Config) {
     if let ContinueFrom::Close = cli_results.continue_from {
@@ -242,7 +267,7 @@ pub fn run(mut cli_results: CLIResults, config: Config) {
                 let reset_deadzones = game.check_reset_deadzones();
                 input.step(&game.tas, &ai_inputs, &mut netplay, reset_deadzones);
 
-                if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input, command_line.block(), &netplay) {
+                if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input.input, command_line.block(), &netplay) {
                     resume_menu = Some(resume_menu_inner)
                 }
                 #[cfg(feature = "vulkan")]
@@ -255,13 +280,13 @@ pub fn run(mut cli_results: CLIResults, config: Config) {
                 }
                 if let NetplayState::Offline = netplay.state() {
                     net_command_line.step(game);
-                    command_line.step(&os_input, game);
+                    command_line.step(&os_input.input, game);
                 }
             }
         }
         else {
             input.step(&[], &[], &mut netplay, false);
-            if let Some(mut menu_game_setup) = menu.step(&mut input, &os_input, &mut netplay) {
+            if let Some(mut menu_game_setup) = menu.step(&mut input, &os_input.input, &mut netplay) {
                 let (package, config) = menu.reclaim();
                 input.set_history(std::mem::replace(&mut menu_game_setup.input_history, vec!()));
                 game = Some(Game::new(package, config, menu_game_setup));
@@ -278,7 +303,7 @@ pub fn run(mut cli_results: CLIResults, config: Config) {
             }
             if let NetplayState::Offline = netplay.state() {
                 net_command_line.step(&mut menu);
-                command_line.step(&os_input, &mut menu);
+                command_line.step(&os_input.input, &mut menu);
             }
         }
 
@@ -298,7 +323,7 @@ pub fn run(mut cli_results: CLIResults, config: Config) {
             // Replay quit     -> replay screen
         }
 
-        if os_input.quit() {
+        if os_input.input.quit() {
             netplay.set_offline(); // tell peer we are quiting
             return;
         }

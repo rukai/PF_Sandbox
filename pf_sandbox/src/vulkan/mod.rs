@@ -146,7 +146,7 @@ pub struct VulkanGraphics {
     uniform_buffer_pool:         CpuBufferPool<vs::ty::Data>,
     surface_uniform_buffer_pool: CpuBufferPool<surface_vs::ty::Data>,
     draw_text:                   DrawText,
-    os_input_tx:                 Sender<WindowEvent>,
+    os_input_tx:                 Sender<Event>,
     render_rx:                   Receiver<GraphicsMessage>,
     frame_durations:             Vec<Duration>,
     fps:                         String,
@@ -163,7 +163,7 @@ struct Pipelines {
 }
 
 impl VulkanGraphics {
-    pub fn init(os_input_tx: Sender<WindowEvent>, device_name: Option<String>) -> Sender<GraphicsMessage> {
+    pub fn init(os_input_tx: Sender<Event>, device_name: Option<String>) -> Sender<GraphicsMessage> {
         let (render_tx, render_rx) = channel();
 
         thread::spawn(move || {
@@ -173,7 +173,7 @@ impl VulkanGraphics {
         render_tx
     }
 
-    fn new(os_input_tx: Sender<WindowEvent>, render_rx: Receiver<GraphicsMessage>, device_name: Option<String>) -> VulkanGraphics {
+    fn new(os_input_tx: Sender<Event>, render_rx: Receiver<GraphicsMessage>, device_name: Option<String>) -> VulkanGraphics {
         let instance = {
             let extensions = vulkano_win::required_extensions();
             Instance::new(None, &extensions, None).expect("failed to create Vulkan instance")
@@ -1322,7 +1322,12 @@ impl VulkanGraphics {
 
         if let Some(resolution) = window.get_inner_size() {
             // force send the current resolution
-            if let Err(_) = self.os_input_tx.send(WindowEvent::Resized(resolution)) {
+            let event = Event::WindowEvent {
+                window_id: self.surface.window().id(),
+                event: WindowEvent::Resized(resolution)
+            };
+
+            if let Err(_) = self.os_input_tx.send(event) {
                 return false;
             }
         } else {
@@ -1331,15 +1336,17 @@ impl VulkanGraphics {
         }
 
         // force send the current dpi
-        if let Err(_) = self.os_input_tx.send(WindowEvent::HiDpiFactorChanged(window.get_hidpi_factor())) {
+        let event = Event::WindowEvent {
+            window_id: self.surface.window().id(),
+            event: WindowEvent::HiDpiFactorChanged(window.get_hidpi_factor())
+        };
+        if let Err(_) = self.os_input_tx.send(event) {
             return false;
         }
 
         let os_input_tx = self.os_input_tx.clone();
         self.events_loop.poll_events(|event| {
-            if let Event::WindowEvent { event, .. } = event {
-                os_input_tx.send(event).ok();
-            };
+            os_input_tx.send(event).ok();
         });
         true
     }
