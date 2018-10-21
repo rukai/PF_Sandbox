@@ -22,17 +22,15 @@ use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::command_buffer::{DynamicState, AutoCommandBufferBuilder};
 use vulkano::descriptor::descriptor_set::{PersistentDescriptorSet, DescriptorSet};
-use vulkano::descriptor::pipeline_layout::PipelineLayoutAbstract;
 use vulkano::device::{Device, Queue, DeviceExtensions};
 use vulkano::format::{Format, ClearValue};
 use vulkano::framebuffer::{Framebuffer, FramebufferAbstract, Subpass, RenderPassAbstract};
 use vulkano::image::SwapchainImage;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::instance::{Instance, PhysicalDevice, PhysicalDeviceType};
-use vulkano::pipeline::GraphicsPipeline;
+use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineAbstract};
 //use vulkano::pipeline::blend::LogicOp;
 use vulkano::pipeline::depth_stencil::{DepthStencil, DepthBounds, Compare};
-use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::swapchain;
 use vulkano::swapchain::{Surface, Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
@@ -156,10 +154,10 @@ pub struct VulkanGraphics {
 }
 
 struct Pipelines {
-    standard:  Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>,      Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
-    invert:    Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>,      Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
-    wireframe: Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>,      Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
-    surface:   Arc<GraphicsPipeline<SingleBufferDefinition<ColorVertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+    standard:  Arc<GraphicsPipelineAbstract + Send + Sync>,
+    invert:    Arc<GraphicsPipelineAbstract + Send + Sync>,
+    wireframe: Arc<GraphicsPipelineAbstract + Send + Sync>,
+    surface:   Arc<GraphicsPipelineAbstract + Send + Sync>,
 }
 
 impl VulkanGraphics {
@@ -324,7 +322,7 @@ impl VulkanGraphics {
         let invert    = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, true, false);
         let wireframe = VulkanGraphics::pipeline_base(vs, fs, device.clone(), render_pass.clone(), dimensions, false, true);
         let builder = GraphicsPipeline::start()
-            .vertex_input_single_buffer()
+            .vertex_input_single_buffer::<ColorVertex>()
             .vertex_shader(surface_vs.main_entry_point(), ())
             .triangle_list()
             .viewports(iter::once(Viewport {
@@ -356,10 +354,10 @@ impl VulkanGraphics {
         dimensions: [f32; 2],
         invert: bool,
         wireframe: bool)
-        -> Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>
+        -> Arc<GraphicsPipelineAbstract + Send + Sync>
     {
         let builder = GraphicsPipeline::start()
-            .vertex_input_single_buffer()
+            .vertex_input_single_buffer::<Vertex>()
             .vertex_shader(vs.main_entry_point(), ())
             .triangle_list()
             .viewports(iter::once(Viewport {
@@ -637,7 +635,7 @@ impl VulkanGraphics {
 
     fn render_buffers(
         &self,
-        pipeline:       Arc<GraphicsPipeline<SingleBufferDefinition<Vertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+        pipeline:       Arc<GraphicsPipelineAbstract + Send + Sync>,
         command_buffer: AutoCommandBufferBuilder,
         render:         &RenderGame,
         buffers:        Buffers,
@@ -660,12 +658,12 @@ impl VulkanGraphics {
             .add_buffer(uniform_buffer).unwrap()
             .build().unwrap()
         );
-        command_buffer.draw_indexed(pipeline, &DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
+        command_buffer.draw_indexed(pipeline, &DynamicState::none(), vec!(buffers.vertex), buffers.index, set, ()).unwrap()
     }
 
     fn render_surface_buffers(
         &self,
-        pipeline:       Arc<GraphicsPipeline<SingleBufferDefinition<ColorVertex>, Box<PipelineLayoutAbstract + Send + Sync>, Arc<RenderPassAbstract + Send + Sync>>>,
+        pipeline:       Arc<GraphicsPipelineAbstract + Send + Sync>,
         command_buffer: AutoCommandBufferBuilder,
         render:         &RenderGame,
         buffers:        ColorBuffers,
@@ -682,7 +680,7 @@ impl VulkanGraphics {
             .add_buffer(uniform_buffer).unwrap()
             .build().unwrap()
         );
-        command_buffer.draw_indexed(pipeline, &DynamicState::none(), buffers.vertex, buffers.index, set, ()).unwrap()
+        command_buffer.draw_indexed(pipeline, &DynamicState::none(), vec!(buffers.vertex), buffers.index, set, ()).unwrap()
     }
 
     fn game_render(&mut self, render: RenderGame, mut command_buffer: AutoCommandBufferBuilder, command_output: &[String]) -> AutoCommandBufferBuilder {
@@ -990,24 +988,24 @@ impl VulkanGraphics {
             match entity_and_set.entity {
                 MenuEntity::Fighter { ref fighter, action, frame } => {
                     if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), fighter, action, frame) {
-                        command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), &DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), &DynamicState::none(), vec!(buffers.vertex.clone()), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
                 MenuEntity::Stage (ref stage) => {
                     let stage: &str = stage.as_ref();
                     if let &Some(ref buffers) = &self.package_buffers.stages[stage] {
-                        command_buffer = command_buffer.draw_indexed(self.pipelines.surface.clone(), &DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        command_buffer = command_buffer.draw_indexed(self.pipelines.surface.clone(), &DynamicState::none(), vec!(buffers.vertex.clone()), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
                 MenuEntity::StageFill (ref stage) => {
                     let stage: &str = stage.as_ref();
                     if let &Some(ref buffers) = &self.package_buffers.stages_fill[stage] {
-                        command_buffer = command_buffer.draw_indexed(self.pipelines.surface.clone(), &DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                        command_buffer = command_buffer.draw_indexed(self.pipelines.surface.clone(), &DynamicState::none(), vec!(buffers.vertex.clone()), buffers.index.clone(), set, ()).unwrap();
                     }
                 }
                 MenuEntity::Rect (ref rect) => {
                     let buffers = Buffers::rect_buffers(self.device.clone(), rect.clone());
-                    command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), &DynamicState::none(), buffers.vertex.clone(), buffers.index.clone(), set, ()).unwrap();
+                    command_buffer = command_buffer.draw_indexed(self.pipelines.standard.clone(), &DynamicState::none(), vec!(buffers.vertex.clone()), buffers.index.clone(), set, ()).unwrap();
                 }
             }
         }
