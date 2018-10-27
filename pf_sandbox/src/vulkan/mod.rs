@@ -223,49 +223,6 @@ impl VulkanGraphics {
             ).unwrap()
         };
 
-        let (render_pass, pipelines, framebuffers) = VulkanGraphics::pipeline(&vs, &fs, &surface_vs, &surface_fs, device.clone(), swapchain.clone(), &images);
-
-        let draw_text = DrawText::new(device.clone(), queue.clone(), swapchain.clone(), &images);
-        let uniform_buffer_pool = CpuBufferPool::<vs::ty::Data>::new(device.clone(), BufferUsage::all());
-        let surface_uniform_buffer_pool = CpuBufferPool::<surface_vs::ty::Data>::new(device.clone(), BufferUsage::all());
-
-        VulkanGraphics {
-            surface,
-            events_loop,
-            device,
-            future,
-            swapchain,
-            queue,
-            vs,
-            fs,
-            surface_vs,
-            surface_fs,
-            pipelines,
-            render_pass,
-            framebuffers,
-            uniform_buffer_pool,
-            surface_uniform_buffer_pool,
-            draw_text,
-            os_input_tx,
-            render_rx,
-            package_buffers: PackageBuffers::new(),
-            frame_durations: vec!(),
-            fps:             String::new(),
-            width:           0,
-            height:          0,
-            prev_fullscreen: None,
-        }
-    }
-
-    fn pipeline(
-        vs: &vs::Shader,
-        fs: &fs::Shader,
-        surface_vs: &surface_vs::Shader,
-        surface_fs: &surface_fs::Shader,
-        device: Arc<Device>,
-        swapchain: Arc<Swapchain<Window>>,
-        images: &[Arc<SwapchainImage<Window>>]
-    ) -> (Arc<RenderPassAbstract + Send + Sync>, Pipelines, Vec<Arc<FramebufferAbstract + Send + Sync>>) {
         let render_pass = Arc::new(single_pass_renderpass!(device.clone(),
             attachments: {
                 multisampled_color: {
@@ -302,6 +259,50 @@ impl VulkanGraphics {
             }
         ).unwrap()) as Arc<RenderPassAbstract + Send + Sync>;
 
+        let (pipelines, framebuffers) = VulkanGraphics::pipeline(render_pass.clone(), &vs, &fs, &surface_vs, &surface_fs, device.clone(), swapchain.clone(), &images);
+
+        let draw_text = DrawText::new(device.clone(), queue.clone(), swapchain.clone(), &images);
+        let uniform_buffer_pool = CpuBufferPool::<vs::ty::Data>::new(device.clone(), BufferUsage::all());
+        let surface_uniform_buffer_pool = CpuBufferPool::<surface_vs::ty::Data>::new(device.clone(), BufferUsage::all());
+
+        VulkanGraphics {
+            surface,
+            events_loop,
+            device,
+            future,
+            swapchain,
+            queue,
+            vs,
+            fs,
+            surface_vs,
+            surface_fs,
+            pipelines,
+            render_pass,
+            framebuffers,
+            uniform_buffer_pool,
+            surface_uniform_buffer_pool,
+            draw_text,
+            os_input_tx,
+            render_rx,
+            package_buffers: PackageBuffers::new(),
+            frame_durations: vec!(),
+            fps:             String::new(),
+            width:           0,
+            height:          0,
+            prev_fullscreen: None,
+        }
+    }
+
+    fn pipeline(
+        render_pass: Arc<RenderPassAbstract + Send + Sync>,
+        vs: &vs::Shader,
+        fs: &fs::Shader,
+        surface_vs: &surface_vs::Shader,
+        surface_fs: &surface_fs::Shader,
+        device: Arc<Device>,
+        swapchain: Arc<Swapchain<Window>>,
+        images: &[Arc<SwapchainImage<Window>>]
+    ) -> (Pipelines, Vec<Arc<FramebufferAbstract + Send + Sync>>) {
         let dimensions = images[0].dimensions();
         let depth = AttachmentImage::transient(device.clone(), dimensions, Format::D16Unorm).unwrap();
         let multisampled_depth = AttachmentImage::transient_multisampled(device.clone(), dimensions, 4, Format::D16Unorm).unwrap();
@@ -343,7 +344,7 @@ impl VulkanGraphics {
         let surface = Arc::new(builder.build(device.clone()).unwrap());
         let pipelines = Pipelines { standard, invert, wireframe, surface };
 
-        (render_pass, pipelines, framebuffers)
+        (pipelines, framebuffers)
     }
 
     fn pipeline_base(
@@ -477,8 +478,7 @@ impl VulkanGraphics {
                 self.height = height;
                 self.swapchain = new_swapchain.clone();
 
-                let (render_pass, pipelines, framebuffers) = VulkanGraphics::pipeline(&self.vs, &self.fs, &self.surface_vs, &self.surface_fs, self.device.clone(), new_swapchain, &new_images);
-                self.render_pass = render_pass;
+                let (pipelines, framebuffers) = VulkanGraphics::pipeline(self.render_pass.clone(), &self.vs, &self.fs, &self.surface_vs, &self.surface_fs, self.device.clone(), new_swapchain, &new_images);
                 self.pipelines = pipelines;
                 self.framebuffers = framebuffers;
 
