@@ -1,6 +1,6 @@
 [package]
 name = "pf_sandbox_lib"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Rukai <rubickent@gmail.com>"]
 description = "Data structures and helper code for PF Sandbox"
 license = "GPL-3.0"
@@ -17,7 +17,7 @@ dirs = "1"
 enum_traits = "0.3"
 enum_traits_macros = "2.0"
 env_logger = "0.5"
-gilrs-core = { git = "https://gitlab.com/gilrs-project/gilrs" }
+gilrs-core = "0.1"
 log = "0.4"
 matches = "0.1"
 os_type = "2"

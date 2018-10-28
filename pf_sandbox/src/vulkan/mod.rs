@@ -36,7 +36,6 @@ use vulkano::swapchain;
 use vulkano::swapchain::{Surface, Swapchain, SurfaceTransform, AcquireError, PresentMode, SwapchainCreationError};
 use vulkano::sync;
 use vulkano::sync::{GpuFuture, FlushError};
-use vulkano_shaders::vulkano_shader;
 use vulkano_text::{DrawText, DrawTextTrait};
 use winit::{Window, Event, WindowEvent, WindowBuilder, EventsLoop};
 
@@ -49,28 +48,32 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread;
 use std::time::{Duration, Instant};
 
-vulkano_shader!{
-    mod_name: vs,
-    ty: "vertex",
-    path: "src/shaders/generic-vertex.glsl"
+mod vs {
+    crate::vulkano_shaders::shader!{
+        ty: "vertex",
+        path: "src/shaders/generic-vertex.glsl"
+    }
 }
 
-vulkano_shader!{
-    mod_name: fs,
-    ty: "fragment",
-    path: "src/shaders/generic-fragment.glsl"
+mod fs {
+    crate::vulkano_shaders::shader!{
+        ty: "fragment",
+        path: "src/shaders/generic-fragment.glsl"
+    }
 }
 
-vulkano_shader!{
-    mod_name: surface_vs,
-    ty: "vertex",
-    path: "src/shaders/surface-vertex.glsl"
+mod surface_vs {
+    crate::vulkano_shaders::shader!{
+        ty: "vertex",
+        path: "src/shaders/surface-vertex.glsl"
+    }
 }
 
-vulkano_shader!{
-    mod_name: surface_fs,
-    ty: "fragment",
-    path: "src/shaders/surface-fragment.glsl"
+mod surface_fs {
+    crate::vulkano_shaders::shader!{
+        ty: "fragment",
+        path: "src/shaders/surface-fragment.glsl"
+    }
 }
 
 /// Returns a list of physical devices, ordered from most preferred to least preferred
