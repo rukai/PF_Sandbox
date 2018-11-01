@@ -1,7 +1,7 @@
 use pf_sandbox_lib::fighter::CollisionBoxRole;
 use pf_sandbox_lib::package::PackageUpdate;
-use game::RenderGame;
-use menu::RenderMenu;
+use crate::game::RenderGame;
+use crate::menu::RenderMenu;
 
 pub struct GraphicsMessage {
     pub render:          Render,

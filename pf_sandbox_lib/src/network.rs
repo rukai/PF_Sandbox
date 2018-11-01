@@ -2,7 +2,7 @@ use treeflection::{NodeRunner, Node};
 use bincode;
 use rand::Rng;
 use rand;
-use json_upgrade;
+use crate::json_upgrade;
 
 use std::net::{TcpListener, UdpSocket, IpAddr, SocketAddr};
 use std::io::Read;
@@ -10,7 +10,7 @@ use std::io::Write;
 use std::str;
 use std::time::{Instant, Duration};
 
-use input::ControllerInput;
+use crate::input::ControllerInput;
 
 pub struct NetCommandLine {
     listener: TcpListener

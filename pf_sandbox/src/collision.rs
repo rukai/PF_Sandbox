@@ -2,7 +2,7 @@ use treeflection::KeyedContextVec;
 
 use pf_sandbox_lib::fighter::{Fighter, HurtBox, HitBox, CollisionBox, CollisionBoxRole, PowerShield};
 use pf_sandbox_lib::stage::Surface;
-use player::Player;
+use crate::player::Player;
 
 // def - player who was attacked
 // atk - player who attacked

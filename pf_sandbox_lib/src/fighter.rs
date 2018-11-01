@@ -1,7 +1,7 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 use enum_traits::{Index, ToIndex, Iterable};
 
-use json_upgrade::engine_version;
+use crate::json_upgrade::engine_version;
 
 impl Default for Fighter {
     fn default() -> Fighter {

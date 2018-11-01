@@ -5,12 +5,12 @@ use pf_sandbox_lib::geometry::Rect;
 use pf_sandbox_lib::json_upgrade;
 use pf_sandbox_lib::package::Verify;
 use self::buffers::{Vertex, ColorVertex, Buffers, ColorBuffers, PackageBuffers};
-use game::{GameState, RenderEntity, RenderGame};
-use graphics::{self, GraphicsMessage, Render, RenderType};
-use menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
-use particle::ParticleType;
-use player::{RenderFighter, RenderPlayer, DebugPlayer};
-use results::PlayerResult;
+use crate::game::{GameState, RenderEntity, RenderGame};
+use crate::graphics::{self, GraphicsMessage, Render, RenderType};
+use crate::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
+use crate::particle::ParticleType;
+use crate::player::{RenderFighter, RenderPlayer, DebugPlayer};
+use crate::results::PlayerResult;
 
 use enum_traits::{FromIndex, ToIndex};
 use cgmath::prelude::*;

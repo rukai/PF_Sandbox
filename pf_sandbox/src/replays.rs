@@ -8,9 +8,9 @@ use pf_sandbox_lib::files;
 use pf_sandbox_lib::input::ControllerInput;
 use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::stage::Stage;
-use game::{Game, PlayerSetup};
-use input::Input;
-use player::Player;
+use crate::game::{Game, PlayerSetup};
+use crate::input::Input;
+use crate::player::Player;
 
 pub fn get_replay_names(package: &Package) -> Vec<String> {
     let mut result: Vec<String> = vec!();

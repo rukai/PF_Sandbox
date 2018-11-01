@@ -2,6 +2,7 @@
 name = "panic_handler"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 gtk = { version = "0.5", features = ["v3_12"] }

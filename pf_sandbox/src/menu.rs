@@ -4,12 +4,12 @@ use pf_sandbox_lib::input::PlayerInput;
 use pf_sandbox_lib::network::{Netplay, NetplayState};
 use pf_sandbox_lib::package::{Package, PackageMeta, Verify};
 use pf_sandbox_lib::package;
-use game::{GameSetup, GameState, PlayerSetup};
-use graphics::{GraphicsMessage, Render, RenderType};
-use graphics;
-use input::Input;
-use replays;
-use results::{GameResults, PlayerResult};
+use crate::game::{GameSetup, GameState, PlayerSetup};
+use crate::graphics::{GraphicsMessage, Render, RenderType};
+use crate::graphics;
+use crate::input::Input;
+use crate::replays;
+use crate::results::{GameResults, PlayerResult};
 
 use treeflection::{Node, NodeRunner, NodeToken};
 use winit::VirtualKeyCode;

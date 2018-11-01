@@ -1,6 +1,6 @@
-use geometry::Rect;
+use crate::geometry::Rect;
 use winit_input_helper::WinitInputHelper;
-use json_upgrade::engine_version;
+use crate::json_upgrade::engine_version;
 
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
 use winit::VirtualKeyCode;

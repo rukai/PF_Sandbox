@@ -11,12 +11,12 @@ use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use zip::ZipWriter;
 use zip::write::FileOptions;
 
-use fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxRole, CollisionBoxLink, LinkType, RenderOrder};
-use files;
-use json_upgrade::engine_version;
-use json_upgrade;
-use rules::Rules;
-use stage::Stage;
+use crate::fighter::{Fighter, ActionFrame, CollisionBox, CollisionBoxRole, CollisionBoxLink, LinkType, RenderOrder};
+use crate::files;
+use crate::json_upgrade::engine_version;
+use crate::json_upgrade;
+use crate::rules::Rules;
+use crate::stage::Stage;
 
 fn get_packages_path() -> PathBuf {
     let mut path = files::get_path();

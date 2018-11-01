@@ -11,6 +11,7 @@ homepage = "https://pfsandbox.net"
 keywords = ["pf", "sandbox", "platform", "fighter", "game"]
 categories = ["games", "game-engines"]
 default-run = "pf_sandbox"
+edition = "2018"
 
 [dependencies]
 pf_sandbox_lib = { path = "../pf_sandbox_lib" }

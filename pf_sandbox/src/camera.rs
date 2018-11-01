@@ -1,6 +1,6 @@
 use pf_sandbox_lib::fighter::Fighter;
 use pf_sandbox_lib::stage::Stage;
-use player::Player;
+use crate::player::Player;
 
 use winit::VirtualKeyCode;
 use winit_input_helper::Camera as CameraWinitInputHelper;

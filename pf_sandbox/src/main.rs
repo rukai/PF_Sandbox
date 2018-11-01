@@ -50,8 +50,8 @@ extern crate cgmath;
 #[cfg(feature = "vulkan")]
 pub(crate) mod vulkan;
 
-use app::run;
-use cli::cli;
+use crate::app::run;
+use crate::cli::cli;
 use pf_sandbox_lib::config::Config;
 use pf_sandbox_lib::logger;
 

@@ -8,6 +8,7 @@ repository = "https://github.com/rukai/pf_sandbox"
 homepage = "https://pfsandbox.net"
 keywords = ["pf", "sandbox", "platform", "fighter", "game"]
 categories = ["games", "game-engines"]
+edition = "2018"
 
 [dependencies]
 backtrace = "0.3"

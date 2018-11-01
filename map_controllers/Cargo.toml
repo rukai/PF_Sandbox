@@ -2,6 +2,7 @@
 name = "pf_map_controllers"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 gdk = "0.9"

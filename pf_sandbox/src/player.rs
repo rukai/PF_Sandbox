@@ -5,10 +5,10 @@ use pf_sandbox_lib::input::{PlayerInput};
 use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::stage::{Stage, Surface, SpawnPoint};
 
-use collision::CollisionResult;
-use graphics;
-use particle::{Particle, ParticleType};
-use results::{RawPlayerResult, DeathRecord};
+use crate::collision::CollisionResult;
+use crate::graphics;
+use crate::particle::{Particle, ParticleType};
+use crate::results::{RawPlayerResult, DeathRecord};
 use pf_sandbox_lib::rules::Goal;
 
 use std::f32;

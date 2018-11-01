@@ -58,7 +58,7 @@ pub fn cli(config: &Config) -> CLIResults {
     #[cfg(feature = "vulkan")]
     {
         if matches.opt_present("d") {
-            use vulkan;
+            use crate::vulkan;
             vulkan::print_physical_devices(config.physical_device_name.clone());
             results.continue_from = ContinueFrom::Close;
             return results;

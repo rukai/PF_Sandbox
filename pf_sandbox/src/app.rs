@@ -1,9 +1,9 @@
 #[cfg(feature = "vulkan")]
-use ::vulkan::VulkanGraphics;
+use crate::vulkan::VulkanGraphics;
 #[cfg(feature = "vulkan")]
-use ::cli::GraphicsBackendChoice;
+use crate::cli::GraphicsBackendChoice;
 #[cfg(feature = "vulkan")]
-use ::graphics::GraphicsMessage;
+use crate::graphics::GraphicsMessage;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std;
@@ -13,11 +13,11 @@ use pf_sandbox_lib::config::Config;
 use pf_sandbox_lib::network::{NetCommandLine, Netplay, NetplayState};
 use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::package;
-use ai;
-use cli::{CLIResults, ContinueFrom};
-use game::{Game, GameState, GameSetup, PlayerSetup};
-use input::Input;
-use menu::{Menu, MenuState, ResumeMenu};
+use crate::ai;
+use crate::cli::{CLIResults, ContinueFrom};
+use crate::game::{Game, GameState, GameSetup, PlayerSetup};
+use crate::input::Input;
+use crate::menu::{Menu, MenuState, ResumeMenu};
 
 use winit::Event;
 use winit_input_helper::WinitInputHelper;

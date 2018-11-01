@@ -1,6 +1,6 @@
 use treeflection::{Node, NodeRunner, NodeToken};
 
-use json_upgrade::engine_version;
+use crate::json_upgrade::engine_version;
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Rules {

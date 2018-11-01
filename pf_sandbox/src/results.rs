@@ -1,4 +1,4 @@
-use replays::Replay;
+use crate::replays::Replay;
 use treeflection::{Node, NodeRunner, NodeToken};
 
 #[derive(Clone, Serialize, Deserialize)]

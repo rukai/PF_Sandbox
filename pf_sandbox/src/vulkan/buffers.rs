@@ -2,10 +2,10 @@ use pf_sandbox_lib::fighter::{LinkType, ColboxOrLink, CollisionBox, CollisionBox
 use pf_sandbox_lib::geometry::Rect;
 use pf_sandbox_lib::stage::Surface;
 use pf_sandbox_lib::package::{Package, PackageUpdate};
-use player::RenderShield;
-use graphics;
-use player::RenderPlayer;
-use game::SurfaceSelection;
+use crate::player::RenderShield;
+use crate::graphics;
+use crate::player::RenderPlayer;
+use crate::game::SurfaceSelection;
 
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
