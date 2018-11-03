@@ -49,28 +49,28 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 mod vs {
-    crate::vulkano_shaders::shader!{
+    vulkano_shaders::shader!{
         ty: "vertex",
         path: "src/shaders/generic-vertex.glsl"
     }
 }
 
 mod fs {
-    crate::vulkano_shaders::shader!{
+    vulkano_shaders::shader!{
         ty: "fragment",
         path: "src/shaders/generic-fragment.glsl"
     }
 }
 
 mod surface_vs {
-    crate::vulkano_shaders::shader!{
+    vulkano_shaders::shader!{
         ty: "vertex",
         path: "src/shaders/surface-vertex.glsl"
     }
 }
 
 mod surface_fs {
-    crate::vulkano_shaders::shader!{
+    vulkano_shaders::shader!{
         ty: "fragment",
         path: "src/shaders/surface-fragment.glsl"
     }
@@ -226,7 +226,7 @@ impl VulkanGraphics {
             ).unwrap()
         };
 
-        let render_pass = Arc::new(single_pass_renderpass!(device.clone(),
+        let render_pass = Arc::new(vulkano::single_pass_renderpass!(device.clone(),
             attachments: {
                 multisampled_color: {
                     load:    Clear,

@@ -1,8 +1,5 @@
 #![windows_subsystem = "windows"]
 
-extern crate pf_sandbox_lib;
-extern crate gtk;
-
 use pf_sandbox_lib::panic_handler::Report;
 
 use std::env;

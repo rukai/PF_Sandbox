@@ -1,12 +1,5 @@
 #![windows_subsystem = "windows"]
 
-             extern crate gdk;
-             extern crate gtk;
-             extern crate gilrs_core;
-             extern crate serde_json;
-             extern crate uuid;
-#[macro_use] extern crate pf_sandbox_lib;
-
 mod state;
 
 use uuid::Uuid;
@@ -64,7 +57,7 @@ macro_rules! clone {
 }
 
 fn main() {
-    setup_panic_handler!();
+    pf_sandbox_lib::setup_panic_handler!();
 
     // Need to be careful with the rw lock.
     // It is easy to accidentally create a deadlock by accidentally triggering

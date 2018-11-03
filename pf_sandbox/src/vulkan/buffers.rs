@@ -27,7 +27,7 @@ pub struct Vertex {
     pub edge: f32,
     pub render_id: u32,
 }
-impl_vertex!(Vertex, position, edge, render_id);
+vulkano::impl_vertex!(Vertex, position, edge, render_id);
 
 fn vertex(x: f32, y: f32) -> Vertex {
     Vertex {
@@ -42,7 +42,7 @@ pub struct ColorVertex {
     pub position:  [f32; 2],
     pub color:     [f32; 4],
 }
-impl_vertex!(ColorVertex, position, color);
+vulkano::impl_vertex!(ColorVertex, position, color);
 
 fn colorvertex(x: f32, y: f32, color: [f32; 4]) -> ColorVertex {
     ColorVertex {

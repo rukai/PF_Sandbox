@@ -1,23 +1,3 @@
-#![feature(nll)]
-
-             extern crate backtrace;
-             extern crate bincode;
-             extern crate chrono;
-             extern crate dirs;
-             extern crate enum_traits;
-             extern crate env_logger;
-             extern crate gilrs_core;
-             extern crate os_type;
-             extern crate rand;
-             extern crate reqwest;
-             extern crate serde;
-             extern crate sha2;
-             extern crate toml;
-             extern crate treeflection;
-             extern crate uuid;
-             extern crate winit;
-             extern crate winit_input_helper;
-             extern crate zip;
 #[macro_use] extern crate enum_traits_macros;
 #[macro_use] extern crate log;
 #[macro_use] extern crate matches;
