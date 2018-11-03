@@ -41,6 +41,8 @@ pub struct Menu {
     package_loader:     Option<PackageLoader>,
     game_results:       Option<GameResults>,
     netplay_history:    Vec<NetplayHistory>,
+    prev_fighters_len:  usize,
+    prev_stages_len:    usize,
 }
 
 pub struct NetplayHistory {
@@ -101,6 +103,8 @@ impl Menu {
             package_loader:     None,
             game_results:       None,
             netplay_history:    vec!(),
+            prev_fighters_len:  0,
+            prev_stages_len:    0,
         }
     }
 
@@ -204,10 +208,15 @@ impl Menu {
 
     /// If controllers are added or removed then the indexes
     /// are going be out of whack so just reset the fighter selection state
+    /// If fighters were added to the package then it will also be out of whack, so reset.
     /// If a controller is added on the same frame another is removed, then no reset occurs.
+    /// Same for add+remove fighters.
     /// However this is rare and the problem is minor, so ¯\_(ツ)_/¯
     fn add_remove_fighter_selections(&mut self, player_inputs: &[PlayerInput]) {
-        if self.fighter_selections.iter().filter(|x| !x.ui.is_cpu()).count() != player_inputs.len() {
+        if self.fighter_selections.iter().filter(|x| !x.ui.is_cpu()).count() != player_inputs.len() // number of controllers is out of sync
+            || self.package.get().fighters.len() != self.prev_fighters_len // number of fighters is out of sync
+        {
+            self.prev_fighters_len = self.package.get().fighters.len();
             self.fighter_selections.clear();
             for (i, input) in player_inputs.iter().enumerate() {
                 let ui = if input.plugged_in {
@@ -494,22 +503,21 @@ impl Menu {
     }
 
     fn step_stage_select(&mut self, player_inputs: &[PlayerInput], netplay: &Netplay) {
-        if let None = self.stage_ticker {
+        if self.stage_ticker.is_none() || self.package.get().stages.len() != self.prev_stages_len {
+            self.prev_stages_len = self.package.get().stages.len();
             self.stage_ticker = Some(MenuTicker::new(self.package.get().stages.len()));
         }
 
-        {
-            let ticker = self.stage_ticker.as_mut().unwrap();
+        let ticker = self.stage_ticker.as_mut().unwrap();
 
-            if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
-                ticker.up();
-            }
-            else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
-                ticker.down();
-            }
-            else {
-                ticker.reset();
-            }
+        if player_inputs.iter().any(|x| x[0].stick_y > 0.4 || x[0].up) {
+            ticker.up();
+        }
+        else if player_inputs.iter().any(|x| x[0].stick_y < -0.4 || x[0].down) {
+            ticker.down();
+        }
+        else {
+            ticker.reset();
         }
 
         if (player_inputs.iter().any(|x| x.start.press || x.a.press)) && self.package.get().stages.len() > 0 {
