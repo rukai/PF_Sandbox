@@ -9,7 +9,7 @@ use crate::game::{GameState, RenderEntity, RenderGame};
 use crate::graphics::{self, GraphicsMessage, Render, RenderType};
 use crate::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
 use crate::particle::ParticleType;
-use crate::player::{RenderFighter, RenderPlayer, DebugPlayer};
+use crate::player::{RenderFighter, RenderPlayer, RenderPlayerFrame, DebugPlayer};
 use crate::results::PlayerResult;
 
 use enum_traits::{FromIndex, ToIndex};
@@ -591,7 +591,7 @@ impl VulkanGraphics {
         for entity in entities {
             if let &RenderEntity::Player(ref player) = entity {
                 location += distance;
-                match Action::from_index(player.action as u64) {
+                match Action::from_index(player.frames[0].action as u64) {
                     Some(Action::Eliminated) => { }
                     _ => {
                         let c = player.fighter_color.clone();
@@ -735,10 +735,6 @@ impl VulkanGraphics {
             let z_particle_bg = 0.8 - i as f32 * 0.00001;
             match entity {
                 &RenderEntity::Player(ref player) => {
-                    let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
-                    let rotate   = Matrix4::from_angle_z(Rad(player.angle));
-                    let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, z_player));
-
                     // draw player ecb
                     if player.debug.ecb {
                         let buffers = Buffers::new_player(self.device.clone(), &player);
@@ -748,10 +744,21 @@ impl VulkanGraphics {
                         } else {
                             [1.0, 1.0, 1.0, 1.0]
                         };
+                        let dir      = Matrix4::from_nonuniform_scale(if player.frames[0].face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                        let position = Matrix4::from_translation(Vector3::new(player.frames[0].bps.0 + pan.0, player.frames[0].bps.1 + pan.1, z_player));
                         let transformation = position * dir;
 
                         command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers, &transformation, edge_color, color);
                     }
+
+                    fn player_matrix(frame: &RenderPlayerFrame, pan: (f32, f32), z_player: f32) -> Matrix4<f32> {
+                        let dir      = Matrix4::from_nonuniform_scale(if frame.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                        let rotate   = Matrix4::from_angle_z(Rad(frame.angle));
+                        let position = Matrix4::from_translation(Vector3::new(frame.bps.0 + pan.0, frame.bps.1 + pan.1, z_player));
+                        position * rotate * dir
+                    }
+
+                    let transformation = player_matrix(&player.frames[0], pan, z_player);
 
                     // draw fighter
                     match player.debug.fighter {
@@ -767,10 +774,26 @@ impl VulkanGraphics {
                                 let c = player.fighter_color.clone();
                                 [c[0], c[1], c[2], 1.0]
                             };
-                            let transformation = position * rotate * dir;
+
+                            // draw previous frame onion skin
+                            if let Some(frame) = player.frames.get(2) {
+                                if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &frame.fighter, frame.action, frame.frame) {
+                                    let transformation = player_matrix(frame, pan, z_player);
+                                    let onion_color = [0.4, 0.4, 0.4, 0.4];
+                                    command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, onion_color, onion_color);
+                                }
+                            }
+
+                            if let Some(frame) = player.frames.get(1) {
+                                if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &frame.fighter, frame.action, frame.frame) {
+                                    let transformation = player_matrix(frame, pan, z_player);
+                                    let onion_color = [0.80, 0.80, 0.80, 0.9];
+                                    command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, onion_color, onion_color);
+                                }
+                            }
 
                             // draw fighter
-                            if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &player.fighter, player.action, player.frame) {
+                            if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &player.frames[0].fighter, player.frames[0].action, player.frames[0].frame) {
                                 command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, edge_color, color);
                             }
                             else {
@@ -783,8 +806,7 @@ impl VulkanGraphics {
                     // draw selected colboxes
                     if player.selected_colboxes.len() > 0 {
                         let color = [0.0, 1.0, 0.0, 1.0];
-                        let transformation = position * rotate * dir;
-                        let buffers = self.package_buffers.new_fighter_frame_colboxes(self.device.clone(), &player.fighter, player.action, player.frame, &player.selected_colboxes);
+                        let buffers = self.package_buffers.new_fighter_frame_colboxes(self.device.clone(), &player.frames[0].fighter, player.frames[0].action, player.frames[0].frame, &player.selected_colboxes);
                         command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers, &transformation, color, color);
                     }
 
@@ -800,8 +822,8 @@ impl VulkanGraphics {
                                 let squish_kbg = Matrix4::from_nonuniform_scale(0.6, hitbox.kbg * kb_squish, 1.0);
                                 let squish_bkb = Matrix4::from_nonuniform_scale(0.3, (hitbox.bkb / 100.0) * kb_squish, 1.0); // divide by 100 so the arrows are comparable if the hit fighter is on 100%
                                 let rotate = Matrix4::from_angle_z(Rad(hitbox.angle.to_radians() - f32::consts::PI / 2.0));
-                                let x = player.bps.0 + pan.0 + colbox.point.0;
-                                let y = player.bps.1 + pan.1 + colbox.point.1;
+                                let x = player.frames[0].bps.0 + pan.0 + colbox.point.0;
+                                let y = player.frames[0].bps.1 + pan.1 + colbox.point.1;
                                 let position = Matrix4::from_translation(Vector3::new(x, y, z_debug));
                                 let transformation_bkb = position * rotate * squish_bkb;
                                 let transformation_kbg = position * rotate * squish_kbg;
@@ -816,7 +838,7 @@ impl VulkanGraphics {
                     for (i, arrow) in player.vector_arrows.iter().enumerate() {
                         let squish = Matrix4::from_nonuniform_scale((num_arrows - i as f32) / num_arrows, 1.0, 1.0); // consecutive arrows are drawn slightly thinner so we can see arrows behind
                         let rotate = Matrix4::from_angle_z(Rad(arrow.y.atan2(arrow.x) - f32::consts::PI / 2.0));
-                        let position = Matrix4::from_translation(Vector3::new(player.bps.0 + pan.0, player.bps.1 + pan.1, z_debug));
+                        let position = Matrix4::from_translation(Vector3::new(player.frames[0].bps.0 + pan.0, player.frames[0].bps.1 + pan.1, z_debug));
                         let transformation = position * rotate * squish;
                         command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, arrow_buffers.clone(), &transformation, arrow.color.clone(), arrow.color.clone());
                     }
@@ -1192,19 +1214,23 @@ impl VulkanGraphics {
                         Action::Idle.index() as usize
                     };
 
+                    let frames = vec!(RenderPlayerFrame {
+                        fighter:    fighter_key.clone(),
+                        bps:        (0.0, 0.0),
+                        ecb:        ECB::default(),
+                        face_right: start_x < 0.0,
+                        frame:      selection.animation_frame,
+                        angle:      0.0,
+                        action,
+                    });
+
                     // draw fighter
                     let player = RenderPlayer {
                         team:              selection.team,
                         debug:             DebugPlayer::default(),
                         damage:            0.0,
                         stocks:            None,
-                        bps:               (0.0, 0.0),
-                        ecb:               ECB::default(),
-                        frame:             selection.animation_frame,
                         frame_data:        ActionFrame::default(),
-                        fighter:           fighter_key.clone(),
-                        face_right:        start_x < 0.0,
-                        angle:             0.0,
                         fighter_color:     graphics::get_team_color3(selection.team),
                         fighter_selected:  false,
                         player_selected:   false,
@@ -1212,7 +1238,7 @@ impl VulkanGraphics {
                         shield:            None,
                         vector_arrows:     vec!(),
                         particles:         vec!(),
-                        action,
+                        frames,
                     };
 
                     // fudge player data TODO: One day I would like to have the menu selection fighters (mostly) playable
@@ -1222,7 +1248,7 @@ impl VulkanGraphics {
 
                     let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
                     let position = Matrix4::from_translation(Vector3::new(fighter_x, fighter_y, 0.0));
-                    let dir      = Matrix4::from_nonuniform_scale(if player.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                    let dir      = Matrix4::from_nonuniform_scale(if player.frames[0].face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
                     let transformation = position * (camera * dir);
                     let uniform = vs::ty::Data {
                         edge_color:     graphics::get_team_color4(selection.team),
@@ -1232,9 +1258,9 @@ impl VulkanGraphics {
                     let set = self.new_uniform_set(uniform);
 
                     let entity = MenuEntity::Fighter {
-                        fighter: player.fighter,
-                        action:  player.action,
-                        frame:   player.frame
+                        fighter: player.frames[0].fighter.clone(),
+                        action:  player.frames[0].action,
+                        frame:   player.frames[0].frame
                     };
 
                     entities.push(MenuEntityAndSet { set, entity });

@@ -232,7 +232,7 @@ impl Game {
 
     fn step_local(&mut self, input: &mut Input, netplay: &Netplay) {
         self.player_history.push(self.players.clone());
-        self.stage_history .push(self.stage.clone());
+        self.stage_history.push(self.stage.clone());
         self.current_frame += 1;
 
         // erase any future history
@@ -1175,7 +1175,7 @@ impl Game {
 
             let fighters = &self.package.fighters;
             let surfaces = &self.stage.surfaces;
-            let player_render = player.render(selected_colboxes, fighter_selected, player_selected, debug, &self.players, fighters, surfaces);
+            let player_render = player.render(selected_colboxes, fighter_selected, player_selected, debug, i, &self.player_history[0..self.current_frame], &self.players, fighters, surfaces);
             entities.push(RenderEntity::Player(player_render));
         }
 

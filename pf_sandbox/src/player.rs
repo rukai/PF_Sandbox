@@ -2455,7 +2455,20 @@ impl Player {
         lines
     }
 
-    pub fn render(&self, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> RenderPlayer {
+    fn render_frame(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> RenderPlayerFrame {
+        let fighter = &fighters[self.fighter.as_ref()];
+        RenderPlayerFrame {
+            fighter:     self.fighter.clone(),
+            bps:         self.public_bps_xy(players, fighters, surfaces),
+            ecb:         self.ecb.clone(),
+            frame:       self.frame as usize,
+            action:      self.action as usize,
+            face_right:  self.face_right,
+            angle:       self.angle(fighter, surfaces),
+        }
+    }
+
+    pub fn render(&self, selected_colboxes: HashSet<usize>, fighter_selected: bool, player_selected: bool, debug: DebugPlayer, player_index: usize, player_history: &[Vec<Player>], players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> RenderPlayer {
         let fighter_color = graphics::get_team_color3(self.team);
         let fighter = &fighters[self.fighter.as_ref()];
         let mut vector_arrows = vec!();
@@ -2507,19 +2520,19 @@ impl Player {
             } else { None }
         } else { None };
 
+        let mut frames = vec!(self.render_frame(players, fighters, surfaces));
+        let range = player_history.len().saturating_sub(10) .. player_history.len();
+        for players in player_history[range].iter().rev() {
+            frames.push(players[player_index].render_frame(players, fighters, surfaces));
+        }
+
         RenderPlayer {
             team:        self.team,
             damage:      self.damage,
             stocks:      self.stocks,
-            bps:         self.public_bps_xy(players, fighters, surfaces),
-            ecb:         self.ecb.clone(),
             frame_data:  self.relative_frame(fighter, surfaces),
-            frame:       self.frame as usize,
-            action:      self.action as usize,
-            fighter:     self.fighter.clone(),
-            face_right:  self.face_right,
             particles:   self.particles.clone(),
-            angle:       self.angle(fighter, surfaces),
+            frames,
             debug,
             fighter_color,
             fighter_selected,
@@ -2698,18 +2711,13 @@ impl JumpResult {
 }
 
 pub struct RenderPlayer {
+    /// Gauranteed to have at least one value (the current frame), and can have up to and including 10 values
+    pub frames: Vec<RenderPlayerFrame>,
     pub team:              usize,
     pub debug:             DebugPlayer,
     pub damage:            f32,
     pub stocks:            Option<u64>,
-    pub bps:               (f32, f32),
-    pub ecb:               ECB,
-    pub frame:             usize,
     pub frame_data:        ActionFrame,
-    pub action:            usize,
-    pub fighter:           String,
-    pub face_right:        bool,
-    pub angle:             f32,
     pub fighter_color:     [f32; 3],
     pub fighter_selected:  bool,
     pub player_selected:   bool,
@@ -2717,6 +2725,16 @@ pub struct RenderPlayer {
     pub shield:            Option<RenderShield>,
     pub vector_arrows:     Vec<VectorArrow>,
     pub particles:         Vec<Particle>,
+}
+
+pub struct RenderPlayerFrame {
+    pub fighter:    String,
+    pub bps:        (f32, f32),
+    pub ecb:        ECB,
+    pub frame:      usize,
+    pub action:     usize,
+    pub face_right: bool,
+    pub angle:      f32,
 }
 
 pub struct RenderShield {
