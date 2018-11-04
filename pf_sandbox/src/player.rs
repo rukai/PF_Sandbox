@@ -275,8 +275,16 @@ impl Player {
 
     pub fn grab_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> (f32, f32) {
         let (x, y) = self.public_bps_xy(players, fighters, surfaces);
-        let fighter_frame = &fighters[self.fighter.as_ref()].actions[self.action as usize].frames[self.frame as usize];
-        (x + fighter_frame.grab_hold_x, y + fighter_frame.grab_hold_y)
+        let fighter_actions = &fighters[self.fighter.as_ref()].actions;
+        if fighter_actions.len() > self.action as usize {
+            let fighter_frames = &fighter_actions[self.action as usize].frames;
+            if fighter_frames.len() > self.frame as usize {
+                let fighter_frame = &fighter_frames[self.frame as usize];
+                return (x + fighter_frame.grab_hold_x, y + fighter_frame.grab_hold_y)
+            }
+        }
+        // We have ended up in an invalid state due to the editor, this is the best we can do.
+        (x, y)
     }
 
     pub fn is_platform(&self) -> bool {
@@ -2455,6 +2463,24 @@ impl Player {
         lines
     }
 
+    pub fn angle(&self, fighter: &Fighter, surfaces: &[Surface]) -> f32 {
+        if fighter.actions.len() > self.action as usize {
+            let fighter_frames = &fighter.actions[self.action as usize].frames;
+            if fighter_frames.len() > self.frame as usize {
+                let fighter_frame = &fighter_frames[self.frame as usize];
+                return match self.location {
+                    Location::Surface { platform_i, .. } if fighter_frame.use_platform_angle => {
+                        surfaces.get(platform_i).map_or(0.0, |x| x.floor_angle().unwrap_or_default())
+                    }
+                    _ => 0.0,
+                }
+            }
+        }
+
+        // We have ended up in an invalid state due to the editor, this is the best we can do.
+        0.0
+    }
+
     fn render_frame(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> RenderPlayerFrame {
         let fighter = &fighters[self.fighter.as_ref()];
         RenderPlayerFrame {
@@ -2523,7 +2549,11 @@ impl Player {
         let mut frames = vec!(self.render_frame(players, fighters, surfaces));
         let range = player_history.len().saturating_sub(10) .. player_history.len();
         for players in player_history[range].iter().rev() {
-            frames.push(players[player_index].render_frame(players, fighters, surfaces));
+            let player = &players[player_index];
+            // handle deleted frames by just skipping it, only encountered when the editor is used.
+            if fighter.actions[player.action as usize].frames.len() > player.frame as usize {
+                frames.push(players[player_index].render_frame(players, fighters, surfaces));
+            }
         }
 
         RenderPlayer {
@@ -2540,16 +2570,6 @@ impl Player {
             selected_colboxes,
             shield,
             vector_arrows,
-        }
-    }
-
-    pub fn angle(&self, fighter: &Fighter, surfaces: &[Surface]) -> f32 {
-        let fighter_frame = &fighter.actions[self.action as usize].frames[self.frame as usize];
-        match self.location {
-            Location::Surface { platform_i, .. } if fighter_frame.use_platform_angle => {
-                surfaces.get(platform_i).map_or(0.0, |x| x.floor_angle().unwrap_or_default())
-            }
-            _ => 0.0,
         }
     }
 
