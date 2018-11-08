@@ -32,6 +32,6 @@ toml = "0.4"
 treeflection = "0.1"
 treeflection_derive = "0.3"
 uuid = { version = "0.7", features = ["v4", "serde"] }
-winit = "0.17" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
-winit_input_helper = "0.1"
+winit = "0.18" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
+winit_input_helper = "0.2"
 zip = "0.4"

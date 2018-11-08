@@ -6,13 +6,11 @@ description = "TAS tool for PF sandbox"
 license = "GPL-3.0"
 repository = "https://github.com/rukai/pf_sandbox"
 keywords = ["pf", "sandbox", "TAS"]
+edition = "2018"
 
 [dependencies]
-winit = "0.17"
-vulkano = "0.10"
-vulkano-win = "0.10"
-vulkano-shader-derive = "0.10"
-vulkano_text = "0.8"
 serde_json = "1.0"
 serde_derive = "1.0"
 serde = "1.0"
+gdk = "0.9"
+gtk = { version = "0.5", features = ["v3_12"] }

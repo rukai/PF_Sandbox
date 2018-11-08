@@ -1,49 +1,45 @@
 #![windows_subsystem = "windows"]
 
-extern crate serde_json;
-extern crate winit;
-extern crate vulkano_win;
-extern crate vulkano_text;
-#[macro_use] extern crate vulkano;
-#[macro_use] extern crate serde_derive;
-
-pub mod graphics;
-pub mod input;
-pub mod state;
-pub mod controller;
-pub mod connection;
-
-use std::time::{Instant, Duration};
-use std::thread;
-
-use graphics::Graphics;
-use input::Input;
-use state::State;
-use winit::EventsLoop;
+use gtk::prelude::*;
+use gtk::{
+    Box,
+    Button,
+    Label,
+    Orientation,
+    Window,
+    WindowType,
+};
 
 fn main() {
-    let mut events_loop = EventsLoop::new();
-    let mut graphics = Graphics::new(&mut events_loop);
-    let mut input = Input::new(events_loop);
-    let mut state = State::new();
+    gtk::init().unwrap();
 
-    loop {
-        let frame_start = Instant::now();
+    let window = Window::new(WindowType::Toplevel);
+    window.set_title("PF TAS");
 
-        input.update();
-        state.update(&input);
-        connection::send(&mut state);
-        graphics.draw(&state);
+    let vbox = Box::new(Orientation::Vertical, 5);
+    vbox.set_margin_start(10);
+    vbox.set_margin_end(10);
+    vbox.set_margin_top(10);
+    vbox.set_margin_bottom(10);
+    window.add(&vbox);
 
-        if input.quit() {
-            connection::quit();
-            return; // TODO: Despite hitting this return, my laptop does not close the program o.0 Attach a debugger I guess.
-        }
+    let label_text = format!("Uhhh ... I kind of deleted the tas tool because it was garbage and needed to be rewritten and I didnt want to maintain the existing tool anymore. Sorry...");
+    let label = Label::new(label_text.as_ref());
+    vbox.add(&label);
 
-        let frame_duration = Duration::from_secs(1) / 60;
-        let frame_duration_actual = frame_start.elapsed();
-        if frame_duration_actual < frame_duration {
-            thread::sleep(frame_duration - frame_start.elapsed());
-        }
-    }
+    let hbox = Box::new(Orientation::Horizontal, 5);
+    vbox.add(&hbox);
+    let button = Button::new_with_label("Close");
+    button.connect_clicked(|_| {
+        gtk::main_quit();
+    });
+    hbox.add(&button);
+
+    window.show_all();
+    window.connect_delete_event(|_, _| {
+        gtk::main_quit();
+        Inhibit(false)
+    });
+
+    gtk::main();
 }
