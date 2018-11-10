@@ -15,33 +15,20 @@ set -ev
     done
 ) &
 
-# test
-#cargo test --release -v --all -j 2 # temp disabled for gtk version
+# test and build
+cargo test --release -v --all -j 2
 cd pf_sandbox
 cargo build --release --no-default-features
 cd ..
-
-# build
-#cargo build --release --all -j 2
-# START TEMP - Manually build each crate as we cant build pf_map_controllers or panic_handler of pf_tas because travis has ancient GTK version
-cd pf_sandbox
-cargo test --release -v -j 2
-cargo build --release -j 2
-cd ../pf_sandbox_lib
-cargo test --release -v -j 2
-cd ../pf_cli
-cargo test --release -v -j 2
-cargo build --release -j 2
-cd ..
-# END TEMP
-mkdir pf
+cargo build --release --all -j 2
 
 if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then
     # package
+    mkdir pf
     mv target/release/pf_sandbox pf/
-    #mv target/release/pf_tas pf/ # Temp disabled
+    mv target/release/pf_tas pf/
     mv target/release/pf_cli pf/
-    #mv target/release/pf_map_controllers pf/ # Temp disabled
+    mv target/release/pf_map_controllers pf/
     tar -cvzf pfsandbox-${TRAVIS_COMMIT:0:15}-linux.tar.gz pf
 
     # upload
