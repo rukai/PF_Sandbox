@@ -17,7 +17,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "1"
 enum_traits = "0.3"
 enum_traits_macros = "2.0"
-env_logger = "0.5"
+env_logger = "0.6"
 gilrs-core = "0.1"
 log = "0.4"
 matches = "0.1"
