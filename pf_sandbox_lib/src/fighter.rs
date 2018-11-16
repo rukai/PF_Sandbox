@@ -502,7 +502,8 @@ impl Default for LinkType {
 pub enum Action {
     // Idle
     Spawn,
-    SpawnIdle,
+    ReSpawn,
+    ReSpawnIdle,
     Idle,
     Crouch,
     LedgeIdle,

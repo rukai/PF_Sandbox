@@ -898,10 +898,9 @@ impl VulkanGraphics {
                 }
 
                 &RenderEntity::SpawnPoint (ref render_point) => {
-                    let point = &render_point.point;
                     let buffers = Buffers::new_spawn_point(self.device.clone());
-                    let flip = Matrix4::from_nonuniform_scale(if point.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
-                    let position = Matrix4::from_translation(Vector3::new(point.x + pan.0, point.y + pan.1, z_debug));
+                    let flip = Matrix4::from_nonuniform_scale(if render_point.face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                    let position = Matrix4::from_translation(Vector3::new(render_point.x + pan.0, render_point.y + pan.1, z_debug));
                     let transformation = position * flip;
                     command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers, &transformation, render_point.color.clone(), render_point.color.clone())
                 }

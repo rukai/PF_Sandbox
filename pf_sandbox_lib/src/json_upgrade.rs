@@ -2,7 +2,7 @@ use serde_json::{Value, Number};
 
 pub fn build_version() -> String { String::from(env!("BUILD_VERSION")) }
 
-pub fn engine_version() -> u64 { 13 }
+pub fn engine_version() -> u64 { 14 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
@@ -34,6 +34,7 @@ pub(crate) fn upgrade_to_latest_fighter(fighter: &mut Value, file_name: &str) {
     else if fighter_engine_version < engine_version() {
         for upgrade_from in fighter_engine_version..engine_version() {
             match upgrade_from {
+                13 => { upgrade_fighter13(fighter) }
                 12 => { upgrade_fighter12(fighter) }
                 11 => { upgrade_fighter11(fighter) }
                 10 => { upgrade_fighter10(fighter) }
@@ -61,7 +62,12 @@ pub(crate) fn upgrade_to_latest_stage(stage: &mut Value, file_name: &str) {
         // TODO: Display warning in window
     }
     else if stage_engine_version < engine_version() {
-        // TODO: Handle upgrades here
+        for upgrade_from in stage_engine_version..engine_version() {
+            match upgrade_from {
+                13 => { upgrade_stage13(stage) }
+                _ => { }
+            }
+        }
         upgrade_engine_version(stage);
     }
 }
@@ -103,6 +109,40 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
+//
+/// Add power shield state
+fn upgrade_fighter13(fighter: &mut Value) {
+    let action = json!({
+      "frames": [
+        {
+          "ecb": {
+            "top": 16.0,
+            "left": -4.0,
+            "right": 4.0,
+            "bottom": 0.0
+          },
+          "colboxes": [],
+          "colbox_links": [],
+          "render_order": [],
+          "effects": [],
+          "item_hold_x": 4.0,
+          "item_hold_y": 11.0,
+          "grab_hold_x": 4.0,
+          "grab_hold_y": 11.0,
+          "pass_through": true,
+          "ledge_cancel": false,
+          "use_platform_angle": false,
+          "ledge_grab_box": null,
+          "force_hitlist_reset": false
+        }
+      ],
+      "iasa": 0
+    });
+
+    if let Some (actions) = get_vec(fighter, "actions") {
+        actions.insert(0, action.clone());
+    }
+}
 
 /// add enable_reverse_hit to Hit
 fn upgrade_fighter12(fighter: &mut Value) {
@@ -447,5 +487,11 @@ fn upgrade_fighter0(fighter: &mut Value) {
                 }
             }
         }
+    }
+}
+
+fn upgrade_stage13(stage: &mut Value) {
+    if let Some (spawn_points) = get_vec(stage, "spawn_points") {
+        spawn_points.clear();
     }
 }

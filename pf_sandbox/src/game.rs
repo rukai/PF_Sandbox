@@ -1,21 +1,22 @@
+use crate::camera::Camera;
+use crate::collision::collision_check;
+use crate::graphics::{GraphicsMessage, Render, RenderType};
+use crate::input::Input;
+use crate::menu::ResumeMenu;
+use crate::player::{Player, RenderPlayer, DebugPlayer, StepContext};
+use crate::replays::Replay;
+use crate::replays;
+use crate::results::{GameResults, RawPlayerResult, PlayerResult};
+
 use pf_sandbox_lib::command_line::CommandLine;
 use pf_sandbox_lib::config::Config;
 use pf_sandbox_lib::fighter::{ActionFrame, CollisionBox, LinkType, Action};
 use pf_sandbox_lib::geometry::Rect;
 use pf_sandbox_lib::input::{PlayerInput, ControllerInput};
 use pf_sandbox_lib::network::Netplay;
-use pf_sandbox_lib::rules::Goal;
-use pf_sandbox_lib::stage::{Stage, DebugStage, SpawnPoint, Surface, Floor};
-use crate::camera::Camera;
-use crate::collision::collision_check;
-use crate::graphics::{GraphicsMessage, Render, RenderType};
-use crate::input::Input;
-use crate::menu::ResumeMenu;
 use pf_sandbox_lib::package::Package;
-use crate::player::{Player, RenderPlayer, DebugPlayer, StepContext};
-use crate::replays::Replay;
-use crate::replays;
-use crate::results::{GameResults, RawPlayerResult, PlayerResult};
+use pf_sandbox_lib::rules::Goal;
+use pf_sandbox_lib::stage::{Stage, DebugStage, ReSpawnPoint, SpawnPoint, Surface, Floor};
 
 use rand::{StdRng, SeedableRng};
 use std::cmp::Ordering;
@@ -81,8 +82,7 @@ impl Game {
                 // Stage can have less spawn points then players
                 let fighter = player.fighter.clone();
                 let team = player.team;
-                let spawn = stage.spawn_points[i % stage.spawn_points.len()].clone();
-                players.push(Player::new(fighter, team, spawn, &package));
+                players.push(Player::new(fighter, team, i, &stage, &package));
                 debug_players.push(Default::default());
             }
         }
@@ -574,7 +574,6 @@ impl Game {
                     for (i, spawn) in self.stage.spawn_points.iter_mut().enumerate() {
                         if self.selector.spawn_points.contains(&i) {
                             spawn.x += d_x;
-                            spawn.y += d_y;
                         }
                     }
 
@@ -625,7 +624,7 @@ impl Game {
                             self.stage.respawn_points.remove(respawn_i);
                         }
 
-                        let mut surfaces_to_delete: Vec<usize> = self.selector.surfaces_vec();
+                        let mut surfaces_to_delete = self.selector.surfaces_vec();
                         surfaces_to_delete.sort();
                         surfaces_to_delete.reverse();
                         let players = self.players.clone();
@@ -664,15 +663,17 @@ impl Game {
                     }
                     // add spawn point
                     if os_input.key_pressed(VirtualKeyCode::Z) {
-                        if let Some((m_x, m_y)) = os_input.game_mouse(self.camera.for_winit_helper()) {
-                            self.stage.spawn_points.push(SpawnPoint::new(m_x, m_y));
+                        if let Some((m_x, _)) = os_input.game_mouse(self.camera.for_winit_helper()) {
+                            for surface_i in self.selector.surfaces_vec() {
+                                self.stage.spawn_points.push(SpawnPoint::new(surface_i, m_x));
+                            }
                             self.update_frame();
                         }
                     }
                     // add respawn point
                     if os_input.key_pressed(VirtualKeyCode::X) {
                         if let Some((m_x, m_y)) = os_input.game_mouse(self.camera.for_winit_helper()) {
-                            self.stage.respawn_points.push(SpawnPoint::new(m_x, m_y));
+                            self.stage.respawn_points.push(ReSpawnPoint::new(m_x, m_y));
                             self.update_frame();
                         }
                     }
@@ -749,7 +750,8 @@ impl Game {
                 if let Some((m_x, m_y)) = self.selector.step_single_selection(os_input, &self.camera) {
                     if self.debug_stage.spawn_points {
                         for (i, point) in self.stage.spawn_points.iter().enumerate() {
-                            let distance = ((m_x - point.x).powi(2) + (m_y - point.y).powi(2)).sqrt();
+                            let xy = point.world_xy(&self.stage.surfaces);
+                            let distance = ((m_x - xy.0).powi(2) + (m_y - xy.1).powi(2)).sqrt();
                             if distance < 4.0 {
                                 if os_input.held_alt() {
                                     self.selector.spawn_points.remove(&i);
@@ -795,7 +797,8 @@ impl Game {
                 if let Some(rect) = self.selector.step_multiple_selection(os_input, &self.camera) {
                     if self.debug_stage.spawn_points {
                         for (i, point) in self.stage.spawn_points.iter().enumerate() {
-                            if rect.contains_point(point.x, point.y) { // TODO: check entire half of surface, not just the edge
+                            let xy = point.world_xy(&self.stage.surfaces);
+                            if rect.contains_point(xy.0, xy.1) { // TODO: check entire half of surface, not just the edge
                                 if os_input.held_alt() {
                                     self.selector.spawn_points.remove(&i);
                                 } else {
@@ -1188,19 +1191,20 @@ impl Game {
         }
         if self.debug_stage.spawn_points {
             for (i, point) in self.stage.spawn_points.iter().enumerate() {
+                let point = point.clone();
                 if self.selector.spawn_points.contains(&i) {
-                    entities.push(RenderEntity::spawn_point(point.clone(), 0.0, 1.0, 0.0));
+                    entities.push(RenderEntity::spawn_point(point, &self.stage.surfaces, 0.0, 1.0, 0.0));
                 } else {
-                    entities.push(RenderEntity::spawn_point(point.clone(), 1.0, 0.0, 1.0));
+                    entities.push(RenderEntity::spawn_point(point, &self.stage.surfaces, 1.0, 0.0, 1.0));
                 }
             }
         }
         if self.debug_stage.respawn_points {
             for (i, point) in self.stage.respawn_points.iter().enumerate() {
                 if self.selector.respawn_points.contains(&i) {
-                    entities.push(RenderEntity::spawn_point(point.clone(), 0.0, 1.0, 0.0));
+                    entities.push(RenderEntity::respawn_point(point.clone(), 0.0, 1.0, 0.0));
                 } else {
-                    entities.push(RenderEntity::spawn_point(point.clone(), 1.0, 1.0, 0.0));
+                    entities.push(RenderEntity::respawn_point(point.clone(), 1.0, 1.0, 0.0));
                 }
             }
         }
@@ -1433,10 +1437,25 @@ impl RenderEntity {
             }
         )
     }
-    pub fn spawn_point(point: SpawnPoint, r: f32, g: f32, b: f32) -> RenderEntity {
+
+    pub fn respawn_point(point: ReSpawnPoint, r: f32, g: f32, b: f32) -> RenderEntity {
         RenderEntity::SpawnPoint (
             RenderSpawnPoint {
-                point,
+                x: point.x,
+                y: point.y,
+                face_right: point.face_right,
+                color: [r, g, b, 1.0]
+            }
+        )
+    }
+
+    pub fn spawn_point(point: SpawnPoint, surfaces: &[Surface], r: f32, g: f32, b: f32) -> RenderEntity {
+        let xy = point.world_xy(surfaces);
+        RenderEntity::SpawnPoint (
+            RenderSpawnPoint {
+                x: xy.0,
+                y: xy.1,
+                face_right: point.face_right,
                 color: [r, g, b, 1.0]
             }
         )
@@ -1449,7 +1468,9 @@ pub struct RenderRect {
 }
 
 pub struct RenderSpawnPoint {
-    pub point: SpawnPoint,
+    pub x: f32,
+    pub y: f32,
+    pub face_right: bool,
     pub color: [f32; 4]
 }
 

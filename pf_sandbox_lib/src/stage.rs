@@ -13,7 +13,7 @@ pub struct Stage {
     pub blast:          Rect,
     pub camera:         Rect,
     pub spawn_points:   ContextVec<SpawnPoint>,
-    pub respawn_points: ContextVec<SpawnPoint>,
+    pub respawn_points: ContextVec<ReSpawnPoint>,
 }
 
 impl Default for Stage {
@@ -62,25 +62,48 @@ impl Default for Stage {
             y2:  150.0,
         };
 
-        let spawn_points = ContextVec::from_vec(vec!(
-            SpawnPoint {
+        let respawn_points = ContextVec::from_vec(vec!(
+            ReSpawnPoint {
                 x:          -50.0,
                 y:          10.0,
                 face_right: true,
             },
-            SpawnPoint {
+            ReSpawnPoint {
                 x:          -25.0,
                 y:          10.0,
                 face_right: false,
             },
-            SpawnPoint {
+            ReSpawnPoint {
                 x:          25.0,
                 y:          10.0,
                 face_right: true,
             },
-            SpawnPoint {
+            ReSpawnPoint {
                 x:          50.0,
                 y:          50.0,
+                face_right: false,
+            },
+        ));
+
+        let spawn_points = ContextVec::from_vec(vec!(
+            SpawnPoint {
+                surface_i:  0,
+                x:          -50.0,
+                face_right: true,
+            },
+            SpawnPoint {
+                surface_i:  0,
+                x:          -25.0,
+                face_right: false,
+            },
+            SpawnPoint {
+                surface_i:  0,
+                x:          25.0,
+                face_right: true,
+            },
+            SpawnPoint {
+                surface_i:  0,
+                x:          50.0,
                 face_right: false,
             },
         ));
@@ -91,8 +114,8 @@ impl Default for Stage {
             surfaces:       ContextVec::from_vec(vec!(main_platform, second_platform)),
             blast:          blast,
             camera:         camera,
-            spawn_points:   spawn_points.clone(),
-            respawn_points: spawn_points,
+            spawn_points:   spawn_points,
+            respawn_points: respawn_points,
         }
     }
 }
@@ -309,14 +332,35 @@ impl Surface {
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]
 pub struct SpawnPoint {
+    pub surface_i: usize,
+    pub x: f32,
+    pub face_right: bool,
+}
+
+impl SpawnPoint {
+    pub fn new(surface_i: usize, x: f32) -> SpawnPoint {
+        SpawnPoint {
+            surface_i,
+            x,
+            face_right: true
+        }
+    }
+
+    pub fn world_xy(&self, surfaces: &[Surface]) -> (f32, f32) {
+        (0.0, 0.0)
+    }
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Node)]
+pub struct ReSpawnPoint {
     pub x:          f32,
     pub y:          f32,
     pub face_right: bool,
 }
 
-impl SpawnPoint {
-    pub fn new(x: f32, y: f32) -> SpawnPoint {
-        SpawnPoint {
+impl ReSpawnPoint {
+    pub fn new(x: f32, y: f32) -> ReSpawnPoint {
+        ReSpawnPoint {
             x,
             y,
             face_right: true

@@ -3,7 +3,7 @@ use pf_sandbox_lib::geometry::Rect;
 use pf_sandbox_lib::geometry;
 use pf_sandbox_lib::input::{PlayerInput};
 use pf_sandbox_lib::package::Package;
-use pf_sandbox_lib::stage::{Stage, Surface, SpawnPoint};
+use pf_sandbox_lib::stage::{Stage, Surface};
 
 use crate::collision::CollisionResult;
 use crate::graphics;
@@ -125,6 +125,7 @@ pub struct Player {
     pub team:               usize,
     pub action:             u64, // always change through next_action
     pub set_action_called:  bool,
+    pub new_action:         bool,
 
     // frame count values:
     // == -1 doesnt correspond to a frame in the fighter data, used for the action logic triggered directly after action state transition, must never be in this state after action_step()
@@ -175,23 +176,38 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(fighter: String, team: usize, spawn: SpawnPoint, package: &Package) -> Player {
+    pub fn new(fighter: String, team: usize, player_i: usize, stage: &Stage, package: &Package) -> Player {
+        let (location, face_right) = if stage.spawn_points.len() == 0 {
+            // There are no spawn points, we could attempt to find a floor surface and put the
+            // player there, however there still might be no floor, so to keep this simple we
+            // just place the player in midair even though this interacts weirdly with Action::Idle
+            // which is supposed to be grounded.
+            (
+                Location::Airbourne { x: 0.0, y: 0.0 },
+                true
+            )
+        } else {
+            let spawn = stage.spawn_points[player_i % stage.spawn_points.len()].clone();
+            (
+                Location::Surface { platform_i: spawn.surface_i, x: spawn.x },
+                spawn.face_right
+            )
+        };
+
         Player {
             action:             Action::DummyFramePreStart.index(),
             set_action_called:  false,
-            team:               team,
+            new_action:         false,
             frame:              0,
             frame_norestart:    0,
             stocks:             package.rules.stock_count,
             damage:             0.0,
-            location:           Location::Airbourne { x: spawn.x, y: spawn.y },
             x_vel:              0.0,
             y_vel:              0.0,
             kb_x_vel:           0.0,
             kb_y_vel:           0.0,
             kb_x_dec:           0.0,
             kb_y_dec:           0.0,
-            face_right:         spawn.face_right,
             frames_since_ledge: 0,
             ledge_idle_timer:   0,
             fastfalled:         false,
@@ -215,7 +231,10 @@ impl Player {
             particles:          vec!(),
             aerial_dodge_frame: None,
             result:             RawPlayerResult::default(),
-            fighter:            fighter,
+            team,
+            fighter,
+            location,
+            face_right,
 
             // Only use for debug display
             frames_since_hit:  0,
@@ -363,6 +382,7 @@ impl Player {
         self.set_action_called = true;
 
         if self.action != action {
+            self.new_action = true;
             self.frame = -1;
             self.frame_norestart = -1;
             self.action = action;
@@ -707,6 +727,7 @@ impl Player {
         }
 
         self.set_action_called = false;
+        self.new_action = false;
         self.frame_step(context);
 
         let action_frames = context.fighter.actions[self.action as usize].frames.len() as i64;
@@ -717,6 +738,8 @@ impl Player {
 
         if !self.set_action_called { // action_expired() can call set_action()
             self.frame += 1;
+        }
+        if !self.new_action {
             self.frame_norestart += 1;
         }
     }
@@ -724,11 +747,15 @@ impl Player {
     fn frame_step(&mut self, context: &mut StepContext) {
         if let Some(action) = Action::from_index(self.action) {
             match action {
-                Action::SpawnIdle  | Action::Fall |
+                Action::Spawn => { }
+                Action::ReSpawn => { }
+                Action::ReSpawnIdle => self.spawn_idle(context),
+
                 Action::AerialFall | Action::JumpAerialF |
                 Action::Fair       | Action::Bair |
                 Action::Dair       | Action::Uair |
-                Action::Nair       | Action::JumpAerialB
+                Action::Nair       | Action::JumpAerialB |
+                Action::Fall
                 => self.aerial_action(context),
 
                 Action::JumpF      | Action::JumpB
@@ -926,6 +953,23 @@ impl Player {
         else {
             self.fastfall_action(context);
             self.air_drift(context);
+        }
+    }
+
+    fn spawn_idle(&mut self, context: &mut StepContext) {
+        if self.check_attacks_aerial(context) { }
+        else if context.input.b.press {
+            // special attack
+        }
+        else if self.check_jump_aerial(context) { }
+        else if context.input.l.press || context.input.r.press {
+            self.aerialdodge(context);
+        }
+        else if context.input[0].stick_x.abs() > 0.2 || context.input[0].stick_y.abs() > 0.2 {
+            self.set_action(context, Action::Fall);
+        }
+        else if self.frame_norestart >= 1000 {
+            self.set_action(context, Action::Fall);
         }
     }
 
@@ -1787,8 +1831,9 @@ impl Player {
             None => panic!("Custom defined action expirations have not been implemented"),
 
             // Idle
-            Some(Action::Spawn)          => self.set_action(context, Action::SpawnIdle),
-            Some(Action::SpawnIdle)      => self.set_action(context, Action::SpawnIdle),
+            Some(Action::Spawn)          => self.set_action(context, Action::Idle),
+            Some(Action::ReSpawn)        => self.set_action(context, Action::ReSpawnIdle),
+            Some(Action::ReSpawnIdle)    => self.set_action(context, Action::ReSpawnIdle),
             Some(Action::Idle)           => self.set_action(context, Action::Idle),
             Some(Action::LedgeIdle)      => self.set_action(context, Action::LedgeIdle),
             Some(Action::Teeter)         => self.set_action(context, Action::TeeterIdle),
@@ -1969,25 +2014,36 @@ impl Player {
 
     pub fn relative_frame(&self, fighter: &Fighter, surfaces: &[Surface]) -> ActionFrame {
         let angle = self.angle(fighter, surfaces);
-        let mut fighter_frame = fighter.actions[self.action as usize].frames[self.frame as usize].clone();
+        println!("self.action {}", self.action);
+        println!("self.frame {}", self.frame);
+        // because this is occuring for the current frame, I think we should never end up in this
+        // state.
+        // However I'm going to do bounds checks to see what the state looks like if it succeeds.
+        if fighter.actions.len() > self.action as usize {
+            let fighter_frames = &fighter.actions[self.action as usize].frames;
+            if fighter_frames.len() > self.frame as usize {
+                let mut fighter_frame = fighter_frames[self.frame as usize].clone();
 
-        // fix hitboxes
-        for colbox in fighter_frame.colboxes.iter_mut() {
-            let (raw_x, y) = colbox.point;
-            let x = self.relative_f(raw_x);
-            let angled_x = x * angle.cos() - y * angle.sin();
-            let angled_y = x * angle.sin() + y * angle.cos();
-            colbox.point = (angled_x, angled_y);
-            if let &mut CollisionBoxRole::Hit (ref mut hitbox) = &mut colbox.role {
-                if !self.face_right {
-                    hitbox.angle = 180.0 - hitbox.angle
-                };
+                // fix hitboxes
+                for colbox in fighter_frame.colboxes.iter_mut() {
+                    let (raw_x, y) = colbox.point;
+                    let x = self.relative_f(raw_x);
+                    let angled_x = x * angle.cos() - y * angle.sin();
+                    let angled_y = x * angle.sin() + y * angle.cos();
+                    colbox.point = (angled_x, angled_y);
+                    if let &mut CollisionBoxRole::Hit (ref mut hitbox) = &mut colbox.role {
+                        if !self.face_right {
+                            hitbox.angle = 180.0 - hitbox.angle
+                        };
+                    }
+                }
+
+                // fix velocity setter
+                fighter_frame.set_x_vel = fighter_frame.set_x_vel.map(|x| self.relative_f(x));
+                return fighter_frame;
             }
         }
-
-        // fix velocity setter
-        fighter_frame.set_x_vel = fighter_frame.set_x_vel.map(|x| self.relative_f(x));
-        fighter_frame
+        ActionFrame::default()
     }
 
     fn specialfall_action(&mut self, context: &mut StepContext) {
@@ -2363,12 +2419,12 @@ impl Player {
                         self.set_action(context, Action::Eliminated);
                     }
                     else {
-                        self.set_action(context, Action::Spawn);
+                        self.set_action(context, Action::ReSpawn);
                     }
                 }
             }
             Goal::KillDeathScore => {
-                self.set_action(context, Action::Spawn);
+                self.set_action(context, Action::ReSpawn);
             }
         }
     }
