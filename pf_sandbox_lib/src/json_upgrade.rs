@@ -62,12 +62,7 @@ pub(crate) fn upgrade_to_latest_stage(stage: &mut Value, file_name: &str) {
         // TODO: Display warning in window
     }
     else if stage_engine_version < engine_version() {
-        for upgrade_from in stage_engine_version..engine_version() {
-            match upgrade_from {
-                13 => { upgrade_stage13(stage) }
-                _ => { }
-            }
-        }
+        // TODO: Handle upgrades here
         upgrade_engine_version(stage);
     }
 }
@@ -110,7 +105,7 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
 //
-/// Add power shield state
+/// Split spawn action into spawn and respawn
 fn upgrade_fighter13(fighter: &mut Value) {
     let action = json!({
       "frames": [
@@ -487,11 +482,5 @@ fn upgrade_fighter0(fighter: &mut Value) {
                 }
             }
         }
-    }
-}
-
-fn upgrade_stage13(stage: &mut Value) {
-    if let Some (spawn_points) = get_vec(stage, "spawn_points") {
-        spawn_points.clear();
     }
 }

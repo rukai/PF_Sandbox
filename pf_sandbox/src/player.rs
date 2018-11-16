@@ -177,21 +177,45 @@ pub struct Player {
 
 impl Player {
     pub fn new(fighter: String, team: usize, player_i: usize, stage: &Stage, package: &Package) -> Player {
-        let (location, face_right) = if stage.spawn_points.len() == 0 {
+        // get the spawn point
+        let spawn = if stage.spawn_points.len() == 0 {
+            None
+        } else {
+            Some(stage.spawn_points[player_i % stage.spawn_points.len()].clone())
+        };
+
+        let location = if let Some(spawn) = &spawn {
+            // find the floor directly beneath the player
+            struct FoundFloor {
+                surface_i: usize,
+                world_y: f32, // The y coordinate of the point on the floor corresponding to the spawnpoints x coordinate.
+            }
+            let mut found_floor = None;
+            for (surface_i, surface) in stage.surfaces.iter().enumerate() {
+                let spawn_x_in_bounds = surface.world_x_in_bounds(spawn.x);
+                let world_y = surface.world_x_to_world_y(spawn.x);
+                let above_plat = world_y <= spawn.y;
+                let closest = found_floor.as_ref().map(|x: &FoundFloor| x.world_y < world_y).unwrap_or(true);
+
+                if surface.floor.is_some() && spawn_x_in_bounds && above_plat && closest {
+                    found_floor = Some(FoundFloor { surface_i, world_y });
+                }
+            }
+
+            if let Some(floor) = found_floor {
+                let surface = &stage.surfaces[floor.surface_i];
+                // place the player on the platform
+                Location::Surface { platform_i: floor.surface_i, x: surface.world_x_to_plat_x(spawn.x) }
+            } else {
+                // no platform just make them airbourne at the exact spawnpoint
+                Location::Airbourne { x: spawn.x, y: spawn.y }
+            }
+        } else {
             // There are no spawn points, we could attempt to find a floor surface and put the
-            // player there, however there still might be no floor, so to keep this simple we
+            // player there, however there might still be no floor, so to keep this rare case simple we
             // just place the player in midair even though this interacts weirdly with Action::Idle
             // which is supposed to be grounded.
-            (
-                Location::Airbourne { x: 0.0, y: 0.0 },
-                true
-            )
-        } else {
-            let spawn = stage.spawn_points[player_i % stage.spawn_points.len()].clone();
-            (
-                Location::Surface { platform_i: spawn.surface_i, x: spawn.x },
-                spawn.face_right
-            )
+            Location::Airbourne { x: 0.0, y: 0.0 }
         };
 
         Player {
@@ -208,6 +232,7 @@ impl Player {
             kb_y_vel:           0.0,
             kb_x_dec:           0.0,
             kb_y_dec:           0.0,
+            face_right:         spawn.map(|x| x.face_right).unwrap_or(false),
             frames_since_ledge: 0,
             ledge_idle_timer:   0,
             fastfalled:         false,
@@ -234,7 +259,6 @@ impl Player {
             team,
             fighter,
             location,
-            face_right,
 
             // Only use for debug display
             frames_since_hit:  0,
@@ -2254,7 +2278,7 @@ impl Player {
     /// returns the index platform that the player will land on
     fn land_stage_collision(&mut self, context: &mut StepContext, old_p: (f32, f32), new_p: (f32, f32)) -> Option<usize> {
         if new_p.1 > old_p.1 {
-            return None;
+            return None
         }
 
         for (surface_i, surface) in context.stage.surfaces.iter().enumerate() {
