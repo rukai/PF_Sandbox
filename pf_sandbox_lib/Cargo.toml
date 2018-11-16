@@ -1,6 +1,6 @@
 [package]
 name = "pf_sandbox_lib"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 description = "Data structures and helper code for PF Sandbox"
 license = "GPL-3.0"
@@ -22,7 +22,7 @@ gilrs-core = "0.1"
 log = "0.4"
 matches = "0.1"
 os_type = "2"
-rand = "0.5"
+rand = "0.6"
 reqwest = "0.9"
 sha2 = "0.8"
 serde = "1"

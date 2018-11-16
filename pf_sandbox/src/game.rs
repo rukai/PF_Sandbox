@@ -18,7 +18,8 @@ use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::rules::Goal;
 use pf_sandbox_lib::stage::{Stage, DebugStage, SpawnPoint, Surface, Floor};
 
-use rand::{StdRng, SeedableRng};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt;

@@ -15,7 +15,7 @@ use std::f32;
 use std::f32::consts::PI;
 use std::collections::HashSet;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
-use rand::StdRng;
+use rand::rngs::StdRng;
 use rand::Rng;
 use enum_traits::{FromIndex, ToIndex};
 use winit::VirtualKeyCode;
