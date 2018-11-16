@@ -318,16 +318,11 @@ impl Player {
 
     pub fn grab_xy(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> (f32, f32) {
         let (x, y) = self.public_bps_xy(players, fighters, surfaces);
-        let fighter_actions = &fighters[self.fighter.as_ref()].actions;
-        if fighter_actions.len() > self.action as usize {
-            let fighter_frames = &fighter_actions[self.action as usize].frames;
-            if fighter_frames.len() > self.frame as usize {
-                let fighter_frame = &fighter_frames[self.frame as usize];
-                return (x + fighter_frame.grab_hold_x, y + fighter_frame.grab_hold_y)
-            }
+        if let Some(fighter_frame) = self.get_fighter_frame(&fighters[self.fighter.as_ref()]) {
+            (x + fighter_frame.grab_hold_x, y + fighter_frame.grab_hold_y)
+        } else {
+            (x, y)
         }
-        // We have ended up in an invalid state due to the editor, this is the best we can do.
-        (x, y)
     }
 
     pub fn is_platform(&self) -> bool {
@@ -587,6 +582,19 @@ impl Player {
      */
 
     pub fn action_hitlag_step(&mut self, context: &mut StepContext) {
+        // If the action or frame is out of bounds jump to a valid one.
+        // This is needed because we can continue from any point in a replay and replays may
+        // contain actions or frames that no longer exist.
+        if self.action as usize >= context.fighter.actions.len() {
+            self.public_set_action(Action::Idle);
+        } else {
+            let fighter_frames = &context.fighter.actions[self.action as usize].frames;
+            if self.frame as usize >= fighter_frames.len() {
+                self.frame = 0;
+            }
+        }
+        // The code from this point onwards can assume we are on a valid action and frame
+
         match self.hitlag.clone() {
             Hitlag::Some (_) => {
                 self.hitlag.decrement();
@@ -2036,38 +2044,51 @@ impl Player {
         }
     }
 
-    pub fn relative_frame(&self, fighter: &Fighter, surfaces: &[Surface]) -> ActionFrame {
-        let angle = self.angle(fighter, surfaces);
-        println!("self.action {}", self.action);
-        println!("self.frame {}", self.frame);
-        // because this is occuring for the current frame, I think we should never end up in this
-        // state.
-        // However I'm going to do bounds checks to see what the state looks like if it succeeds.
+    /// Helper function to safely get the current fighter frame
+    /// Figuring out whether we need to use this helper is kind of messy:
+    ///
+    /// Anything hit by the rendering logic can have the indexes out of whack.
+    /// This has to be the case so that replays can remain as accurate as possible.
+    ///
+    /// However the action_hitlag_step logic will correct any invalid indexes
+    /// So anything hit by the action_hitlag_step logic doesnt need to use this helper
+    /// however its not harmful either.
+    fn get_fighter_frame<'a>(&self, fighter: &'a Fighter) -> Option<&'a ActionFrame> {
         if fighter.actions.len() > self.action as usize {
             let fighter_frames = &fighter.actions[self.action as usize].frames;
             if fighter_frames.len() > self.frame as usize {
-                let mut fighter_frame = fighter_frames[self.frame as usize].clone();
-
-                // fix hitboxes
-                for colbox in fighter_frame.colboxes.iter_mut() {
-                    let (raw_x, y) = colbox.point;
-                    let x = self.relative_f(raw_x);
-                    let angled_x = x * angle.cos() - y * angle.sin();
-                    let angled_y = x * angle.sin() + y * angle.cos();
-                    colbox.point = (angled_x, angled_y);
-                    if let &mut CollisionBoxRole::Hit (ref mut hitbox) = &mut colbox.role {
-                        if !self.face_right {
-                            hitbox.angle = 180.0 - hitbox.angle
-                        };
-                    }
-                }
-
-                // fix velocity setter
-                fighter_frame.set_x_vel = fighter_frame.set_x_vel.map(|x| self.relative_f(x));
-                return fighter_frame;
+                return Some(&fighter_frames[self.frame as usize]);
             }
         }
-        ActionFrame::default()
+        None
+    }
+
+    pub fn relative_frame(&self, fighter: &Fighter, surfaces: &[Surface]) -> ActionFrame {
+        let angle = self.angle(fighter, surfaces);
+        if let Some(fighter_frame) = self.get_fighter_frame(fighter) {
+            let mut fighter_frame = fighter_frame.clone();
+
+            // fix hitboxes
+            for colbox in fighter_frame.colboxes.iter_mut() {
+                let (raw_x, y) = colbox.point;
+                let x = self.relative_f(raw_x);
+                let angled_x = x * angle.cos() - y * angle.sin();
+                let angled_y = x * angle.sin() + y * angle.cos();
+                colbox.point = (angled_x, angled_y);
+                if let &mut CollisionBoxRole::Hit (ref mut hitbox) = &mut colbox.role {
+                    if !self.face_right {
+                        hitbox.angle = 180.0 - hitbox.angle
+                    };
+                }
+            }
+
+            // fix velocity setter
+            fighter_frame.set_x_vel = fighter_frame.set_x_vel.map(|x| self.relative_f(x));
+
+            fighter_frame
+        } else {
+            ActionFrame::default()
+        }
     }
 
     fn specialfall_action(&mut self, context: &mut StepContext) {
@@ -2544,21 +2565,16 @@ impl Player {
     }
 
     pub fn angle(&self, fighter: &Fighter, surfaces: &[Surface]) -> f32 {
-        if fighter.actions.len() > self.action as usize {
-            let fighter_frames = &fighter.actions[self.action as usize].frames;
-            if fighter_frames.len() > self.frame as usize {
-                let fighter_frame = &fighter_frames[self.frame as usize];
-                return match self.location {
-                    Location::Surface { platform_i, .. } if fighter_frame.use_platform_angle => {
-                        surfaces.get(platform_i).map_or(0.0, |x| x.floor_angle().unwrap_or_default())
-                    }
-                    _ => 0.0,
+        if let Some(fighter_frame) = self.get_fighter_frame(fighter) {
+             match self.location {
+                Location::Surface { platform_i, .. } if fighter_frame.use_platform_angle => {
+                    surfaces.get(platform_i).map_or(0.0, |x| x.floor_angle().unwrap_or_default())
                 }
+                _ => 0.0,
             }
+        } else {
+            0.0
         }
-
-        // We have ended up in an invalid state due to the editor, this is the best we can do.
-        0.0
     }
 
     fn render_frame(&self, players: &[Player], fighters: &KeyedContextVec<Fighter>, surfaces: &[Surface]) -> RenderPlayerFrame {
