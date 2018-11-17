@@ -1,25 +1,26 @@
+use crate::collision::CollisionResult;
+use crate::graphics;
+use crate::particle::{Particle, ParticleType};
+use crate::results::{RawPlayerResult, DeathRecord};
+
 use pf_sandbox_lib::fighter::*;
 use pf_sandbox_lib::geometry::Rect;
 use pf_sandbox_lib::geometry;
 use pf_sandbox_lib::input::{PlayerInput};
 use pf_sandbox_lib::package::Package;
+use pf_sandbox_lib::rules::Goal;
 use pf_sandbox_lib::stage::{Stage, Surface};
 
-use crate::collision::CollisionResult;
-use crate::graphics;
-use crate::particle::{Particle, ParticleType};
-use crate::results::{RawPlayerResult, DeathRecord};
-use pf_sandbox_lib::rules::Goal;
+use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
+use rand::Rng;
+use rand_chacha::ChaChaRng;
+use enum_traits::{FromIndex, ToIndex};
+use winit::VirtualKeyCode;
+use winit_input_helper::WinitInputHelper;
 
 use std::f32;
 use std::f32::consts::PI;
 use std::collections::HashSet;
-use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
-use rand::rngs::StdRng;
-use rand::Rng;
-use enum_traits::{FromIndex, ToIndex};
-use winit::VirtualKeyCode;
-use winit_input_helper::WinitInputHelper;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Node)]
 pub enum LockTimer {
@@ -102,7 +103,7 @@ impl Hitlag {
         end
     }
 
-    fn wobble(&mut self, rng: &mut StdRng) {
+    fn wobble(&mut self, rng: &mut ChaChaRng) {
         if let &mut Hitlag::Launch { ref mut wobble_x, .. } = self {
             *wobble_x = (rng.gen::<f32>() - 0.5) * 3.0;
         }
@@ -116,7 +117,7 @@ pub struct StepContext<'a> {
     pub fighter:  &'a Fighter,
     pub stage:    &'a Stage,
     pub surfaces: &'a [Surface],
-    pub rng:      &'a mut StdRng
+    pub rng:      &'a mut ChaChaRng,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Node)]

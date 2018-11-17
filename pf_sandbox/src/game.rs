@@ -18,8 +18,8 @@ use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::rules::Goal;
 use pf_sandbox_lib::stage::{Stage, DebugStage, SpawnPoint, Surface, Floor};
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand_chacha::ChaChaRng;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt;
@@ -944,7 +944,7 @@ impl Game {
 
     fn step_game(&mut self, input: &Input, player_input: &Vec<PlayerInput>) {
         {
-            let mut rng = StdRng::from_seed(self.get_seed());
+            let mut rng = ChaChaRng::from_seed(self.get_seed());
 
             // To synchronize player stepping, we step through player logic in stages (action logic, physics logic, collision logic)
             // Modified players are copied from the previous stage so that every player perceives themselves as being stepped first, within that stage.
