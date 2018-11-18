@@ -729,11 +729,12 @@ impl VulkanGraphics {
         }
 
         for (i, entity) in render.entities.iter().enumerate() {
-            let z_debug       = 0.1 - i as f32 * 0.00001;
-            let z_particle_fg = 0.2 - i as f32 * 0.00001;
-            //let z_shield    = 0.4 - i as f32 * 0.00001; // used in transparent pass below
-            let z_player      = 0.5 - i as f32 * 0.00001;
-            let z_particle_bg = 0.8 - i as f32 * 0.00001;
+            let z_debug        = 0.1  - i as f32 * 0.00001;
+            let z_particle_fg  = 0.2  - i as f32 * 0.00001;
+            //let z_shield     = 0.4  - i as f32 * 0.00001; // used in transparent pass below
+            let z_respawn_plat = 0.45 - i as f32 * 0.00001;
+            let z_player       = 0.5  - i as f32 * 0.00001;
+            let z_particle_bg  = 0.8  - i as f32 * 0.00001;
             match entity {
                 &RenderEntity::Player(ref player) => {
                     // draw player ecb
@@ -890,6 +891,26 @@ impl VulkanGraphics {
                     // TODO: Edit::Player  - render selected player's BPS as green
                     // TODO: Edit::Fighter - Click and drag on ECB points
                     // TODO: Edit::Stage   - render selected surfaces as green
+
+                    // Draw spawn plat
+                    match Action::from_index(player.frames[0].action as u64) {
+                        Some(Action::ReSpawn) | Some(Action::ReSpawnIdle) => {
+                            // TODO: get width from player dimensions
+                            let width = 15.0;
+                            let height = width / 4.0;
+                            let scale = Matrix4::from_nonuniform_scale(width, -height, 1.0); // negative y to point triangle downwards.
+                            let rotate = Matrix4::from_angle_z(Rad(player.frames[0].angle));
+                            let bps = &player.frames[0].bps;
+                            let position = Matrix4::from_translation(Vector3::new(bps.0 + pan.0, bps.1 + pan.1, z_respawn_plat));
+                            let transformation = position * rotate * scale;
+
+                            let c = player.fighter_color.clone();
+                            let color = [c[0], c[1], c[2], 1.0];
+
+                            command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, triangle_buffers.clone(), &transformation, color, color)
+                        }
+                        _ => { }
+                    }
                 }
                 &RenderEntity::RectOutline (ref render_rect) => {
                     let transformation = Matrix4::from_translation(Vector3::new(pan.0, pan.1, 0.0));
