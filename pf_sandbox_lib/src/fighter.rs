@@ -1,5 +1,6 @@
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
-use enum_traits::{Index, ToIndex, Iterable};
+use strum::IntoEnumIterator;
+use num_traits::ToPrimitive;
 
 use crate::json_upgrade::engine_version;
 
@@ -10,7 +11,7 @@ impl Default for Fighter {
             iasa:   0,
         };
         let mut actions: ContextVec<ActionDef> = ContextVec::new();
-        for action in Action::variants() {
+        for action in Action::iter() {
             let mut action_def_new = action_def.clone();
             action_def_new.frames[0].pass_through = match action {
                 Action::Damage     | Action::DamageFly |
@@ -43,7 +44,7 @@ impl Default for Fighter {
 
             // css render
             name:       "Base Fighter".to_string(),
-            css_action: Action::Idle.index(),
+            css_action: Action::Idle.to_u64().unwrap(),
             css_scale:  1.0,
 
             // in game attributes
@@ -498,7 +499,7 @@ impl Default for LinkType {
 }
 
 #[repr(u64)]
-#[derive(Clone, PartialEq, Debug, EnumIndex, EnumFromIndex, EnumToIndex, EnumIter, Serialize, Deserialize, Node)]
+#[derive(Clone, PartialEq, Debug, ToPrimitive, FromPrimitive, EnumIter, Serialize, Deserialize, Node)]
 pub enum Action {
     // Idle
     Spawn,

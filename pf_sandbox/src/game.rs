@@ -25,7 +25,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::time::Duration;
 use chrono::Local;
-use enum_traits::{FromIndex, ToIndex};
+use num_traits::{FromPrimitive, ToPrimitive};
 
 use treeflection::{Node, NodeRunner, NodeToken};
 use winit::VirtualKeyCode;
@@ -371,7 +371,7 @@ impl Game {
                 let fighter_string = self.players[player].fighter.clone();
                 let fighter = fighter_string.as_ref();
                 let action = self.players[player].action as usize;
-                let action_enum = Action::from_index(self.players[player].action);
+                let action_enum = Action::from_u64(self.players[player].action);
                 let frame  = self.players[player].frame as usize;
                 let land_frame_skip  = self.players[player].land_frame_skip;
                 self.debug_players[player].step(os_input);
@@ -1008,8 +1008,8 @@ impl Game {
         }
 
         if self.time_out() ||
-           (self.players.len() == 1 && self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 0) ||
-           (self.players.len() >  1 && self.players.iter().filter(|x| x.action != Action::Eliminated.index()).count() == 1)
+           (self.players.len() == 1 && self.players.iter().filter(|x| x.action != Action::Eliminated.to_u64().unwrap()).count() == 0) ||
+           (self.players.len() >  1 && self.players.iter().filter(|x| x.action != Action::Eliminated.to_u64().unwrap()).count() == 1)
         {
             self.state = self.generate_game_results(input);
         }

@@ -17,8 +17,7 @@ edition = "2018"
 pf_sandbox_lib = { path = "../pf_sandbox_lib" }
 byteorder = "1"
 chrono = { version = "0.4", features = ["serde"] }
-enum_traits = "0.3"
-enum_traits_macros = "2.0"
+num-traits = "0.2"
 getopts = "0.2"
 gilrs-core = "0.1"
 libusb = "0.3"

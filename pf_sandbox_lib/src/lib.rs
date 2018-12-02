@@ -1,4 +1,5 @@
-#[macro_use] extern crate enum_traits_macros;
+#[macro_use] extern crate strum_macros;
+#[macro_use] extern crate num_derive;
 #[macro_use] extern crate log;
 #[macro_use] extern crate matches;
 #[macro_use] extern crate serde_derive;

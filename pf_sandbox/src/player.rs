@@ -14,7 +14,7 @@ use pf_sandbox_lib::stage::{Stage, Surface};
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use rand::Rng;
 use rand_chacha::ChaChaRng;
-use enum_traits::{FromIndex, ToIndex};
+use num_traits::{FromPrimitive, ToPrimitive};
 use winit::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
@@ -220,7 +220,7 @@ impl Player {
         };
 
         Player {
-            action:             Action::DummyFramePreStart.index(),
+            action:             Action::DummyFramePreStart.to_u64().unwrap(),
             set_action_called:  false,
             new_action:         false,
             frame:              0,
@@ -369,7 +369,7 @@ impl Player {
     }
 
     pub fn is_shielding(&self) -> bool {
-        match Action::from_index(self.action) {
+        match Action::from_u64(self.action) {
             Some(Action::Shield) |
             Some(Action::ShieldOn) |
             Some(Action::ShieldOff) |
@@ -471,7 +471,7 @@ impl Player {
 
                     let mut kb_vel = (bkb + kbg * (damage_launch * weight * 1.4 + 18.0)).min(2500.0);
 
-                    if let Some(action) = Action::from_index(self.action) {
+                    if let Some(action) = Action::from_u64(self.action) {
                         match action {
                             Action::Crouch => {
                                 kb_vel *= 0.67;
@@ -535,7 +535,7 @@ impl Player {
                 &CollisionResult::HitShieldAtk { ref hitbox, ref power_shield, player_def_i} => {
                     self.hitlist.push(player_def_i);
                     if let &Some(ref power_shield) = power_shield {
-                        if let (Some(Action::PowerShield), &Some(ref stun)) = (Action::from_index(self.action), &power_shield.enemy_stun) {
+                        if let (Some(Action::PowerShield), &Some(ref stun)) = (Action::from_u64(self.action), &power_shield.enemy_stun) {
                             if stun.window > context.players[player_def_i].frame as u64 {
                                 self.stun_timer = stun.duration;
                             }
@@ -551,7 +551,7 @@ impl Player {
                 }
                 &CollisionResult::HitShieldDef { ref hitbox, ref power_shield, player_atk_i } => {
                     if let &Some(ref power_shield) = power_shield {
-                        if let (Some(Action::PowerShield), &Some(ref parry)) = (Action::from_index(self.action), &power_shield.parry) {
+                        if let (Some(Action::PowerShield), &Some(ref parry)) = (Action::from_u64(self.action), &power_shield.parry) {
                             if parry.window > self.frame as u64 {
                                 self.parry_timer = parry.duration;
                             }
@@ -690,7 +690,7 @@ impl Player {
             self.lcancel_timer -= 1;
         }
         else if context.input.l.press || context.input.r.press || context.input[0].l_trigger > 0.165 || context.input[0].r_trigger > 0.165 ||
-            context.input.z.press && !(self.frame == 0 && Action::from_index(self.action).as_ref().map_or(false, |x| x.is_air_attack())) // only register z press if its not from an attack
+            context.input.z.press && !(self.frame == 0 && Action::from_u64(self.action).as_ref().map_or(false, |x| x.is_air_attack())) // only register z press if its not from an attack
         {
             if let &Some(ref lcancel) = &context.fighter.lcancel {
                 self.lcancel_timer = lcancel.active_window;
@@ -749,7 +749,7 @@ impl Player {
         // update ecb
         let prev_bottom = self.ecb.bottom;
         self.ecb = fighter_frame.ecb.clone();
-        match Action::from_index(self.action) {
+        match Action::from_u64(self.action) {
             Some(Action::JumpF) | Some(Action::JumpB) | Some(Action::JumpAerialF) | Some(Action::JumpAerialB) if self.frame < 10
                 => { self.ecb.bottom = prev_bottom }
             _   => { }
@@ -778,7 +778,7 @@ impl Player {
     }
 
     fn frame_step(&mut self, context: &mut StepContext) {
-        if let Some(action) = Action::from_index(self.action) {
+        if let Some(action) = Action::from_u64(self.action) {
             match action {
                 Action::Spawn => { }
                 Action::ReSpawn => { }
@@ -1568,7 +1568,7 @@ impl Player {
 
     fn check_crouch(&mut self, context: &mut StepContext) -> bool {
         if context.input[0].stick_y < -0.77 {
-            if let Some(action) = Action::from_index(self.action) {
+            if let Some(action) = Action::from_u64(self.action) {
                 match action {
                     Action::CrouchStart | Action::Crouch | Action::CrouchEnd => {
                     }
@@ -1860,7 +1860,7 @@ impl Player {
     }
 
     fn action_expired(&mut self, context: &mut StepContext) {
-        match Action::from_index(self.action) {
+        match Action::from_u64(self.action) {
             None => panic!("Custom defined action expirations have not been implemented"),
 
             // Idle
@@ -2254,7 +2254,7 @@ impl Player {
     }
 
     fn apply_friction(&mut self, fighter: &Fighter) {
-        match Action::from_index(self.action) {
+        match Action::from_u64(self.action) {
             Some(Action::Idle) |
             Some(Action::Dash) |
             Some(Action::Shield) |
@@ -2367,7 +2367,7 @@ impl Player {
     }
 
     fn land(&mut self, context: &mut StepContext, platform_i: usize, x: f32) {
-        let action = Action::from_index(self.action);
+        let action = Action::from_u64(self.action);
 
         self.land_frame_skip = match action {
             Some(_) if action.as_ref().map_or(false, |x| x.is_air_attack()) && self.lcancel_timer > 0 => 1,
@@ -2550,7 +2550,7 @@ impl Player {
         }
 
         if debug.action {
-            let action = Action::from_index(self.action).unwrap();
+            let action = Action::from_u64(self.action).unwrap();
             let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
             let iasa = fighter.actions[self.action as usize].iasa;
 
@@ -2748,7 +2748,7 @@ impl Player {
         };
 
         let (x, y) = self.bps_xy(context);
-        let action = Action::from_index(self.action);
+        let action = Action::from_u64(self.action);
 
         let color = if
             action.map_or(false, |x| x.is_attack_land()) && self.land_frame_skip == 0 || // missed LCancel

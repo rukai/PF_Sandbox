@@ -12,7 +12,7 @@ use crate::particle::ParticleType;
 use crate::player::{RenderFighter, RenderPlayer, RenderPlayerFrame, DebugPlayer};
 use crate::results::PlayerResult;
 
-use enum_traits::{FromIndex, ToIndex};
+use num_traits::{FromPrimitive, ToPrimitive};
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector3, Rad};
 use rand::{Rng, SeedableRng};
@@ -592,7 +592,7 @@ impl VulkanGraphics {
         for entity in entities {
             if let &RenderEntity::Player(ref player) = entity {
                 location += distance;
-                match Action::from_index(player.frames[0].action as u64) {
+                match Action::from_u64(player.frames[0].action as u64) {
                     Some(Action::Eliminated) => { }
                     _ => {
                         let c = player.fighter_color.clone();
@@ -893,7 +893,7 @@ impl VulkanGraphics {
                     // TODO: Edit::Stage   - render selected surfaces as green
 
                     // Draw spawn plat
-                    match Action::from_index(player.frames[0].action as u64) {
+                    match Action::from_u64(player.frames[0].action as u64) {
                         Some(Action::ReSpawn) | Some(Action::ReSpawnIdle) => {
                             // TODO: get width from player dimensions
                             let width = 15.0;
@@ -1232,7 +1232,7 @@ impl VulkanGraphics {
                     let action = if css_action < fighter.actions.len() {
                         css_action
                     } else {
-                        Action::Idle.index() as usize
+                        Action::Idle.to_u64().unwrap() as usize
                     };
 
                     let frames = vec!(RenderPlayerFrame {
