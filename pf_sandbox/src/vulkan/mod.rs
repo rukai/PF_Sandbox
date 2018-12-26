@@ -764,38 +764,38 @@ impl VulkanGraphics {
 
                     // draw fighter
                     match player.debug.fighter {
-                        RenderFighter::Normal | RenderFighter::Debug => {
-                            let color = if let RenderFighter::Debug = player.debug.fighter {
-                                [0.0, 0.0, 0.0, 0.0]
-                            } else {
-                                [0.9, 0.9, 0.9, 1.0]
-                            };
-                            let edge_color = if player.fighter_selected {
-                                [0.0, 1.0, 0.0, 1.0]
-                            } else {
-                                let c = player.fighter_color.clone();
-                                [c[0], c[1], c[2], 1.0]
-                            };
-
-                            // draw previous frame onion skin
-                            if let Some(frame) = player.frames.get(2) {
-                                if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &frame.fighter, frame.action, frame.frame) {
-                                    let transformation = player_matrix(frame, pan, z_player);
-                                    let onion_color = [0.4, 0.4, 0.4, 0.4];
-                                    command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, onion_color, onion_color);
+                        RenderFighter::Normal | RenderFighter::Debug | RenderFighter::OnionSkin => {
+                            if let RenderFighter::OnionSkin = player.debug.fighter {
+                                if let Some(frame) = player.frames.get(2) {
+                                    if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &frame.fighter, frame.action, frame.frame) {
+                                        let transformation = player_matrix(frame, pan, z_player);
+                                        let onion_color = [0.4, 0.4, 0.4, 0.4];
+                                        command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, onion_color, onion_color);
+                                    }
                                 }
-                            }
 
-                            if let Some(frame) = player.frames.get(1) {
-                                if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &frame.fighter, frame.action, frame.frame) {
-                                    let transformation = player_matrix(frame, pan, z_player);
-                                    let onion_color = [0.80, 0.80, 0.80, 0.9];
-                                    command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, onion_color, onion_color);
+                                if let Some(frame) = player.frames.get(1) {
+                                    if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &frame.fighter, frame.action, frame.frame) {
+                                        let transformation = player_matrix(frame, pan, z_player);
+                                        let onion_color = [0.80, 0.80, 0.80, 0.9];
+                                        command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, onion_color, onion_color);
+                                    }
                                 }
                             }
 
                             // draw fighter
                             if let Some(buffers) = self.package_buffers.new_fighter_frame(self.device.clone(), &player.frames[0].fighter, player.frames[0].action, player.frames[0].frame) {
+                                let color = if let RenderFighter::Debug = player.debug.fighter {
+                                    [0.0, 0.0, 0.0, 0.0]
+                                } else {
+                                    [0.9, 0.9, 0.9, 1.0]
+                                };
+                                let edge_color = if player.fighter_selected {
+                                    [0.0, 1.0, 0.0, 1.0]
+                                } else {
+                                    let c = player.fighter_color.clone();
+                                    [c[0], c[1], c[2], 1.0]
+                                };
                                 command_buffer = self.render_buffers(self.pipelines.standard.clone(), command_buffer, &render, buffers.clone(), &transformation, edge_color, color);
                             }
                             else {

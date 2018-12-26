@@ -2870,6 +2870,7 @@ pub struct VectorArrow {
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub enum RenderFighter {
     Normal,
+    OnionSkin,
     Debug,
     None,
 }
@@ -2931,6 +2932,9 @@ impl DebugPlayer {
         if os_input.key_pressed(VirtualKeyCode::F9) {
             self.fighter = match self.fighter {
                 RenderFighter::Normal => {
+                    RenderFighter::OnionSkin
+                }
+                RenderFighter::OnionSkin=> {
                     RenderFighter::Debug
                 }
                 RenderFighter::Debug => {
