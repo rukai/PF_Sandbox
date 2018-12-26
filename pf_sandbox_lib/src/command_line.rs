@@ -70,7 +70,7 @@ impl CommandLine {
 
             if os_input.key_pressed(VirtualKeyCode::Return) {
                 {
-                    let command = format!("→{}", self.command.trim_right());
+                    let command = format!("→{}", self.command.trim_end());
                     self.output_add(command);
                 }
                 let result = match NodeRunner::new(self.command.as_str()) {
@@ -81,7 +81,7 @@ impl CommandLine {
                     self.output_add(line.to_string());
                 }
 
-                self.history.insert(0, self.command.trim_right().to_string());
+                self.history.insert(0, self.command.trim_end().to_string());
                 self.history_index = -1;
                 self.command.clear();
                 self.cursor = 0;
