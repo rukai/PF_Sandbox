@@ -4,7 +4,7 @@ use pf_sandbox_lib::fighter::{Action, ECB, CollisionBoxRole, ActionFrame};
 use pf_sandbox_lib::geometry::Rect;
 use pf_sandbox_lib::json_upgrade;
 use pf_sandbox_lib::package::Verify;
-use self::buffers::{Vertex, ColorVertex, Buffers, ColorBuffers, PackageBuffers};
+use buffers::{Vertex, ColorVertex, Buffers, ColorBuffers, PackageBuffers};
 use crate::game::{GameState, RenderEntity, RenderGame};
 use crate::graphics::{self, GraphicsMessage, Render, RenderType};
 use crate::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};

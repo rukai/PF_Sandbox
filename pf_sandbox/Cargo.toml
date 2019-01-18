@@ -37,7 +37,7 @@ vulkano = { version = "0.11", optional = true }
 vulkano-win = { version = "0.11", optional = true }
 vulkano-shaders = { version = "0.11", optional = true }
 vulkano_text = { version = "0.9", optional = true }
-cgmath = { version = "0.16", optional = true }
+cgmath = { version = "0.17", optional = true }
 
 [features]
 default = ["vulkan"]

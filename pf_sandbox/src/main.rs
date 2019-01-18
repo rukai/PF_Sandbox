@@ -23,8 +23,8 @@ pub(crate) mod results;
 #[cfg(feature = "vulkan")]
 pub(crate) mod vulkan;
 
-use crate::app::run;
-use crate::cli::cli;
+use app::run;
+use cli::cli;
 use pf_sandbox_lib::config::Config;
 use pf_sandbox_lib::logger;
 

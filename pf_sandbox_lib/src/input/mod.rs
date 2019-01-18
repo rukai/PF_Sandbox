@@ -7,7 +7,7 @@ use gilrs_core::{EvCode, Gamepad, EventType};
 use uuid::Uuid;
 use treeflection::{Node, NodeRunner, NodeToken};
 
-use self::maps::{ControllerMap, AnalogFilter, AnalogDest, DigitalFilter, DigitalDest};
+use maps::{ControllerMap, AnalogFilter, AnalogDest, DigitalFilter, DigitalDest};
 
 /// Stores the first value returned from an input source
 pub struct Deadzone {
