@@ -225,6 +225,19 @@ pub struct ActionDef {
 }
 
 #[derive(Clone, Serialize, Deserialize, Node)]
+pub enum VelModify {
+    Set (f32),
+    Add (f32),
+    None,
+}
+
+impl Default for VelModify {
+    fn default() -> Self {
+        VelModify::None
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Node)]
 pub struct ActionFrame {
     pub ecb:                 ECB,
     pub colboxes:            ContextVec<CollisionBox>,
@@ -234,14 +247,20 @@ pub struct ActionFrame {
     pub item_hold_y:         f32,
     pub grab_hold_x:         f32,
     pub grab_hold_y:         f32,
-    pub set_x_vel:           Option<f32>,
-    pub set_y_vel:           Option<f32>,
     pub pass_through:        bool, // only used on aerial actions
     pub ledge_cancel:        bool, // only used on ground actions
     pub use_platform_angle:  bool, // only used on ground actions
     // TODO: pub land_cancel: bool // only used on aerial attacks
     pub ledge_grab_box:      Option<LedgeGrabBox>,
     pub force_hitlist_reset: bool,
+    /// Affects the next frames velocity
+    pub x_vel_modify: VelModify,
+    /// Affects the next frames velocity
+    pub y_vel_modify: VelModify,
+    /// Does not affect the next frames velocity
+    pub x_vel_temp: f32,
+    /// Does not affect the next frames velocity
+    pub y_vel_temp: f32,
 }
 
 impl Default for ActionFrame {
@@ -255,8 +274,10 @@ impl Default for ActionFrame {
             item_hold_y:         11.0,
             grab_hold_x:         4.0,
             grab_hold_y:         11.0,
-            set_x_vel:           None,
-            set_y_vel:           None,
+            x_vel_modify:        VelModify::None,
+            y_vel_modify:        VelModify::None,
+            x_vel_temp:           0.0,
+            y_vel_temp:           0.0,
             pass_through:        true,
             ledge_cancel:        true,
             use_platform_angle:  false,

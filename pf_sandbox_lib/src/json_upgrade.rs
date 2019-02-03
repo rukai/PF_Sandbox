@@ -2,7 +2,7 @@ use serde_json::{Value, Number};
 
 pub fn build_version() -> String { String::from(env!("BUILD_VERSION")) }
 
-pub fn engine_version() -> u64 { 14 }
+pub fn engine_version() -> u64 { 15 }
 
 pub fn engine_version_json() -> Value {
     Value::Number(Number::from(engine_version()))
@@ -34,6 +34,7 @@ pub(crate) fn upgrade_to_latest_fighter(fighter: &mut Value, file_name: &str) {
     else if fighter_engine_version < engine_version() {
         for upgrade_from in fighter_engine_version..engine_version() {
             match upgrade_from {
+                14 => { upgrade_fighter14(fighter) }
                 13 => { upgrade_fighter13(fighter) }
                 12 => { upgrade_fighter12(fighter) }
                 11 => { upgrade_fighter11(fighter) }
@@ -105,6 +106,26 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
 //
+/// move set_x_vel/set_y_vel to x_vel_modify/y_vel_modify and x_vel_temp/y_vel_temp
+fn upgrade_fighter14(fighter: &mut Value) {
+    if let Some (actions) = get_vec(fighter, "actions") {
+        for action in actions {
+            if let Some (frames) = get_vec(action, "frames") {
+                for frame in frames {
+                    if let &mut Value::Object (ref mut frame) = frame {
+                        frame.remove(&String::from("set_x_vel"));
+                        frame.remove(&String::from("set_y_vel"));
+                        frame.insert(String::from("x_vel_modify"), json!("None"));
+                        frame.insert(String::from("y_vel_modify"), json!("None"));
+                        frame.insert(String::from("x_vel_temp"), json!("0.0"));
+                        frame.insert(String::from("y_vel_temp"), json!("0.0"));
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Split spawn action into spawn and respawn
 fn upgrade_fighter13(fighter: &mut Value) {
     let action = json!({

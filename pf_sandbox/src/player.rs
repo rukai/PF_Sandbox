@@ -2083,8 +2083,13 @@ impl Player {
                 }
             }
 
-            // fix velocity setter
-            fighter_frame.set_x_vel = fighter_frame.set_x_vel.map(|x| self.relative_f(x));
+            // fix velocity modifier
+            fighter_frame.x_vel_modify = match fighter_frame.x_vel_modify {
+                VelModify::Set (x_vel) => VelModify::Set(self.relative_f(x_vel)),
+                VelModify::Add (x_vel) => VelModify::Add(self.relative_f(x_vel)),
+                VelModify::None        => VelModify::None,
+            };
+            fighter_frame.x_vel_temp = self.relative_f(fighter_frame.x_vel_temp);
 
             fighter_frame
         } else {
@@ -2153,16 +2158,19 @@ impl Player {
             }
 
             // calculate velocity
-            let x_vel = if let Some(x_vel) = fighter_frame.set_x_vel {
-                self.relative_f(x_vel) + self.kb_x_vel
-            } else {
-                self.x_vel + self.kb_x_vel
-            };
-            let y_vel = if let Some(y_vel) = fighter_frame.set_y_vel {
-                self.relative_f(y_vel) + self.kb_y_vel
-            } else {
-                self.y_vel + self.kb_y_vel
-            };
+            match fighter_frame.x_vel_modify {
+                VelModify::Set (x_vel) => self.x_vel = self.relative_f(x_vel),
+                VelModify::Add (x_vel) => self.x_vel += self.relative_f(x_vel),
+                VelModify::None => { }
+            }
+            match fighter_frame.y_vel_modify {
+                VelModify::Set (y_vel) => self.y_vel = y_vel,
+                VelModify::Add (y_vel) => self.y_vel += y_vel,
+                VelModify::None => { }
+            }
+
+            let x_vel = self.x_vel + self.kb_x_vel + self.relative_f(fighter_frame.x_vel_temp);
+            let y_vel = self.y_vel + self.kb_y_vel + fighter_frame.y_vel_temp;
 
             // update position
             match self.location.clone() {
