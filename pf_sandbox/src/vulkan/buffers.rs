@@ -10,8 +10,7 @@ use crate::game::SurfaceSelection;
 use vulkano::buffer::{CpuAccessibleBuffer, BufferUsage};
 use vulkano::device::Device;
 
-use lyon::path::default::Path;
-use lyon::path::builder::FlatPathBuilder;
+use lyon::path::Path;
 use lyon::math::point;
 use lyon::tessellation::{VertexBuffers, FillVertex};
 use lyon::tessellation::{FillTessellator, FillOptions};
@@ -455,7 +454,7 @@ impl Buffers {
         let mut tessellator = FillTessellator::new();
         let mut mesh = VertexBuffers::new();
         tessellator.tessellate_path(
-            path.path_iter(),
+            path.iter(),
             &FillOptions::tolerance(0.01),
             &mut BuffersBuilder::new(&mut mesh, StageVertexConstructor)
         ).unwrap();
