@@ -117,8 +117,8 @@ fn upgrade_fighter14(fighter: &mut Value) {
                         frame.remove(&String::from("set_y_vel"));
                         frame.insert(String::from("x_vel_modify"), json!("None"));
                         frame.insert(String::from("y_vel_modify"), json!("None"));
-                        frame.insert(String::from("x_vel_temp"), json!("0.0"));
-                        frame.insert(String::from("y_vel_temp"), json!("0.0"));
+                        frame.insert(String::from("x_vel_temp"), json!(0.0));
+                        frame.insert(String::from("y_vel_temp"), json!(0.0));
                     }
                 }
             }
