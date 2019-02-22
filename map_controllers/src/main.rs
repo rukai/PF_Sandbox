@@ -76,7 +76,7 @@ fn main() {
     vbox.add(&save_copy_hbox(state.clone()));
     window.add(&vbox);
 
-    let scrolled_window = ScrolledWindow::new(None, None);
+    let scrolled_window = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
     scrolled_window.set_property_hscrollbar_policy(PolicyType::Never);
 
     let inputs_vbox = Box::new(Orientation::Vertical, 20);
@@ -296,7 +296,6 @@ fn digital_input_gc_hbox(state: Rc<RwLock<State>>, vbox: Box, input_text: String
     let hbox = Box::new(Orientation::Horizontal, 5);
 
     let input_label = Label::new(Some(input_text.as_str()));
-    input_label.set_property_xalign(0.0);
     hbox.add(&input_label);
 
     let detect_button = Button::new_with_label("Add from last input");
@@ -462,7 +461,6 @@ fn analog_input_gc_hbox(state: Rc<RwLock<State>>, vbox: Box, input_text: String,
     let hbox = Box::new(Orientation::Horizontal, 5);
 
     let input_label = Label::new(Some(input_text.as_str()));
-    input_label.set_property_xalign(0.0);
     hbox.add(&input_label);
 
     let detect_button = Button::new_with_label("Add from last input");
