@@ -7,7 +7,7 @@ use log::{Record, Level};
 
 pub fn init() {
     if let Ok(env_var) = env::var("PFS_LOG") {
-        Builder::new().format(format).parse(&env_var).init()
+        Builder::new().format(format).parse_filters(&env_var).init()
     }
 }
 
