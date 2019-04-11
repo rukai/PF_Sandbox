@@ -1,4 +1,3 @@
-extern crate pf_sandbox_lib;
 use pf_sandbox_lib::input::stick_deadzone;
 
 #[test]
