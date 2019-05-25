@@ -849,7 +849,7 @@ pub struct PackageMeta {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
         path:              PathBuf,
-    pub engine_version:    u64, // compared with a value incremented by pf engine when there are breaking changes to data structures
+    pub engine_version:    u64, // compared with a value incremented by pf sandbox when there are breaking changes to data structures
     pub published_version: u64, // incremented every time the package is published
     pub title:             String,
     pub fighter_keys:      Vec<String>,

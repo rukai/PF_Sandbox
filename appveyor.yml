@@ -30,7 +30,7 @@ install:
   - echo %PATH%
   - pacman --noconfirm -Syu --force
   - pacman --noconfirm -Syu --force
-  - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3 mingw-w64-x86_64-cmake mingw-w64-x86_64-make --force
+  - pacman --noconfirm -Syu mingw64/mingw-w64-x86_64-pkg-config mingw64/mingw-w64-x86_64-libusb mingw-w64-x86_64-gcc mingw-w64-x86_64-gtk3 mingw-w64-x86_64-cmake mingw-w64-x86_64-make mingw-w64-x86_64-ninja --force
 
 test_script:
   - set PKG_CONFIG_ALLOW_CROSS=1
