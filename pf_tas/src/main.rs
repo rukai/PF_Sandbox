@@ -24,7 +24,7 @@ fn main() {
     window.add(&vbox);
 
     let label_text = format!("Uhhh ... I kind of deleted the tas tool because it was garbage and needed to be rewritten and I didnt want to maintain the existing tool anymore. Sorry...");
-    let label = Label::new(label_text.as_ref());
+    let label = Label::new(Some(label_text.as_ref()));
     vbox.add(&label);
 
     let hbox = Box::new(Orientation::Horizontal, 5);

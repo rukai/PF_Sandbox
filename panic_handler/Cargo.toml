@@ -5,5 +5,5 @@ authors = ["Rukai <rubickent@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-gtk = { version = "0.6" }
+gtk = "0.7"
 pf_sandbox_lib = { path = "../pf_sandbox_lib" }

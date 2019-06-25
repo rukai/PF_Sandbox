@@ -42,7 +42,7 @@ fn display_window(file_name: &str) {
         Ok (report) => {
             let hbox = Box::new(Orientation::Horizontal, 5);
             vbox.add(&hbox);
-            let label = Label::new(format!("{} has panicked.\nPlease report this at:", report.crate_name).as_ref());
+            let label = Label::new(Some(format!("{} has panicked.\nPlease report this at:", report.crate_name).as_ref()));
             hbox.add(&label);
 
             let hbox = Box::new(Orientation::Horizontal, 5);
@@ -57,7 +57,7 @@ fn display_window(file_name: &str) {
             };
             let body = "PLEASE REPLACE THIS TEXT WITH WHAT YOU WERE DOING WHEN THE PANIC OCCURRED.%0A%0APLEASE ENSURE THE PANIC DUMP FILE IS ATTACHED.";
             let address = format!("https://github.com/rukai/PF_Sandbox/issues/new?labels=panic&title={}&body={}", title, body);
-            let link = LinkButton::new_with_label(&address, "https://github.com/rukai/PF_Sandbox/issues/new");
+            let link = LinkButton::new_with_label(&address, Some("https://github.com/rukai/PF_Sandbox/issues/new"));
             if address.len() >= 2000 {
                 eprintln!("This address is too long, it may not work on some browsers:\n{}", address);
             }
@@ -65,12 +65,12 @@ fn display_window(file_name: &str) {
 
             let hbox = Box::new(Orientation::Horizontal, 5);
             vbox.add(&hbox);
-            let label = Label::new(format!("Please attach this file to your issue report: {}", file_name).as_ref());
+            let label = Label::new(Some(format!("Please attach this file to your issue report: {}", file_name).as_ref()));
             hbox.add(&label);
         }
         Err (err) => {
             let label_text = format!("Failed to read the panic report:\n{}", err);
-            let label = Label::new(label_text.as_ref());
+            let label = Label::new(Some(label_text.as_ref()));
             vbox.add(&label);
         }
     }

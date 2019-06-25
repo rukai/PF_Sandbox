@@ -38,6 +38,7 @@ pub fn generate_example_stub() {
             published_version: 0,
             title:             "Example Package".to_string(),
             source:            Some("lucaskent.me/example_package".to_string()),
+            //source:          Some("pfsandbox.net/example_package".to_string()),
             published:         true,
             hash:              "".to_string(),
             fighter_keys:      vec!(),

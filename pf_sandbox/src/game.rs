@@ -18,7 +18,7 @@ use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::rules::Goal;
 use pf_sandbox_lib::stage::{Stage, DebugStage, SpawnPoint, Surface, Floor};
 
-use rand::SeedableRng;
+use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaChaRng;
 use std::cmp::Ordering;
 use std::collections::HashSet;
