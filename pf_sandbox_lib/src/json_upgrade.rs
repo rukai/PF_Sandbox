@@ -105,7 +105,7 @@ fn get_vec<'a>(parent: &'a mut Value, member: &str) -> Option<&'a mut Vec<Value>
 
 // Important:
 // Upgrades cannot rely on current structs as future changes may break those past upgrades
-//
+
 /// move set_x_vel/set_y_vel to x_vel_modify/y_vel_modify and x_vel_temp/y_vel_temp
 fn upgrade_fighter14(fighter: &mut Value) {
     if let Some (actions) = get_vec(fighter, "actions") {

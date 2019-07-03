@@ -1089,6 +1089,7 @@ impl Player {
         else if self.check_special(context) { } // TODO: No neutral special
         else if self.check_smash(context) { }
         else if self.check_attacks(context) { }
+        else if self.check_grab(context) { }
         else if self.check_taunt(context) { }
         else {
             self.apply_friction(&context.fighter);
@@ -1104,6 +1105,7 @@ impl Player {
         else if self.check_special(context) { } // TODO: No neutral special
         else if self.check_smash(context) { }
         else if self.check_attacks(context) { }
+        else if self.check_grab(context) { }
         else if self.check_taunt(context) { }
         else {
             self.apply_friction(&context.fighter);
@@ -1131,6 +1133,7 @@ impl Player {
             else if self.check_special(context) { } // TODO: no neutral/side special
             else if self.check_smash(context) { }
             else if self.check_attacks(context) { }
+            else if self.check_grab(context) { }
             else if self.check_taunt(context) { }
             else if self.check_jump(context) { }
             else {
@@ -1150,6 +1153,7 @@ impl Player {
             else if self.check_special(context) { } // TODO: no neutral/side special
             else if self.check_smash(context) { }
             else if self.check_attacks(context) { }
+            else if self.check_grab(context) { }
             else if self.check_taunt(context) { }
             else if self.check_dash(context) { }
             else if self.check_smash_turn(context) { }
@@ -1170,6 +1174,7 @@ impl Player {
             else if self.check_special(context) { } // TODO: no neutral/side special
             else if self.check_smash(context) { }
             else if self.check_attacks(context) { }
+            else if self.check_grab(context) { }
             else if self.check_dash(context) { }
             else if self.check_smash_turn(context) { }
             else if self.check_tilt_turn(context) { }
@@ -1191,6 +1196,7 @@ impl Player {
             else if self.check_special(context) { }
             else if self.check_smash(context) { }
             else if self.check_attacks(context) { }
+            else if self.check_grab(context) { }
             else if self.check_taunt(context) { }
             else if self.check_crouch(context) { }
             else if self.check_dash(context) { }
@@ -1217,6 +1223,7 @@ impl Player {
             else if self.check_special(context) { }
             else if self.check_smash(context) { }
             else if self.check_attacks(context) { }
+            else if self.check_grab(context) { }
             else if self.check_taunt(context) { }
             else if self.check_dash(context) { }
             else if self.check_smash_turn(context) { }
@@ -1243,6 +1250,7 @@ impl Player {
             else if self.check_special(context) { }
             else if self.check_smash(context) { }
             else if self.check_attacks(context) { }
+            else if self.check_grab(context) { }
             else if self.check_taunt(context) { }
             else if self.check_dash(context) { }
             else if self.check_smash_turn(context) { }
@@ -1267,6 +1275,7 @@ impl Player {
             else if self.check_special(context) { }
             else if self.check_smash(context) { }
             else if self.check_attacks(context) { }
+            else if self.check_grab(context) { }
             else if self.check_taunt(context) { }
             else if self.check_crouch(context) { }
             else if self.check_dash(context) { }
@@ -1285,6 +1294,7 @@ impl Player {
         else if self.check_special(context) { }
         else if self.check_smash(context) { }
         else if self.check_attacks(context) { }
+        else if self.check_grab(context) { }
         else if self.check_crouch(context) { }
         else if self.check_dash(context) { }
         else if self.check_smash_turn(context) { }
@@ -1337,6 +1347,14 @@ impl Player {
                     }
                 }
             }
+        }
+
+        let run_frame = 13; // TODO: Variable per character
+        let last_action_frame = context.fighter.actions[self.action as usize].frames.len() as i64 - 1;
+        if (self.frame >= run_frame || (run_frame > last_action_frame && self.last_frame(&context.fighter)))
+            && self.relative_f(context.input.stick_x.value) >= 0.62
+        {
+            self.set_action(context, Action::Run);
         }
 
         if self.check_shield(context) {
@@ -1749,6 +1767,15 @@ impl Player {
         }
     }
 
+    fn check_grab(&mut self, context: &mut StepContext) -> bool {
+        if context.input.z.press {
+            self.set_action(context, Action::Grab);
+            true
+        } else {
+            false
+        }
+    }
+
     fn check_special(&mut self, context: &StepContext) -> bool {
         if context.input.b.press {
             // special attack
@@ -1896,7 +1923,7 @@ impl Player {
                 }
             }
             Some(Action::TiltTurn)       => self.set_action(context, Action::Idle),
-            Some(Action::Dash)           => self.set_action(context, Action::Run),
+            Some(Action::Dash)           => self.set_action(context, Action::Idle),
             Some(Action::Run)            => self.set_action(context, Action::Run),
             Some(Action::RunEnd)         => self.set_action(context, Action::Idle),
             Some(Action::Walk)           => self.set_action(context, Action::Walk),
