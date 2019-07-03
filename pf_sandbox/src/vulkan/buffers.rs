@@ -20,7 +20,7 @@ use std::collections::{HashSet, HashMap};
 use std::f32::consts;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Vertex {
     pub position: [f32; 2],
     pub edge: f32,
@@ -36,7 +36,7 @@ fn vertex(x: f32, y: f32) -> Vertex {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct ColorVertex {
     pub position:  [f32; 2],
     pub color:     [f32; 4],

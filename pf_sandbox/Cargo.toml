@@ -1,5 +1,3 @@
-cargo-features = ["default-run"]
-
 [package]
 name = "pf_sandbox"
 version = "0.1.1"
@@ -23,7 +21,7 @@ gilrs-core = "0.2"
 libusb = "0.3"
 log = "0.4"
 lyon = "0.13"
-rand = "0.7.0-pre.1"
+rand = "0.7.0"
 rand_chacha = "0.2"
 serde = "1"
 serde_derive = "1"
@@ -33,10 +31,10 @@ treeflection_derive = "0.3"
 winit = "0.19" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 winit_input_helper = "0.3"
 
-vulkano = { version = "0.12", optional = true }
-vulkano-win = { version = "0.12", optional = true }
-vulkano-shaders = { version = "0.12", optional = true }
-vulkano_text = { version = "0.10", optional = true }
+vulkano = { version = "0.13", optional = true }
+vulkano-win = { version = "0.13", optional = true }
+vulkano-shaders = { version = "0.13", optional = true }
+vulkano_text = { version = "0.11", optional = true }
 cgmath = { version = "0.17", optional = true }
 
 [features]

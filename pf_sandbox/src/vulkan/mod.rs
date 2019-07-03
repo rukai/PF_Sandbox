@@ -135,7 +135,7 @@ pub struct VulkanGraphics {
     surface:                     Arc<Surface<Window>>,
     events_loop:                 EventsLoop,
     device:                      Arc<Device>,
-    future:                      Box<GpuFuture>,
+    future:                      Box<dyn GpuFuture>,
     swapchain:                   Arc<Swapchain<Window>>,
     queue:                       Arc<Queue>,
     vs:                          vs::Shader,
@@ -143,8 +143,8 @@ pub struct VulkanGraphics {
     surface_vs:                  surface_vs::Shader,
     surface_fs:                  surface_fs::Shader,
     pipelines:                   Pipelines,
-    render_pass:                 Arc<RenderPassAbstract + Send + Sync>,
-    framebuffers:                Vec<Arc<FramebufferAbstract + Send + Sync>>,
+    render_pass:                 Arc<dyn RenderPassAbstract + Send + Sync>,
+    framebuffers:                Vec<Arc<dyn FramebufferAbstract + Send + Sync>>,
     uniform_buffer_pool:         CpuBufferPool<vs::ty::Data>,
     surface_uniform_buffer_pool: CpuBufferPool<surface_vs::ty::Data>,
     draw_text:                   DrawText,
@@ -158,10 +158,10 @@ pub struct VulkanGraphics {
 }
 
 struct Pipelines {
-    standard:  Arc<GraphicsPipelineAbstract + Send + Sync>,
-    invert:    Arc<GraphicsPipelineAbstract + Send + Sync>,
-    wireframe: Arc<GraphicsPipelineAbstract + Send + Sync>,
-    surface:   Arc<GraphicsPipelineAbstract + Send + Sync>,
+    standard:  Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
+    invert:    Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
+    wireframe: Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
+    surface:   Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
 }
 
 impl VulkanGraphics {
@@ -201,7 +201,7 @@ impl VulkanGraphics {
         let surface_vs = surface_vs::Shader::load(device.clone()).unwrap();
         let surface_fs = surface_fs::Shader::load(device.clone()).unwrap();
 
-        let future = Box::new(sync::now(device.clone())) as Box<GpuFuture>;
+        let future = Box::new(sync::now(device.clone())) as Box<dyn GpuFuture>;
 
         let queue = queues.next().unwrap();
 
@@ -261,7 +261,7 @@ impl VulkanGraphics {
                 depth_stencil: {multisampled_depth},
                 resolve: [resolve_color]
             }
-        ).unwrap()) as Arc<RenderPassAbstract + Send + Sync>;
+        ).unwrap()) as Arc<dyn RenderPassAbstract + Send + Sync>;
 
         let (pipelines, framebuffers) = VulkanGraphics::pipeline(render_pass.clone(), &vs, &fs, &surface_vs, &surface_fs, device.clone(), swapchain.clone(), &images);
 
@@ -298,7 +298,7 @@ impl VulkanGraphics {
     }
 
     fn pipeline(
-        render_pass: Arc<RenderPassAbstract + Send + Sync>,
+        render_pass: Arc<dyn RenderPassAbstract + Send + Sync>,
         vs: &vs::Shader,
         fs: &fs::Shader,
         surface_vs: &surface_vs::Shader,
@@ -306,7 +306,7 @@ impl VulkanGraphics {
         device: Arc<Device>,
         swapchain: Arc<Swapchain<Window>>,
         images: &[Arc<SwapchainImage<Window>>]
-    ) -> (Pipelines, Vec<Arc<FramebufferAbstract + Send + Sync>>) {
+    ) -> (Pipelines, Vec<Arc<dyn FramebufferAbstract + Send + Sync>>) {
         let dimensions = images[0].dimensions();
         let depth = AttachmentImage::transient(device.clone(), dimensions, Format::D16Unorm).unwrap();
         let multisampled_depth = AttachmentImage::transient_multisampled(device.clone(), dimensions, 4, Format::D16Unorm).unwrap();
@@ -319,7 +319,7 @@ impl VulkanGraphics {
                 .add(multisampled_depth.clone()).unwrap()
                 .add(depth.clone()).unwrap()
                 .build().unwrap()
-            ) as Arc<FramebufferAbstract + Send + Sync>
+            ) as Arc<dyn FramebufferAbstract + Send + Sync>
         }).collect::<Vec<_>>();
 
         let dimensions = [dimensions[0] as f32, dimensions[1] as f32];
@@ -355,11 +355,11 @@ impl VulkanGraphics {
         vs: &vs::Shader,
         fs: &fs::Shader,
         device: Arc<Device>,
-        render_pass: Arc<RenderPassAbstract + Send + Sync>,
+        render_pass: Arc<dyn RenderPassAbstract + Send + Sync>,
         dimensions: [f32; 2],
         invert: bool,
         wireframe: bool)
-        -> Arc<GraphicsPipelineAbstract + Send + Sync>
+        -> Arc<dyn GraphicsPipelineAbstract + Send + Sync>
     {
         let builder = GraphicsPipeline::start()
             .vertex_input_single_buffer::<Vertex>()
@@ -397,7 +397,7 @@ impl VulkanGraphics {
         Arc::new(builder.build(device.clone()).unwrap())
     }
 
-    fn new_uniform_set(&self, uniform: vs::ty::Data) -> Arc<DescriptorSet + Send + Sync> {
+    fn new_uniform_set(&self, uniform: vs::ty::Data) -> Arc<dyn DescriptorSet + Send + Sync> {
         let uniform_buffer = self.uniform_buffer_pool.next(uniform).unwrap();
         Arc::new(
             PersistentDescriptorSet::start(self.pipelines.standard.clone(), 0)
@@ -406,7 +406,7 @@ impl VulkanGraphics {
         )
     }
 
-    fn new_surface_uniform_set(&self, uniform: surface_vs::ty::Data) -> Arc<DescriptorSet + Send + Sync> {
+    fn new_surface_uniform_set(&self, uniform: surface_vs::ty::Data) -> Arc<dyn DescriptorSet + Send + Sync> {
         let uniform_buffer = self.surface_uniform_buffer_pool.next(uniform).unwrap();
         Arc::new(
             PersistentDescriptorSet::start(self.pipelines.standard.clone(), 0)
@@ -546,7 +546,7 @@ impl VulkanGraphics {
         .draw_text(&mut self.draw_text, image_num)
         .build().unwrap();
 
-        let mut old_future = Box::new(sync::now(self.device.clone())) as Box<GpuFuture>; // TODO: Can I avoid making this dummy future?
+        let mut old_future = Box::new(sync::now(self.device.clone())) as Box<dyn GpuFuture>; // TODO: Can I avoid making this dummy future?
         mem::swap(&mut self.future, &mut old_future);
 
         let future_result = old_future.join(new_future)
@@ -639,7 +639,7 @@ impl VulkanGraphics {
 
     fn render_buffers(
         &self,
-        pipeline:       Arc<GraphicsPipelineAbstract + Send + Sync>,
+        pipeline:       Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
         command_buffer: AutoCommandBufferBuilder,
         render:         &RenderGame,
         buffers:        Buffers,
@@ -667,7 +667,7 @@ impl VulkanGraphics {
 
     fn render_surface_buffers(
         &self,
-        pipeline:       Arc<GraphicsPipelineAbstract + Send + Sync>,
+        pipeline:       Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
         command_buffer: AutoCommandBufferBuilder,
         render:         &RenderGame,
         buffers:        ColorBuffers,
@@ -1409,5 +1409,5 @@ enum MenuEntity {
 
 struct MenuEntityAndSet {
     entity: MenuEntity,
-    set:    Arc<DescriptorSet + Send + Sync>,
+    set:    Arc<dyn DescriptorSet + Send + Sync>,
 }
