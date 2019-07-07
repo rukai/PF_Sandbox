@@ -1,8 +1,10 @@
-#[cfg(feature = "vulkan")]
+#[cfg(feature = "vulkan_renderer")]
 use crate::vulkan::VulkanGraphics;
-#[cfg(feature = "vulkan")]
+#[cfg(feature = "wgpu_renderer")]
+use crate::wgpu::WgpuGraphics;
+#[cfg(any(feature = "vulkan_renderer", feature = "wgpu_renderer"))]
 use crate::cli::GraphicsBackendChoice;
-#[cfg(feature = "vulkan")]
+#[cfg(any(feature = "vulkan_renderer", feature = "wgpu_renderer"))]
 use crate::graphics::GraphicsMessage;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
@@ -54,7 +56,7 @@ pub fn run(mut cli_results: CLIResults, config: Config) {
 
     let mut context = Context::new().unwrap();
     let mut input = Input::new(&mut context);
-    #[cfg(feature = "vulkan")]
+    #[cfg(any(feature = "vulkan_renderer", feature = "wgpu_renderer"))]
     let mut graphics_tx: Option<Sender<GraphicsMessage>> = None;
     let mut net_command_line = NetCommandLine::new();
     let mut netplay = Netplay::new();
@@ -67,18 +69,28 @@ pub fn run(mut cli_results: CLIResults, config: Config) {
         package::generate_example_stub();
         let package_string = cli_results.package.or(config.current_package.clone());
 
-        #[cfg(feature = "vulkan")]
+        #[cfg(any(feature = "vulkan_renderer", feature = "wgpu_renderer"))]
         {
             match cli_results.graphics_backend {
-                #[cfg(feature = "vulkan")]
+                #[cfg(feature = "vulkan_renderer")]
                 GraphicsBackendChoice::Vulkan => {
                     graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone(), config.physical_device_name.clone()));
                 }
+                #[cfg(feature = "wgpu_renderer")]
+                GraphicsBackendChoice::Wgpu => {
+                    graphics_tx = Some(WgpuGraphics::init(os_input_tx.clone(), config.physical_device_name.clone()));
+                }
                 GraphicsBackendChoice::Headless => {}
                 GraphicsBackendChoice::Default => {
-                    #[cfg(feature = "vulkan")]
+                    #[cfg(feature = "vulkan_renderer")]
                     {
                         graphics_tx = Some(VulkanGraphics::init(os_input_tx.clone(), config.physical_device_name.clone()));
+                    }
+                    if graphics_tx.is_none() {
+                        #[cfg(feature = "wgpu_renderer")]
+                        {
+                            graphics_tx = Some(WgpuGraphics::init(os_input_tx.clone(), config.physical_device_name.clone()));
+                        }
                     }
                 }
             }
@@ -269,7 +281,7 @@ pub fn run(mut cli_results: CLIResults, config: Config) {
                 if let GameState::Quit (resume_menu_inner) = game.step(&mut input, &os_input.input, command_line.block(), &netplay) {
                     resume_menu = Some(resume_menu_inner)
                 }
-                #[cfg(feature = "vulkan")]
+                #[cfg(any(feature = "vulkan_renderer", feature = "wgpu_renderer"))]
                 {
                     if let Some(ref tx) = graphics_tx {
                         if let Err(_) = tx.send(game.graphics_message(&command_line)) {
@@ -291,7 +303,7 @@ pub fn run(mut cli_results: CLIResults, config: Config) {
                 game = Some(Game::new(package, config, menu_game_setup));
             }
             else {
-                #[cfg(feature = "vulkan")]
+                #[cfg(any(feature = "vulkan_renderer", feature = "wgpu_renderer"))]
                 {
                     if let Some(ref tx) = graphics_tx {
                         if let Err(_) = tx.send(menu.graphics_message(&command_line)) {

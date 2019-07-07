@@ -16,7 +16,7 @@ pub fn cli(config: &Config) -> CLIResults {
 
     let mut opts = Options::new();
     opts.optflag("l", "list", "List available packages and close");
-    if cfg!(feature = "vulkan") {
+    if cfg!(feature = "vulkan_renderer") {
         opts.optflag("d", "devices", "List vulkan physical devices and close");
     }
     opts.optopt("s", "stage",          "Use the stage specified", "NAME");
@@ -27,8 +27,12 @@ pub fn cli(config: &Config) -> CLIResults {
     opts.optopt("n", "netplayplayers", "Search for a netplay game with the specified number of players", "NUM_PLAYERS");
     opts.optopt("r", "netplayregion",  "Search for a netplay game with the specified region", "REGION");
     opts.optopt("g", "graphics",       "Graphics backend to use",
-        if cfg!(feature = "vulkan") {
+        if cfg!(feature = "vulkan_renderer") && cfg!(feature = "wgpu_renderer") {
+            "[vulkan|wgpu|none]"
+        } else if cfg!(feature = "vulkan_renderer") {
             "[vulkan|none]"
+        } else if cfg!(feature = "wgpu_renderer") {
+            "[wgpu|none]"
         } else {
             "[none]"
         }
@@ -55,7 +59,7 @@ pub fn cli(config: &Config) -> CLIResults {
     #[allow(unused_variables)]
 	let config = config;
 
-    #[cfg(feature = "vulkan")]
+    #[cfg(feature = "vulkan_renderer")]
     {
         if matches.opt_present("d") {
             use crate::vulkan;
@@ -125,9 +129,11 @@ pub fn cli(config: &Config) -> CLIResults {
 
     if let Some(backend_string) = matches.opt_str("g") {
         results.graphics_backend = match backend_string.to_lowercase().as_ref() {
-            #[cfg(feature = "vulkan")]
+            #[cfg(feature = "vulkan_renderer")]
             "vulkan" => { GraphicsBackendChoice::Vulkan }
-            "none"   => { GraphicsBackendChoice::Headless }
+            #[cfg(feature = "wgpu_renderer")]
+            "wgpu" => { GraphicsBackendChoice::Wgpu }
+            "none" => { GraphicsBackendChoice::Headless }
             _ => {
                 print_usage(program, opts);
                 results.continue_from = ContinueFrom::Close;
@@ -194,8 +200,10 @@ pub enum ContinueFrom {
 }
 
 pub enum GraphicsBackendChoice {
-    #[cfg(feature = "vulkan")]
+    #[cfg(feature = "vulkan_renderer")]
     Vulkan,
+    #[cfg(feature = "wgpu_renderer")]
+    Wgpu,
     Headless,
     Default,
 }

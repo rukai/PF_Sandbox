@@ -20,8 +20,11 @@ pub(crate) mod player;
 pub(crate) mod replays;
 pub(crate) mod results;
 
-#[cfg(feature = "vulkan")]
+#[cfg(feature = "vulkan_renderer")]
 pub(crate) mod vulkan;
+
+#[cfg(feature = "wgpu_renderer")]
+pub(crate) mod wgpu;
 
 use app::run;
 use cli::cli;
