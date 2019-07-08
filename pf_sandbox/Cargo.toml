@@ -39,6 +39,7 @@ cgmath = { version = "0.17", optional = true }
 
 vk-shader-macros = { version = "0.2", optional = true }
 wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "d836a4f041c04f32cde5976a24e502beab6e21e4", optional = true }
+#wgpu = { features = ["vulkan"], path = "/home/rubic/Projects/Crates/wgpu/wgpu-rs", optional = true }
 
 [features]
 default = ["vulkan_renderer", "wgpu_renderer"]
