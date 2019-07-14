@@ -4,20 +4,25 @@ mod buffers;
 
 use buffers::{ColorVertex, ColorBuffers, Vertex, Buffers};
 use crate::game::{GameState, RenderEntity, RenderGame};
-use crate::graphics::{GraphicsMessage, Render, RenderType};
-use crate::menu::{RenderMenu};
+use crate::graphics::{self, GraphicsMessage, Render, RenderType};
+use crate::menu::{RenderMenu, RenderMenuState, PlayerSelect, PlayerSelectUi};
 use crate::particle::ParticleType;
-use crate::player::{RenderPlayerFrame, RenderFighter};
-use pf_sandbox_lib::fighter::{CollisionBoxRole, Action};
-use pf_sandbox_lib::package::{Package, PackageUpdate};
+use crate::player::{RenderFighter, RenderPlayer, RenderPlayerFrame, DebugPlayer};
+use crate::results::PlayerResult;
+use pf_sandbox_lib::fighter::{Action, ECB, CollisionBoxRole, ActionFrame};
+use pf_sandbox_lib::geometry::Rect;
+use pf_sandbox_lib::json_upgrade;
+use pf_sandbox_lib::package::{Package, PackageUpdate, Verify};
 
+use std::collections::HashSet;
 use std::sync::mpsc::{Sender, Receiver, channel};
-use std::{thread, mem, f32};
 use std::time::{Duration, Instant};
+use std::{thread, mem, f32};
 
 use cgmath::Rad;
+use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector3};
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, ToPrimitive};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wgpu::{Device, SwapChain, BindGroup, BindGroupLayout, RenderPipeline, RenderPass, TextureView};
@@ -31,25 +36,23 @@ use winit::{
 };
 
 pub struct WgpuGraphics {
-    package:                   Option<Package>,
-    glyph_brush:               GlyphBrush<'static>,
-    window:                    Window,
-    event_loop:                EventsLoop,
-    os_input_tx:               Sender<Event>,
-    render_rx:                 Receiver<GraphicsMessage>,
-    device:                    Device,
-    swap_chain:                Option<SwapChain>,
-    multisampled_framebuffer:  TextureView,
-    render_pipeline:           RenderPipeline,
-    pipeline:                  RenderPipeline,
-    pipeline_surface:          RenderPipeline,
-    bind_group:                BindGroup,
-    bind_group_layout_surface: BindGroupLayout,
-    prev_fullscreen:           Option<bool>,
-    frame_durations:           Vec<Duration>,
-    fps:                       String,
-    width:                     u32,
-    height:                    u32,
+    package:                  Option<Package>,
+    glyph_brush:              GlyphBrush<'static>,
+    window:                   Window,
+    event_loop:               EventsLoop,
+    os_input_tx:              Sender<Event>,
+    render_rx:                Receiver<GraphicsMessage>,
+    device:                   Device,
+    swap_chain:               Option<SwapChain>,
+    multisampled_framebuffer: TextureView,
+    pipeline:                 RenderPipeline,
+    pipeline_surface:         RenderPipeline,
+    bind_group_layout:        BindGroupLayout,
+    prev_fullscreen:          Option<bool>,
+    frame_durations:          Vec<Duration>,
+    fps:                      String,
+    width:                    u32,
+    height:                   u32,
 }
 
 const SAMPLE_COUNT: u32 = 4;
@@ -94,11 +97,6 @@ impl WgpuGraphics {
             limits: wgpu::Limits::default(),
         });
 
-        let vs_bytes = include_bytes!("shader.vert.spv");
-        let vs_module = device.create_shader_module(vs_bytes);
-        let fs_bytes = include_bytes!("shader.frag.spv");
-        let fs_module = device.create_shader_module(fs_bytes);
-
         let surface_vs_u32 = vk_shader_macros::include_glsl!("src/shaders/surface-vertex.glsl", kind: vert);
         let mut surface_vs_bytes = vec!();
         for word in surface_vs_u32.iter() {
@@ -113,24 +111,15 @@ impl WgpuGraphics {
         }
         let surface_fs_module = device.create_shader_module(&surface_fs_bytes);
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { bindings: &[] });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            bindings: &[],
-        });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[&bind_group_layout],
-        });
-
-        let bind_group_layout_surface = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { bindings: &[
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { bindings: &[
             wgpu::BindGroupLayoutBinding {
                 binding:    0,
                 visibility: wgpu::ShaderStage::all(),
                 ty:         wgpu::BindingType::UniformBuffer,
             }
         ] });
-        let pipeline_layout_surface = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[&bind_group_layout_surface],
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            bind_group_layouts: &[&bind_group_layout],
         });
 
         let rasterization_state = wgpu::RasterizationStateDescriptor {
@@ -148,27 +137,8 @@ impl WgpuGraphics {
             write_mask: wgpu::ColorWrite::ALL,
         }];
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &pipeline_layout,
-            vertex_stage: wgpu::PipelineStageDescriptor {
-                module: &vs_module,
-                entry_point: "main",
-            },
-            fragment_stage: Some(wgpu::PipelineStageDescriptor {
-                module: &fs_module,
-                entry_point: "main",
-            }),
-            rasterization_state: rasterization_state.clone(),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &color_states,
-            depth_stencil_state: None,
-            index_format: wgpu::IndexFormat::Uint16,
-            vertex_buffers: &[],
-            sample_count: SAMPLE_COUNT,
-        });
-
         let pipeline_surface = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &pipeline_layout_surface,
+            layout: &pipeline_layout,
             vertex_stage: wgpu::PipelineStageDescriptor {
                 module: &surface_vs_module,
                 entry_point: "main",
@@ -216,7 +186,7 @@ impl WgpuGraphics {
         let fs_module = device.create_shader_module(&fs_bytes);
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &pipeline_layout_surface,
+            layout: &pipeline_layout,
             vertex_stage: wgpu::PipelineStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
@@ -292,11 +262,9 @@ impl WgpuGraphics {
             device,
             swap_chain,
             multisampled_framebuffer,
-            render_pipeline,
             pipeline,
             pipeline_surface,
-            bind_group,
-            bind_group_layout_surface,
+            bind_group_layout,
             prev_fullscreen: None,
             frame_durations: vec!(),
             fps: "".into(),
@@ -555,19 +523,11 @@ impl WgpuGraphics {
             transformation: transformation.into(),
         };
 
-        #[derive(Clone, Copy)]
-        #[allow(dead_code)]
-        #[repr(C)]
-        struct Uniform {
-            edge_color:     [f32; 4],
-            color:          [f32; 4],
-            transformation: [[f32; 4]; 4],
-        }
         let uniform_buffer = self.device.create_buffer_mapped(1, wgpu::BufferUsage::UNIFORM)
             .fill_from_slice(&[uniform]);
 
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &self.bind_group_layout_surface,
+            layout: &self.bind_group_layout,
             bindings: &[wgpu::Binding {
                 binding: 0,
                 resource: wgpu::BindingResource::Buffer {
@@ -598,17 +558,11 @@ impl WgpuGraphics {
         let transformation = camera * entity;
         let uniform = ColorUniform { transformation: transformation.into() };
 
-        #[derive(Clone, Copy)]
-        #[allow(dead_code)]
-        #[repr(C)]
-        struct ColorUniform {
-            transformation: [[f32; 4]; 4],
-        }
         let uniform_buffer = self.device.create_buffer_mapped(1, wgpu::BufferUsage::UNIFORM)
             .fill_from_slice(&[uniform]);
 
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &self.bind_group_layout_surface,
+            layout: &self.bind_group_layout,
             bindings: &[wgpu::Binding {
                 binding: 0,
                 resource: wgpu::BindingResource::Buffer {
@@ -624,6 +578,23 @@ impl WgpuGraphics {
         rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
         rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
     }
+
+    fn new_bind_group<T>(&self, uniform: T) -> BindGroup where T: 'static + Copy {
+        let uniform_buffer = self.device.create_buffer_mapped(1, wgpu::BufferUsage::UNIFORM)
+            .fill_from_slice(&[uniform]);
+
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &self.bind_group_layout,
+            bindings: &[wgpu::Binding {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer {
+                    buffer: &uniform_buffer,
+                    range: 0..mem::size_of::<T>() as wgpu::BufferAddress,
+                }
+            }]
+        })
+    }
+
 
     fn game_render(&mut self, render: RenderGame, rpass: &mut RenderPass, command_output: &[String]) {
         let mut rng = StdRng::from_seed(render.seed);
@@ -746,7 +717,6 @@ impl WgpuGraphics {
                     // draw selected colboxes
                     if player.selected_colboxes.len() > 0 {
                         let color = [0.0, 1.0, 0.0, 1.0];
-                        // TODO
                         let buffers = Buffers::new_fighter_frame_colboxes(&self.device, &self.package.as_ref().unwrap(), &player.frames[0].fighter, player.frames[0].action, player.frames[0].frame, &player.selected_colboxes);
                         self.render_buffers(&self.pipeline, rpass, &render, buffers, &transformation, color, color);
                     }
@@ -888,10 +858,569 @@ impl WgpuGraphics {
         }
     }
 
-    fn menu_render(&mut self, _render: RenderMenu, rpass: &mut RenderPass, _command_output: &[String]) {
-        rpass.set_pipeline(&self.render_pipeline);
-        rpass.set_bind_group(0, &self.bind_group, &[]);
-        rpass.draw(0 .. 3, 0 .. 1);
+    fn menu_render(&mut self, render: RenderMenu, rpass: &mut RenderPass, command_output: &[String]) {
+        self.fps_render();
+        let mut entities: Vec<MenuEntityAndBindGroup> = vec!();
+
+        match render.state {
+            RenderMenuState::GameSelect (selection) => {
+                self.draw_game_selector(selection);
+                self.draw_package_banner(&render.package_verify, command_output);
+            }
+            RenderMenuState::ReplaySelect (replay_names, selection) => {
+                self.draw_replay_selector(&replay_names, selection);
+                self.draw_package_banner(&render.package_verify, command_output);
+            }
+            RenderMenuState::CharacterSelect (selections, back_counter, back_counter_max) => {
+                let mut plugged_in_selections: Vec<(&PlayerSelect, usize)> = vec!();
+                for (i, selection) in selections.iter().enumerate() {
+                    if selection.ui.is_visible() {
+                        plugged_in_selections.push((selection, i));
+                    }
+                }
+
+                self.draw_back_counter(&mut entities, back_counter, back_counter_max);
+                self.glyph_brush.queue(Section {
+                    text: "Select Fighters",
+                    color: [1.0, 1.0, 1.0, 1.0],
+                    screen_position: (100.0, 4.0),
+                    scale: GlyphScale::uniform(50.0),
+                    .. Section::default()
+                });
+
+                match plugged_in_selections.len() {
+                    0 => {
+                        self.glyph_brush.queue(Section {
+                            text: "There are no controllers plugged in.",
+                            color: [1.0, 1.0, 1.0, 1.0],
+                            screen_position: (100.0, 100.0),
+                            scale: GlyphScale::uniform(30.0),
+                            .. Section::default()
+                        });
+                    }
+                    1 => {
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 0, -0.9, -0.8, 0.9, 0.9);
+
+                    }
+                    2 => {
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 0, -0.9, -0.8, 0.0, 0.9);
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 1,  0.0, -0.8, 0.9, 0.9);
+                    }
+                    3 => {
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 0, -0.9, -0.8, 0.0, 0.0);
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 1,  0.0, -0.8, 0.9, 0.0);
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 2, -0.9,  0.0, 0.0, 0.9);
+                    }
+                    4 => {
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 0, -0.9, -0.8, 0.0, 0.0);
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 1,  0.0, -0.8, 0.9, 0.0);
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 2, -0.9,  0.0, 0.0, 0.9);
+                        self.draw_fighter_selector(&mut entities, &plugged_in_selections, 3,  0.0,  0.0, 0.9, 0.9);
+                    }
+                    _ => {
+                        self.glyph_brush.queue(Section {
+                            text: "Currently only supports up to 4 controllers. Please unplug some.",
+                            color: [1.0, 1.0, 1.0, 1.0],
+                            screen_position: (100.0, 100.0),
+                            scale: GlyphScale::uniform(30.0),
+                            .. Section::default()
+                        });
+                    }
+                }
+                self.draw_package_banner(&render.package_verify, command_output);
+            }
+            RenderMenuState::StageSelect (selection) => {
+                self.draw_stage_selector(&mut entities, selection);
+                self.draw_package_banner(&render.package_verify, command_output);
+            }
+            RenderMenuState::GameResults { results, replay_saved } => {
+                let max = results.len() as f32;
+                for (i, result) in results.iter().enumerate() {
+                    let i = i as f32;
+                    let start_x = i / max;
+                    self.draw_player_result(result, start_x);
+                }
+
+                if replay_saved {
+                    self.glyph_brush.queue(Section {
+                        text: "Replay saved!",
+                        color: [1.0, 1.0, 1.0, 1.0],
+                        screen_position: (30.0, self.height as f32 - 30.0),
+                        scale: GlyphScale::uniform(30.0),
+                        .. Section::default()
+                    });
+                }
+            }
+            RenderMenuState::PackageSelect (ref names, selection, ref message) => {
+                self.draw_package_selector(names, selection, message, command_output);
+            }
+            RenderMenuState::GenericText (ref text) => {
+                self.glyph_brush.queue(Section {
+                    text,
+                    color: [1.0, 1.0, 0.0, 1.0],
+                    screen_position: (100.0, 50.0),
+                    scale: GlyphScale::uniform(30.0),
+                    .. Section::default()
+                });
+            }
+        }
+
+        for entity in entities {
+            match entity.entity {
+                MenuEntity::Fighter { ref fighter, action, frame } => {
+                    if let Some(buffers) = Buffers::new_fighter_frame(&self.device, &self.package.as_ref().unwrap(), fighter, action, frame) {
+                        rpass.set_pipeline(&self.pipeline);
+                        rpass.set_bind_group(0, &entity.bind_group, &[]);
+                        rpass.set_index_buffer(&buffers.index, 0);
+                        rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+                        rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
+                    }
+                }
+                MenuEntity::Stage (ref stage) => {
+                    let stage: &str = stage.as_ref();
+                    let stage = &self.package.as_ref().unwrap().stages[stage];
+                    if let Some(buffers) = ColorBuffers::new_surfaces(&self.device, &stage.surfaces) {
+                        rpass.set_pipeline(&self.pipeline_surface);
+                        rpass.set_bind_group(0, &entity.bind_group, &[]);
+                        rpass.set_index_buffer(&buffers.index, 0);
+                        rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+                        rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
+                    }
+
+                }
+                MenuEntity::StageFill (ref stage) => {
+                    let stage: &str = stage.as_ref();
+                    let stage = &self.package.as_ref().unwrap().stages[stage];
+                    if let Some(buffers) = ColorBuffers::new_surfaces_fill(&self.device, &stage.surfaces) {
+                        rpass.set_pipeline(&self.pipeline_surface);
+                        rpass.set_bind_group(0, &entity.bind_group, &[]);
+                        rpass.set_index_buffer(&buffers.index, 0);
+                        rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+                        rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
+                    }
+                }
+                MenuEntity::Rect (ref rect) => {
+                    let buffers = Buffers::rect_buffers(&self.device, rect.clone());
+                    rpass.set_pipeline(&self.pipeline);
+                    rpass.set_bind_group(0, &entity.bind_group, &[]);
+                    rpass.set_index_buffer(&buffers.index, 0);
+                    rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+                    rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
+                }
+            }
+        }
+    }
+
+    fn draw_package_banner(&mut self, verify: &Verify, command_output: &[String]) {
+        if command_output.len() == 0 {
+            let package = &self.package.as_ref().unwrap();
+            let color: [f32; 4] = if let &Verify::Ok = verify {
+                [0.0, 1.0, 0.0, 1.0]
+            } else {
+                [1.0, 0.0, 0.0, 1.0]
+            };
+
+            let message = if let Some(ref source) = package.meta.source {
+                match verify {
+                    &Verify::Ok => {
+                        format!("{} - {}", package.meta.title, source)
+                    }
+                    &Verify::IncorrectHash => {
+                        format!("{} - {} - The computed hash did not match the hash given by the host", package.meta.title, source)
+                    }
+                    &Verify::UpdateAvailable => {
+                        format!("{} - {} - There is an update available from the host", package.meta.title, source)
+                    }
+                    &Verify::CannotConnect => {
+                        format!("{} - {} - Cannot connect to package host", package.meta.title, source)
+                    }
+                    &Verify::None => {
+                        unreachable!();
+                    }
+                }
+            } else {
+                package.meta.title.clone()
+            };
+
+            self.glyph_brush.queue(Section {
+                text: message.as_str(),
+                color,
+                screen_position: (30.0, self.height as f32 - 60.0),
+                scale: GlyphScale::uniform(30.0),
+                .. Section::default()
+            });
+        }
+        else {
+            self.command_render(command_output);
+        }
+    }
+
+    fn draw_package_selector(&mut self, package_names: &[String], selection: usize, message: &str, command_output: &[String]) {
+        let color: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
+        self.glyph_brush.queue(Section {
+            text: "Select Package",
+            color,
+            screen_position: (100.0, 4.0),
+            scale: GlyphScale::uniform(50.0),
+            .. Section::default()
+        });
+        self.glyph_brush.queue(Section {
+            text: message,
+            color,
+            screen_position: (100.0, self.height as f32 - 60.0),
+            scale: GlyphScale::uniform(30.0),
+            .. Section::default()
+        });
+        self.glyph_brush.queue(Section {
+            text: json_upgrade::build_version().as_str(),
+            color,
+            screen_position: (self.width as f32 - 380.0, self.height as f32 - 60.0),
+            scale: GlyphScale::uniform(30.0),
+            .. Section::default()
+        });
+
+        for (package_i, name) in package_names.iter().enumerate() {
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let x_offset = if package_i == selection { 0.1 } else { 0.0 };
+            let x = self.width as f32 * (0.1 + x_offset);
+            let y = self.height as f32 * 0.1 + package_i as f32 * 50.0;
+            self.glyph_brush.queue(Section {
+                text: name.as_ref(),
+                color,
+                screen_position: (x, y),
+                scale: GlyphScale::uniform(size),
+                .. Section::default()
+            });
+        }
+        self.command_render(command_output);
+    }
+
+    fn draw_game_selector(&mut self, selection: usize) {
+        self.glyph_brush.queue(Section {
+            text: "Select Game Mode",
+            color: [1.0, 1.0, 1.0, 1.0],
+            screen_position: (100.0, 4.0),
+            scale: GlyphScale::uniform(50.0),
+            .. Section::default()
+        });
+
+        let modes = vec!("Local", "Netplay", "Replays");
+        for (mode_i, name) in modes.iter().enumerate() {
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let x_offset = if mode_i == selection { 0.1 } else { 0.0 };
+            let x = self.width as f32 * (0.1 + x_offset);
+            let y = self.height as f32 * 0.1 + mode_i as f32 * 50.0;
+            self.glyph_brush.queue(Section {
+                text: name.as_ref(),
+                color: [1.0, 1.0, 1.0, 1.0],
+                screen_position: (x, y),
+                scale: GlyphScale::uniform(size),
+                .. Section::default()
+            });
+        }
+    }
+
+    fn draw_replay_selector(&mut self, replay_names: &[String], selection: usize) {
+        self.glyph_brush.queue(Section {
+            text: "Select Replay",
+            color: [1.0, 1.0, 1.0, 1.0],
+            screen_position: (100.0, 4.0),
+            scale: GlyphScale::uniform(50.0),
+            .. Section::default()
+        });
+
+        for (replay_i, name) in replay_names.iter().enumerate() {
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let x_offset = if replay_i == selection { 0.1 } else { 0.0 };
+            let x = self.width as f32 * (0.1 + x_offset);
+            let y = self.height as f32 * 0.1 + replay_i as f32 * 50.0;
+            self.glyph_brush.queue(Section {
+                text: name.as_ref(),
+                color: [1.0, 1.0, 1.0, 1.0],
+                screen_position: (x, y),
+                scale: GlyphScale::uniform(size),
+                .. Section::default()
+            });
+        }
+    }
+
+    // TODO: Rewrite text rendering to be part of scene instead of just plastered on top
+    // TODO: Then this bar can be drawn on top of the package banner text
+    fn draw_back_counter(&mut self, entities: &mut Vec<MenuEntityAndBindGroup>, back_counter: usize, back_counter_max: usize) {
+        let uniform = Uniform {
+            edge_color:     [1.0, 1.0, 1.0, 1.0],
+            color:          [1.0, 1.0, 1.0, 1.0],
+            transformation: Matrix4::identity().into(),
+        };
+        let bind_group = self.new_bind_group(uniform);
+
+        let entity = MenuEntity::Rect (Rect {
+            x1: -1.0,
+            y1: -0.85,
+            x2: back_counter as f32 / back_counter_max as f32 * 2.0 - 1.0,
+            y2: -1.0,
+        });
+
+        entities.push(MenuEntityAndBindGroup { bind_group, entity });
+    }
+
+    fn draw_fighter_selector(&mut self, entities: &mut Vec<MenuEntityAndBindGroup>, selections: &[(&PlayerSelect, usize)], i: usize, start_x: f32, start_y: f32, end_x: f32, end_y: f32) {
+        let fighters = &self.package.as_ref().unwrap().fighters;
+        let (selection, controller_i) = selections[i];
+
+        // render player name
+        {
+            let x = ((start_x+1.0) / 2.0) * self.width  as f32;
+            let y = ((start_y+1.0) / 2.0) * self.height as f32;
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let color = if let Some((check_i, _)) = selection.controller {
+                // Use the team color of the controller currently manipulating this selection
+                let mut team = 0;
+                for val in selections {
+                    let &(controller_selection, i) = val;
+                    if check_i == i {
+                        team = controller_selection.team;
+                    }
+                }
+                graphics::get_team_color4(team)
+            } else {
+                [0.5, 0.5, 0.5, 1.0]
+            };
+            let name = match selection.ui {
+                PlayerSelectUi::CpuAi        (_) => format!("CPU AI"),
+                PlayerSelectUi::CpuFighter   (_) => format!("CPU Fighter"),
+                PlayerSelectUi::HumanFighter (_) => format!("Port #{}", controller_i+1),
+                PlayerSelectUi::HumanTeam    (_) => format!("Port #{} Team", controller_i+1),
+                PlayerSelectUi::CpuTeam      (_) => format!("CPU Team"),
+                PlayerSelectUi::HumanUnplugged   => unreachable!()
+            };
+            self.glyph_brush.queue(Section {
+                text: name.as_ref(),
+                color: color,
+                screen_position: (x, y),
+                scale: GlyphScale::uniform(size),
+                .. Section::default()
+            });
+        }
+
+        // render UI
+        let mut options = vec!();
+        match selection.ui {
+            PlayerSelectUi::HumanFighter (_) => {
+                options.extend(fighters.iter().map(|x| x.name.clone()));
+                options.push(String::from("Change Team"));
+                options.push(String::from("Add CPU"));
+            }
+            PlayerSelectUi::CpuFighter (_) => {
+                options.extend(fighters.iter().map(|x| x.name.clone()));
+                options.push(String::from("Change Team"));
+                options.push(String::from("Change AI"));
+                options.push(String::from("Remove CPU"));
+            }
+            PlayerSelectUi::HumanTeam (_) => {
+                options.extend(graphics::get_colors().iter().map(|x| x.name.clone()));
+                options.push(String::from("Return"));
+            }
+            PlayerSelectUi::CpuTeam (_) => {
+                options.extend(graphics::get_colors().iter().map(|x| x.name.clone()));
+                options.push(String::from("Return"));
+            }
+            PlayerSelectUi::CpuAi (_) => {
+                options.push(String::from("Return"));
+            }
+            PlayerSelectUi::HumanUnplugged => unreachable!()
+        }
+
+        for (option_i, option) in options.iter().enumerate() {
+            let x_offset = if option_i == selection.ui.ticker_unwrap().cursor { 0.1 } else { 0.0 };
+            let x = ((start_x+1.0 + x_offset) / 2.0) * self.width  as f32;
+            let y = ((start_y+1.0           ) / 2.0) * self.height as f32 + (option_i+1) as f32 * 40.0;
+
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let mut color = [1.0, 1.0, 1.0, 1.0];
+            match selection.ui {
+                PlayerSelectUi::HumanFighter (_) |
+                PlayerSelectUi::CpuFighter (_) => {
+                    if let Some(selected_option_i) = selection.fighter {
+                        if selected_option_i == option_i {
+                            color = graphics::get_team_color4(selection.team);
+                        }
+                    }
+                }
+                PlayerSelectUi::HumanTeam (_) |
+                PlayerSelectUi::CpuTeam (_) => {
+                    if option_i < graphics::get_colors().len() {
+                        color = graphics::get_team_color4(option_i);
+                    }
+                }
+                _ => { }
+            }
+            self.glyph_brush.queue(Section {
+                text: option.as_ref(),
+                color,
+                screen_position: (x, y),
+                scale: GlyphScale::uniform(size),
+                .. Section::default()
+            });
+        }
+
+        // render fighter
+        for (fighter_i, (fighter_key, _)) in fighters.key_value_iter().enumerate() {
+            if let Some(selection_i) = selection.fighter {
+                if fighter_i == selection_i {
+                    let fighter = fighters.key_to_value(fighter_key).unwrap();
+
+                    // Determine action, handling the user setting it to an invalid value
+                    let css_action = fighter.css_action as usize;
+                    let action = if css_action < fighter.actions.len() {
+                        css_action
+                    } else {
+                        Action::Idle.to_u64().unwrap() as usize
+                    };
+
+                    let frames = vec!(RenderPlayerFrame {
+                        fighter:    fighter_key.clone(),
+                        bps:        (0.0, 0.0),
+                        ecb:        ECB::default(),
+                        face_right: start_x < 0.0,
+                        frame:      selection.animation_frame,
+                        angle:      0.0,
+                        action,
+                    });
+
+                    // draw fighter
+                    let player = RenderPlayer {
+                        team:              selection.team,
+                        debug:             DebugPlayer::default(),
+                        damage:            0.0,
+                        stocks:            None,
+                        frame_data:        ActionFrame::default(),
+                        fighter_color:     graphics::get_team_color3(selection.team),
+                        fighter_selected:  false,
+                        player_selected:   false,
+                        selected_colboxes: HashSet::new(),
+                        shield:            None,
+                        vector_arrows:     vec!(),
+                        particles:         vec!(),
+                        frames,
+                    };
+
+                    // fudge player data TODO: One day I would like to have the menu selection fighters (mostly) playable
+                    let zoom = fighter.css_scale / 40.0;
+                    let fighter_x = start_x + (end_x - start_x) / 2.0;
+                    let fighter_y = end_y * -1.0 + 0.05;
+
+                    let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
+                    let position = Matrix4::from_translation(Vector3::new(fighter_x, fighter_y, 0.0));
+                    let dir      = Matrix4::from_nonuniform_scale(if player.frames[0].face_right { 1.0 } else { -1.0 }, 1.0, 1.0);
+                    let transformation = position * (camera * dir);
+                    let uniform = Uniform {
+                        edge_color:     graphics::get_team_color4(selection.team),
+                        color:          [0.9, 0.9, 0.9, 1.0],
+                        transformation: transformation.into(),
+                    };
+                    let bind_group = self.new_bind_group(uniform);
+
+                    let entity = MenuEntity::Fighter {
+                        fighter: player.frames[0].fighter.clone(),
+                        action:  player.frames[0].action,
+                        frame:   player.frames[0].frame
+                    };
+
+                    entities.push(MenuEntityAndBindGroup { bind_group, entity });
+                }
+            }
+        }
+    }
+
+    fn draw_stage_selector(&mut self, entities: &mut Vec<MenuEntityAndBindGroup>, selection: usize) {
+        self.glyph_brush.queue(Section {
+            text: "Select Stage",
+            color: [1.0, 1.0, 1.0, 1.0],
+            screen_position: (100.0, 4.0),
+            scale: GlyphScale::uniform(50.0),
+            .. Section::default()
+        });
+        let stages = &self.package.as_ref().unwrap().stages;
+        for (stage_i, stage) in stages.key_value_iter().enumerate() {
+            let (stage_key, stage) = stage;
+            let size = 26.0; // TODO: determine from width/height of screen and start/end pos
+            let x_offset = if stage_i == selection { 0.05 } else { 0.0 };
+            let x = self.width as f32 * (0.1 + x_offset);
+            let y = self.height as f32 * 0.1 + stage_i as f32 * 50.0;
+            self.glyph_brush.queue(Section {
+                text: stage.name.as_ref(),
+                color: [1.0, 1.0, 1.0, 1.0],
+                screen_position: (x, y),
+                scale: GlyphScale::uniform(size),
+                .. Section::default()
+            });
+
+            if stage_i == selection {
+                let zoom_divider = 100.0;
+                let zoom = 1.0 / zoom_divider;
+                let y = -0.2 * zoom_divider;
+
+                let camera   = Matrix4::from_nonuniform_scale(zoom, zoom * self.aspect_ratio(), 1.0);
+                let position = Matrix4::from_translation(Vector3::new(1.0, y, 0.0));
+                let transformation = camera * position;
+                let uniform = ColorUniform { transformation: transformation.into() };
+
+                let bind_group = self.new_bind_group(uniform);
+                let entity = MenuEntity::Stage(stage_key.clone());
+                entities.push(MenuEntityAndBindGroup { bind_group, entity });
+
+                let bind_group = self.new_bind_group(uniform);
+                let entity = MenuEntity::StageFill(stage_key.clone());
+                entities.push(MenuEntityAndBindGroup { bind_group, entity });
+            }
+        }
+    }
+
+    fn draw_player_result(&mut self, result: &PlayerResult, start_x: f32) {
+        let fighter_name = self.package.as_ref().unwrap().fighters[result.fighter.as_ref()].name.as_ref();
+        let color = graphics::get_team_color4(result.team);
+        let x = (start_x + 0.05) * self.width as f32;
+        let mut y = 30.0;
+        self.glyph_brush.queue(Section {
+            text: (result.place + 1).to_string().as_ref(),
+            color,
+            screen_position: (x, y),
+            scale: GlyphScale::uniform(100.0),
+            .. Section::default()
+        });
+        y += 120.0;
+        self.glyph_brush.queue(Section {
+            text: fighter_name,
+            color,
+            screen_position: (x, y),
+            scale: GlyphScale::uniform(30.0),
+            .. Section::default()
+        });
+        y += 30.0;
+        self.glyph_brush.queue(Section {
+            text: format!("Kills: {}", result.kills.len()).as_str(),
+            color,
+            screen_position: (x, y),
+            scale: GlyphScale::uniform(30.0),
+            .. Section::default()
+        });
+        y += 30.0;
+        self.glyph_brush.queue(Section {
+            text: format!("Deaths: {}", result.deaths.len()).as_str(),
+            color,
+            screen_position: (x, y),
+            scale: GlyphScale::uniform(30.0),
+            .. Section::default()
+        });
+        y += 30.0;
+        self.glyph_brush.queue(Section {
+            text: format!("L-Cancel Success: {}%", result.lcancel_percent).as_str(),
+            color,
+            screen_position: (x, y),
+            scale: GlyphScale::uniform(30.0),
+            .. Section::default()
+        });
     }
 
     fn aspect_ratio(&self) -> f32 {
@@ -931,4 +1460,32 @@ impl WgpuGraphics {
         });
         true
     }
+}
+
+enum MenuEntity {
+    Fighter   { fighter: String, action: usize, frame: usize },
+    Stage     (String),
+    StageFill (String),
+    Rect      (Rect),
+}
+
+struct MenuEntityAndBindGroup {
+    entity:     MenuEntity,
+    bind_group: BindGroup,
+}
+
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+#[repr(C)]
+struct Uniform {
+    edge_color:     [f32; 4],
+    color:          [f32; 4],
+    transformation: [[f32; 4]; 4],
+}
+
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+#[repr(C)]
+struct ColorUniform {
+    transformation: [[f32; 4]; 4],
 }

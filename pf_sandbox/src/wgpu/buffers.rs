@@ -215,7 +215,7 @@ impl Buffers {
         Buffers::new(device, &vertices, &indices)
     }
 
-    pub fn _rect_buffers(device: &Device, rect: Rect) -> Buffers {
+    pub fn rect_buffers(device: &Device, rect: Rect) -> Buffers {
         let left  = rect.left();
         let right = rect.right();
         let bot   = rect.bot();
