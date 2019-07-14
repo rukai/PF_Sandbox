@@ -1,5 +1,6 @@
-use pf_sandbox_lib::fighter::{LinkType, CollisionBox, CollisionBoxLink};
+use pf_sandbox_lib::fighter::{LinkType, CollisionBox, CollisionBoxLink, ColboxOrLink};
 use pf_sandbox_lib::geometry::Rect;
+use pf_sandbox_lib::package::Package;
 use pf_sandbox_lib::stage::Surface;
 use crate::player::RenderShield;
 use crate::graphics;
@@ -90,7 +91,7 @@ impl Buffers {
     }
 
     /// Creates a single circle with radius 1 around the origin
-    pub fn _new_circle(device: &Device) -> Buffers {
+    pub fn new_circle(device: &Device) -> Buffers {
         let mut vertices: Vec<Vertex> = vec!();
         let mut indices: Vec<u16> = vec!();
 
@@ -110,7 +111,7 @@ impl Buffers {
     }
 
     /// Creates a single triangle with sides of length 1
-    pub fn _new_triangle(device: &Device) -> Buffers {
+    pub fn new_triangle(device: &Device) -> Buffers {
         let h = ((3.0/4.0) as f32).sqrt();
         let vertices = [
             Vertex { position: [0.0,    h  ], edge: 0.0, render_id: 0 },
@@ -152,7 +153,7 @@ impl Buffers {
         Buffers::new(device, &vertices, &indices)
     }
 
-    pub fn _new_spawn_point(device: &Device) -> Buffers {
+    pub fn new_spawn_point(device: &Device) -> Buffers {
         let vertices: [Vertex; 11] = [
             // vertical bar
             vertex(-0.15, -4.0),
@@ -188,7 +189,7 @@ impl Buffers {
         Buffers::new(device, &vertices, &indices)
     }
 
-    pub fn _new_arrow(device: &Device) -> Buffers {
+    pub fn new_arrow(device: &Device) -> Buffers {
         let vertices: [Vertex; 7] = [
             // stick
             vertex(-0.7, 0.0),
@@ -235,7 +236,7 @@ impl Buffers {
         Buffers::new(device, &vertices, &indices)
     }
 
-    pub fn _rect_outline_buffers(device: &Device, rect: &Rect) -> Buffers {
+    pub fn rect_outline_buffers(device: &Device, rect: &Rect) -> Buffers {
         let width = 0.5;
         let left  = rect.left();
         let right = rect.right();
@@ -266,7 +267,7 @@ impl Buffers {
         Buffers::new(device, &vertices, &indices)
     }
 
-    pub fn _new_player(device: &Device, player: &RenderPlayer) -> Buffers {
+    pub fn new_player(device: &Device, player: &RenderPlayer) -> Buffers {
         let mid_y = (player.frames[0].ecb.top + player.frames[0].ecb.bottom) / 2.0;
         let vertices: [Vertex; 12] = [
             // ecb
@@ -298,6 +299,162 @@ impl Buffers {
         ];
 
         Buffers::new(device, &vertices, &indices)
+    }
+
+    pub fn gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16, render_id: u32) {
+        let triangles = 60;
+        // triangles are drawn meeting at the centre, forming a circle
+        let point = &colbox.point;
+        vertices.push(Vertex { position: [point.0, point.1], edge: 0.0, render_id});
+        for i in 0..triangles {
+            let angle = i as f32 * 2.0 * consts::PI / (triangles as f32);
+            let (sin, cos) = angle.sin_cos();
+            let x = point.0 + cos * colbox.radius;
+            let y = point.1 + sin * colbox.radius;
+            vertices.push(Vertex { position: [x, y], edge: 1.0, render_id });
+            indices.push(*index_count);
+            indices.push(*index_count + i + 1);
+            indices.push(*index_count + (i + 1) % triangles + 1);
+        }
+        *index_count += triangles + 1;
+    }
+
+    pub fn gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16) {
+        let render_id1 = graphics::get_render_id(&colbox1.role);
+        let render_id2 = graphics::get_render_id(&colbox2.role);
+
+        let render_id_link = render_id1;
+        match link.link_type {
+            LinkType::MeldFirst | LinkType::MeldSecond => {
+                // draw a rectangle connecting two colboxes
+                let (x1, y1)   = colbox1.point;
+                let (x2, y2)   = colbox2.point;
+                let one_radius = colbox1.radius;
+                let two_radius = colbox2.radius;
+
+                let mid_angle = (y1 - y2).atan2(x1 - x2);
+
+                let angle1 = mid_angle + consts::FRAC_PI_2;
+                let angle2 = mid_angle - consts::FRAC_PI_2;
+
+                // rectangle as 4 points
+                let link_x1 = x1 + angle1.cos() * one_radius;
+                let link_x2 = x1 + angle2.cos() * one_radius;
+                let link_x3 = x2 + angle1.cos() * two_radius;
+                let link_x4 = x2 + angle2.cos() * two_radius;
+                let link_x5 = x1;
+                let link_x6 = x2;
+
+                let link_y1 = y1 + angle1.sin() * one_radius;
+                let link_y2 = y1 + angle2.sin() * one_radius;
+                let link_y3 = y2 + angle1.sin() * two_radius;
+                let link_y4 = y2 + angle2.sin() * two_radius;
+                let link_y5 = y1;
+                let link_y6 = y2;
+
+                // rectangle into buffers
+                vertices.push(Vertex { position: [link_x1, link_y1], edge: 1.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x2, link_y2], edge: 1.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x3, link_y3], edge: 1.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x4, link_y4], edge: 1.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x5, link_y5], edge: 0.0, render_id: render_id_link });
+                vertices.push(Vertex { position: [link_x6, link_y6], edge: 0.0, render_id: render_id_link });
+
+                indices.push(*index_count);
+                indices.push(*index_count + 4);
+                indices.push(*index_count + 5);
+
+                indices.push(*index_count + 0);
+                indices.push(*index_count + 2);
+                indices.push(*index_count + 5);
+
+                indices.push(*index_count + 1);
+                indices.push(*index_count + 3);
+                indices.push(*index_count + 4);
+
+                indices.push(*index_count + 3);
+                indices.push(*index_count + 4);
+                indices.push(*index_count + 5);
+                *index_count += 6;
+
+                let triangles = 30;
+
+                // draw colbox1, triangles are drawn meeting at the centre, forming a circle
+                vertices.push(Vertex { position: [x1, y1], edge: 0.0, render_id: render_id2 });
+                for i in 0..triangles + 1 {
+                    let angle = angle2 + i as f32 * consts::PI / (triangles as f32);
+                    let (sin, cos) = angle.sin_cos();
+                    let x = x1 + cos * colbox1.radius;
+                    let y = y1 + sin * colbox1.radius;
+                    vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id1 });
+                }
+                for i in 0..triangles {
+                    indices.push(*index_count);
+                    indices.push(*index_count + i + 1);
+                    indices.push(*index_count + i + 2);
+                }
+                *index_count += triangles + 2;
+
+                // draw colbox2, triangles are drawn meeting at the centre, forming a circle
+                vertices.push(Vertex { position: [x2, y2], edge: 0.0, render_id: render_id2 });
+                for i in 0..triangles + 1 {
+                    let angle = angle1 + i as f32 * consts::PI / (triangles as f32);
+                    let (sin, cos) = angle.sin_cos();
+                    let x = x2 + cos * colbox2.radius;
+                    let y = y2 + sin * colbox2.radius;
+                    vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id2 });
+                }
+                for i in 0..triangles {
+                    indices.push(*index_count);
+                    indices.push(*index_count + i + 1);
+                    indices.push(*index_count + i + 2);
+                }
+                *index_count += triangles + 2;
+            }
+            LinkType::Simple => { }
+        }
+    }
+
+    pub fn new_fighter_frame_colboxes(device: &Device, package: &Package, fighter: &str, action: usize, frame: usize, selected: &HashSet<usize>) -> Buffers {
+        let mut vertices: Vec<Vertex> = vec!();
+        let mut indices: Vec<u16> = vec!();
+        let mut index_count = 0;
+
+        let colboxes = &package.fighters[fighter].actions[action].frames[frame].colboxes;
+        for (i, colbox) in colboxes.iter().enumerate() {
+            if selected.contains(&i) {
+                Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, 0);
+            }
+        }
+
+        Buffers::new(device, &vertices, &indices)
+    }
+
+    pub fn new_fighter_frame(device: &Device, package: &Package, fighter: &str, action: usize, frame: usize) -> Option<Buffers> {
+        let frames = &package.fighters[fighter].actions[action].frames;
+        if let Some(frame) = frames.get(frame) {
+            let mut vertices: Vec<Vertex> = vec!();
+            let mut indices: Vec<u16> = vec!();
+            let mut index_count = 0;
+
+            for colbox_or_link in frame.get_colboxes_and_links() {
+                match colbox_or_link {
+                    ColboxOrLink::Colbox (ref colbox) => {
+                        let render_id = graphics::get_render_id(&colbox.role);
+                        Buffers::gen_colbox(&mut vertices, &mut indices, colbox, &mut index_count, render_id);
+                    }
+                    ColboxOrLink::Link (ref link) => {
+                        let colbox1 = &frame.colboxes[link.one];
+                        let colbox2 = &frame.colboxes[link.two];
+                        Buffers::gen_link(&mut vertices, &mut indices, link, colbox1, colbox2, &mut index_count);
+                    }
+                }
+            }
+
+            Some(Buffers::new(device, &vertices, &indices))
+        } else {
+            None
+        }
     }
 }
 
@@ -503,119 +660,5 @@ impl ColorBuffers {
         ).unwrap();
 
         Some(ColorBuffers::new(device, &mesh.vertices, &mesh.indices))
-    }
-
-    pub fn _gen_colbox(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, colbox: &CollisionBox, index_count: &mut u16, render_id: u32) {
-        let triangles = 60;
-        // triangles are drawn meeting at the centre, forming a circle
-        let point = &colbox.point;
-        vertices.push(Vertex { position: [point.0, point.1], edge: 0.0, render_id});
-        for i in 0..triangles {
-            let angle = i as f32 * 2.0 * consts::PI / (triangles as f32);
-            let (sin, cos) = angle.sin_cos();
-            let x = point.0 + cos * colbox.radius;
-            let y = point.1 + sin * colbox.radius;
-            vertices.push(Vertex { position: [x, y], edge: 1.0, render_id });
-            indices.push(*index_count);
-            indices.push(*index_count + i + 1);
-            indices.push(*index_count + (i + 1) % triangles + 1);
-        }
-        *index_count += triangles + 1;
-    }
-
-    pub fn _gen_link(vertices: &mut Vec<Vertex>, indices: &mut Vec<u16>, link: &CollisionBoxLink, colbox1: &CollisionBox, colbox2: &CollisionBox, index_count: &mut u16) {
-        let render_id1 = graphics::get_render_id(&colbox1.role);
-        let render_id2 = graphics::get_render_id(&colbox2.role);
-
-        let render_id_link = render_id1;
-        match link.link_type {
-            LinkType::MeldFirst | LinkType::MeldSecond => {
-                // draw a rectangle connecting two colboxes
-                let (x1, y1)   = colbox1.point;
-                let (x2, y2)   = colbox2.point;
-                let one_radius = colbox1.radius;
-                let two_radius = colbox2.radius;
-
-                let mid_angle = (y1 - y2).atan2(x1 - x2);
-
-                let angle1 = mid_angle + consts::FRAC_PI_2;
-                let angle2 = mid_angle - consts::FRAC_PI_2;
-
-                // rectangle as 4 points
-                let link_x1 = x1 + angle1.cos() * one_radius;
-                let link_x2 = x1 + angle2.cos() * one_radius;
-                let link_x3 = x2 + angle1.cos() * two_radius;
-                let link_x4 = x2 + angle2.cos() * two_radius;
-                let link_x5 = x1;
-                let link_x6 = x2;
-
-                let link_y1 = y1 + angle1.sin() * one_radius;
-                let link_y2 = y1 + angle2.sin() * one_radius;
-                let link_y3 = y2 + angle1.sin() * two_radius;
-                let link_y4 = y2 + angle2.sin() * two_radius;
-                let link_y5 = y1;
-                let link_y6 = y2;
-
-                // rectangle into buffers
-                vertices.push(Vertex { position: [link_x1, link_y1], edge: 1.0, render_id: render_id_link });
-                vertices.push(Vertex { position: [link_x2, link_y2], edge: 1.0, render_id: render_id_link });
-                vertices.push(Vertex { position: [link_x3, link_y3], edge: 1.0, render_id: render_id_link });
-                vertices.push(Vertex { position: [link_x4, link_y4], edge: 1.0, render_id: render_id_link });
-                vertices.push(Vertex { position: [link_x5, link_y5], edge: 0.0, render_id: render_id_link });
-                vertices.push(Vertex { position: [link_x6, link_y6], edge: 0.0, render_id: render_id_link });
-
-                indices.push(*index_count);
-                indices.push(*index_count + 4);
-                indices.push(*index_count + 5);
-
-                indices.push(*index_count + 0);
-                indices.push(*index_count + 2);
-                indices.push(*index_count + 5);
-
-                indices.push(*index_count + 1);
-                indices.push(*index_count + 3);
-                indices.push(*index_count + 4);
-
-                indices.push(*index_count + 3);
-                indices.push(*index_count + 4);
-                indices.push(*index_count + 5);
-                *index_count += 6;
-
-                let triangles = 30;
-
-                // draw colbox1, triangles are drawn meeting at the centre, forming a circle
-                vertices.push(Vertex { position: [x1, y1], edge: 0.0, render_id: render_id2 });
-                for i in 0..triangles + 1 {
-                    let angle = angle2 + i as f32 * consts::PI / (triangles as f32);
-                    let (sin, cos) = angle.sin_cos();
-                    let x = x1 + cos * colbox1.radius;
-                    let y = y1 + sin * colbox1.radius;
-                    vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id1 });
-                }
-                for i in 0..triangles {
-                    indices.push(*index_count);
-                    indices.push(*index_count + i + 1);
-                    indices.push(*index_count + i + 2);
-                }
-                *index_count += triangles + 2;
-
-                // draw colbox2, triangles are drawn meeting at the centre, forming a circle
-                vertices.push(Vertex { position: [x2, y2], edge: 0.0, render_id: render_id2 });
-                for i in 0..triangles + 1 {
-                    let angle = angle1 + i as f32 * consts::PI / (triangles as f32);
-                    let (sin, cos) = angle.sin_cos();
-                    let x = x2 + cos * colbox2.radius;
-                    let y = y2 + sin * colbox2.radius;
-                    vertices.push(Vertex { position: [x, y], edge: 1.0, render_id: render_id2 });
-                }
-                for i in 0..triangles {
-                    indices.push(*index_count);
-                    indices.push(*index_count + i + 1);
-                    indices.push(*index_count + i + 2);
-                }
-                *index_count += triangles + 2;
-            }
-            LinkType::Simple => { }
-        }
     }
 }

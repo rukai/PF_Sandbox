@@ -7,7 +7,7 @@ layout(location = 0) out vec4 f_color;
 layout(set = 0, binding = 0) uniform Data {
     vec4 edge_color;
     vec4 color;
-    mat3 transformation;
+    mat4 transformation;
 } uniforms;
 
 void main() {
