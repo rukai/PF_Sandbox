@@ -13,6 +13,7 @@ use pf_sandbox_lib::package::{Package, PackageUpdate};
 
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::{thread, mem, f32};
+use std::time::{Duration, Instant};
 
 use cgmath::Rad;
 use cgmath::{Matrix4, Vector3};
@@ -20,6 +21,7 @@ use num_traits::FromPrimitive;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wgpu::{Device, SwapChain, BindGroup, BindGroupLayout, RenderPipeline, RenderPass, TextureView};
+use wgpu_glyph::{Section, GlyphBrush, GlyphBrushBuilder, Scale as GlyphScale};
 
 use winit::{
     Event,
@@ -30,6 +32,7 @@ use winit::{
 
 pub struct WgpuGraphics {
     package:                   Option<Package>,
+    glyph_brush:               GlyphBrush<'static>,
     window:                    Window,
     event_loop:                EventsLoop,
     os_input_tx:               Sender<Event>,
@@ -43,6 +46,8 @@ pub struct WgpuGraphics {
     bind_group:                BindGroup,
     bind_group_layout_surface: BindGroupLayout,
     prev_fullscreen:           Option<bool>,
+    frame_durations:           Vec<Duration>,
+    fps:                       String,
     width:                     u32,
     height:                    u32,
 }
@@ -82,7 +87,7 @@ impl WgpuGraphics {
             power_preference: wgpu::PowerPreference::LowPower,
         });
 
-        let device = adapter.request_device(&wgpu::DeviceDescriptor {
+        let mut device = adapter.request_device(&wgpu::DeviceDescriptor {
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
@@ -249,6 +254,9 @@ impl WgpuGraphics {
             sample_count: SAMPLE_COUNT,
         });
 
+        let font: &[u8] = include_bytes!("DejaVuSans.ttf");
+        let glyph_brush = GlyphBrushBuilder::using_font_bytes(font).build(&mut device, wgpu::TextureFormat::Bgra8Unorm);
+
         let width = size.width.round() as u32;
         let height = size.height.round() as u32;
 
@@ -276,6 +284,7 @@ impl WgpuGraphics {
 
         WgpuGraphics {
             package: None,
+            glyph_brush,
             window,
             event_loop,
             os_input_tx,
@@ -289,6 +298,8 @@ impl WgpuGraphics {
             bind_group,
             bind_group_layout_surface,
             prev_fullscreen: None,
+            frame_durations: vec!(),
+            fps: "".into(),
             width,
             height,
         }
@@ -297,6 +308,8 @@ impl WgpuGraphics {
     fn run(&mut self) {
         loop {
             {
+                let frame_start = Instant::now();
+
                 // get the most recent render
                 let mut render = if let Ok(message) = self.render_rx.recv() {
                     self.read_message(message)
@@ -317,6 +330,7 @@ impl WgpuGraphics {
                 }
 
                 self.render(render);
+                self.frame_durations.push(frame_start.elapsed());
             }
 
             if !self.handle_events() {
@@ -402,9 +416,123 @@ impl WgpuGraphics {
                     RenderType::Menu(menu) => self.menu_render(menu, &mut rpass, &render.command_output)
                 }
             }
+
+            self.glyph_brush.draw_queued(&mut self.device, &mut encoder, &frame.view, self.width, self.height).unwrap();
+
             self.device.get_queue().submit(&[encoder.finish()]);
         }
         self.swap_chain = Some(swap_chain);
+    }
+
+    fn command_render(&mut self, lines: &[String]) {
+        // TODO: Render white text, with black background
+        for (i, line) in lines.iter().enumerate() {
+            self.glyph_brush.queue(Section {
+                text: line,
+                color: [1.0, 1.0, 0.0, 1.0],
+                screen_position: (0.0, self.height as f32 - 15.0 - 20.0 * i as f32),
+                scale: GlyphScale::uniform(20.0),
+                .. Section::default()
+            });
+        }
+    }
+
+    fn game_timer_render(&mut self, timer: &Option<Duration>) {
+        if let &Some(ref timer) = timer {
+            let minutes = timer.as_secs() / 60;
+            let seconds = timer.as_secs() % 60;
+            self.glyph_brush.queue(Section {
+                text: format!("{:02}:{:02}", minutes, seconds).as_ref(),
+                color: [1.0, 1.0, 1.0, 1.0],
+                screen_position: ((self.width / 2) as f32 - 50.0, 4.0),
+                scale: GlyphScale::uniform(40.0),
+                .. Section::default()
+            });
+        }
+    }
+
+    fn game_hud_render(&mut self, entities: &[RenderEntity]) {
+        let mut players = 0;
+        for entity in entities {
+            if let &RenderEntity::Player(_) = entity {
+                players += 1;
+            }
+        }
+        let distance = (self.width / (players + 1)) as f32;
+
+        let mut location = -100.0;
+        for entity in entities {
+            if let &RenderEntity::Player(ref player) = entity {
+                location += distance;
+                match Action::from_u64(player.frames[0].action as u64) {
+                    Some(Action::Eliminated) => { }
+                    _ => {
+                        let c = player.fighter_color.clone();
+                        let color = [c[0], c[1], c[2], 1.0];
+
+                        if let Some(stocks) = player.stocks {
+                            let stocks_string = if stocks > 5 {
+                                format!("⬤ x {}", stocks)
+                            } else {
+                                let mut stocks_string = String::new();
+                                for _ in 0..stocks {
+                                    stocks_string.push('⬤');
+                                }
+                                stocks_string
+                            };
+
+                            self.glyph_brush.queue(Section {
+                                text: stocks_string.as_ref(),
+                                color,
+                                screen_position: (location + 10.0, self.height as f32 - 130.0),
+                                scale: GlyphScale::uniform(22.0),
+                                .. Section::default()
+                            });
+                        }
+
+                        self.glyph_brush.queue(Section {
+                            text: format!("{}%", player.damage).as_ref(),
+                            color,
+                            screen_position: (location, self.height as f32 - 117.0),
+                            scale: GlyphScale::uniform(110.0),
+                            .. Section::default()
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    fn fps_render(&mut self) {
+        if self.frame_durations.len() == 60 {
+            let total: Duration = self.frame_durations.iter().sum();
+            let total = total.as_secs() as f64 + total.subsec_nanos() as f64 / 1_000_000_000.0;
+            let average = total / 60.0;
+            self.fps = format!("{:.0}", 1.0 / average);
+            self.frame_durations.clear();
+        }
+
+        self.glyph_brush.queue(Section {
+            text: &self.fps,
+            color: [1.0, 1.0, 1.0, 1.0],
+            screen_position: (self.width as f32 - 30.0, 4.0),
+            scale: GlyphScale::uniform(20.0),
+            .. Section::default()
+        });
+    }
+
+    fn debug_lines_render(&mut self, lines: &[String]) {
+        if lines.len() > 1 {
+            for (i, line) in lines.iter().enumerate() {
+                self.glyph_brush.queue(Section {
+                    text: line,
+                    color: [1.0, 1.0, 0.0, 1.0],
+                    screen_position: (0.0, 12.0 + 20.0 * i as f32),
+                    scale: GlyphScale::uniform(20.0),
+                    .. Section::default()
+                });
+            }
+        }
     }
 
     fn render_buffers(
@@ -497,8 +625,17 @@ impl WgpuGraphics {
         rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
     }
 
-    fn game_render(&mut self, render: RenderGame, rpass: &mut RenderPass, _command_output: &[String]) {
+    fn game_render(&mut self, render: RenderGame, rpass: &mut RenderPass, command_output: &[String]) {
         let mut rng = StdRng::from_seed(render.seed);
+        if command_output.len() == 0 {
+            self.game_hud_render(&render.entities);
+            self.game_timer_render(&render.timer);
+            self.debug_lines_render(&render.debug_lines);
+            self.fps_render();
+        }
+        else {
+            self.command_render(command_output);
+        }
 
         let pan = render.camera.pan;
 

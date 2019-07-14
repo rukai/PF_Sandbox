@@ -38,10 +38,11 @@ vulkano_text = { version = "0.11", optional = true }
 cgmath = { version = "0.17", optional = true }
 
 vk-shader-macros = { version = "0.2", optional = true }
-wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "d836a4f041c04f32cde5976a24e502beab6e21e4", optional = true }
+wgpu_glyph = { git = "https://github.com/rukai/wgpu_glyph", rev = "eb203b59365a3d31cd72d68830731eaea9f72a88", optional = true }
+wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "a05eab15a1efeb9c5ac49c0b4bd2620bcf850a3a", optional = true }
 #wgpu = { features = ["vulkan"], path = "/home/rubic/Projects/Crates/wgpu/wgpu-rs", optional = true }
 
 [features]
 default = ["vulkan_renderer", "wgpu_renderer"]
 vulkan_renderer = ["vulkano", "vulkano-win", "vulkano-shaders", "vulkano_text", "cgmath"]
-wgpu_renderer = ["wgpu", "vk-shader-macros", "cgmath"]
+wgpu_renderer = ["wgpu", "wgpu_glyph", "vk-shader-macros", "cgmath"]
