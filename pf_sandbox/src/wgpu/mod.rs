@@ -132,10 +132,27 @@ impl WgpuGraphics {
 
         let color_states = [wgpu::ColorStateDescriptor {
             format: wgpu::TextureFormat::Bgra8Unorm,
-            color_blend: wgpu::BlendDescriptor::REPLACE,
-            alpha_blend: wgpu::BlendDescriptor::REPLACE,
+            color_blend: wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha_blend: wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
             write_mask: wgpu::ColorWrite::ALL,
         }];
+        let depth_stencil_state = Some(wgpu::DepthStencilStateDescriptor {
+            format: wgpu::TextureFormat::D16Unorm,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::LessEqual,
+            stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
+            stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
+            stencil_read_mask: 0,
+            stencil_write_mask: 0,
+        });
 
         let pipeline_surface = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
@@ -150,7 +167,7 @@ impl WgpuGraphics {
             rasterization_state: rasterization_state.clone(),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &color_states,
-            depth_stencil_state: None,
+            depth_stencil_state: depth_stencil_state.clone(),
             index_format: wgpu::IndexFormat::Uint16,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: mem::size_of::<ColorVertex>() as wgpu::BufferAddress,
@@ -198,7 +215,7 @@ impl WgpuGraphics {
             rasterization_state: rasterization_state.clone(),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &color_states,
-            depth_stencil_state: None,
+            depth_stencil_state,
             index_format: wgpu::IndexFormat::Uint16,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -376,7 +393,15 @@ impl WgpuGraphics {
                         store_op: wgpu::StoreOp::Store,
                         clear_color: wgpu::Color::BLACK,
                     }],
-                    depth_stencil_attachment: None,
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                        attachment: &self.wsd.depth_stencil,
+                        depth_load_op: wgpu::LoadOp::Clear,
+                        depth_store_op: wgpu::StoreOp::Store,
+                        stencil_load_op: wgpu::LoadOp::Clear,
+                        stencil_store_op: wgpu::StoreOp::Store,
+                        clear_depth: 1.0,
+                        clear_stencil: 0,
+                    }),
                 });
 
                 match render.render_type {
@@ -1465,6 +1490,7 @@ impl WgpuGraphics {
 struct WindowSizeDependent {
     swap_chain:               Option<SwapChain>,
     multisampled_framebuffer: TextureView,
+    depth_stencil:            TextureView,
 }
 
 impl WindowSizeDependent {
@@ -1491,9 +1517,21 @@ impl WindowSizeDependent {
         };
         let multisampled_framebuffer = device.create_texture(multisampled_frame_descriptor).create_default_view();
 
+        let depth_stencil_descriptor = &wgpu::TextureDescriptor {
+            size: wgpu::Extent3d { width, height, depth: 1 },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: SAMPLE_COUNT,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::D16Unorm,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        };
+        let depth_stencil = device.create_texture(depth_stencil_descriptor).create_default_view();
+
         WindowSizeDependent {
             swap_chain,
             multisampled_framebuffer,
+            depth_stencil,
         }
     }
 }
