@@ -25,7 +25,7 @@ use cgmath::{Matrix4, Vector3};
 use num_traits::{FromPrimitive, ToPrimitive};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use wgpu::{Device, SwapChain, BindGroup, BindGroupLayout, RenderPipeline, RenderPass, TextureView};
+use wgpu::{Device, Surface, SwapChain, BindGroup, BindGroupLayout, RenderPipeline, RenderPass, TextureView};
 use wgpu_glyph::{Section, GlyphBrush, GlyphBrushBuilder, Scale as GlyphScale};
 
 use winit::{
@@ -36,23 +36,23 @@ use winit::{
 };
 
 pub struct WgpuGraphics {
-    package:                  Option<Package>,
-    glyph_brush:              GlyphBrush<'static>,
-    window:                   Window,
-    event_loop:               EventsLoop,
-    os_input_tx:              Sender<Event>,
-    render_rx:                Receiver<GraphicsMessage>,
-    device:                   Device,
-    swap_chain:               Option<SwapChain>,
-    multisampled_framebuffer: TextureView,
-    pipeline:                 RenderPipeline,
-    pipeline_surface:         RenderPipeline,
-    bind_group_layout:        BindGroupLayout,
-    prev_fullscreen:          Option<bool>,
-    frame_durations:          Vec<Duration>,
-    fps:                      String,
-    width:                    u32,
-    height:                   u32,
+    package:           Option<Package>,
+    glyph_brush:       GlyphBrush<'static>,
+    window:            Window,
+    event_loop:        EventsLoop,
+    os_input_tx:       Sender<Event>,
+    render_rx:         Receiver<GraphicsMessage>,
+    device:            Device,
+    surface:           Surface,
+    wsd:               WindowSizeDependent,
+    pipeline:          RenderPipeline,
+    pipeline_surface:  RenderPipeline,
+    bind_group_layout: BindGroupLayout,
+    prev_fullscreen:   Option<bool>,
+    frame_durations:   Vec<Duration>,
+    fps:               String,
+    width:             u32,
+    height:            u32,
 }
 
 const SAMPLE_COUNT: u32 = 4;
@@ -229,28 +229,7 @@ impl WgpuGraphics {
 
         let width = size.width.round() as u32;
         let height = size.height.round() as u32;
-
-        let swap_chain = Some(device.create_swap_chain(
-            &surface,
-            &wgpu::SwapChainDescriptor {
-                usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-                format: wgpu::TextureFormat::Bgra8Unorm,
-                width,
-                height,
-            },
-        ));
-
-        let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
-            size: wgpu::Extent3d { width, height, depth: 1 },
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: SAMPLE_COUNT,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        };
-
-        let multisampled_framebuffer = device.create_texture(multisampled_frame_descriptor).create_default_view();
+        let wsd = WindowSizeDependent::new(&device, &surface, width, height);
 
         WgpuGraphics {
             package: None,
@@ -259,9 +238,9 @@ impl WgpuGraphics {
             event_loop,
             os_input_tx,
             render_rx,
+            surface,
             device,
-            swap_chain,
-            multisampled_framebuffer,
+            wsd,
             pipeline,
             pipeline_surface,
             bind_group_layout,
@@ -327,7 +306,9 @@ impl WgpuGraphics {
 
         self.width = width;
         self.height = height;
-        // TODO
+
+        self.wsd = WindowSizeDependent::new(&self.device, &self.surface, width, height);
+
     }
 
     fn render(&mut self, render: Render) {
@@ -363,14 +344,14 @@ impl WgpuGraphics {
         self.window.hide_cursor(render.fullscreen && !in_game_paused);
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-        let mut swap_chain = self.swap_chain.take().unwrap();
+        let mut swap_chain = self.wsd.swap_chain.take().unwrap();
         {
             let frame = swap_chain.get_next_texture();
 
             {
                 let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &self.multisampled_framebuffer,
+                        attachment: &self.wsd.multisampled_framebuffer,
                         resolve_target: Some(&frame.view),
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
@@ -389,7 +370,7 @@ impl WgpuGraphics {
 
             self.device.get_queue().submit(&[encoder.finish()]);
         }
-        self.swap_chain = Some(swap_chain);
+        self.wsd.swap_chain = Some(swap_chain);
     }
 
     fn command_render(&mut self, lines: &[String]) {
@@ -772,7 +753,7 @@ impl WgpuGraphics {
                                 let transformation = position * rotate * size;
                                 let color = [c[0], c[1], c[2], 1.0];
                                 let pipeline = if c[0] == 1.0 && c[1] == 1.0 && c[2] == 1.0 {
-                                    //self.pipelines.wireframe.clone() // TODO
+                                    //self.pipelines.wireframe // TODO
                                     &self.pipeline
                                 } else {
                                     &self.pipeline
@@ -1459,6 +1440,42 @@ impl WgpuGraphics {
             os_input_tx.send(event).ok();
         });
         true
+    }
+}
+
+struct WindowSizeDependent {
+    swap_chain:               Option<SwapChain>,
+    multisampled_framebuffer: TextureView,
+}
+
+impl WindowSizeDependent {
+    /// This method is called once during initialization, then again whenever the window is resized
+    fn new(device: &Device, surface: &Surface, width: u32, height: u32) -> WindowSizeDependent {
+        let swap_chain = Some(device.create_swap_chain(
+            &surface,
+            &wgpu::SwapChainDescriptor {
+                usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+                format: wgpu::TextureFormat::Bgra8Unorm,
+                width,
+                height,
+            },
+        ));
+
+        let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+            size: wgpu::Extent3d { width, height, depth: 1 },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: SAMPLE_COUNT,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        };
+        let multisampled_framebuffer = device.create_texture(multisampled_frame_descriptor).create_default_view();
+
+        WindowSizeDependent {
+            swap_chain,
+            multisampled_framebuffer,
+        }
     }
 }
 
