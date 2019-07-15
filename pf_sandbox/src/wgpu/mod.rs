@@ -26,7 +26,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wgpu::{Device, Surface, SwapChain, BindGroup, BindGroupLayout, RenderPipeline, RenderPass, TextureView};
-use wgpu_glyph::{Section, GlyphBrush, GlyphBrushBuilder, Scale as GlyphScale};
+use wgpu_glyph::{Section, GlyphBrush, GlyphBrushBuilder, FontId, Scale as GlyphScale};
 
 use winit::{
     Event,
@@ -38,6 +38,7 @@ use winit::{
 pub struct WgpuGraphics {
     package:           Option<Package>,
     glyph_brush:       GlyphBrush<'static>,
+    hack_font_id:      FontId,
     window:            Window,
     event_loop:        EventsLoop,
     os_input_tx:       Sender<Event>,
@@ -241,8 +242,12 @@ impl WgpuGraphics {
             sample_count: SAMPLE_COUNT,
         });
 
-        let font: &[u8] = include_bytes!("DejaVuSans.ttf");
-        let glyph_brush = GlyphBrushBuilder::using_font_bytes(font).build(&mut device, wgpu::TextureFormat::Bgra8Unorm);
+        let dejavu: &[u8] = include_bytes!("../fonts/DejaVuSans.ttf");
+        let hack: &[u8] = include_bytes!("../fonts/Hack-Regular.ttf");
+
+        let mut glyph_brush_builder = GlyphBrushBuilder::using_font_bytes(dejavu);
+        let hack_font_id = glyph_brush_builder.add_font_bytes(hack);
+        let glyph_brush = glyph_brush_builder.build(&mut device, wgpu::TextureFormat::Bgra8Unorm);
 
         let width = size.width.round() as u32;
         let height = size.height.round() as u32;
@@ -251,6 +256,7 @@ impl WgpuGraphics {
         WgpuGraphics {
             package: None,
             glyph_brush,
+            hack_font_id,
             window,
             event_loop,
             os_input_tx,
@@ -423,8 +429,9 @@ impl WgpuGraphics {
             self.glyph_brush.queue(Section {
                 text: line,
                 color: [1.0, 1.0, 0.0, 1.0],
-                screen_position: (0.0, self.height as f32 - 15.0 - 20.0 * i as f32),
+                screen_position: (0.0, self.height as f32 - 25.0 - 20.0 * i as f32),
                 scale: GlyphScale::uniform(20.0),
+                font_id: self.hack_font_id,
                 .. Section::default()
             });
         }
@@ -522,6 +529,7 @@ impl WgpuGraphics {
                     color: [1.0, 1.0, 0.0, 1.0],
                     screen_position: (0.0, 12.0 + 20.0 * i as f32),
                     scale: GlyphScale::uniform(20.0),
+                    font_id: self.hack_font_id,
                     .. Section::default()
                 });
             }

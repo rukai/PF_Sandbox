@@ -2556,7 +2556,7 @@ impl Player {
     pub fn debug_print(&self, fighter: &Fighter, player_input: &PlayerInput, debug: &DebugPlayer, index: usize) -> Vec<String> {
         let mut lines: Vec<String> = vec!();
         if debug.physics {
-            lines.push(format!("Player: {}    location: {:?}    x_vel: {:.5}    y_vel: {:.5}    kb_x_vel: {:.5}    kb_y_vel: {:.5} ",
+            lines.push(format!("Player: {}  location: {:?}  x_vel: {:.5}  y_vel: {:.5}  kb_x_vel: {:.5}  kb_y_vel: {:.5}",
                 index, self.location, self.x_vel, self.y_vel, self.kb_x_vel, self.kb_y_vel));
         }
 
@@ -2568,7 +2568,7 @@ impl Player {
             let l_trigger = player_input.l_trigger.value;
             let r_trigger = player_input.r_trigger.value;
 
-            lines.push(format!("Player: {}    VALUE    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
+            lines.push(format!("Player: {}  VALUE  stick_x: {:.5}  stick_y: {:.5}  c_stick_x: {:.5}  c_stick_y: {:.5}  l_trigger: {:.5}  r_trigger: {:.5}",
                 index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger));
         }
 
@@ -2580,7 +2580,7 @@ impl Player {
             let l_trigger = player_input.l_trigger.diff;
             let r_trigger = player_input.r_trigger.diff;
 
-            lines.push(format!("Player: {}    DIFF    stick_x: {:.5}    stick_y: {:.5}    c_stick_x: {:.5}    c_stick_y: {:.5}    l_trigger: {:.5}    r_trigger: {:.5}",
+            lines.push(format!("Player: {}  DIFF   stick_x: {:.5}  stick_y: {:.5}  c_stick_x: {:.5}  c_stick_y: {:.5}  l_trigger: {:.5}  r_trigger: {:.5}",
                 index, stick_x, stick_y, c_stick_x, c_stick_y, l_trigger, r_trigger));
         }
 
@@ -2589,12 +2589,12 @@ impl Player {
             let last_action_frame = fighter.actions[self.action as usize].frames.len() as u64 - 1;
             let iasa = fighter.actions[self.action as usize].iasa;
 
-            lines.push(format!("Player: {}    action: {:?}    frame: {}/{}    frame no restart: {}    IASA: {}",
+            lines.push(format!("Player: {}  action: {:?}  frame: {}/{}  frame no restart: {}  IASA: {}",
                 index, action, self.frame, last_action_frame, self.frame_norestart, iasa));
         }
 
         if debug.frame {
-            lines.push(format!("Player: {}    shield HP: {:.5}    hitstun: {:.5}    hitlag: {:?}    tech timer: {:?}    lcancel timer: {}",
+            lines.push(format!("Player: {}  shield HP: {:.5}  hitstun: {:.5}  hitlag: {:?}  tech timer: {:?}  lcancel timer: {}",
                 index, self.shield_hp, self.hitstun, self.hitlag, self.tech_timer, self.lcancel_timer));
         }
         lines
