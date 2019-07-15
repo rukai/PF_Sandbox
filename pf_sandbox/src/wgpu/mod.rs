@@ -293,7 +293,26 @@ impl WgpuGraphics {
                 PackageUpdate::Package (package) => {
                     self.package = Some(package);
                 }
-                _ => { }
+                PackageUpdate::DeleteFighterFrame { fighter, action, frame_index } => {
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        package.fighters[fighter.as_ref()].actions[action].frames.remove(frame_index);
+                    }
+                }
+                PackageUpdate::InsertFighterFrame { fighter, action, frame_index, frame } => {
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        package.fighters[fighter.as_ref()].actions[action].frames.insert(frame_index, frame);
+                    }
+                }
+                PackageUpdate::DeleteStage { index, .. } => {
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        package.stages.remove(index);
+                    }
+                }
+                PackageUpdate::InsertStage { index, key, stage } => {
+                    if let &mut Some(ref mut package) = &mut self.package {
+                        package.stages.insert(index, key, stage);
+                    }
+                }
             }
         }
         message.render
