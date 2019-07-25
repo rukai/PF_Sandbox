@@ -20,7 +20,7 @@ getopts = "0.2"
 gilrs-core = "0.2"
 libusb = "0.3"
 log = "0.4"
-lyon = "0.13"
+lyon = "0.14"
 rand = "0.7.0"
 rand_chacha = "0.2"
 serde = "1"
@@ -36,6 +36,7 @@ vulkano-win = { version = "0.13", optional = true }
 vulkano-shaders = { version = "0.13", optional = true }
 vulkano_text = { version = "0.11", optional = true }
 cgmath = { version = "0.17", optional = true }
+shaderc = { version = "0.5", features = ["build-from-source"] }
 
 vk-shader-macros = { version = "0.2", optional = true }
 wgpu_glyph = { git = "https://github.com/rukai/wgpu_glyph", rev = "eb203b59365a3d31cd72d68830731eaea9f72a88", optional = true }
