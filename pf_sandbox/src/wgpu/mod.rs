@@ -37,7 +37,7 @@ use winit::{
 
 pub struct WgpuGraphics {
     package:           Option<Package>,
-    glyph_brush:       GlyphBrush<'static>,
+    glyph_brush:       GlyphBrush<'static, ()>,
     hack_font_id:      FontId,
     window:            Window,
     event_loop:        EventsLoop,
@@ -98,19 +98,11 @@ impl WgpuGraphics {
             limits: wgpu::Limits::default(),
         });
 
-        let surface_vs_u32 = vk_shader_macros::include_glsl!("src/shaders/surface-vertex.glsl", kind: vert);
-        let mut surface_vs_bytes = vec!();
-        for word in surface_vs_u32.iter() {
-            surface_vs_bytes.extend(&u32::to_le_bytes(*word));
-        }
-        let surface_vs_module = device.create_shader_module(&surface_vs_bytes);
+        let surface_vs = vk_shader_macros::include_glsl!("src/shaders/surface-vertex.glsl", kind: vert);
+        let surface_vs_module = device.create_shader_module(surface_vs);
 
-        let surface_fs_u32 = vk_shader_macros::include_glsl!("src/shaders/surface-fragment.glsl", kind: frag);
-        let mut surface_fs_bytes = vec!();
-        for word in surface_fs_u32.iter() {
-            surface_fs_bytes.extend(&u32::to_le_bytes(*word));
-        }
-        let surface_fs_module = device.create_shader_module(&surface_fs_bytes);
+        let surface_fs = vk_shader_macros::include_glsl!("src/shaders/surface-fragment.glsl", kind: frag);
+        let surface_fs_module = device.create_shader_module(surface_fs);
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { bindings: &[
             wgpu::BindGroupLayoutBinding {
@@ -189,19 +181,11 @@ impl WgpuGraphics {
             sample_count: SAMPLE_COUNT,
         });
 
-        let vs_u32 = vk_shader_macros::include_glsl!("src/shaders/generic-vertex.glsl", kind: vert);
-        let mut vs_bytes = vec!();
-        for word in vs_u32.iter() {
-            vs_bytes.extend(&u32::to_le_bytes(*word));
-        }
-        let vs_module = device.create_shader_module(&vs_bytes);
+        let vs = vk_shader_macros::include_glsl!("src/shaders/generic-vertex.glsl", kind: vert);
+        let vs_module = device.create_shader_module(vs);
 
-        let fs_u32 = vk_shader_macros::include_glsl!("src/shaders/generic-fragment.glsl", kind: frag);
-        let mut fs_bytes = vec!();
-        for word in fs_u32.iter() {
-            fs_bytes.extend(&u32::to_le_bytes(*word));
-        }
-        let fs_module = device.create_shader_module(&fs_bytes);
+        let fs = vk_shader_macros::include_glsl!("src/shaders/generic-fragment.glsl", kind: frag);
+        let fs_module = device.create_shader_module(fs);
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
@@ -1509,6 +1493,7 @@ impl WindowSizeDependent {
             &wgpu::SwapChainDescriptor {
                 usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
                 format: wgpu::TextureFormat::Bgra8Unorm,
+                present_mode: wgpu::PresentMode::Vsync,
                 width,
                 height,
             },

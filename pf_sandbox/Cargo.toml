@@ -39,8 +39,8 @@ cgmath = { version = "0.17", optional = true }
 shaderc = { version = "0.5", features = ["build-from-source"] }
 
 vk-shader-macros = { version = "0.2", optional = true }
-wgpu_glyph = { git = "https://github.com/rukai/wgpu_glyph", rev = "eb203b59365a3d31cd72d68830731eaea9f72a88", optional = true }
-wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "a05eab15a1efeb9c5ac49c0b4bd2620bcf850a3a", optional = true }
+wgpu_glyph = { git = "https://github.com/hecrj/wgpu_glyph", rev = "0b9cc885a28b98c74d19efbdf85b239259f858a9", optional = true }
+wgpu = { version = "0.3", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "d332eade8a186a12144bdbd389761fdb1da2969b", optional = true }
 
 [features]
 default = ["vulkan_renderer", "wgpu_renderer"]
