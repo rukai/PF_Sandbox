@@ -33,9 +33,9 @@ winit_input_helper = "0.3"
 
 cgmath = { version = "0.17", optional = true }
 
-vk-shader-macros = { git = "https://github.com/ralith/vk-shader-macros", rev = "4604a7c366467da93af08497b1490f2e5c555e99", optional = true }
-wgpu_glyph = { git = "https://github.com/hecrj/wgpu_glyph", rev = "0b9cc885a28b98c74d19efbdf85b239259f858a9", optional = true }
-wgpu = { version = "0.3", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "d332eade8a186a12144bdbd389761fdb1da2969b", optional = true }
+vk-shader-macros = { version = "0.2", optional = true }
+wgpu_glyph = { git = "https://github.com/hecrj/wgpu_glyph", rev = "cd62e772760e50ca215df47f0628c1d8c43047e6", optional = true }
+wgpu = { version = "0.3", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "e2b6727eb087a26690cf2946b7379840af3fd677", optional = true }
 
 [features]
 default = ["wgpu_renderer"]

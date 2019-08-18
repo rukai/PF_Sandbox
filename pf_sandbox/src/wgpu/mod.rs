@@ -87,16 +87,16 @@ impl WgpuGraphics {
             (window, instance, size, surface)
         };
 
-        let adapter = instance.get_adapter(&wgpu::AdapterDescriptor {
+        let adapter = instance.get_adapter(Some(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::LowPower,
-        });
+        }));
 
-        let mut device = adapter.request_device(&wgpu::DeviceDescriptor {
+        let mut device = adapter.request_device(Some(&wgpu::DeviceDescriptor {
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
             limits: wgpu::Limits::default(),
-        });
+        }));
 
         let surface_vs = vk_shader_macros::include_glsl!("src/shaders/surface-vertex.glsl", kind: vert);
         let surface_vs_module = device.create_shader_module(surface_vs);
@@ -109,19 +109,22 @@ impl WgpuGraphics {
                 binding:    0,
                 visibility: wgpu::ShaderStage::all(),
                 ty:         wgpu::BindingType::UniformBuffer,
+                dynamic: false,
+                multisampled: false,
+                texture_dimension: wgpu::TextureViewDimension::D2,
             }
         ] });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
         });
 
-        let rasterization_state = wgpu::RasterizationStateDescriptor {
+        let rasterization_state = Some(wgpu::RasterizationStateDescriptor {
             front_face: wgpu::FrontFace::Ccw,
             cull_mode: wgpu::CullMode::None,
             depth_bias: 0,
             depth_bias_slope_scale: 0.0,
             depth_bias_clamp: 0.0,
-        };
+        });
 
         let color_states = [wgpu::ColorStateDescriptor {
             format: wgpu::TextureFormat::Bgra8Unorm,
@@ -138,7 +141,7 @@ impl WgpuGraphics {
             write_mask: wgpu::ColorWrite::ALL,
         }];
         let depth_stencil_state = Some(wgpu::DepthStencilStateDescriptor {
-            format: wgpu::TextureFormat::D16Unorm,
+            format: wgpu::TextureFormat::Depth32Float,
             depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::LessEqual,
             stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
@@ -149,11 +152,11 @@ impl WgpuGraphics {
 
         let pipeline_surface = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
-            vertex_stage: wgpu::PipelineStageDescriptor {
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &surface_vs_module,
                 entry_point: "main",
             },
-            fragment_stage: Some(wgpu::PipelineStageDescriptor {
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
                 module: &surface_fs_module,
                 entry_point: "main",
             }),
@@ -179,6 +182,8 @@ impl WgpuGraphics {
                 ],
             }],
             sample_count: SAMPLE_COUNT,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
         });
 
         let vs = vk_shader_macros::include_glsl!("src/shaders/generic-vertex.glsl", kind: vert);
@@ -189,11 +194,11 @@ impl WgpuGraphics {
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
-            vertex_stage: wgpu::PipelineStageDescriptor {
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
             },
-            fragment_stage: Some(wgpu::PipelineStageDescriptor {
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
                 module: &fs_module,
                 entry_point: "main",
             }),
@@ -224,6 +229,8 @@ impl WgpuGraphics {
                 ],
             }],
             sample_count: SAMPLE_COUNT,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
         });
 
         let dejavu: &[u8] = include_bytes!("../fonts/DejaVuSans.ttf");
@@ -402,7 +409,7 @@ impl WgpuGraphics {
 
             self.glyph_brush.draw_queued(&mut self.device, &mut encoder, &frame.view, self.width, self.height).unwrap();
 
-            self.device.get_queue().submit(&[encoder.finish()]);
+            self.device.get_queue().submit(&[encoder.finish(None)]);
         }
         self.wsd.swap_chain = Some(swap_chain);
     }
@@ -557,7 +564,7 @@ impl WgpuGraphics {
         rpass.set_pipeline(pipeline);
         rpass.set_bind_group(0, &bind_group, &[]);
         rpass.set_index_buffer(&buffers.index, 0);
-        rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+        rpass.set_vertex_buffers(0, &[(&buffers.vertex, 0)]);
         rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
     }
 
@@ -592,7 +599,7 @@ impl WgpuGraphics {
         rpass.set_pipeline(pipeline);
         rpass.set_bind_group(0, &bind_group, &[]);
         rpass.set_index_buffer(&buffers.index, 0);
-        rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+        rpass.set_vertex_buffers(0, &[(&buffers.vertex, 0)]);
         rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
     }
 
@@ -989,7 +996,7 @@ impl WgpuGraphics {
                         rpass.set_pipeline(&self.pipeline);
                         rpass.set_bind_group(0, &entity.bind_group, &[]);
                         rpass.set_index_buffer(&buffers.index, 0);
-                        rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+                        rpass.set_vertex_buffers(0, &[(&buffers.vertex, 0)]);
                         rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
                     }
                 }
@@ -1000,7 +1007,7 @@ impl WgpuGraphics {
                         rpass.set_pipeline(&self.pipeline_surface);
                         rpass.set_bind_group(0, &entity.bind_group, &[]);
                         rpass.set_index_buffer(&buffers.index, 0);
-                        rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+                        rpass.set_vertex_buffers(0, &[(&buffers.vertex, 0)]);
                         rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
                     }
 
@@ -1012,7 +1019,7 @@ impl WgpuGraphics {
                         rpass.set_pipeline(&self.pipeline_surface);
                         rpass.set_bind_group(0, &entity.bind_group, &[]);
                         rpass.set_index_buffer(&buffers.index, 0);
-                        rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+                        rpass.set_vertex_buffers(0, &[(&buffers.vertex, 0)]);
                         rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
                     }
                 }
@@ -1021,7 +1028,7 @@ impl WgpuGraphics {
                     rpass.set_pipeline(&self.pipeline);
                     rpass.set_bind_group(0, &entity.bind_group, &[]);
                     rpass.set_index_buffer(&buffers.index, 0);
-                    rpass.set_vertex_buffers(&[(&buffers.vertex, 0)]);
+                    rpass.set_vertex_buffers(0, &[(&buffers.vertex, 0)]);
                     rpass.draw_indexed(0 .. buffers.index_count, 0, 0 .. 1);
                 }
             }
@@ -1508,7 +1515,7 @@ impl WindowSizeDependent {
             format: wgpu::TextureFormat::Bgra8Unorm,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         };
-        let multisampled_framebuffer = device.create_texture(multisampled_frame_descriptor).create_default_view();
+        let multisampled_framebuffer = device.create_texture(multisampled_frame_descriptor).create_view(None);
 
         let depth_stencil_descriptor = &wgpu::TextureDescriptor {
             size: wgpu::Extent3d { width, height, depth: 1 },
@@ -1516,10 +1523,10 @@ impl WindowSizeDependent {
             mip_level_count: 1,
             sample_count: SAMPLE_COUNT,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::D16Unorm,
+            format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         };
-        let depth_stencil = device.create_texture(depth_stencil_descriptor).create_default_view();
+        let depth_stencil = device.create_texture(depth_stencil_descriptor).create_view(None);
 
         WindowSizeDependent {
             swap_chain,
