@@ -31,18 +31,12 @@ treeflection_derive = "0.4"
 winit = "0.19" # Needed on all builds, game logic is dependent on VirtualKeyCode struct
 winit_input_helper = "0.3"
 
-vulkano = { version = "0.13", optional = true }
-vulkano-win = { version = "0.13", optional = true }
-vulkano-shaders = { version = "0.13", optional = true }
-vulkano_text = { version = "0.11", optional = true }
 cgmath = { version = "0.17", optional = true }
-shaderc = { version = "0.5", features = ["build-from-source"] }
 
-vk-shader-macros = { version = "0.2", optional = true }
+vk-shader-macros = { git = "https://github.com/ralith/vk-shader-macros", rev = "4604a7c366467da93af08497b1490f2e5c555e99", optional = true }
 wgpu_glyph = { git = "https://github.com/hecrj/wgpu_glyph", rev = "0b9cc885a28b98c74d19efbdf85b239259f858a9", optional = true }
 wgpu = { version = "0.3", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "d332eade8a186a12144bdbd389761fdb1da2969b", optional = true }
 
 [features]
-default = ["vulkan_renderer", "wgpu_renderer"]
-vulkan_renderer = ["vulkano", "vulkano-win", "vulkano-shaders", "vulkano_text", "cgmath"]
+default = ["wgpu_renderer"]
 wgpu_renderer = ["wgpu", "wgpu_glyph", "vk-shader-macros", "cgmath"]

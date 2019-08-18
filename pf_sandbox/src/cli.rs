@@ -1,4 +1,3 @@
-use pf_sandbox_lib::config::Config;
 use pf_sandbox_lib::package;
 
 use getopts::Options;
@@ -10,15 +9,12 @@ fn print_usage(program: &str, opts: Options) {
     print!("{}", opts.usage(&brief));
 }
 
-pub fn cli(config: &Config) -> CLIResults {
+pub fn cli() -> CLIResults {
     let args: Vec<String> = env::args().collect();
     let program = &args[0];
 
     let mut opts = Options::new();
     opts.optflag("l", "list", "List available packages and close");
-    if cfg!(feature = "vulkan_renderer") {
-        opts.optflag("d", "devices", "List vulkan physical devices and close");
-    }
     opts.optopt("s", "stage",          "Use the stage specified", "NAME");
     opts.optopt("f", "fighters",       "Use the fighters specified", "NAME1,NAME2,NAME3...");
     opts.optopt("h", "humanplayers",   "Number of human players in the game", "NUM_HUMAN_PLAYERS");
@@ -27,11 +23,7 @@ pub fn cli(config: &Config) -> CLIResults {
     opts.optopt("n", "netplayplayers", "Search for a netplay game with the specified number of players", "NUM_PLAYERS");
     opts.optopt("r", "netplayregion",  "Search for a netplay game with the specified region", "REGION");
     opts.optopt("g", "graphics",       "Graphics backend to use",
-        if cfg!(feature = "vulkan_renderer") && cfg!(feature = "wgpu_renderer") {
-            "[vulkan|wgpu|none]"
-        } else if cfg!(feature = "vulkan_renderer") {
-            "[vulkan|none]"
-        } else if cfg!(feature = "wgpu_renderer") {
+        if cfg!(feature = "wgpu_renderer") {
             "[wgpu|none]"
         } else {
             "[none]"
@@ -53,20 +45,6 @@ pub fn cli(config: &Config) -> CLIResults {
         package::print_list();
         results.continue_from = ContinueFrom::Close;
         return results;
-    }
-
-	// avoid unused warning on headless build
-    #[allow(unused_variables)]
-	let config = config;
-
-    #[cfg(feature = "vulkan_renderer")]
-    {
-        if matches.opt_present("d") {
-            use crate::vulkan;
-            vulkan::print_physical_devices(config.physical_device_name.clone());
-            results.continue_from = ContinueFrom::Close;
-            return results;
-        }
     }
 
     if matches.free.len() > 1 {
@@ -129,8 +107,6 @@ pub fn cli(config: &Config) -> CLIResults {
 
     if let Some(backend_string) = matches.opt_str("g") {
         results.graphics_backend = match backend_string.to_lowercase().as_ref() {
-            #[cfg(feature = "vulkan_renderer")]
-            "vulkan" => { GraphicsBackendChoice::Vulkan }
             #[cfg(feature = "wgpu_renderer")]
             "wgpu" => { GraphicsBackendChoice::Wgpu }
             "none" => { GraphicsBackendChoice::Headless }
@@ -200,8 +176,6 @@ pub enum ContinueFrom {
 }
 
 pub enum GraphicsBackendChoice {
-    #[cfg(feature = "vulkan_renderer")]
-    Vulkan,
     #[cfg(feature = "wgpu_renderer")]
     Wgpu,
     Headless,

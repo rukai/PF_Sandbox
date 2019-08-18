@@ -20,9 +20,6 @@ pub(crate) mod player;
 pub(crate) mod replays;
 pub(crate) mod results;
 
-#[cfg(feature = "vulkan_renderer")]
-pub(crate) mod vulkan;
-
 #[cfg(feature = "wgpu_renderer")]
 pub(crate) mod wgpu;
 
@@ -34,6 +31,5 @@ use pf_sandbox_lib::logger;
 fn main() {
     pf_sandbox_lib::setup_panic_handler!();
     logger::init();
-    let config = Config::load();
-    run(cli(&config), config);
+    run(cli(), Config::load());
 }
