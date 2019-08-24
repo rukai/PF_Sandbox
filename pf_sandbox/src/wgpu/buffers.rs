@@ -295,7 +295,7 @@ impl Buffers {
             4,  5,  6,
             7,  6,  5,
             8,  9,  10,
-            11, 10, 13,
+            11, 10, 9,
         ];
 
         Buffers::new(device, &vertices, &indices)

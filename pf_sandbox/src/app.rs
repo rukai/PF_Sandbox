@@ -19,19 +19,19 @@ use crate::game::{Game, GameState, GameSetup, PlayerSetup};
 use crate::input::Input;
 use crate::menu::{Menu, MenuState, ResumeMenu};
 
-use winit::Event;
+use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
 use libusb::Context;
 use std::time::{Duration, Instant};
 
 #[allow(unused)] // Needed for headless build
 struct OsInput {
-    input: WinitInputHelper,
-    rx: Receiver<Event>
+    input: WinitInputHelper<()>,
+    rx: Receiver<Event<()>>
 }
 
 impl OsInput {
-    fn new() -> (OsInput, Sender<Event>) {
+    fn new() -> (OsInput, Sender<Event<()>>) {
         let input = WinitInputHelper::new();
         let (tx, rx) = mpsc::channel();
         let os_input = OsInput { input, rx };
@@ -39,11 +39,12 @@ impl OsInput {
     }
 
     fn step(&mut self) {
-        let mut events = vec!();
         while let Ok(event) = self.rx.try_recv() {
-            events.push(event);
+            self.input.update(event); // returned bool is useless as we filter out EventsCleared
         }
-        self.input.update_from_vec(events);
+
+        // force the WinitInputHelper to process the received events
+        self.input.update(Event::EventsCleared);
     }
 }
 

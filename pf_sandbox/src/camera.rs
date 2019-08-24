@@ -2,7 +2,7 @@ use pf_sandbox_lib::fighter::Fighter;
 use pf_sandbox_lib::stage::Stage;
 use crate::player::Player;
 
-use winit::VirtualKeyCode;
+use winit::event::VirtualKeyCode;
 use winit_input_helper::Camera as CameraWinitInputHelper;
 use winit_input_helper::WinitInputHelper;
 use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
@@ -37,7 +37,7 @@ impl Camera {
         }
     }
 
-    pub fn update_os_input(&mut self, os_input: &WinitInputHelper) {
+    pub fn update_os_input(&mut self, os_input: &WinitInputHelper<()>) {
         // set manual/automatic camera control
         if os_input.mouse_pressed(2) || os_input.scroll_diff() != 0.0 {
             self.state = CameraState::Manual;
@@ -59,7 +59,7 @@ impl Camera {
         }
     }
 
-    pub fn update(&mut self, os_input: &WinitInputHelper, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage) {
+    pub fn update(&mut self, os_input: &WinitInputHelper<()>, players: &[Player], fighters: &KeyedContextVec<Fighter>, stage: &Stage) {
         if let CameraState::Auto = self.state {
             if let Some((width, height)) = os_input.resolution() {
                 self.aspect_ratio = width as f32 / height as f32;

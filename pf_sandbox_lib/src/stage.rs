@@ -3,7 +3,7 @@ use winit_input_helper::WinitInputHelper;
 use crate::json_upgrade::engine_version;
 
 use treeflection::{Node, NodeRunner, NodeToken, ContextVec};
-use winit::VirtualKeyCode;
+use winit::event::VirtualKeyCode;
 
 #[derive(Clone, Serialize, Deserialize, Node)]
 pub struct Stage {
@@ -366,7 +366,7 @@ pub struct DebugStage {
 }
 
 impl DebugStage {
-    pub fn step(&mut self, os_input: &WinitInputHelper) {
+    pub fn step(&mut self, os_input: &WinitInputHelper<()>) {
         if os_input.key_pressed(VirtualKeyCode::F1) {
             self.blast = !self.blast;
         }

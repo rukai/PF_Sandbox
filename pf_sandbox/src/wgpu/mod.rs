@@ -28,20 +28,18 @@ use rand::{Rng, SeedableRng};
 use wgpu::{Device, Surface, SwapChain, BindGroup, BindGroupLayout, RenderPipeline, RenderPass, TextureView};
 use wgpu_glyph::{Section, GlyphBrush, GlyphBrushBuilder, FontId, Scale as GlyphScale};
 
-use winit::{
-    Event,
-    EventsLoop,
-    Window,
-    WindowEvent,
-};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::Window;
+use winit::event::{Event, WindowEvent};
+use winit::window::Fullscreen;
+use raw_window_handle::HasRawWindowHandle as _;
 
 pub struct WgpuGraphics {
     package:           Option<Package>,
     glyph_brush:       GlyphBrush<'static, ()>,
     hack_font_id:      FontId,
     window:            Window,
-    event_loop:        EventsLoop,
-    os_input_tx:       Sender<Event>,
+    os_input_tx:       Sender<Event<()>>,
     render_rx:         Receiver<GraphicsMessage>,
     device:            Device,
     surface:           Surface,
@@ -59,44 +57,44 @@ pub struct WgpuGraphics {
 const SAMPLE_COUNT: u32 = 4;
 
 impl WgpuGraphics {
-    pub fn init(os_input_tx: Sender<Event>, device_name: Option<String>) -> Sender<GraphicsMessage> {
+    pub fn init(os_input_tx: Sender<Event<()>>, device_name: Option<String>) -> Sender<GraphicsMessage> {
         let (render_tx, render_rx) = channel();
 
         thread::spawn(move || {
-            let mut graphics = WgpuGraphics::new(os_input_tx, render_rx, device_name);
-            graphics.run();
+            let event_loop = EventLoop::new();
+            let mut graphics = WgpuGraphics::new(&event_loop, os_input_tx, render_rx, device_name);
+            event_loop.run(move |event, _, control_flow| {
+                graphics.update(event, control_flow);
+            });
         });
         render_tx
     }
 
-    fn new(os_input_tx: Sender<Event>, render_rx: Receiver<GraphicsMessage>, _device_name: Option<String>) -> WgpuGraphics {
-        let event_loop = EventsLoop::new();
-
+    fn new(event_loop: &EventLoop<()>, os_input_tx: Sender<Event<()>>, render_rx: Receiver<GraphicsMessage>, _device_name: Option<String>) -> WgpuGraphics {
         let (window, instance, size, surface) = {
             let instance = wgpu::Instance::new();
 
             let window = Window::new(&event_loop).unwrap();
             window.set_title("PF Sandbox");
             let size = window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(window.get_hidpi_factor());
+                .inner_size()
+                .to_physical(window.hidpi_factor());
 
-            let surface = instance.create_surface(&window);
+            let surface = instance.create_surface(window.raw_window_handle());
 
             (window, instance, size, surface)
         };
 
-        let adapter = instance.get_adapter(Some(&wgpu::RequestAdapterOptions {
+        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::LowPower,
-        }));
+        });
 
-        let mut device = adapter.request_device(Some(&wgpu::DeviceDescriptor {
+        let mut device = adapter.request_device(&wgpu::DeviceDescriptor {
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
             limits: wgpu::Limits::default(),
-        }));
+        });
 
         let surface_vs = vk_shader_macros::include_glsl!("src/shaders/surface-vertex.glsl", kind: vert);
         let surface_vs_module = device.create_shader_module(surface_vs);
@@ -108,10 +106,7 @@ impl WgpuGraphics {
             wgpu::BindGroupLayoutBinding {
                 binding:    0,
                 visibility: wgpu::ShaderStage::all(),
-                ty:         wgpu::BindingType::UniformBuffer,
-                dynamic: false,
-                multisampled: false,
-                texture_dimension: wgpu::TextureViewDimension::D2,
+                ty: wgpu::BindingType::UniformBuffer { dynamic: false },
             }
         ] });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -249,7 +244,6 @@ impl WgpuGraphics {
             glyph_brush,
             hack_font_id,
             window,
-            event_loop,
             os_input_tx,
             render_rx,
             surface,
@@ -266,36 +260,38 @@ impl WgpuGraphics {
         }
     }
 
-    fn run(&mut self) {
-        loop {
-            {
+    fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
+        match event {
+            Event::EventsCleared => {
                 let frame_start = Instant::now();
+
+                if self.force_send_window_events() {
+                    *control_flow = ControlFlow::Exit;
+                }
+
 
                 // get the most recent render
                 let mut render = if let Ok(message) = self.render_rx.recv() {
                     self.read_message(message)
                 } else {
+                    *control_flow = ControlFlow::Exit;
                     return;
                 };
                 while let Ok(message) = self.render_rx.try_recv() {
                     render = self.read_message(message);
                 }
 
-                // MS Windows removes the window immediately on close before the process ends
-                if let Some(resolution) = self.window.get_inner_size() {
-                    let resolution: (u32, u32) = resolution.to_physical(self.window.get_hidpi_factor()).into();
-                    self.window_resize(resolution.0, resolution.1);
-                }
-                else {
-                    return;
-                }
+                let resolution: (u32, u32) = self.window.inner_size()
+                    .to_physical(self.window.hidpi_factor())
+                    .into();
+                self.window_resize(resolution.0, resolution.1);
 
                 self.render(render);
                 self.frame_durations.push(frame_start.elapsed());
             }
-
-            if !self.handle_events() {
-                return;
+            Event::NewEvents (_) => { }
+            _ => {
+                self.os_input_tx.send(event).ok();
             }
         }
     }
@@ -353,10 +349,11 @@ impl WgpuGraphics {
         if self.prev_fullscreen.is_none() {
             self.prev_fullscreen = Some(!render.fullscreen); // force set fullscreen state on first update
         }
-        if render.fullscreen != self.prev_fullscreen.unwrap() { // Need to avoid needlessly recalling set_fullscreen(Some(..)) or it causes FPS drops on at least X11
+        if render.fullscreen != self.prev_fullscreen.unwrap() { // Avoid needlessly recalling set_fullscreen(Some(..)) to avoid FPS drops on at least X11
             if render.fullscreen {
-                let monitor = self.window.get_current_monitor();
-                self.window.set_fullscreen(Some(monitor));
+                let monitor = self.window.current_monitor();
+                // TODO: Investigate exclusive fullscreen
+                self.window.set_fullscreen(Some(Fullscreen::Borderless(monitor)));
             }
             else {
                 self.window.set_fullscreen(None);
@@ -374,7 +371,7 @@ impl WgpuGraphics {
         } else {
             false
         };
-        self.window.hide_cursor(render.fullscreen && !in_game_paused);
+        self.window.set_cursor_visible(!render.fullscreen || in_game_paused);
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         let mut swap_chain = self.wsd.swap_chain.take().unwrap();
@@ -409,7 +406,7 @@ impl WgpuGraphics {
 
             self.glyph_brush.draw_queued(&mut self.device, &mut encoder, &frame.view, self.width, self.height).unwrap();
 
-            self.device.get_queue().submit(&[encoder.finish(None)]);
+            self.device.get_queue().submit(&[encoder.finish()]);
         }
         self.wsd.swap_chain = Some(swap_chain);
     }
@@ -1451,38 +1448,28 @@ impl WgpuGraphics {
         self.width as f32 / self.height as f32
     }
 
-    /// returns true iff succeeds
-    fn handle_events(&mut self) -> bool {
-        // We need to force send the resolution and dpi every frame because OsInput may receive the normal events while it isn't listening for them.
-        if let Some(resolution) = self.window.get_inner_size() {
-            // force send the current resolution
-            let event = Event::WindowEvent {
-                window_id: self.window.id(),
-                event: WindowEvent::Resized(resolution)
-            };
+    /// returns true iff fails
+    fn force_send_window_events(&mut self) -> bool {
+        // We need to force send the resolution and dpi every frame because WinitInputHelper may receive the normal events while it isn't listening for them.
+        let event = Event::WindowEvent {
+            window_id: self.window.id(),
+            event: WindowEvent::Resized(self.window.inner_size())
+        };
 
-            if let Err(_) = self.os_input_tx.send(event) {
-                return false;
-            }
-        } else {
-            // MS Windows removes the window immediately on close before the process ends
-            return false;
+        if let Err(_) = self.os_input_tx.send(event) {
+            return true;
         }
 
         // force send the current dpi
         let event = Event::WindowEvent {
             window_id: self.window.id(),
-            event: WindowEvent::HiDpiFactorChanged(self.window.get_hidpi_factor())
+            event: WindowEvent::HiDpiFactorChanged(self.window.hidpi_factor())
         };
         if let Err(_) = self.os_input_tx.send(event) {
-            return false;
+            return true;
         }
 
-        let os_input_tx = self.os_input_tx.clone();
-        self.event_loop.poll_events(|event| {
-            os_input_tx.send(event).ok();
-        });
-        true
+        false
     }
 }
 
@@ -1515,7 +1502,7 @@ impl WindowSizeDependent {
             format: wgpu::TextureFormat::Bgra8Unorm,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         };
-        let multisampled_framebuffer = device.create_texture(multisampled_frame_descriptor).create_view(None);
+        let multisampled_framebuffer = device.create_texture(multisampled_frame_descriptor).create_default_view();
 
         let depth_stencil_descriptor = &wgpu::TextureDescriptor {
             size: wgpu::Extent3d { width, height, depth: 1 },
@@ -1526,7 +1513,7 @@ impl WindowSizeDependent {
             format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         };
-        let depth_stencil = device.create_texture(depth_stencil_descriptor).create_view(None);
+        let depth_stencil = device.create_texture(depth_stencil_descriptor).create_default_view();
 
         WindowSizeDependent {
             swap_chain,

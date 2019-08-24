@@ -15,7 +15,7 @@ use treeflection::{Node, NodeRunner, NodeToken, KeyedContextVec};
 use rand::Rng;
 use rand_chacha::ChaChaRng;
 use num_traits::{FromPrimitive, ToPrimitive};
-use winit::VirtualKeyCode;
+use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
 use std::f32;
@@ -2933,7 +2933,7 @@ pub struct DebugPlayer {
 }
 
 impl DebugPlayer {
-    pub fn step(&mut self, os_input: &WinitInputHelper) {
+    pub fn step(&mut self, os_input: &WinitInputHelper<()>) {
         if os_input.key_pressed(VirtualKeyCode::F1) {
             self.physics = !self.physics;
         }
