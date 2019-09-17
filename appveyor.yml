@@ -8,11 +8,12 @@ image: Visual Studio 2017
 
 install:
   # setup ssh keys
-  - nuget install secure-file -ExcludeVersion
-  - secure-file\tools\secure-file -decrypt ssh-keys-appveyor.zip.enc -secret %ssh-keys-secret%
-  - 7z x ssh-keys-appveyor.zip
-  - rm -r C:/Users/appveyor/.ssh
-  - mv .ssh C:/Users/appveyor/
+  # commented out as website is not running for now
+  #- nuget install secure-file -ExcludeVersion
+  #- secure-file\tools\secure-file -decrypt ssh-keys-appveyor.zip.enc -secret %ssh-keys-secret%
+  #- 7z x ssh-keys-appveyor.zip
+  #- rm -r C:/Users/appveyor/.ssh
+  #- mv .ssh C:/Users/appveyor/
   # setup rust
   - curl -sSf -o rustup-init.exe https://win.rustup.rs/
   - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
@@ -36,28 +37,29 @@ test_script:
   - set PKG_CONFIG_ALLOW_CROSS=1
   - cargo test --release --all --target x86_64-pc-windows-gnu
   - cargo build --release --all --target x86_64-pc-windows-gnu
-  - mkdir pf
-  - move target\x86_64-pc-windows-gnu\release\pf_sandbox.exe pf
-  - move target\x86_64-pc-windows-gnu\release\pf_tas.exe pf
-  - move target\x86_64-pc-windows-gnu\release\pf_cli.exe pf
-  - move target\x86_64-pc-windows-gnu\release\pf_map_controllers.exe pf
-  - move target\x86_64-pc-windows-gnu\release\panic_handler.exe pf
-  - copy C:\msys64\mingw64\bin\libcairo-2.dll pf
-  - copy C:\msys64\mingw64\bin\libcairo-gobject-2.dll pf
-  - copy C:\msys64\mingw64\bin\libepoxy-0.dll pf
-  - copy C:\msys64\mingw64\bin\libfribidi-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgdk-3-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgdk_pixbuf-2.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgio-2.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libglib-2.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgmodule-2.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgobject-2.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libgtk-3-0.dll pf
-  - copy C:\msys64\mingw64\bin\libintl-8.dll pf
-  - copy C:\msys64\mingw64\bin\libpango-1.0-0.dll pf
-  - copy C:\msys64\mingw64\bin\libusb-1.0.dll pf
-  - 7z a pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip pf
-  - echo put pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip /home/rubic/PF_Sandbox_Website/builds/ | sftp rubic@pfsandbox.net
+  # commented out as website is not running for now
+  #- mkdir pf
+  #- move target\x86_64-pc-windows-gnu\release\pf_sandbox.exe pf
+  #- move target\x86_64-pc-windows-gnu\release\pf_tas.exe pf
+  #- move target\x86_64-pc-windows-gnu\release\pf_cli.exe pf
+  #- move target\x86_64-pc-windows-gnu\release\pf_map_controllers.exe pf
+  #- move target\x86_64-pc-windows-gnu\release\panic_handler.exe pf
+  #- copy C:\msys64\mingw64\bin\libcairo-2.dll pf
+  #- copy C:\msys64\mingw64\bin\libcairo-gobject-2.dll pf
+  #- copy C:\msys64\mingw64\bin\libepoxy-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libfribidi-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libgdk-3-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libgdk_pixbuf-2.0-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libgio-2.0-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libglib-2.0-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libgmodule-2.0-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libgobject-2.0-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libgtk-3-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libintl-8.dll pf
+  #- copy C:\msys64\mingw64\bin\libpango-1.0-0.dll pf
+  #- copy C:\msys64\mingw64\bin\libusb-1.0.dll pf
+  #- 7z a pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip pf
+  #- echo put pfsandbox-%APPVEYOR_REPO_COMMIT:~0,15%-windows.zip /home/rubic/PF_Sandbox_Website/builds/ | sftp rubic@pfsandbox.net
 
 skip_tags: true
 #cache:
