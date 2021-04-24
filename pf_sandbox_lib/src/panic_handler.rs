@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::env;
 use std::fs::File;
 use std::io::{Write, Read};
@@ -8,7 +7,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use backtrace::Backtrace;
-use os_type;
 use uuid::Uuid;
 use toml;
 
@@ -41,12 +39,7 @@ pub fn setup(build_version: &'static str, crate_name: &'static str) {
                 None      => (None, None, None)
             };
 
-            let operating_system = if cfg!(windows) {
-                "windows".into()
-            } else {
-                let platform = os_type::current_platform();
-                format!("unix:{:?}", platform.os_type).into()
-            };
+            let operating_system = os_info::get().to_string();
 
             let report = Report {
                 backtrace:     format!("{:#?}", Backtrace::new()),
@@ -114,7 +107,7 @@ pub struct Report {
     pub location_line:    Option<u32>,
     pub location_column:  Option<u32>,
     pub backtrace:        String,
-    pub operating_system: Cow<'static, str>,
+    pub operating_system: String,
 }
 
 impl Report {
